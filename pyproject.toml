@@ -1,0 +1,32 @@
+[project]
+name = "harmonization"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "anywidget>=0.9.18",
+    "chromadb>=1.0.15",
+    "ipykernel>=6.30.0",
+    "itables>=2.4.4",
+    "langchain-chroma>=0.2.5",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.72",
+    "langchain-huggingface>=0.3.1",
+    "pandas>=2.3.1",
+    "pydantic>=2.11.7",
+    "requests>=2.32.4",
+    "sentence-transformers>=5.0.0",
+    "sssom>=0.4.16",
+    "tqdm>=4.67.1",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-v"
+testpaths = [
+    "tests",
+]
+
+[tool.setuptools]
+packages = ["harmonization"]

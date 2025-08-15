@@ -19,7 +19,7 @@ from harmonization.cde import (
     get_similar_documents,
     get_similar_documents_as_string,
 )
-from harmonization.harmonization_approaches.harmonization import (
+from harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,

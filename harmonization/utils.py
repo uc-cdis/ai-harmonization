@@ -9,9 +9,10 @@ import shutil
 import tarfile
 import zipfile
 from csv import DictReader
+from typing import List, Union
+
 import pandas as pd
 import requests
-from typing import List, Union
 from pydantic import BaseModel
 from tqdm import tqdm
 

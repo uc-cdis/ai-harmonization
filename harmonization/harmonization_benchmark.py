@@ -5,7 +5,7 @@ import os
 from collections import Counter
 from typing import Dict
 
-from harmonization.harmonization_approaches.harmonization import (
+from harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,

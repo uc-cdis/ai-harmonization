@@ -10,7 +10,6 @@ repos:
         args: [ '--baseline', '.secrets.baseline' ]
         exclude: |
             (?x)^(
-                poetry.lock|
                 data/.*|
                 datasets/.*|
                 output/.*
@@ -26,3 +25,9 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
+        exclude: |
+            (?x)^(
+                data/.*|
+                datasets/.*|
+                output/.*
+            )$

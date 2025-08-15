@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from typing import List
 
-from harmonization.harmonization_approaches.harmonization import (
+from harmonization.harmonization_approaches.base import (
     SingleHarmonizationSuggestion,
     HarmonizationSuggestions,
 )

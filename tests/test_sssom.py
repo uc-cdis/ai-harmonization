@@ -2,7 +2,7 @@ import pytest
 from typing import List
 from pathlib import Path
 
-from harmonization.harmonization_approaches.harmonization import (
+from harmonization.harmonization_approaches.base import (
     SingleHarmonizationSuggestion,
     harmonization_suggestions_to_sssom,
 )

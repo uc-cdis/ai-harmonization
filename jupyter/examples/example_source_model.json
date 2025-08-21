@@ -1,0 +1,857 @@
+{
+    "nodes": [
+        {
+            "name": "WorkAttempt",
+            "description": "Any task or project that aims to meet a singular objective, such as collecting files from a repository.",
+            "links": [],
+            "required": [
+                "code",
+                "jcoin_study_id"
+            ],
+            "properties": [
+                {
+                    "name": "OpenClosed",
+                    "description": "Represents the type of study being conducted within a WorkAttempt.",
+                    "type": "enum"
+                },
+                {
+                    "name": "req_code",
+                    "description": "A specific piece of work undertaken to meet a single requirement, often defined by the WorkAttempt's purpose.",
+                    "type": "string"
+                },
+                {
+                    "name": "plannedRelease",
+                    "description": "Specifies the desired completion date for a particular piece of work.",
+                    "type": "string"
+                },
+                {
+                    "name": "funding_institution",
+                    "description": "Identifies the organizations that provide funding for a WorkAttempt or researcher.",
+                    "type": "string"
+                },
+                {
+                    "name": "CollaboratorID",
+                    "description": "Identifies the individual responsible for meeting a specific WorkAttempt requirement.",
+                    "type": "string"
+                },
+                {
+                    "name": "last_submitted_work",
+                    "description": "Track the latest piece of work completed or attempted within a specific WorkAttempt.",
+                    "type": "string"
+                },
+                {
+                    "name": "ReleaseableFlag",
+                    "description": "This field determines if a WorkAttempt can be released, controlled by the user.",
+                    "type": "boolean"
+                },
+                {
+                    "name": "task_requirement_project",
+                    "description": "The URL of the dataset's source.",
+                    "type": "string"
+                },
+                {
+                    "name": "jcoin_study_id",
+                    "description": "Unique key for a single requirement that represents a self-contained unit of work.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "SiteAddress",
+            "description": "Describes the regional position of a project, including latitude and longitude values.",
+            "links": [
+                "WorkAttempt"
+            ],
+            "required": [
+                "jcoin_study_id",
+                "location_key"
+            ],
+            "properties": [
+                {
+                    "name": "ProjectLoc",
+                    "description": "A reference to the city where a project takes place.",
+                    "type": "string"
+                },
+                {
+                    "name": "CovidUID",
+                    "description": "The unique identifier for a project's location, based on predefined criteria.",
+                    "type": "integer"
+                },
+                {
+                    "name": "Earthland",
+                    "description": "The largest areas of land on Earth.",
+                    "type": "enum"
+                },
+                {
+                    "name": "region_name",
+                    "description": "A standard ISO code for the country or region.",
+                    "type": "string"
+                },
+                {
+                    "name": "RegionalUnit",
+                    "description": "County",
+                    "type": "string"
+                },
+                {
+                    "name": "iso2",
+                    "description": "A concise two-letter code representing a specific nation.",
+                    "type": "string"
+                },
+                {
+                    "name": "iso_3166_2",
+                    "description": "Two-letter country code plus separator and optional three-character identifier for provinces or states.",
+                    "type": "string"
+                },
+                {
+                    "name": "geo_point",
+                    "description": "Coordinate pair representing a project.",
+                    "type": "string"
+                },
+                {
+                    "name": "geoLong",
+                    "description": "Geographical information contained in the table with the ability to store longitudes or other similar values. This is suitable for all databases that use the 'longitude' named SiteAddress table as this would be consistent across all tables using this term.",
+                    "type": "string"
+                },
+                {
+                    "name": "metro_area",
+                    "description": "A compact geographic area encompassing a major city and its surrounding metropolitan regions.",
+                    "type": "string"
+                },
+                {
+                    "name": "site_identity",
+                    "description": "A standardized term for geographical locations in the database.",
+                    "type": "string"
+                },
+                {
+                    "name": "operOrg",
+                    "description": "The operational status of a project location as recorded in the summary table.",
+                    "type": "enum"
+                },
+                {
+                    "name": "LocationRegion",
+                    "description": "Identifies the region within a project's location that is relevant to its healthcare aspects.",
+                    "type": "string"
+                },
+                {
+                    "name": "jcoin_study_id",
+                    "description": "Unique identifiers for records in the 'WorkAttempt' table that relate via this foreign key to records in the 'summary_location' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "location_key",
+                    "description": "The unique identifier for each project location, used to identify and track locations across multiple projects.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "exploratory_design",
+            "description": "A systematic plan for gathering data through observations and actions.",
+            "links": [
+                "WorkAttempt"
+            ],
+            "required": [
+                "jcoin_study_id",
+                "record_index"
+            ],
+            "properties": [
+                {
+                    "name": "authors",
+                    "description": "Collection of experts contributing to the research.",
+                    "type": "string"
+                },
+                {
+                    "name": "researchBrief",
+                    "description": "A detailed description of the data files and metadata, providing additional context and insights.",
+                    "type": "string"
+                },
+                {
+                    "name": "DataGatheringStatus",
+                    "description": "Informs the analysis team regarding the action taken or taken not been done in the exploratory_design.",
+                    "type": "boolean"
+                },
+                {
+                    "name": "ResearchPublication",
+                    "description": "A description of the exploratory_design's findings and conclusions.",
+                    "type": "string"
+                },
+                {
+                    "name": "PublicationsList",
+                    "description": "The article's publication outlet.",
+                    "type": "string"
+                },
+                {
+                    "name": "study_identifier",
+                    "description": "Pubmed identifier for the article",
+                    "type": "integer"
+                },
+                {
+                    "name": "discoveryOutline",
+                    "description": "A brief summary of a exploratory_design, focusing on its main components, methodology, and results.",
+                    "type": "string"
+                },
+                {
+                    "name": "id_system",
+                    "description": "The DOI serves as a persistent link to a exploratory_design's digital content, facilitating efficient searching and retrieval.",
+                    "type": "string"
+                },
+                {
+                    "name": "StudyReleased",
+                    "description": "The date of publication for the coordinated set of actions and observations.",
+                    "type": "string"
+                },
+                {
+                    "name": "VersionShared",
+                    "description": "The most recent data shared from a exploratory_design, often used for updating research.",
+                    "type": "string"
+                },
+                {
+                    "name": "jcoin_study_id",
+                    "description": "Unique identifiers for records in the 'WorkAttempt' table that relate via this foreign key to records in this 'study' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "record_index",
+                    "description": "A unique identifier used to track exploratory_design records and data.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "patient_case",
+            "description": "Patient and case-related data gathered for a specific experiment or study.",
+            "links": [
+                "WorkAttempt",
+                "exploratory_design"
+            ],
+            "required": [
+                "data_record"
+            ],
+            "properties": [
+                {
+                    "name": "covid_19_status",
+                    "description": "The amount and type of virus present within a patient_case's system, often used to monitor treatment effectiveness.",
+                    "type": "enum"
+                },
+                {
+                    "name": "PatientTransmitter",
+                    "description": "Indicates the patient_case who is carrying or transmitting the infection.",
+                    "type": "array"
+                },
+                {
+                    "name": "dataDescription",
+                    "description": "Patient information, demographics, and data related to their cases.",
+                    "type": "string"
+                },
+                {
+                    "name": "zipResidentialPrefix",
+                    "description": "The part of the patient's or patient_case's zip code that relates to their demographic information.",
+                    "type": "string"
+                },
+                {
+                    "name": "ClassificationKey",
+                    "description": "Designates the specific taxonomic classification of an organism.",
+                    "type": "integer"
+                },
+                {
+                    "name": "dataset_subject_info",
+                    "description": "Information about patient_cases as part of a broader research project.",
+                    "type": "array"
+                },
+                {
+                    "name": "SubjectUID",
+                    "description": "Unique identifier assigned to patient_cases in various studies and experiments.",
+                    "type": "string"
+                },
+                {
+                    "name": "subject_data",
+                    "description": "A comprehensive set of data related to a particular patient_case or research topic.",
+                    "type": "string"
+                },
+                {
+                    "name": "ProjectResult",
+                    "description": "The survival state of the person registered on the protocol.",
+                    "type": "enum"
+                },
+                {
+                    "name": "record_index",
+                    "description": "Dataset identifiers used for patient, case, or subject record linkage.",
+                    "type": "string"
+                },
+                {
+                    "name": "jcoin_study_id",
+                    "description": "Combination of WorkAttempt and subject IDs for efficient lookup.",
+                    "type": "string"
+                },
+                {
+                    "name": "data_record",
+                    "description": "The unique identifier assigned to each patient, case, or patient_case in a dataset or experimental context.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "diseasePresenceIndicators",
+            "description": "Concise results of an investigation into a subject's signs, symptoms, and scientific determination.",
+            "links": [
+                "patient_case"
+            ],
+            "required": [
+                "data_record",
+                "StudyUnique"
+            ],
+            "properties": [
+                {
+                    "name": "RDStatus",
+                    "description": "Is the patient experiencing symptoms of acute respiratory distress?",
+                    "type": "enum"
+                },
+                {
+                    "name": "CdcId2019v2",
+                    "description": "Code used to identify and track COVID-19 data.",
+                    "type": "string"
+                },
+                {
+                    "name": "us_source_case",
+                    "description": "COVID-19 Source Case - U.S.",
+                    "type": "string"
+                },
+                {
+                    "name": "BronchialCld",
+                    "description": "Clinical facts and diseasePresenceIndicatorss related to chronic lung diseases.",
+                    "type": "enum"
+                },
+                {
+                    "name": "HepaticCoexistence",
+                    "description": "Association between hepatic disease and comorbid conditions in patients.",
+                    "type": "boolean"
+                },
+                {
+                    "name": "ClinicalFacts",
+                    "description": "A state of being that describes the presence and nature of disease, condition, or injury.",
+                    "type": "enum"
+                },
+                {
+                    "name": "usCovidCheck",
+                    "description": "Did the patient have direct contact with someone infected in the US?",
+                    "type": "enum"
+                },
+                {
+                    "name": "Observations",
+                    "description": "Information gathered on the subject's medical history and conditions.",
+                    "type": "enum"
+                },
+                {
+                    "name": "hospitalized_status",
+                    "description": "Was the patient hospitalized due to illness or injury?",
+                    "type": "enum"
+                },
+                {
+                    "name": "ICUAdmitted",
+                    "description": "Does the diseasePresenceIndicators data indicate a critical condition that requires intensive care?",
+                    "type": "enum"
+                },
+                {
+                    "name": "isolation_status",
+                    "description": "Detailed results of clinical diseasePresenceIndicatorss.",
+                    "type": "enum"
+                },
+                {
+                    "name": "othrp_obs_data",
+                    "description": "Observations that don't fit into standard measurement domains like social and lifestyle information",
+                    "type": "string"
+                },
+                {
+                    "name": "fact_observation",
+                    "description": "Clinical facts not captured by measurements.",
+                    "type": "string"
+                },
+                {
+                    "name": "PnomaPresentFlag",
+                    "description": "Did pneumonia result from the lymphatic system of the patient?",
+                    "type": "enum"
+                },
+                {
+                    "name": "dateFirstPosTestU",
+                    "description": "Used to verify if the date of the initial confirmed case is not recorded.",
+                    "type": "enum"
+                },
+                {
+                    "name": "outcomeDate",
+                    "description": "The point in time when a program or intervention ends.",
+                    "type": "string"
+                },
+                {
+                    "name": "ClinicalFindings",
+                    "description": "Reporting date",
+                    "type": "string"
+                },
+                {
+                    "name": "Tobacco user",
+                    "description": "Indicates an individual's status as a tobacco user or non-user.",
+                    "type": "enum"
+                },
+                {
+                    "name": "data_record",
+                    "description": "Foreign key referencing unique patient_case IDs in related observation records.",
+                    "type": "string"
+                },
+                {
+                    "name": "StudyUnique",
+                    "description": "A unique identifier for records in this 'diseasePresenceIndicators' table.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "SymptomReportEntry",
+            "description": "A log of all clinical encounters, including dates, times, and nature of visits.",
+            "links": [
+                "diseasePresenceIndicators"
+            ],
+            "required": [
+                "start_dt",
+                "end_dt",
+                "encounter_id",
+                "StudyUnique",
+                "EncounterNum"
+            ],
+            "properties": [
+                {
+                    "name": "PatientMeetingCode",
+                    "description": "Guid used in observation nodes to uniquely identify SymptomReportEntrys.",
+                    "type": "string"
+                },
+                {
+                    "name": "EncounterEnd",
+                    "description": "A standard, abbreviated representation of a patient's SymptomReportEntry end date.",
+                    "type": "string"
+                },
+                {
+                    "name": "cpt_list",
+                    "description": "CPT codes used during clinical SymptomReportEntrys.",
+                    "type": "array"
+                },
+                {
+                    "name": "PatientStartDate",
+                    "description": "A field capturing the starting point of an SymptomReportEntry, providing context for subsequent data entries.",
+                    "type": "string"
+                },
+                {
+                    "name": "StudyUnique",
+                    "description": "Matches records in the 'encounter' table with corresponding records elsewhere in the database.",
+                    "type": "string"
+                },
+                {
+                    "name": "EncounterNum",
+                    "description": "A one-of-a-kind code assigned to each patient SymptomReportEntry, enabling efficient tracking of medical history and treatment plans.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "sample",
+            "description": "Used for testing, diagnostic, propagation, treatment or research purposes, including samples obtained from living organisms, halting of all life functions.",
+            "links": [
+                "WorkAttempt",
+                "exploratory_design",
+                "patient_case",
+                "diseasePresenceIndicators",
+                "SymptomReportEntry"
+            ],
+            "required": [
+                "specimenPart"
+            ],
+            "properties": [
+                {
+                    "name": "CellGrowthEquipment",
+                    "description": "Equipment used to culture and store biological materials, such as cells and tissues.",
+                    "type": "string"
+                },
+                {
+                    "name": "PureCellSample",
+                    "description": "A material sample that has been optimized for consistency and quality in testing or research applications.",
+                    "type": "string"
+                },
+                {
+                    "name": "CellCount",
+                    "description": "A numerical representation of the density of cultured cells in one container.",
+                    "type": "integer"
+                },
+                {
+                    "name": "specimenSample",
+                    "description": "This field contains a description of the sample. The information provided here can include details about the sample's composition and origin.",
+                    "type": "string"
+                },
+                {
+                    "name": "ContinentOfOrigin",
+                    "description": "A material sample obtained from a biological entity for various purposes.",
+                    "type": "string"
+                },
+                {
+                    "name": "SamplingUnit",
+                    "description": "A sample taken from a living organism or biological object for research purposes.",
+                    "type": "string"
+                },
+                {
+                    "name": "eastWestGeoLocation",
+                    "description": "Geographic coordinates representing the county side of the sample's location.",
+                    "type": "string"
+                },
+                {
+                    "name": "ResearchMaterial",
+                    "description": "The taxonomic level Family.",
+                    "type": "string"
+                },
+                {
+                    "name": "genetic_sample",
+                    "description": "Genetic Sample ID. Description of sample.",
+                    "type": "string"
+                },
+                {
+                    "name": "OrganicAge",
+                    "description": "The age of the sample, considering its origin and composition.",
+                    "type": "integer"
+                },
+                {
+                    "name": "BiospecimenTravelHistory",
+                    "description": "Countries visited by the host during disease exposure.",
+                    "type": "string"
+                },
+                {
+                    "name": "sample_characterization",
+                    "description": "Refers to the part of the original specimen taken for testing or research purposes.",
+                    "type": "enum"
+                },
+                {
+                    "name": "specimen_origin",
+                    "description": "Any material sample taken from a biological entity for testing, diagnostic, propagation, treatment or research purposes.",
+                    "type": "string"
+                },
+                {
+                    "name": "sampleTypeDesc",
+                    "description": "Characterizes the current stored material type of the sample at LDACC.",
+                    "type": "enum"
+                },
+                {
+                    "name": "data_record",
+                    "description": "Identifies any material sample used for testing, diagnostic, propagation, treatment, or research purposes.",
+                    "type": "string"
+                },
+                {
+                    "name": "StudyUnique",
+                    "description": "Unique identifiers for records in the 'diseasePresenceIndicators' table that relate via this foreign key to records in this 'sample' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "record_index",
+                    "description": "Unique identifiers for records in the 'exploratory_design' table that relate via this foreign key to records in this 'sample' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "jcoin_study_id",
+                    "description": "Any material sample taken for diagnostic, propagation, treatment, or research purposes.",
+                    "type": "string"
+                },
+                {
+                    "name": "EncounterNum",
+                    "description": "Unique reference for a biospecimen used in testing, diagnostics, or research.",
+                    "type": "string"
+                },
+                {
+                    "name": "specimenPart",
+                    "description": "A unique identifier for each biological or material sample in the database.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "virus_genome",
+            "description": "Central repository for nucleotide sequencing data.",
+            "links": [
+                "exploratory_design",
+                "sample"
+            ],
+            "required": [
+                "VirusId"
+            ],
+            "properties": [
+                {
+                    "name": "accession",
+                    "description": "SRA Run accession in the form of SRR######## (ERR or DRR for INSDC partners).",
+                    "type": "string"
+                },
+                {
+                    "name": "genomicFileHub",
+                    "description": "The source of the virus genome.",
+                    "type": "enum"
+                },
+                {
+                    "name": "sourceLocations",
+                    "description": "Points of access for downloading virus genomic data files.",
+                    "type": "array"
+                },
+                {
+                    "name": "GenomeDataStart",
+                    "description": "The data file containing the virus genomic files was first published.",
+                    "type": "array"
+                },
+                {
+                    "name": "InsDcVirusAlias",
+                    "description": "Alias of the INSDC partner used in the virus genome data.",
+                    "type": "string"
+                },
+                {
+                    "name": "genome_data_file",
+                    "description": "A collection of databases for storing viral sequence information.",
+                    "type": "string"
+                },
+                {
+                    "name": "mbases",
+                    "description": "The number of mega bases in the SRA runs.",
+                    "type": "integer"
+                },
+                {
+                    "name": "platform",
+                    "description": "A collection of genomic files from viral genomes sequenced using Illumina platforms.",
+                    "type": "string"
+                },
+                {
+                    "name": "ViralGenomicsData",
+                    "description": "A collection of virus files, including their genomic contents and characteristics, used for further research and analysis.",
+                    "type": "string"
+                },
+                {
+                    "name": "specimenPart",
+                    "description": "Foreign key field referencing virus genomic data.",
+                    "type": "string"
+                },
+                {
+                    "name": "record_index",
+                    "description": "A unique identifier for virus genomic records in the 'virus_genome' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "VirusId",
+                    "description": "A unique identifier for every record in the virus_genome table, making it simple to track and manage vast amounts of genomic data.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "SequenceDatabaseEntry",
+            "description": "Provides details on the viral genome, including its size, composition, and characteristics.",
+            "links": [
+                "SiteAddress",
+                "exploratory_design",
+                "sample",
+                "virus_genome"
+            ],
+            "required": [
+                "md5sum",
+                "data_type",
+                "SeqFileNum"
+            ],
+            "properties": [
+                {
+                    "name": "SeqDatabaseCen",
+                    "description": "Virus sequencing research facility",
+                    "type": "string"
+                },
+                {
+                    "name": "PublicUseOnly",
+                    "description": "Description of access level for virus sequence data.",
+                    "type": "string"
+                },
+                {
+                    "name": "file_content_type",
+                    "description": "Data type information for files of viral sequence data.",
+                    "type": "enum"
+                },
+                {
+                    "name": "datastore_provider",
+                    "description": "Stores information about the websites or servers hosting sequence files related to viruses.",
+                    "type": "array"
+                },
+                {
+                    "name": "data_source_id",
+                    "description": "Source identifier for the sample sequence data.",
+                    "type": "string"
+                },
+                {
+                    "name": "insdc_seq_rel_date",
+                    "description": "The launch date of the database table containing virus sequence files, marked as publicly accessible.",
+                    "type": "array"
+                },
+                {
+                    "name": "GenomeData",
+                    "description": "Files containing viral sequence information.",
+                    "type": "string"
+                },
+                {
+                    "name": "library_source",
+                    "description": "Describes the library type used to generate the virus sequence files.",
+                    "type": "enum"
+                },
+                {
+                    "name": "RandomViralSeq",
+                    "description": "Describes the type of PCR used for amplifying selected viral sequences.",
+                    "type": "string"
+                },
+                {
+                    "name": "sequenceFileSource",
+                    "description": "This variable specifies the origin of the sequence data stored in the 'SequenceDatabaseEntry' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "SRARunData",
+                    "description": "Number of mega bytes of data in the SRA Run.",
+                    "type": "integer"
+                },
+                {
+                    "name": "digitalFingerPrint",
+                    "description": "The 128-bit hash value expressed as a 32 digit hexadecimal number used as a file's digital fingerprint.",
+                    "type": "string"
+                },
+                {
+                    "name": "GlobalPangolin",
+                    "description": "Comparative analysis of pangolin lineage phylogenetic relationships in viral data sets.",
+                    "type": "string"
+                },
+                {
+                    "name": "sequencing_eqt",
+                    "description": "Sequencing equipment or tool used in the lab.",
+                    "type": "string"
+                },
+                {
+                    "name": "InfectorDate",
+                    "description": "The day when the biological threat posed by the virus sequence data became apparent to the general public.",
+                    "type": "string"
+                },
+                {
+                    "name": "specimenPart",
+                    "description": "Sequence ID to Sample ID mapping, used to link viral sequences with their corresponding records in the 'sample' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "VirusId",
+                    "description": "References between virus genomes and their respective sequence data.",
+                    "type": "string"
+                },
+                {
+                    "name": "record_index",
+                    "description": "Unique identifiers for records in the 'sequence' table that relate via this foreign key to records in this 'exploratory_design' table.",
+                    "type": "string"
+                },
+                {
+                    "name": "location_key",
+                    "description": "Foreign key referencing the 'virus_sequence' table, establishing a link with 'SiteAddress' records.",
+                    "type": "string"
+                },
+                {
+                    "name": "SeqFileNum",
+                    "description": "A sequential number assigned to virus sequence files in the 'SequenceDatabaseEntry' table.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "KmerTaxonomy",
+            "description": "AnalysisResults",
+            "links": [
+                "SequenceDatabaseEntry"
+            ],
+            "required": [
+                "data_format",
+                "SeqFileNum",
+                "kmer_result_id"
+            ],
+            "properties": [
+                {
+                    "name": "accession_number",
+                    "description": "Shortened version of the full taxonomy ID.",
+                    "type": "string"
+                },
+                {
+                    "name": "RunAnalysis",
+                    "description": "Format for storing sequence data in the database.",
+                    "type": "enum"
+                },
+                {
+                    "name": "SeqFileNum",
+                    "description": "Provides a bridge between virus sequence and taxonomy data, enabling analysis and comparison of related records.",
+                    "type": "string"
+                },
+                {
+                    "name": "kmer_result_id",
+                    "description": "Identifying code for records in the virus sequence run taxonomy table that represent the outcome of kmer-based taxonomic analysis on raw sequencing runs.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "RefSeq_guided_sars",
+            "description": "Detailed assembly data for SARS-CoV-2 refseq guided assemblies. Includes contig information.",
+            "links": [
+                "KmerTaxonomy"
+            ],
+            "required": [
+                "file_size",
+                "md5sum",
+                "kmer_result_id",
+                "ViralSequenceTag"
+            ],
+            "properties": [
+                {
+                    "name": "dataFileSize",
+                    "description": "Represents the size of a specific reference sequence assembly in binary units.",
+                    "type": "integer"
+                },
+                {
+                    "name": "RefseqCheck",
+                    "description": "The 128-bit hash value expressed as a 32 digit hexadecimal number used as a file's digital fingerprint.",
+                    "type": "string"
+                },
+                {
+                    "name": "kmer_result_id",
+                    "description": "Identifiers for virus sequence run taxonomies related to SARS-CoV-2 refseq guided assemblies.",
+                    "type": "string"
+                },
+                {
+                    "name": "ViralSequenceTag",
+                    "description": "Key for identifying viral sequences in the contig table, linked to SARS-CoV-2 reference sequence assemblies and assembly data.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "RapidDataRetrieval",
+            "description": "SARS-CoV-2 Read Align Objects have been created to facilitate more rapid identification of NGS data of interest to the COVID-19 research community. This data type represents a compressed data format for more rapid data retrieval and faciliates data exploration via the pre-assembled contigs.",
+            "links": [
+                "RefSeq_guided_sars"
+            ],
+            "required": [
+                "file_size",
+                "ViralSequenceTag",
+                "DataPointKey"
+            ],
+            "properties": [
+                {
+                    "name": "FileBytes",
+                    "description": "Real-time alignment measurement in bytes to track progress.",
+                    "type": "integer"
+                },
+                {
+                    "name": "ViralSequenceTag",
+                    "description": "Unique identifiers for SARS-CoV-2 Read Align Objects.",
+                    "type": "string"
+                },
+                {
+                    "name": "DataPointKey",
+                    "description": "Coronavirus-specific reference ID for tracking and managing read align objects.",
+                    "type": "string"
+                }
+            ]
+        }
+    ]
+}

@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
+import pandas as pd
 from sssom.parsers import MappingSetDataFrame
 from sssom.writers import write_table
 from sssom_schema import Mapping, MappingSet
@@ -45,10 +46,29 @@ class HarmonizationSuggestions(BaseModel):
 
     suggestions: List[SingleHarmonizationSuggestion]
 
+    def to_dataframe(self) -> pd.DataFrame:
+        return pd.DataFrame([suggestion.__dict__ for suggestion in self.suggestions])
+
+    def to_simlified_dataframe(self) -> pd.DataFrame:
+        data = []
+        for suggestion in self.suggestions:
+            data.append(
+                {
+                    "Original Node.Property": f"{suggestion.source_node}.{suggestion.source_property}",
+                    "Suggested Target Node.Property": f"{suggestion.target_node}.{suggestion.target_property}",
+                    "Similarity": suggestion.similarity,
+                    "Original Description": suggestion.source_description,
+                    "Target Description": suggestion.target_description,
+                }
+            )
+        return pd.DataFrame(data)
+
 
 class HarmonizationApproach(ABC):
     @abstractmethod
-    def get_harmonization_suggestions(self, **kwargs) -> HarmonizationSuggestions:
+    def get_harmonization_suggestions(
+        self, input_source_model, input_target_model, **kwargs
+    ) -> HarmonizationSuggestions:
         """
         Returns HarmonizationSuggestions according to the implementing algorithm.
         """

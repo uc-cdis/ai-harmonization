@@ -8,7 +8,6 @@ from typing import List, Union
 import chromadb
 import requests
 from chromadb.utils.batch_utils import create_batches
-from itables.widget import ITable
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
@@ -423,44 +422,6 @@ def _metadata_func(record: dict, metadata: dict) -> dict:
     metadata["source"] = f"https://cde.nlm.nih.gov/deView?tinyId={record['tinyID']}"
 
     return metadata
-
-
-def get_interactive_table_for_suggestions(
-    suggestions_df, column_for_filtering=1, table_description=None
-):
-    table_description = (
-        table_description
-        or """
-    This table allows you to:
-    1. Filter for each "Original Node.Property"
-    2. Make a selection from the table below
-        (which contains the suggestions based on CDEs for the selected "Original Node.Property")
-    3. Multi-select (a ctrl / cmd click will add and remove items from the selection)
-    """
-    )
-    table = ITable(
-        suggestions_df,
-        select=True,
-        buttons=[
-            {
-                "extend": "colvis",
-                "collectionLayout": "fixed columns",
-                "popoverTitle": "Column visibility control",
-            }
-        ],  # "copyHtml5", "csvHtml5", "excelHtml5"
-        layout={"top1": "searchPanes"},
-        searchPanes={
-            "layout": "columns-1",
-            "cascadePanes": True,
-            "columns": [column_for_filtering],
-        },
-        # showIndex=False,
-        columnDefs=[{"className": "dt-left", "targets": "_all"}],
-        # classes="display nowrap table_with_monospace_font",
-        allow_html=True,
-    )
-    print(table_description)
-    return table
 
 
 EXAMPLE_AI_MODEL_OUTPUT_JSON = json.loads(

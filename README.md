@@ -111,10 +111,18 @@ uv sync
 uv pip install -e .
 ```
 
-## Tests
+### Tests
 
 ```
 uv run pytest tests/
 ```
 
 > Note: Tests are fairly minimal at the moment
+
+### Other
+
+If for some reason you need to run detect-secrets separately from pre-commit and you have a ton of data or datasets, you can explicitly exclude those directories (they should already ignored by git):
+
+```
+detect-secrets scan --exclude-files '.*/data/.*|.*/datasets/.*|.*/output/.*'
+```

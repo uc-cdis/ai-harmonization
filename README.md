@@ -2,9 +2,13 @@
 
 This contains code and related artifacts for powering an AI-assisted data model harmonization tool. It also contains the infrastructure for abstracting approaches, benchmarking them, and generating training data.
 
-## Demo Usage
+## Usage
 
-See `jupyter` folder for notebooks utilizing this code:
+### **AI-Assisted Data Curation Toolkit**
+
+- **[Demo](./jupyter/ai_assisted_data_curation.ipynb)**
+
+### Harmonization Benchmarking and AI Training
 
 - [Example of Evaluating a Harmonization Approach](./jupyter/harmonization_approach_evaluation.ipynb)
 - [Example Creation of a Benchmark for Evaluation](./jupyter/harmonization_benchmark_creation.ipynb)

@@ -1,5 +1,15 @@
+import logging
+
 import torch
 from transformers import AutoTokenizer, AutoModelForImageTextToText
+
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from harmonization.harmonization_approaches.base import (
+    HarmonizationApproach,
+    HarmonizationSuggestions,
+    SingleHarmonizationSuggestion,
+)
 
 
 class SimilaritySearchInMedgemma(HarmonizationApproach):
@@ -7,12 +17,12 @@ class SimilaritySearchInMedgemma(HarmonizationApproach):
     def __init__(
         self,
         model_name: str = "google/medgemma-4b-pt",
-        input_target_model_type: str = "gen3",
+        target_model_type: str = "gen3",
         embedding_function: HuggingFaceEmbeddings = None,
     ):
         super().__init__()
 
-        if input_target_model_type == "gen3":
+        if target_model_type == "gen3":
             logging.info(f"Treating input target as type: 'gen3'")
         else:
             raise NotImplementedError(
@@ -30,10 +40,14 @@ class SimilaritySearchInMedgemma(HarmonizationApproach):
         self.calculate_cosine_similarity = torch.nn.CosineSimilarity(dim=0)
 
     def get_harmonization_suggestions(
-        self, source_model, target_model, score_threshold=0.5, k=4, **kwargs
+        self, input_source_model, input_target_model, score_threshold=0.5, k=4, **kwargs
     ):
         suggestions_for_output_model = self._get_suggestions_for_ai_model_output(
-            source_model, target_model, score_threshold=score_threshold, k=k, **kwargs
+            input_source_model,
+            input_target_model,
+            score_threshold=score_threshold,
+            k=k,
+            **kwargs,
         )
         # WIP from here
         suggestions = []
@@ -92,7 +106,7 @@ class SimilaritySearchInMedgemma(HarmonizationApproach):
             return cls_embedding
 
     def _get_suggestions_for_ai_model_output(
-        self, source_model, target_model, score_threshold=0.5**kwargs
+        self, source_model, target_model, score_threshold=0.5, **kwargs
     ):
         suggestions_for_output_model = {}
         source_node_property_desc_list = self._get_node_property_desc_list(source_model)

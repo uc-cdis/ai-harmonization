@@ -78,27 +78,38 @@ class SimilaritySearchInMedgemma(HarmonizationApproach):
                 suggestions.append(single_suggestion)
         return HarmonizationSuggestions(suggestions=suggestions)
 
-    def _get_node_property_desc_list(model):
+    def _get_node_property_desc_list(self, model):
+        print("Model:")
+        print(model)
         node_property_desc_list = []
-        for node, node_info in model.items():
-            node_properties = getattr(node_info, "properties", None) or node_info
-            if type(node_properties) == list:
-                node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
-                node_property_desc_list.extend(node_property_desc)
-            elif type(node_properties) == dict:
-                for _, node_property in node_info.get("properties", {}).items():
-                    node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
-                    node_property_desc_list.extend(node_property_desc)
-            else:
-                raise Exception(f"Cannot parse node properties. Node failed:/n{node}")
+        for node in model.get("nodes", []):
+            for node_property in node.get("properties", []):
+                node_property_desc = f'{node.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
+                node_property_desc_list.extend([node_property_desc])
+        if not node_property_desc_list:
+            for node, node_info in model.items():
+                node_properties = getattr(node_info, "properties", None) or node_info
+                if type(node_properties) == list:
+                    for node_property in node_properties:
+                        node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
+                        node_property_desc_list.extend([node_property_desc])
+                elif type(node_properties) == dict:
+                    for _, node_property in node_info.get("properties", {}).items():
+                        node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
+                        node_property_desc_list.extend([node_property_desc])
+                else:
+                    raise Exception(
+                        f"Cannot parse node properties. Node failed:/n{node}"
+                    )
+        print(node_property_desc_list)
         return node_property_desc_list
 
-    def _get_cls_embedding(text):
+    def _get_cls_embedding(self, text):
         text_inputs = self.tokenizer(
             text, return_tensors="pt", truncation=True, padding=True
-        ).to(model.device)
+        ).to(self.model.device)
         with torch.no_grad():
-            text_outputs = model(**text_inputs, output_hidden_states=True)
+            text_outputs = self.model(**text_inputs, output_hidden_states=True)
             hidden_states = text_outputs.hidden_states
             final_hidden_state = hidden_states[-1]
             cls_embedding = final_hidden_state.mean(dim=1).squeeze()

@@ -143,7 +143,7 @@ def create_batches(
     """
     Returns batches of provided batch_size from the lists of ids, embeddings, metadatas and documents.
 
-    Mimics chromadb.utils.batch_utils import create_batches behaviour but instead of using api.get_max_batch_size() for the batch creation it uses provided batch_size parameter.
+    Mimics chromadb.utils.batch_utils.create_batches behaviour but instead of using api.get_max_batch_size() for the batch creation it uses provided batch_size parameter.
 
     Args:
       ids (IDs): list of document IDs

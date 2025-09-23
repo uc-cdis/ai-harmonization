@@ -144,27 +144,26 @@ def create_batches(
     Returns batches of provided batch_size from the lists of ids, embeddings, metadatas and documents.
 
     Mimics chromadb.utils.batch_utils import create_batches behaviour but instead of using api.get_max_batch_size() for the batch creation it uses provided batch_size parameter.
-    
+
     Args:
       ids (IDs): list of document IDs
       embeddings ([Embeddings]): optional list of embeddings,
       metadatas ([Metadatas]): optional list of metadatas,
       documents ([Documents]): optional list of documents
+
     Returns:
         List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]]: list of batches
     """
-    _batches: List[
-        Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]
-    ] = []
+    _batches: List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]] = (
+        []
+    )
     if len(ids) > batch_size:
         # create split batches
         for i in range(0, len(ids), batch_size):
             _batches.append(
                 (  # type: ignore
                     ids[i : i + batch_size],
-                    embeddings[i : i + batch_size]
-                    if embeddings
-                    else None,
+                    embeddings[i : i + batch_size] if embeddings else None,
                     metadatas[i : i + batch_size] if metadatas else None,
                     documents[i : i + batch_size] if documents else None,
                 )
@@ -173,7 +172,10 @@ def create_batches(
         _batches.append((ids, embeddings, metadatas, documents))  # type: ignore
     return _batches
 
-def add_documents_to_vectorstore(documents, vectorstore, persistent_client, batch_size=None):
+
+def add_documents_to_vectorstore(
+    documents, vectorstore, persistent_client, batch_size=None
+):
     batch_size = batch_size or persistent_client.get_max_batch_size()
     logging.info(
         "Number of documents that can be inserted at once:",

@@ -29,7 +29,7 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         input_target_model_type: str = "gen3",
         embedding_function=None,
         force_vectorstore_recreation: bool = False,
-        batch_size: int = None
+        batch_size: int = None,
     ):
         super().__init__()
 
@@ -55,7 +55,9 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
 
         try:
             self._add_target_to_vector_database(
-                input_target_model, force_recreation=force_vectorstore_recreation, batch_size=batch_size
+                input_target_model,
+                force_recreation=force_vectorstore_recreation,
+                batch_size=batch_size,
             )
         except ExistingVectorstoreException:
             logging.info("vectorstore already exists, NOT recreating...")

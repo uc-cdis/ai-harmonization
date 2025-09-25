@@ -110,16 +110,23 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
                                         suggested_docs
                                         )
             
-            if llm_suggestion["no_match"]:
-                target_node = "unknown"
-                target_property = "unknown"
-                target_description = "unknown"
+            try:
+                target_node = llm_suggestion["node"]
+            except Exception as e:
+                logging.info(f"Failed to parse target_node for {llm_suggestion}, error: {e}")
+                target_node = "unknown, failed to parse"
+
+            try:
+                target_property = llm_suggestion["property"]
+            except Exception as e:
+                logging.info(f"Failed to parse target_property for {llm_suggestion}, error: {e}")
+                target_property = "unknown, failed to parse"
+
+            try:
+                similarity = float(llm_suggestion["confidence"])
+            except Exception as e:
+                logging.info(f"Failed to parse similarity/confidence for {llm_suggestion}, error: {e}")
                 similarity = 0.0
-            else:
-                target_node = llm_suggestion["best_match"]["node"]
-                target_property = llm_suggestion["best_match"]["property"]
-                target_description = llm_suggestion["best_match"]["description"]
-                similarity = float(llm_suggestion["best_match"]["confidence"])
 
             single_suggestion = SingleHarmonizationSuggestion(
                 source_node=source_node,
@@ -127,7 +134,7 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
                 source_description=source_description,
                 target_node=target_node,
                 target_property=target_property,
-                target_description=target_description,
+                target_description="N/A",
                 similarity=similarity,
             )
             suggestions.append(single_suggestion)
@@ -173,13 +180,13 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
 class BestMatch(BaseModel):
         node: str = Field(..., description="The name of the node")
         property: str = Field(..., description="The name of the property")
-        description: str = Field(..., description="The description of the property")
+        #description: str = Field(..., description="The description of the property")
         confidence: float = Field(..., description="The confidence score")
 
-class MatchResult(BaseModel):
-    no_match: bool = Field(..., description="True if there is no match")
-    reason: str = Field(..., description="Describe the reason for the result")
-    best_match: BestMatch
+#class MatchResult(BaseModel):
+#    no_match: bool = Field(..., description="True if there is no match")
+#    reason: str = Field(..., description="Describe the reason for the result")
+#    best_match: BestMatch
 
 class LLMHelper:
     def __init__(self):
@@ -199,10 +206,11 @@ class LLMHelper:
             max_model_len=2048,
             dtype="float16",             # saves memory vs bfloat16
             max_num_seqs=1,              # how many requests at a time
-            tensor_parallel_size=tensor_parallel_size
+            tensor_parallel_size=tensor_parallel_size,
+            max_num_batched_tokens=2048
             )
 
-    json_schema = MatchResult.model_json_schema()
+    json_schema = BestMatch.model_json_schema()
     guided_decoding_params_json = GuidedDecodingParams(json=json_schema)
     sampling_params_json = SamplingParams(
         guided_decoding=guided_decoding_params_json,
@@ -210,7 +218,7 @@ class LLMHelper:
     )
 
     query_template = """
-Given an INPUT and a few TARGET candidates, choose the best mapping or output no_match=true.
+Given an INPUT and a few TARGET candidates, choose the best mapping.
 
 INPUT:
 Node: {input_node}
@@ -256,6 +264,5 @@ CANDIDATES:
             decision = json.loads(outputs[0].outputs[0].text)
         except Exception as e:
             decision = {"no_match": True, "reason": "Parse error", "best_match": None}
-
         
         return decision

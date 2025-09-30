@@ -103,43 +103,57 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
             source_node = source_node_prop.split(".")[0]
             source_property = ".".join(source_node_prop.split(".")[1:])
 
+            sorted_suggestions_list = self._convert_documents_to_sorted_list(suggested_docs)
+
             llm_suggestion = llm_helper.get_decision(
                                         source_node, 
                                         source_property, 
                                         source_description, 
-                                        suggested_docs
+                                        sorted_suggestions_list
                                         )
             
-            try:
-                target_node = llm_suggestion["node"]
-            except Exception as e:
-                logging.info(f"Failed to parse target_node for {llm_suggestion}, error: {e}")
-                target_node = "unknown, failed to parse"
+            if llm_suggestion != None:
+                for i, d in enumerate(sorted_suggestions_list):
+                    if d["node"] == llm_suggestion["node"] and d["property"] == llm_suggestion["property"]:
+                        item = sorted_suggestions_list.pop(i)   # remove from current position
+                        sorted_suggestions_list.insert(0, item) # put at the front
+                        break
 
-            try:
-                target_property = llm_suggestion["property"]
-            except Exception as e:
-                logging.info(f"Failed to parse target_property for {llm_suggestion}, error: {e}")
-                target_property = "unknown, failed to parse"
+            for i, d in enumerate(sorted_suggestions_list, start=1):  # start=1 makes ranking go from 1..n
+                d["ranking"] = i
 
-            try:
-                similarity = float(llm_suggestion["confidence"])
-            except Exception as e:
-                logging.info(f"Failed to parse similarity/confidence for {llm_suggestion}, error: {e}")
-                similarity = 0.0
-
-            single_suggestion = SingleHarmonizationSuggestion(
-                source_node=source_node,
-                source_property=source_property,
-                source_description=source_description,
-                target_node=target_node,
-                target_property=target_property,
-                target_description="N/A",
-                similarity=similarity,
-            )
-            suggestions.append(single_suggestion)
+            for item in sorted_suggestions_list:
+                single_suggestion = SingleHarmonizationSuggestion(
+                    source_node=source_node,
+                    source_property=source_property,
+                    source_description=source_description,
+                    target_node=item["node"],
+                    target_property=item["property"],
+                    target_description=item["description"],
+                    similarity=item["similarity"],
+                    ranking=item["ranking"]
+                )
+                suggestions.append(single_suggestion)
 
         return HarmonizationSuggestions(suggestions=suggestions)
+    
+
+    def _convert_documents_to_sorted_list(self, docs):
+        data = []
+        for single_doc, similarity in docs:
+            text = single_doc.page_content
+
+            node_prop = text.split(": ")[0]
+            description = ":".join(text.split(": ")[1:])
+
+            node = node_prop.split(".")[0]
+            property = ".".join(node_prop.split(".")[1:])
+
+            data.append({"node": node, "property": property, "description": description, "similarity": similarity})
+
+        sorted_data = sorted(data, key=lambda x: x["similarity"], reverse=True)
+        return sorted_data
+
 
     def _get_suggestions_for_ai_model_output(self, input_source_model, **kwargs):
         suggestions_for_output_model = {}
@@ -181,7 +195,7 @@ class BestMatch(BaseModel):
         node: str = Field(..., description="The name of the node")
         property: str = Field(..., description="The name of the property")
         #description: str = Field(..., description="The description of the property")
-        confidence: float = Field(..., description="The confidence score")
+        #confidence: float = Field(..., description="The confidence score")
 
 #class MatchResult(BaseModel):
 #    no_match: bool = Field(..., description="True if there is no match")
@@ -214,11 +228,12 @@ class LLMHelper:
     guided_decoding_params_json = GuidedDecodingParams(json=json_schema)
     sampling_params_json = SamplingParams(
         guided_decoding=guided_decoding_params_json,
-        max_tokens=256
+        max_tokens=256,
+        temperature=0.0
     )
 
     query_template = """
-Given an INPUT and a few TARGET candidates, choose the best mapping.
+You are a helpful schema-matching assistant that outputs in JSON. Given an INPUT and a few target CANDIDATES, choose the best mapping. You have to choose one from the CANDIDATES.
 
 INPUT:
 Node: {input_node}
@@ -227,6 +242,8 @@ Description: {input_description}
 
 CANDIDATES:
 {candidates}
+
+{invalid_note}
 """
     
 
@@ -236,33 +253,45 @@ CANDIDATES:
                      source_node, 
                      source_property, 
                      source_description, 
-                     matches):
-
+                     suggestions,
+                     max_retries: int = 3):
+        
         cand_strs = []
-        for single_suggested_doc, similarity in matches:
-            target_text = single_suggested_doc.page_content
-
-            target_node_prop = target_text.split(": ")[0]
-            target_description = ":".join(target_text.split(": ")[1:])
-
-            target_node = target_node_prop.split(".")[0]
-            target_property = ".".join(target_node_prop.split(".")[1:])
-
+        node_property_pairs = set()
+        for item in suggestions:
+            node_property_pairs.add((item["node"],item["property"]))
             cand_strs.append(
-                f"Node: {target_node}\nProperty: {target_property}\nDescription: {target_description}\nScore: {similarity:.3f}"
+                f"Node: {item["node"]}\nProperty: {item["property"]}\nDescription: {item["description"]}\nScore: {item["similarity"]:.3f}"
             )
         cand_str = "\n\n".join(cand_strs)
+        invalid_answers = []
 
-        query = self.__class__.query_template.format(input_node=source_node, 
-                                      input_property=source_property,
-                                      input_description=source_description,
-                                      candidates=cand_str)
+        for attempt in range(max_retries):
+            invalid_note = ""
+            if invalid_answers:
+                invalid_note = f"Previous invalid answers: {', '.join(invalid_answers)}. Do NOT repeat them."
 
-        outputs = self.llm.generate(query, sampling_params=self.__class__.sampling_params_json)
 
-        try:
-            decision = json.loads(outputs[0].outputs[0].text)
-        except Exception as e:
-            decision = {"no_match": True, "reason": "Parse error", "best_match": None}
-        
-        return decision
+            query = self.__class__.query_template.format(input_node=source_node, 
+                                        input_property=source_property,
+                                        input_description=source_description,
+                                        candidates=cand_str,
+                                        invalid_note=invalid_note)
+            
+            outputs = self.llm.generate(query, sampling_params=self.__class__.sampling_params_json)
+
+            decision = None
+            node_property_pair = None
+            try:
+                decision = json.loads(outputs[0].outputs[0].text)
+                node_property_pair = (decision["node"], decision["property"])
+            except Exception as e:
+                invalid_answers.append(outputs[0].outputs[0].text)
+            
+            if decision and node_property_pair:
+                if node_property_pair in node_property_pairs:
+                    return decision
+                else:
+                    invalid_answers.append(str(decision))
+
+        return None

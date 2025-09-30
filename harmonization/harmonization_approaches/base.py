@@ -39,6 +39,7 @@ class SingleHarmonizationSuggestion(BaseModel):
     target_description: str
     target_additional_metadata: Optional[dict] = None
     similarity: Optional[float] = None
+    ranking: Optional[int] = None
 
 
 class HarmonizationSuggestions(BaseModel):
@@ -61,6 +62,7 @@ class HarmonizationSuggestions(BaseModel):
                     "Similarity": suggestion.similarity,
                     "Original Description": suggestion.source_description,
                     "Target Description": suggestion.target_description,
+                    "Ranking": suggestion.ranking
                 }
             )
         return pd.DataFrame(data)

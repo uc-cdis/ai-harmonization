@@ -11,7 +11,8 @@ This contains code and related artifacts for powering an AI-assisted data model 
 ### Harmonization Benchmarking and AI Training
 
 - [Example of Evaluating a Harmonization Approach](./jupyter/harmonization_approach_evaluation.ipynb)
-- [Example Creation of a Benchmark for Evaluation](./jupyter/harmonization_benchmark_creation.ipynb)
+- [Example Creation of a Synthetic Benchmark for Evaluation](./jupyter/harmonization_synth_benchmark_creation.ipynb)
+- [Example Creation of a Real Benchmark for Evaluation](./jupyter/harmonization_real_benchmark_creation.ipynb)
 - [Example Creation of a Training Data for Harmonization](./jupyter/harmonization_training_data.ipynb)
 
 ## Details

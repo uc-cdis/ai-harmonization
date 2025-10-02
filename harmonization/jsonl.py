@@ -175,7 +175,7 @@ def split_harmonization_jsonl_by_input_target_model(jsonl_path, output_dir):
     with open(jsonl_path, "r", encoding="utf-8") as infile:
         for line in infile:
             row = json.loads(line)
-            key = row["input_target_model"]
+            key = str(row["input_target_model"])
             # Compute SHA256 checksum of the input_target_model string
             checksum = hashlib.sha256(key.encode("utf-8")).hexdigest()
             filename = f"target_model_{checksum}"

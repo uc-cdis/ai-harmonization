@@ -19,8 +19,8 @@ DEFAULT_SSSOM_METADATA: Dict[str, str | dict] = {
         "where 'node' is the original entity/table/class, and 'property' is the attribute/field/column. "
         "For example, 'Subject.name' refers to the 'name' property of the 'Subject' node in the source model."
     ),
-    # "prefix_map": {"EX": "http://example.org/"},
 }
+SSSOM_PREFIX_MAP = {"EX": "http://example.org/"}
 DEFAULT_SSSOM_PREDICATE_ID: str = "skos:relatedMatch"
 DEFAULT_SSSOM_MAPPING_JUSTIFICATION: str = "semapv:UnspecifiedMatching"
 
@@ -33,9 +33,11 @@ class SingleHarmonizationSuggestion(BaseModel):
     source_node: str
     source_property: str
     source_description: str
+    source_additional_metadata: Optional[dict] = None
     target_node: str
     target_property: str
     target_description: str
+    target_additional_metadata: Optional[dict] = None
     similarity: Optional[float] = None
 
 
@@ -86,14 +88,17 @@ class ExampleHarmonizationApproach(HarmonizationApproach):
         """
         Example implementation for demonstration.
         """
+
         suggestions: List[SingleHarmonizationSuggestion] = [
             SingleHarmonizationSuggestion(
                 source_node="source_node_1",
                 source_property="source_property_1",
                 source_description="source_description_1",
+                source_additional_metadata={"type": "string"},
                 target_node="target_node_1",
                 target_property="target_property_1",
                 target_description="target_description_1",
+                target_additional_metadata={"type": "number"},
                 similarity=0.9,
             )
         ]
@@ -104,6 +109,7 @@ def harmonization_suggestions_to_sssom(
     suggestions: List[SingleHarmonizationSuggestion],
     filename: str,
     meta: Optional[dict] = None,
+    exclude_required_comments: bool = False,
 ) -> None:
     """
     Convert a list of harmonization suggestions into a MappingSet and write to a SSSOM TSV file.
@@ -112,6 +118,8 @@ def harmonization_suggestions_to_sssom(
         suggestions: List of SingleHarmonizationSuggestion.
         filename: Output .sssom.tsv file.
         meta: Optional SSSOM MappingSet metadata dictionary. If None, uses DEFAULT_SSSOM_METADATA.
+        exclude_required_comments: Will output a non-standard SSSOM file with no comments. This allows
+            you to create a "clean" TSV which starts with headers and contains only rows after
     """
     meta = meta or DEFAULT_SSSOM_METADATA
     mappings = [
@@ -119,6 +127,12 @@ def harmonization_suggestions_to_sssom(
     ]
     mapping_set = MappingSet(**meta, mappings=mappings)
     write_mappingset_to_sssom(mapping_set, filename)
+
+    if exclude_required_comments:
+        with open(filename, "r") as file:
+            lines = [line for line in file if not line.lstrip().startswith("#")]
+        with open(filename, "w") as file:
+            file.writelines(lines)
 
 
 def suggestion_to_mapping(
@@ -173,6 +187,9 @@ def write_mappingset_to_sssom(
     """
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    mapping_set_df = MappingSetDataFrame.from_mapping_set(mapping_set)
+    mapping_set_df = MappingSetDataFrame.from_mapping_set(
+        mapping_set, converter=SSSOM_PREFIX_MAP
+    )
+    mapping_set_df.clean_prefix_map()
     with open(filename, "w", encoding="utf-8") as output_file:
         write_table(mapping_set_df, output_file)

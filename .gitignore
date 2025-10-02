@@ -4,7 +4,7 @@ data/
 output/
 
 jupyter/*.json
-
+real_benchmarks/
 
 **/*custom_metrics*/*.md
 *custom_metrics*.md

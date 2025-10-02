@@ -359,3 +359,22 @@ def get_gen3_json_schemas_and_templates(
         )
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+
+
+def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, str, str]:
+    """
+    Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
+    and returns a tuple containing the node name, property name, property type, and property description.
+    """
+    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):\s*(.*)|:\s*(.*))$", input_string)
+    if match:
+        node_name = match.group(1)
+        prop_name = match.group(2)
+        if match.group(3):
+            prop_type = match.group(3)
+            prop_desc = match.group(4)
+        else:
+            prop_type = ""
+            prop_desc = match.group(5)
+        return node_name, prop_name, prop_type, prop_desc
+    return "", "", "", ""

@@ -1,4 +1,5 @@
 import logging
+import re
 
 from langchain_huggingface import HuggingFaceEmbeddings
 
@@ -14,6 +15,7 @@ from harmonization.harmonization_approaches.base import (
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,
 )
+from harmonization.utils import get_node_prop_type_desc_from_string
 
 
 class ExistingVectorstoreException(BaseException):
@@ -89,28 +91,35 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         )
         suggestions = []
         for node_property_desc, suggested_docs in suggestions_for_output_model.items():
-            source_node_prop = node_property_desc.split(": ")[0]
-            source_description = ":".join(node_property_desc.split(": ")[1:])
+            source_node_name, source_prop_name, source_prop_type, source_prop_desc = (
+                get_node_prop_type_desc_from_string(node_property_desc)
+            )
 
-            source_node = source_node_prop.split(".")[0]
-            source_property = ".".join(source_node_prop.split(".")[1:])
+            source_additional_metadata = {}
+            source_additional_metadata["type"] = source_prop_type
 
             for single_suggested_doc, similarity in suggested_docs:
                 target_text = single_suggested_doc.page_content
 
-                target_node_prop = target_text.split(": ")[0]
-                target_description = ":".join(target_text.split(": ")[1:])
+                (
+                    target_node_name,
+                    target_prop_name,
+                    target_prop_type,
+                    target_prop_desc,
+                ) = get_node_prop_type_desc_from_string(target_text)
 
-                target_node = target_node_prop.split(".")[0]
-                target_property = ".".join(target_node_prop.split(".")[1:])
+                target_additional_metadata = {}
+                target_additional_metadata["type"] = target_prop_type
 
                 single_suggestion = SingleHarmonizationSuggestion(
-                    source_node=source_node,
-                    source_property=source_property,
-                    source_description=source_description,
-                    target_node=target_node,
-                    target_property=target_property,
-                    target_description=target_description,
+                    source_node=source_node_name,
+                    source_property=source_prop_name,
+                    source_description=source_prop_desc,
+                    source_additional_metadata=source_additional_metadata,
+                    target_node=target_node_name,
+                    target_property=target_prop_name,
+                    target_description=target_prop_desc,
+                    target_additional_metadata=target_additional_metadata,
                     similarity=similarity,
                 )
                 suggestions.append(single_suggestion)

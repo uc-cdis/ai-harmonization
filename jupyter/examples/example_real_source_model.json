@@ -1,0 +1,223 @@
+{
+    "nodes": [
+        {
+            "name": "study_registration_metadata",
+            "description": "Export of the dbGaP FHIR API study registration metadata which provides study-level metadata for a specific PHS ID.",
+            "links": [],
+            "properties": [
+                {
+                    "name": "Accession",
+                    "description": "The accession number of the dbGaP study, which is the phs number prefixed with 'phs' and including the version, consent group, and participant set numbers (e.g., phs004055.v1.p1.c1).",
+                    "type": "string"
+                },
+                {
+                    "name": "c",
+                    "description": "The c number denotes the consent group, which contains data from a set of participants who have all signed the same consent agreement. A study with multiple consent groups will have multiple consent group numbers (e.g., .c1, .c2). Data delivered for a single consent group will have the same Data Use Limitations (DULs).",
+                    "type": "string"
+                },
+                {
+                    "name": "ConsentGroup",
+                    "description": "Text code that indicates data use restrictions (e.g., GRU=general research, HMB=health/biomedical only, DS-X=disease-specific, NPU=non-profit use, IRB=requires ethics approval) per Data Use Ontology (DUO).",
+                    "type": "string"
+                },
+                {
+                    "name:": "p",
+                    "description": "The p number, also known as the 'participant set version', identifies a specific group of participants within a study. The number is incremented when the consent status of subjects in an existing study set changes, but not when new subjects are simply added.",
+                    "type": "string"
+                },
+                {
+                    "name:": "phs",
+                    "description": "The phs ID of the dbGaP study; phs stands for Phenotype Study and indicates that the accession number is for a dbGaP study.",
+                    "type": "string"
+                },
+                {
+                    "name:": "v",
+                    "description": "The v number is the study's version number. This number is incremented when changes are made to existing data or new data is added to a study.",
+                    "type": "string"
+                },
+                {
+                    "name:": "Title",
+                    "description": "The title of the dbGaP study.",
+                    "type": "string"
+                },
+                {
+                    "name": "handle",
+                    "description": "The human-readable ID or handle of the dbGaP study.",
+                    "type": "string"
+                },
+                {
+                    "name": "Description",
+                    "description": "The description of the dbGaP study.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "telemetry_report",
+            "description": "Export of the dbGaP FHIR API subject telemetry report, which provides subject-level metadata for a specific PHS ID.",
+            "links": [
+                "study_registration_metadata"
+            ],
+            "properties": [
+                {
+                    "name": "consent_code",
+                    "description": "The consent code assigned to a subject.",
+                    "type": "string"
+                },
+                {
+                    "name": "dbgap_subject_id",
+                    "description": "The unique identifier for a subject in the context of a dbGaP study.",
+                    "type": "string"
+                },
+                {
+                    "name": "submitted_subject_id",
+                    "description": "The unique identifier for a subject that was originally submitted by the data contributor.",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "derive13",
+            "description": "Data from version 1 of the main study of the Atherosclerosis Risk in Communities (ARIC) study within the BioLINCC repository.",
+            "links": [
+                "telemetry_report"
+            ],
+            "properties": [
+                {
+                    "name": "ID_C",
+                    "description": "The unique identifier for subjects in the ARIC (Atherosclerosis Risk in Communities) study dataset within the BioLINCC repository. The submitted_subject_id in the subject telemetry report.",
+                    "type": "string"
+                },
+                {
+                    "name": "GENDER",
+                    "description": "SEX (from FTRA22)",
+                    "type": "string"
+                },
+                {
+                    "name": "RACEGRP",
+                    "description": "RACE (from FTRA23)",
+                    "type": "string"
+                },
+                {
+                    "name": "BMI01",
+                    "description": "BODY MASS INDEX IN KG/(M*M)",
+                    "type": "number"
+                },
+                {
+                    "name": "CURSMK01",
+                    "description": "Current cigarette smoker",
+                    "type": "number"
+                },
+                {
+                    "name": "EVRSMK01",
+                    "description": "Ever smoked cigarettes",
+                    "type": "number"
+                },
+                {
+                    "name": "FORSMK01",
+                    "description": "Former cigarette smoker",
+                    "type": "string"
+                },
+                {
+                    "name": "CIGT01",
+                    "description": "CIGARETTE SMOKING STATUS",
+                    "type": "number"
+                },
+                {
+                    "name": "PIPE01",
+                    "description": "PIPE SMOKING STATUS",
+                    "type": "number"
+                },
+                {
+                    "name": "CIGR01",
+                    "description": "CIGAR/CIGARILLO SMOKING STATUS",
+                    "type": "number"
+                },
+                {
+                    "name": "CIGTYR01",
+                    "description": "CIGARETTE YEARS OF SMOKING",
+                    "type": "number"
+                },
+                {
+                    "name": "PIPEYR01",
+                    "description": "PIPE YEARS OF SMOKING",
+                    "type": "number"
+                },
+                {
+                    "name": "CIGRYR01",
+                    "description": "CIGAR/CIGARILLO YEARS OF SMOKING",
+                    "type": "number"
+                }
+            ]
+        },
+        {
+            "name": "dmri_ia1",
+            "description": "Data from an ancillary study Diffusion Magnetic Resonance Imaging-1 (dmri-ia1) of the Atherosclerosis Risk in Communities (ARIC) study within the BioLINCC repository.",
+            "links": [
+                "telemetry_report"
+            ],
+            "properties": [
+                {
+                    "name": "ID_C",
+                    "description": "The unique identifier for subjects in the ARIC (Atherosclerosis Risk in Communities) study dataset within the BioLINCC repository. The submitted_subject_id in the subject telemetry report.",
+                    "type": "string"
+                },
+                {
+                    "name": "CURAGE16",
+                    "description": "Age at MRI visit",
+                    "type": "number"
+                },
+                {
+                    "name": "HEIGHT16",
+                    "description": "Height (cm)",
+                    "type": "number"
+                },
+                {
+                    "name": "WEIGHT16",
+                    "description": "Weight (lbs)",
+                    "type": "number"
+                },
+                {
+                    "name": "BMI16",
+                    "description": "BMI (kg/m2)",
+                    "type": "number"
+                },
+                {
+                    "name": "SBP",
+                    "description": "Systolic blood pressure",
+                    "type": "number"
+                },
+                {
+                    "name": "DBP",
+                    "description": "Diastolic blood pressure",
+                    "type": "number"
+                },
+                {
+                    "name": "HIBPMED",
+                    "description": "Hypertension medication use",
+                    "type": "string"
+                },
+                {
+                    "name": "STROKE16",
+                    "description": "Stroke",
+                    "type": "string"
+                },
+                {
+                    "name": "CURSMK16",
+                    "description": "Current cigarette smoker",
+                    "type": "string"
+                },
+                {
+                    "name": "EVRSMK16",
+                    "description": "Ever smoked cigarettes",
+                    "type": "string"
+                },
+                {
+                    "name": "FORSMK16",
+                    "description": "Former cigarette smoker",
+                    "type": "string"
+                }
+            ]
+        }
+    ]
+}

@@ -1,25 +1,38 @@
 import logging
-import re
+from typing import List, TypedDict
 
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.documents import Document
 
-from harmonization.cde import (
-    TEMP_DIR,
-    add_documents_to_vectorstore,
-    get_gen3_data_model_as_langchain_documents,
-    get_langchain_vectorstore_and_persistent_client,
-    get_similar_documents,
-)
 from harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,
 )
-from harmonization.utils import get_node_prop_type_desc_from_string
+from harmonization.utils import (
+    TEMP_DIR,
+    add_documents_to_vectorstore,
+    get_langchain_vectorstore_and_persistent_client,
+    get_similar_documents,
+)
+from harmonization.simple_data_model import (
+    get_data_model_as_langchain_documents,
+    get_node_prop_type_desc_from_string,
+    SimpleDataModel,
+    Node,
+    Property,
+    get_node_property_as_string,
+)
 
 
 class ExistingVectorstoreException(BaseException):
     pass
+
+
+class SuggestionInfo(TypedDict):
+    node: Node
+    property: Property
+    matches: List[Document]
 
 
 class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
@@ -27,20 +40,12 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
     def __init__(
         self,
         vectordb_persist_directory_name: str,
-        input_target_model: dict,
-        input_target_model_type: str = "gen3",
+        input_target_model: SimpleDataModel,
         embedding_function: HuggingFaceEmbeddings | None = None,
         force_vectorstore_recreation: bool = False,
         batch_size: int | None = None,
     ):
         super().__init__()
-
-        if input_target_model_type == "gen3":
-            logging.info(f"Treating input target as type: 'gen3'")
-        else:
-            raise NotImplementedError(
-                f"input_target_model_type of '{input_target_model_type}' is not supported at this time."
-            )
 
         self.embedding_function = embedding_function or HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-mpnet-base-v2"
@@ -79,23 +84,33 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
                 "aborting re-adding. Delete the persist directory, use a new one, or force recreation."
             )
 
-        target_docs = get_gen3_data_model_as_langchain_documents(input_target_model)
+        target_docs = get_data_model_as_langchain_documents(input_target_model)
 
         add_documents_to_vectorstore(
             target_docs, self.vectorstore, self.persistent_client, batch_size
         )
 
     def get_harmonization_suggestions(
-        self, input_source_model, input_target_model, **kwargs
+        self,
+        input_source_model: SimpleDataModel,
+        input_target_model: SimpleDataModel,
+        **kwargs,
     ):
         # note: k and score_threshold are in kwargs
-        suggestions_for_output_model = self._get_suggestions_for_ai_model_output(
+        suggestions_for_output_model = self._get_suggestions_for_source_model(
             input_source_model, **kwargs
         )
         suggestions = []
-        for node_property_desc, suggested_docs in suggestions_for_output_model.items():
+        for suggestion_info in suggestions_for_output_model:
+            source_property = suggestion_info["property"]
+            source_node = suggestion_info["node"]
+            suggested_docs = suggestion_info["matches"]
+
             source_node_name, source_prop_name, source_prop_type, source_prop_desc = (
-                get_node_prop_type_desc_from_string(node_property_desc)
+                source_node.name,
+                source_property.name,
+                source_property.type,
+                source_property.description,
             )
 
             source_additional_metadata = {}
@@ -129,37 +144,31 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
 
         return HarmonizationSuggestions(suggestions=suggestions)
 
-    def _get_suggestions_for_ai_model_output(self, input_source_model, **kwargs):
-        suggestions_for_output_model = {}
+    def _get_suggestions_for_source_model(
+        self, input_source_model: SimpleDataModel, **kwargs
+    ) -> List[SuggestionInfo]:
+        suggestions_for_output_model = []
+        for node in input_source_model.nodes:
+            for node_property in node.properties:
+                suggestion_info = {
+                    "node": node,
+                    "property": node_property,
+                    "matches": [],
+                }
 
-        for node in input_source_model.get("nodes", []):
-            for node_property in node.get("properties", []):
-                node_property_desc = f'{node.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
+                source_query = get_node_property_as_string(node, node_property)
                 matches = get_similar_documents(
-                    self.vectorstore, node_property_desc, **kwargs
+                    self.vectorstore,
+                    source_query,
+                    **kwargs,
                 )
+
+                suggestion_info["matches"] = matches
+
                 if matches:
-                    suggestions_for_output_model[node_property_desc] = matches
+                    suggestions_for_output_model.append(suggestion_info)
 
         if not suggestions_for_output_model:
-            for node, node_info in input_source_model.items():
-                node_properties = getattr(node_info, "properties", None) or node_info
-                if type(node_properties) == list:
-                    for node_property in node_properties:
-                        node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
-                        matches = get_similar_documents(
-                            self.vectorstore, node_property_desc, **kwargs
-                        )
-                        if matches:
-                            suggestions_for_output_model[node_property_desc] = matches
-                elif type(node_properties) == dict:
-                    for _, node_property in node_info.get("properties", {}).items():
-                        node_property_desc = f'{node_info.get("name", "unknown")}.{node_property.get("name", "unknown")}: {node_property.get("description", "")}'
-                        matches = get_similar_documents(
-                            self.vectorstore, node_property_desc, **kwargs
-                        )
-                        if matches:
-                            suggestions_for_output_model[node_property_desc] = matches
-                else:
-                    raise Exception(f"Cannot parse node properties")
+            raise Exception(f"Cannot parse node properties")
+
         return suggestions_for_output_model

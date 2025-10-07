@@ -4,7 +4,7 @@ from IPython.display import display
 
 
 def get_interactive_table_for_suggestions(
-    suggestions_df, column_for_filtering=1, table_description=None
+    suggestions_df, column_for_filtering=1, table_description=None, **kwargs
 ):
     table_description = (
         table_description
@@ -36,6 +36,7 @@ def get_interactive_table_for_suggestions(
         columnDefs=[{"className": "dt-left", "targets": "_all"}],
         # classes="display nowrap table_with_monospace_font",
         allow_html=True,
+        **kwargs,
     )
     print(table_description)
     return table

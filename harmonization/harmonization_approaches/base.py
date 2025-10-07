@@ -9,6 +9,7 @@ from sssom.writers import write_table
 from sssom_schema import Mapping, MappingSet
 
 from harmonization.utils import nodeproperty_to_curie
+from harmonization.simple_data_model import SimpleDataModel
 
 DEFAULT_SSSOM_METADATA: Dict[str, str | dict] = {
     "mapping_set_id": "https://example.org/mappings/example.sssom.tsv",
@@ -61,6 +62,7 @@ class HarmonizationSuggestions(BaseModel):
                     "Similarity": suggestion.similarity,
                     "Original Description": suggestion.source_description,
                     "Target Description": suggestion.target_description,
+                    # "Additional Metad": suggestion.target_description,
                 }
             )
         return pd.DataFrame(data)
@@ -69,7 +71,10 @@ class HarmonizationSuggestions(BaseModel):
 class HarmonizationApproach(ABC):
     @abstractmethod
     def get_harmonization_suggestions(
-        self, input_source_model, input_target_model, **kwargs
+        self,
+        input_source_model: SimpleDataModel,
+        input_target_model: SimpleDataModel,
+        **kwargs,
     ) -> HarmonizationSuggestions:
         """
         Returns HarmonizationSuggestions according to the implementing algorithm.
@@ -83,7 +88,10 @@ class ExampleHarmonizationApproach(HarmonizationApproach):
     """
 
     def get_harmonization_suggestions(
-        self, input_source_model, input_target_model, **kwargs
+        self,
+        input_source_model: SimpleDataModel,
+        input_target_model: SimpleDataModel,
+        **kwargs,
     ) -> HarmonizationSuggestions:
         """
         Example implementation for demonstration.

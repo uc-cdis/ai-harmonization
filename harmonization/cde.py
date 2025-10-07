@@ -161,7 +161,7 @@ def create_batches(
         # create split batches
         for i in range(0, len(ids), batch_size):
             _batches.append(
-                (  # type: ignore
+                (
                     ids[i : i + batch_size],
                     embeddings[i : i + batch_size] if embeddings else None,
                     metadatas[i : i + batch_size] if metadatas else None,
@@ -169,7 +169,7 @@ def create_batches(
                 )
             )
     else:
-        _batches.append((ids, embeddings, metadatas, documents))  # type: ignore
+        _batches.append((ids, embeddings, metadatas, documents))
     return _batches
 
 

@@ -29,7 +29,7 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         vectordb_persist_directory_name: str,
         input_target_model: dict,
         input_target_model_type: str = "gen3",
-        embedding_function=None,
+        embedding_function: HuggingFaceEmbeddings | None = None,
         force_vectorstore_recreation: bool = False,
         batch_size: int = None,
     ):

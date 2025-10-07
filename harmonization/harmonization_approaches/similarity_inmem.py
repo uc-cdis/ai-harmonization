@@ -31,6 +31,7 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         input_target_model_type: str = "gen3",
         embedding_function: HuggingFaceEmbeddings | None = None,
         force_vectorstore_recreation: bool = False,
+        batch_size: int | None = None,
     ):
         super().__init__()
 
@@ -56,14 +57,16 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
 
         try:
             self._add_target_to_vector_database(
-                input_target_model, force_recreation=force_vectorstore_recreation
+                input_target_model,
+                force_recreation=force_vectorstore_recreation,
+                batch_size=batch_size,
             )
         except ExistingVectorstoreException:
             logging.info("vectorstore already exists, NOT recreating...")
             pass
 
     def _add_target_to_vector_database(
-        self, input_target_model, force_recreation=False
+        self, input_target_model, force_recreation=False, batch_size=None
     ):
         if force_recreation:
             all_ids = self.vectorstore.get()["ids"]
@@ -79,7 +82,7 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         target_docs = get_gen3_data_model_as_langchain_documents(input_target_model)
 
         add_documents_to_vectorstore(
-            target_docs, self.vectorstore, self.persistent_client
+            target_docs, self.vectorstore, self.persistent_client, batch_size
         )
 
     def get_harmonization_suggestions(

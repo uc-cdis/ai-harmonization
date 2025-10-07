@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<4.0.0"
 dependencies = [
     "anywidget>=0.9.18",
+    "accelerate>=1.10.0",
     "chromadb>=1.0.15",
     "ipykernel>=6.30.0",
     "itables>=2.4.4",

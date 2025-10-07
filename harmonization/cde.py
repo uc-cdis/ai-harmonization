@@ -7,13 +7,19 @@ from typing import List, Union
 
 import chromadb
 import requests
-from chromadb.utils.batch_utils import create_batches
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_huggingface import HuggingFaceEmbeddings
 from pydantic import BaseModel
+from typing import Optional, Tuple, List
+from chromadb.api.types import (
+    Documents,
+    Embeddings,
+    IDs,
+    Metadatas,
+)
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.path.abspath(f"{CURRENT_DIR}/../output/temp")
@@ -127,14 +133,57 @@ def get_langchain_vectorstore_and_persistent_client(
     return vectorstore, persistent_client
 
 
-def add_documents_to_vectorstore(documents, vectorstore, persistent_client):
+def create_batches(
+    batch_size: int,
+    ids: IDs,
+    embeddings: Optional[Embeddings] = None,
+    metadatas: Optional[Metadatas] = None,
+    documents: Optional[Documents] = None,
+) -> List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]]:
+    """
+    Returns batches of provided batch_size from the lists of ids, embeddings, metadatas and documents.
+
+    Mimics chromadb.utils.batch_utils.create_batches behaviour but instead of using api.get_max_batch_size() for the batch creation it uses provided batch_size parameter.
+
+    Args:
+      ids (IDs): list of document IDs
+      embeddings ([Embeddings]): optional list of embeddings,
+      metadatas ([Metadatas]): optional list of metadatas,
+      documents ([Documents]): optional list of documents
+
+    Returns:
+        List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]]: list of batches
+    """
+    _batches: List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]] = (
+        []
+    )
+    if len(ids) > batch_size:
+        # create split batches
+        for i in range(0, len(ids), batch_size):
+            _batches.append(
+                (
+                    ids[i : i + batch_size],
+                    embeddings[i : i + batch_size] if embeddings else None,
+                    metadatas[i : i + batch_size] if metadatas else None,
+                    documents[i : i + batch_size] if documents else None,
+                )
+            )
+    else:
+        _batches.append((ids, embeddings, metadatas, documents))
+    return _batches
+
+
+def add_documents_to_vectorstore(
+    documents, vectorstore, persistent_client, batch_size=None
+):
+    batch_size = batch_size or persistent_client.get_max_batch_size()
     logging.info(
         "Number of documents that can be inserted at once:",
-        persistent_client.get_max_batch_size(),
+        batch_size,
     )
     ids = range(len(documents))
     batches = create_batches(
-        api=persistent_client, ids=list(ids), documents=list(documents)
+        batch_size=batch_size, ids=list(ids), documents=list(documents)
     )
     for batch in batches:
         logging.info(f"Adding batch of size {len(batch[0])}")

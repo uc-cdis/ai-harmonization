@@ -31,7 +31,7 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         input_target_model_type: str = "gen3",
         embedding_function: HuggingFaceEmbeddings | None = None,
         force_vectorstore_recreation: bool = False,
-        batch_size: int = None,
+        batch_size: int | None = None,
     ):
         super().__init__()
 

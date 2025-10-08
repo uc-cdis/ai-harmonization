@@ -13,12 +13,12 @@ from csv import DictReader
 from typing import List, Optional, Tuple, Union
 
 import chromadb
+import requests
 from chromadb.api.types import Documents, Embeddings, IDs, Metadatas
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_huggingface import HuggingFaceEmbeddings
-import requests
 from tqdm import tqdm
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))

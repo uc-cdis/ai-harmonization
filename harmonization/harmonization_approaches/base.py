@@ -2,14 +2,14 @@ import os
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
 import pandas as pd
+from pydantic import BaseModel
 from sssom.parsers import MappingSetDataFrame
 from sssom.writers import write_table
 from sssom_schema import Mapping, MappingSet
 
-from harmonization.utils import nodeproperty_to_curie
 from harmonization.simple_data_model import SimpleDataModel
+from harmonization.utils import nodeproperty_to_curie
 
 DEFAULT_SSSOM_METADATA: Dict[str, str | dict] = {
     "mapping_set_id": "https://example.org/mappings/example.sssom.tsv",

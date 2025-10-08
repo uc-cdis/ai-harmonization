@@ -4,7 +4,7 @@ import json
 import os
 import re
 from collections import Counter
-from typing import Dict, Callable
+from typing import Callable, Dict
 
 from harmonization.harmonization_approaches.base import (
     HarmonizationApproach,

@@ -1,6 +1,6 @@
-from itables.widget import ITable
 import pandas as pd
 from IPython.display import display
+from itables.widget import ITable
 
 
 def get_interactive_table_for_suggestions(

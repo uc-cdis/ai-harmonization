@@ -1,5 +1,7 @@
+import numpy as np
 import torch
 from transformers import AutoModel, AutoTokenizer
+
 
 
 class BaseEmbeddings:
@@ -77,3 +79,20 @@ class QwenEmbeddings(BaseEmbeddings):
             )
             pooled = self.mean_pool(last_hidden, mask)
             return pooled.cpu().numpy().tolist()
+
+
+class BGEEmbeddings(BaseEmbeddings):
+    def __init__(self, model_name="BAAI/bge-large-en-v1.5", device=None):
+        super().__init__(model_name, device=device)
+
+    def embed_documents(self, texts):
+        inputs = self.tokenizer(
+            texts, padding=True, truncation=True, max_length=512, return_tensors="pt"
+        ).to(self.device)
+        with torch.no_grad():
+            model_output = self.model(**inputs)
+            mask = inputs["attention_mask"].unsqueeze(-1)
+            pooled = self.mean_pool(model_output.last_hidden_state, mask)
+        pooled = pooled.cpu().numpy()
+        pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
+        return pooled.tolist()

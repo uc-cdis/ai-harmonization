@@ -7,34 +7,22 @@ import os
 import re
 import shutil
 import tarfile
+import warnings
 import zipfile
 from csv import DictReader
-from typing import List, Union
+from typing import List, Optional, Tuple, Union
 
-import pandas as pd
+import chromadb
 import requests
-from pydantic import BaseModel
+from chromadb.api.types import Documents, Embeddings, IDs, Metadatas
+from langchain_chroma import Chroma
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from tqdm import tqdm
 
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMP_DIR = os.path.abspath(f"{CURRENT_DIR}/../output/temp")
-
-
-class Property(BaseModel):
-    description: str
-    type: Union[str, List[str]]
-    name: str
-
-
-class Node(BaseModel):
-    name: str
-    description: str
-    links: List[str]
-    properties: List[Property]
-
-
-class DataModel(BaseModel):
-    nodes: List[Node]
 
 
 def read_in_json(file_location):
@@ -282,32 +270,6 @@ def nodeproperty_to_curie(s: str) -> str:
         return f"EX:{node_str}"
 
 
-def get_data_model_as_node_prop_descriptions(data_model: DataModel) -> List[str]:
-    """
-    Retrieves and converts a data model output to a list of strings with the format:
-        node_name.property_name: property_desc
-
-    Returns:
-        List[str]: A list of strings representing the property
-    """
-    if "nodes" not in data_model.keys():
-        raise Exception(
-            f"Input data model does not conform to schema. Must have nodes with properties and descriptions"
-        )
-
-    node_prop_descs = []
-    for node in data_model.get("nodes", []):
-        node_name = node.get("name", "")
-        for property in node.get("properties", []):
-            property_name = property.get("name", "")
-            property_desc = (
-                property.get("description", "").replace("\t", "    ").replace("\n", " ")
-            )
-            value = f"{node_name}.{property_name}: {property_desc}"
-            node_prop_descs.append(value)
-    return node_prop_descs
-
-
 def get_gen3_json_schemas_and_templates(
     url: str, output_dir: str, internal_folder_name: str = "Unmodified"
 ) -> None:
@@ -361,20 +323,149 @@ def get_gen3_json_schemas_and_templates(
         logging.error(f"An error occurred: {e}")
 
 
-def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, str, str]:
+def create_batches(
+    batch_size: int,
+    ids: IDs,
+    embeddings: Optional[Embeddings] = None,
+    metadatas: Optional[Metadatas] = None,
+    documents: Optional[Documents] = None,
+) -> List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]]:
     """
-    Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
-    and returns a tuple containing the node name, property name, property type, and property description.
+    Returns batches of provided batch_size from the lists of ids, embeddings, metadatas and documents.
+
+    Mimics chromadb.utils.batch_utils.create_batches behaviour but instead of using api.get_max_batch_size() for the batch creation it uses provided batch_size parameter.
+
+    Args:
+      ids (IDs): list of document IDs
+      embeddings ([Embeddings]): optional list of embeddings,
+      metadatas ([Metadatas]): optional list of metadatas,
+      documents ([Documents]): optional list of documents
+
+    Returns:
+        List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]]: list of batches
     """
-    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):\s*(.*)|:\s*(.*))$", input_string)
-    if match:
-        node_name = match.group(1)
-        prop_name = match.group(2)
-        if match.group(3):
-            prop_type = match.group(3)
-            prop_desc = match.group(4)
-        else:
-            prop_type = ""
-            prop_desc = match.group(5)
-        return node_name, prop_name, prop_type, prop_desc
-    return "", "", "", ""
+    _batches: List[Tuple[IDs, Embeddings, Optional[Metadatas], Optional[Documents]]] = (
+        []
+    )
+    if len(ids) > batch_size:
+        # create split batches
+        for i in range(0, len(ids), batch_size):
+            _batches.append(
+                (
+                    ids[i : i + batch_size],
+                    embeddings[i : i + batch_size] if embeddings else None,
+                    metadatas[i : i + batch_size] if metadatas else None,
+                    documents[i : i + batch_size] if documents else None,
+                )
+            )
+    else:
+        _batches.append((ids, embeddings, metadatas, documents))
+    return _batches
+
+
+def add_documents_to_vectorstore(
+    documents, vectorstore, persistent_client, batch_size=None
+):
+    batch_size = batch_size or persistent_client.get_max_batch_size()
+    logging.info(
+        "Number of documents that can be inserted at once:",
+        batch_size,
+    )
+    ids = range(len(documents))
+    batches = create_batches(
+        batch_size=batch_size, ids=list(ids), documents=list(documents)
+    )
+    for batch in batches:
+        logging.info(f"Adding batch of size {len(batch[0])}")
+        vectorstore.add_documents(documents=batch[3])
+
+
+def get_similar_documents(vectorstore, query, **kwargs) -> List[Document]:
+    """
+    Retrieves similar documents from a vector store using a given query.
+
+    This function uses the `vectorstore.similarity_search_with_relevance_scores` method to find similar documents.
+    The returned list of documents includes their relevance scores, which can be used for ranking or filtering purposes.
+
+    Args:
+        vectorstore (Chroma): The Chroma vector store to search in.
+        query (str): The search query to use when retrieving similar documents.
+        **kwargs: Optional keyword arguments to pass to the `vectorstore.similarity_search_with_relevance_scores` method.
+
+    Returns:
+        List[Document]: A list of Document objects representing the retrieved similar documents, along with their relevance scores.
+    """
+    # We want to ignore the printed warning when there's no documents.
+    # We don't want that in stdout polluting it, we just will have an empty list
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return vectorstore.similarity_search_with_relevance_scores(query, **kwargs)
+
+
+def get_langchain_vectorstore_and_persistent_client(
+    persist_directory_name: str = "cdes",
+    embedding_function: Union[Embeddings, None] = None,
+    chromadb_settings: Union[chromadb.config.Settings, None] = None,
+) -> Chroma:
+    """
+    Creates and returns a Chroma vectorstore for the 'cdes' topic.
+
+    Parameters:
+        persist_directory_name (str): The name of the persistent directory.
+        embedding_function (Embeddings | None): The language embedding function. Defaults to HuggingFaceEmbeddings with the "all-MiniLM-L6-v2" model.
+        chromadb_settings (chromadb.config.Settings | None): ChromaDB settings. Defaults to chromadb Settings with migrations_hash_algorithm="sha256" and anonymized_telemetry=False.
+
+    Returns:
+        Chroma: A Chroma vectorstore object.
+    """
+    # We're using a general purpose language embedding algorithm
+    embedding_function = embedding_function or HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L6-v2"
+    )
+
+    settings = chromadb_settings or chromadb.Settings(
+        migrations_hash_algorithm="sha256",
+        anonymized_telemetry=False,
+    )
+
+    persistent_client = chromadb.PersistentClient(
+        path=f"{TEMP_DIR}/vectorstore/{persist_directory_name}", settings=settings
+    )
+    vectorstore = Chroma(
+        client=persistent_client,
+        collection_name=persist_directory_name,
+        embedding_function=embedding_function,
+        # https://docs.trychroma.com/usage-guide#changing-the-distance-function
+        collection_metadata={"hnsw:space": "cosine"},
+        persist_directory=f"{TEMP_DIR}/vectorstore/{persist_directory_name}",
+        client_settings=settings,
+    )
+
+    return vectorstore, persistent_client
+
+
+def get_similar_documents_as_string(documents: tuple[Document, float]) -> str:
+    """
+    This function takes a tuple of Document objects and their corresponding similarity scores,
+    and returns a formatted string representation of the input documents.
+
+    The returned string includes the document's metadata, which is converted using pprint.pformat() for readability.
+
+    Args:
+        documents (tuple[Document, float]): A tuple containing a Document object and its corresponding similarity score.
+
+    Returns:
+        str: A formatted string representation of the input documents.
+    """
+    output = ""
+    for doc, similarity_score in documents:
+        output += f"-" * 80 + "\n"
+        output += f"similarity_score: {similarity_score}" + "\n"
+        output += f"             ids: {doc.metadata['ids']}" + "\n"
+        output += f"           names: {doc.metadata['names']}" + "\n"
+        output += f"          source: {doc.metadata['source']}" + "\n"
+        output += f"     nihEndorsed: {doc.metadata['nihEndorsed']}" + "\n"
+        output += f"     valueDomain: {doc.metadata['valueDomain']}" + "\n"
+        output += f"\n   full metadata:\n"
+        output += f"{pprint.pformat(doc.metadata)}" + "\n"
+    return output

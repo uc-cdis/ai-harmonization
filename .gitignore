@@ -6,6 +6,10 @@ output/
 jupyter/*.json
 real_benchmarks/
 
+selected_suggestions.tsv
+
+tmp_*
+
 **/*custom_metrics*/*.md
 *custom_metrics*.md
 

@@ -4,7 +4,7 @@ import json
 import os
 import re
 from collections import Counter
-from typing import Dict
+from typing import Callable, Dict
 
 from harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
@@ -12,7 +12,10 @@ from harmonization.harmonization_approaches.base import (
     SingleHarmonizationSuggestion,
     harmonization_suggestions_to_sssom,
 )
-from harmonization.utils import get_node_prop_type_desc_from_string
+from harmonization.simple_data_model import (
+    SimpleDataModel,
+    get_node_prop_type_desc_from_string,
+)
 
 
 def get_metrics_for_approach(
@@ -23,8 +26,52 @@ def get_metrics_for_approach(
     output_sssom_per_row: bool = False,
     output_tsvs_per_row: bool = False,
     output_expected_results_per_row: bool = False,
+    source_model_to_simple_model_converter_function: (
+        Callable[[str], SimpleDataModel] | None
+    ) = None,
+    target_model_to_simple_model_converter_function: (
+        Callable[[str], SimpleDataModel] | None
+    ) = None,
     **kwargs,
 ) -> str:
+    """
+    Calculates and outputs metrics for a harmonization approach on a benchmark.
+
+    This function processes a benchmark file, applies a given harmonization
+    approach, and outputs various metrics, including accuracy, precision, recall,
+    and F1-score. It also provides options to output SSSOM (Simple Semantic
+    Similarity Output Measure) and TSV (Tab-Separated Values) files for each row
+    of the benchmark.
+
+    Args:
+        benchmark_filepath: Path to the benchmark file (JSON Lines format).
+        harmonization_approach: The harmonization approach to evaluate.
+        output_filename: Path to the output file for metrics (JSON Lines format).
+            If None, a default filename is generated based on the benchmark file.
+        metrics_column_name: The name of the column to store metrics in the
+            output file.
+        output_sssom_per_row: Whether to output SSSOM files for each row.
+        output_tsvs_per_row: Whether to output TSV files for each row.
+        output_expected_results_per_row: Whether to output expected results as TSV
+            files for each row.
+        source_model_to_simple_model_converter_function: A function to convert the
+            source model to a SimpleDataModel. If None, a default converter is used.
+        target_model_to_simple_model_converter_function: A function to convert the
+            target model to a SimpleDataModel. If None, a default converter is used.
+        **kwargs: Additional keyword arguments to pass to the harmonization approach.
+
+    Returns:
+        The path to the output file containing the metrics.
+    """
+    source_model_to_simple_model_converter_function = (
+        source_model_to_simple_model_converter_function
+        or SimpleDataModel.get_from_unknown_json_format
+    )
+    target_model_to_simple_model_converter_function = (
+        target_model_to_simple_model_converter_function
+        or SimpleDataModel.get_from_unknown_json_format
+    )
+
     if not output_filename:
         dir_name = os.path.dirname(benchmark_filepath)
         base_name = os.path.basename(benchmark_filepath)
@@ -48,10 +95,18 @@ def get_metrics_for_approach(
                 except Exception:
                     input_source_model = row["input_source_model"]
 
+                input_source_model = source_model_to_simple_model_converter_function(
+                    json.dumps(input_source_model)
+                )
+
                 try:
                     input_target_model = json.loads(row["input_target_model"])
                 except Exception:
                     input_target_model = row["input_target_model"]
+
+                input_target_model = target_model_to_simple_model_converter_function(
+                    json.dumps(input_target_model)
+                )
 
                 harmonized_mapping = row["harmonized_mapping"]
                 expected_harmonization_suggestions = (
@@ -157,6 +212,10 @@ def get_metrics_for_test_case(
     expected_pairs = set(to_pair(e) for e in expected_mappings.suggestions)
 
     correct_pairs = suggestion_pairs & expected_pairs
+    missing_pairs = expected_pairs - suggestion_pairs
+    missing_mappings = [
+        f"{pair[0]}.{pair[1]} -> {pair[2]}.{pair[3]}" for pair in missing_pairs
+    ]
 
     n_correct = len(correct_pairs)
     n_suggested = len(suggestion_pairs)
@@ -185,4 +244,5 @@ def get_metrics_for_test_case(
         "precision": precision,
         "recall": recall,
         "f1_score": f1,
+        "missing_mappings": missing_mappings,
     }

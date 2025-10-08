@@ -1,0 +1,271 @@
+import json
+import re
+from typing import List, Optional, Union
+
+import pandas as pd
+from langchain_core.documents import Document
+from pydantic import BaseModel
+
+
+class Property(BaseModel):
+    description: str
+    type: Union[str, List[str]]
+    name: str
+    additional_metadata: Optional[dict] = None
+
+
+class Node(BaseModel):
+    name: str
+    description: str
+    links: List[str]
+    properties: List[Property]
+    additional_metadata: Optional[dict] = None
+
+
+class SimpleDataModel(BaseModel):
+    nodes: List[Node]
+    additional_metadata: Optional[dict] = None
+
+    def get_property_df(self) -> pd.DataFrame:
+        """
+        Get a pandas DataFrame with a row per property from the SimpleDataModel.
+        """
+        property_list = []
+        for node in self.nodes:
+            for property in node.properties:
+                property_list.append(
+                    {
+                        "node_name": node.name,
+                        "property_name": property.name,
+                        "property_description": property.description,
+                        "property_type": property.type,
+                        "additional_metadata": property.additional_metadata,
+                    }
+                )
+        return pd.DataFrame(property_list)
+
+    @staticmethod
+    def from_simple_json(input_json: str):
+        """
+        Converts a Simple Data Model json format to a standard format object
+        """
+        input_model = json.loads(input_json)
+
+        nodes = []
+        for node_data in input_model["nodes"]:
+            properties = []
+            for prop_data in node_data["properties"]:
+                properties.append(
+                    Property(
+                        description=prop_data.get("description", ""),
+                        type=prop_data.get("type", ""),
+                        name=prop_data.get("name", prop_data.get("name:", "")),
+                    )
+                )
+
+            nodes.append(
+                Node(
+                    name=node_data.get("name", node_data.get("name:", "")),
+                    description=node_data.get("description", ""),
+                    links=node_data.get("links", []),
+                    properties=properties,
+                )
+            )
+
+        data_model = SimpleDataModel(nodes=nodes)
+        return data_model
+
+    @staticmethod
+    def from_gen3_model(input_json: str):
+        """
+        Converts a Gen3 DD JSON model to a standard format
+        """
+        gen3_model = json.loads(input_json)
+        data_model = SimpleDataModel(nodes=[])
+
+        for node_name, node_info in gen3_model.items():
+            if node_name in [
+                "_terms",
+                "_settings",
+                "_definitions",
+                "metaschema",
+                "root",
+            ]:
+                continue
+
+            # Convert each property in the gen3_model to our Property model
+            properties = []
+            for property_name, property_info in node_info.get("properties", {}).items():
+                # handle foreign key links
+                if "anyOf" in property_info.keys():
+                    for sub_properties in property_info["anyOf"]:
+                        sub_node_name = property_name
+
+                        if sub_node_name.endswith("s"):
+                            sub_node_name = sub_node_name[:-1]
+
+                        # TODO better handle non-plural
+
+                        if sub_node_name.endswith("ies"):
+                            sub_node_name = sub_node_name[:-3] + "y"
+
+                        for sub_property_name, sub_property_info in (
+                            sub_properties.get("items", {})
+                            .get("properties", {})
+                            .items()
+                        ):
+                            node_property = Property(
+                                description=sub_property_info.get("description", ""),
+                                type=sub_property_info.get("type", ""),
+                                name=f"{sub_node_name}.{sub_property_name}",
+                            )
+                            if not node_property.type:
+                                if "enum" in sub_property_info:
+                                    node_property.type = "enum"
+                            if not node_property.description:
+                                if "term" in sub_property_info:
+                                    node_property.description = sub_property_info[
+                                        "term"
+                                    ].get("description", "")
+
+                            if (
+                                "term" in sub_property_info
+                                and "termDef" in sub_property_info["term"]
+                            ):
+                                if not node_property.additional_metadata:
+                                    node_property.additional_metadata = {}
+
+                                node_property.additional_metadata.update(
+                                    {"cde_info": sub_property_info["term"]["termDef"]}
+                                )
+                            properties.append(node_property)
+                else:
+                    node_property = Property(
+                        description=property_info.get("description", ""),
+                        type=property_info.get("type", ""),
+                        name=property_name,
+                    )
+                    if not node_property.type:
+                        if "enum" in property_info:
+                            node_property.type = "enum"
+                    if not node_property.description:
+                        if "term" in property_info:
+                            node_property.description = property_info["term"].get(
+                                "description", ""
+                            )
+
+                    if "term" in property_info and "termDef" in property_info["term"]:
+                        if not node_property.additional_metadata:
+                            node_property.additional_metadata = {}
+
+                        node_property.additional_metadata.update(
+                            {"cde_info": property_info["term"]["termDef"]}
+                        )
+
+                    properties.append(node_property)
+
+            node = Node(
+                name=node_name,
+                description=node_info["description"],
+                properties=properties,
+                links=[
+                    link_info["name"]
+                    for link_info in node_info.get("links", [])
+                    if "name" in link_info
+                ],
+            )
+
+            if not node.links and "subgroup" in node_info.get("links", {}):
+                node.links = [
+                    link_info["name"] for link_info in node_info["links"]["subgroup"]
+                ]
+
+            data_model.nodes.append(node)
+
+        return data_model
+
+    @staticmethod
+    def get_from_unknown_json_format(input_json: str):
+        simple_data_model = None
+        exception: BaseException = BaseException()
+
+        try:
+            simple_data_model = SimpleDataModel.from_simple_json(input_json)
+        except BaseException as exc:
+            exception = exc
+            pass
+
+        try:
+            simple_data_model = SimpleDataModel.from_gen3_model(input_json)
+        except BaseException as exc:
+            exception = exc
+            pass
+
+        if not simple_data_model:
+            print(
+                "Could not convert from unknown format to SimpleDataModel. Consider writing a custom converter."
+            )
+            raise exception
+
+        return simple_data_model
+
+
+def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, str, str]:
+    """
+    Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
+    and returns a tuple containing the node name, property name, property type, and property description.
+    """
+    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):\s*(.*)|:\s*(.*))$", input_string)
+    if match:
+        node_name = match.group(1)
+        prop_name = match.group(2)
+        if match.group(3):
+            prop_type = match.group(3)
+            prop_desc = match.group(4)
+        else:
+            prop_type = ""
+            prop_desc = match.group(5)
+        return node_name or "", prop_name or "", prop_type or "", prop_desc or ""
+    return "", "", "", ""
+
+
+def get_data_model_as_node_prop_type_descriptions(
+    data_model: SimpleDataModel,
+) -> List[str]:
+    """
+    Retrieves and converts a data model output to a list of strings with the format:
+        node_name.property_name (type): property_desc
+
+    Returns:
+        List[str]: A list of strings representing the property
+    """
+    node_prop_descs = []
+    for node in data_model.nodes:
+        for property in node.properties:
+            value = get_node_property_as_string(node, property)
+            node_prop_descs.append(value)
+    return node_prop_descs
+
+
+def get_node_property_as_string(node: Node, node_property: Property) -> str:
+    property_desc = node_property.description.replace("\t", "    ").replace("\n", " ")
+    return f"{node.name}.{node_property.name} ({node_property.type}): {property_desc}"
+
+
+def get_data_model_as_langchain_documents(
+    data_model: SimpleDataModel,
+) -> List[Document]:
+    """
+    Retrieves and converts a data model output to LangChain documents.
+
+    Returns:
+        List[Document]: A list of Document objects representing the converted LangChain documents.
+    """
+    documents = []
+    node_prop_descs = get_data_model_as_node_prop_type_descriptions(data_model)
+
+    for value in node_prop_descs:
+        document = Document(page_content=value, metadata={})
+        documents.append(document)
+
+    return documents

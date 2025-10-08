@@ -1,5 +1,6 @@
 import torch
-from transformers import AutoTokenizer, AutoModel
+from transformers import AutoModel, AutoTokenizer
+
 
 class BaseEmbeddings:
     def __init__(self, model_name, device=None, trust_remote_code=False):
@@ -10,10 +11,12 @@ class BaseEmbeddings:
         self.device = torch.device(
             device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         )
-        self.model = AutoModel.from_pretrained(
-            model_name, trust_remote_code=trust_remote_code
-        ).to(self.device).eval()
-    
+        self.model = (
+            AutoModel.from_pretrained(model_name, trust_remote_code=trust_remote_code)
+            .to(self.device)
+            .eval()
+        )
+
     def embed_query(self, text):
         return self.embed_documents([text])[0]
 
@@ -27,6 +30,7 @@ class BaseEmbeddings:
 
     def embed_documents(self, texts):
         raise NotImplementedError("Implement in subclass.")
+
 
 class MedGemmaEmbeddings(BaseEmbeddings):
     def __init__(self, model_name="google/medgemma-4b-it", device=None):
@@ -47,6 +51,7 @@ class MedGemmaEmbeddings(BaseEmbeddings):
             )
             pooled = self.mean_pool(last_hidden, mask)
             return pooled.cpu().numpy().tolist()
+
 
 class QwenEmbeddings(BaseEmbeddings):
     def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B", device=None):

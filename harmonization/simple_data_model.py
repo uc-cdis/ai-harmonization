@@ -45,21 +45,32 @@ class SimpleDataModel(BaseModel):
         return pd.DataFrame(property_list)
 
     @staticmethod
-    def from_simple_json(input_json: str):
+    def from_simple_json(input_json: str, ignore_properties_with_endings=None):
         """
         Converts a Simple Data Model json format to a standard format object
         """
+        ignore_properties_with_endings = ignore_properties_with_endings or []
+
         input_model = json.loads(input_json)
 
         nodes = []
         for node_data in input_model["nodes"]:
             properties = []
             for prop_data in node_data["properties"]:
+                property_name = prop_data.get("name", prop_data.get("name:", ""))
+
+                skip = False
+                for ending in ignore_properties_with_endings:
+                    if property_name.strip().endswith(ending):
+                        skip = True
+                if skip:
+                    continue
+
                 properties.append(
                     Property(
                         description=prop_data.get("description", ""),
                         type=prop_data.get("type", ""),
-                        name=prop_data.get("name", prop_data.get("name:", "")),
+                        name=property_name,
                     )
                 )
 
@@ -76,10 +87,12 @@ class SimpleDataModel(BaseModel):
         return data_model
 
     @staticmethod
-    def from_gen3_model(input_json: str):
+    def from_gen3_model(input_json: str, ignore_properties_with_endings=None):
         """
         Converts a Gen3 DD JSON model to a standard format
         """
+        ignore_properties_with_endings = ignore_properties_with_endings or []
+
         gen3_model = json.loads(input_json)
         data_model = SimpleDataModel(nodes=[])
 
@@ -96,6 +109,13 @@ class SimpleDataModel(BaseModel):
             # Convert each property in the gen3_model to our Property model
             properties = []
             for property_name, property_info in node_info.get("properties", {}).items():
+                skip = False
+                for ending in ignore_properties_with_endings:
+                    if property_name.strip().endswith(ending):
+                        skip = True
+                if skip:
+                    continue
+
                 # handle foreign key links
                 if "anyOf" in property_info.keys():
                     for sub_properties in property_info["anyOf"]:
@@ -114,6 +134,13 @@ class SimpleDataModel(BaseModel):
                             .get("properties", {})
                             .items()
                         ):
+                            skip = False
+                            for ending in ignore_properties_with_endings:
+                                if sub_property_name.strip().endswith(ending):
+                                    skip = True
+                            if skip:
+                                continue
+
                             node_property = Property(
                                 description=sub_property_info.get("description", ""),
                                 type=sub_property_info.get("type", ""),
@@ -185,18 +212,77 @@ class SimpleDataModel(BaseModel):
         return data_model
 
     @staticmethod
-    def get_from_unknown_json_format(input_json: str):
+    def from_linkml_jsonschema(input_json: str, ignore_properties_with_endings=None):
+        """
+        Converts a LinkML JSON model to a standard format
+        """
+        ignore_properties_with_endings = ignore_properties_with_endings or []
+
+        input_model = json.loads(input_json)
+        data_model = SimpleDataModel(nodes=[])
+
+        for node_name, node_info in input_model["$defs"].items():
+            node_description: str = node_info.get("description", "")
+            properties: List[Property] = []
+            for property_name, property_info in node_info.get("properties", {}).items():
+                skip = False
+                for ending in ignore_properties_with_endings:
+                    if property_name.strip().endswith(ending):
+                        skip = True
+                if skip:
+                    continue
+
+                property_type = property_info.get("type", "")
+                property_description = property_info.get("description", "")
+                if "type" in property_info:
+                    del property_info["type"]
+                if "description" in property_info:
+                    del property_info["description"]
+                properties.append(
+                    Property(
+                        name=property_name,
+                        description=property_description,
+                        type=property_type,
+                        additional_metadata=property_info,
+                    )
+                )
+            if "properties" in node_info:
+                del node_info["properties"]
+
+            del node_info["description"]
+
+            # TODO: populate links
+            node_links = []
+
+            data_model.nodes.append(
+                Node(
+                    name=node_name,
+                    properties=properties,
+                    links=node_links,
+                    description=node_description,
+                    additional_metadata=node_info,
+                )
+            )
+
+        return data_model
+
+    @staticmethod
+    def get_from_unknown_json_format(input_json: str, *args, **kwargs):
         simple_data_model = None
         exception: BaseException = BaseException()
 
         try:
-            simple_data_model = SimpleDataModel.from_simple_json(input_json)
+            simple_data_model = SimpleDataModel.from_simple_json(
+                input_json, *args, **kwargs
+            )
         except BaseException as exc:
             exception = exc
             pass
 
         try:
-            simple_data_model = SimpleDataModel.from_gen3_model(input_json)
+            simple_data_model = SimpleDataModel.from_gen3_model(
+                input_json, *args, **kwargs
+            )
         except BaseException as exc:
             exception = exc
             pass

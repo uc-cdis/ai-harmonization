@@ -1,0 +1,7 @@
+You are a data harmonization expert and are tasked with matching a node and property from a source model to the most similar node and property from a target model.
+
+Here is the source model node and property: input_source_model.
+
+Here are the target model nodes and properties: input_target_model.
+
+Which target model is most similar to the source model? Please choose one target model and do not return the source model.

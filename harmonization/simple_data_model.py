@@ -184,6 +184,103 @@ class SimpleDataModel(BaseModel):
 
         return data_model
 
+    def from_dict(input_json):
+        """
+        Converts JSON model created from CSV to SimpleDataModel.
+        Accepts either a JSON string or dict.
+        Returns a SimpleDataModel instance.
+        """
+        # Load if string
+        if isinstance(input_json, str):
+            model = json.loads(input_json)
+        else:
+            model = input_json
+
+        # Get top-level name if available, default to "Source"
+        node_name = model.get("name", "Source")
+        node_description = model.get("description", "")
+
+        properties = []
+        for prop in model.get("properties", []):
+            properties.append(
+                Property(
+                    name=prop.get("name", ""),
+                    type=prop.get("type", ""),
+                    description=prop.get("description", ""),
+                    histogram=prop.get("histogram", {}),
+                )
+            )
+
+        node = Node(
+            name=node_name,
+            description=node_description,
+            properties=properties,
+            links=[],
+        )
+
+        data_model = SimpleDataModel(nodes=[node])
+        return data_model
+
+    @staticmethod
+    def from_gdc_model(input_json: str):
+        """
+        Converts a GDC model to a standard SimpleDataModel
+        Accepts input as a json string or a parsed dict.
+        """
+        # If input is a string, parse it
+        if isinstance(input_json, str):
+            gdc_dict = json.loads(input_json)
+        else:
+            gdc_dict = input_json
+
+        nodes = []
+        for node_name, node_data in gdc_dict.items():
+            # Skip metadata/_definitions nodes
+            if node_name.startswith("_"):
+                continue
+
+            # Node might have description missing, so use empty string
+            node_description = node_data.get("description", "")
+            properties = []
+
+            for prop_name, prop_data in node_data.get("properties", {}).items():
+                # Build a Property object
+                prop = Property(
+                    name=prop_name,
+                    description=prop_data.get("description", ""),
+                    type=prop_data.get("type", ""),
+                )
+                properties.append(prop)
+
+            # Links: GDC rarely has links, but may add as empty list
+            links = []
+            if isinstance(node_data.get("links", []), list):
+                links = [
+                    link.get("name", "")
+                    for link in node_data.get("links", [])
+                    if "name" in link
+                ]
+            elif (
+                isinstance(node_data.get("links", {}), dict)
+                and "subgroup" in node_data["links"]
+            ):
+                links = [
+                    link_info["name"] for link_info in node_data["links"]["subgroup"]
+                ]()
+
+            # Build Node
+            node = Node(
+                name=node_name,
+                description=node_description,
+                properties=properties,
+                links=links,
+            )
+
+            nodes.append(node)
+
+        data_model = SimpleDataModel(nodes=nodes)
+        return data_model
+
     @staticmethod
     def get_from_unknown_json_format(input_json: str):
         simple_data_model = None
@@ -196,7 +293,19 @@ class SimpleDataModel(BaseModel):
             pass
 
         try:
+            simple_data_model = SimpleDataModel.from_dict(input_json)
+        except BaseException as exc:
+            exception = exc
+            pass
+
+        try:
             simple_data_model = SimpleDataModel.from_gen3_model(input_json)
+        except BaseException as exc:
+            exception = exc
+            pass
+
+        try:
+            simple_data_model = SimpleDataModel.from_gdc_model(input_json)
         except BaseException as exc:
             exception = exc
             pass
@@ -215,17 +324,20 @@ def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, st
     Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
     and returns a tuple containing the node name, property name, property type, and property description.
     """
-    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):\s*(.*)|:\s*(.*))$", input_string)
+    match = re.match(r"^(.*?)\.(.*)\s+\(([^)]*)\):\s*(.*)$", input_string)
     if match:
-        node_name = match.group(1)
-        prop_name = match.group(2)
-        if match.group(3):
-            prop_type = match.group(3)
-            prop_desc = match.group(4)
-        else:
-            prop_type = ""
-            prop_desc = match.group(5)
-        return node_name or "", prop_name or "", prop_type or "", prop_desc or ""
+        node_name = match.group(1).strip()
+        prop_name = match.group(2).strip()
+        prop_type = match.group(3)
+        prop_desc = match.group(4)
+        return node_name, prop_name, prop_type, prop_desc
+    # Fallback:
+    match = re.match(r"^(.*?)\.(.*?):\s*(.*)$", input_string)
+    if match:
+        node_name = match.group(1).strip()
+        prop_name = match.group(2).strip()
+        prop_type = ""
+        prop_desc = match.group(3)
     return "", "", "", ""
 
 

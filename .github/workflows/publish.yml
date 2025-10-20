@@ -54,8 +54,21 @@ jobs:
         id: test-pypi-uv
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: |
-          echo "Attempting a test publish before a real one. Note that a real one will only trigger on tags"
-          uv publish -v --index testpypi
+            echo "Attempting a test publish before a real one. Note that a real one will only trigger on tags."
+            uv publish -v --index testpypi
+
+            if [ $? -eq 0 ]; then
+                echo "Push to Test PyPI successful, now try installing the pushed package in a fresh virtual env..."
+                python -m venv .venv-test-pypi
+                source .venv-test-pypi/bin/activate
+
+                pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ ai_harmonization
+
+                if [ $? -eq 0 ]; then
+                    echo "Package installation successful, uninstalling..."
+                    pip uninstall ai_harmonization
+                fi
+            fi
 
       - name: uv Publish to PyPI
         id: prod-pypi-uv
@@ -63,6 +76,14 @@ jobs:
         run: |
           echo "Since this is a tagged release, do a real publish"
           uv publish -v -n
+
+          if [ $? -eq 0 ]; then
+              echo "Push to PyPI successful, now try installing the pushed package in a fresh virtual env..."
+              python -m venv .venv-pypi
+              source .venv-pypi/bin/activate
+
+              pip install ai_harmonization
+          fi
 
       - name: If uv Publish to PyPI Did Not Succeed, Fail Job
         if: ${{ steps.prod-pypi-uv.outcome != 'success' }}

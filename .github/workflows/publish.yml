@@ -10,3 +10,4 @@ jobs:
     with:
       PYTHON_VERSION: '3.13'
       DO_TEST_PUBLISH_FIRST: true
+      USE_UV: true

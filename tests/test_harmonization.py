@@ -1,4 +1,4 @@
-from harmonization.harmonization_benchmark import (
+from ai_harmonization.harmonization_benchmark import (
     get_metrics_for_approach,
     HarmonizationApproach,
 )
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from typing import List
 
-from harmonization.harmonization_approaches.base import (
+from ai_harmonization.harmonization_approaches.base import (
     SingleHarmonizationSuggestion,
     HarmonizationSuggestions,
 )
@@ -43,14 +43,33 @@ def example_suggestions():
 def test_get_metrics_for_approach(
     tmp_path: Path, example_suggestions: List[SingleHarmonizationSuggestion]
 ):
+    test1 = {
+        "nodes": [
+            {
+                "name": "a",
+                "description": "foobar",
+                "properties": [
+                    {"foo": {"name": "a", "type": "string", "description": "Foo field"}}
+                ],
+            },
+        ]
+    }
+    test2 = {
+        "nodes": [
+            {
+                "name": "b",
+                "description": "foobar",
+                "properties": [
+                    {"bar": {"name": "b", "type": "string", "description": "Bar field"}}
+                ],
+            },
+        ]
+    }
+
     # Create a sample benchmark file with JSONL content
     sample_row = {
-        "input_source_model": """
-{"a": 1}
-""".strip(),
-        "input_target_model": """
-{"b": 2}
-""".strip(),
+        "input_source_model": json.dumps(test1),
+        "input_target_model": json.dumps(test2),
         "harmonized_mapping": """
 foo\tbar
 x\ty
@@ -65,10 +84,9 @@ x\ty
 
     # Mock HarmonizationApproach and get_metrics_for_test_case
     mock_approach = MagicMock(spec=HarmonizationApproach)
-    mock_approach.get_harmonization_suggestions.return_value = example_suggestions
-
+    mock_approach.get_harmonization_suggestions.return_value = example_suggestion
     with patch(
-        "harmonization.harmonization_benchmark.get_metrics_for_test_case",
+        "ai_harmonization.harmonization_benchmark.get_metrics_for_test_case",
         return_value={"accuracy": 0.9},
     ):
         get_metrics_for_approach(
@@ -83,4 +101,4 @@ x\ty
         written_row = json.loads(f.readline())
         assert "custom_metrics" in written_row
         assert written_row["custom_metrics"] == {"accuracy": 0.9}
-        assert json.loads(written_row["input_source_model"]) == {"a": 1}
+        assert json.loads(written_row["input_source_model"]) == test1

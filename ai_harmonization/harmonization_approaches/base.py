@@ -8,8 +8,8 @@ from sssom.parsers import MappingSetDataFrame
 from sssom.writers import write_table
 from sssom_schema import Mapping, MappingSet
 
-from harmonization.simple_data_model import SimpleDataModel
-from harmonization.utils import nodeproperty_to_curie
+from ai_harmonization.simple_data_model import SimpleDataModel
+from ai_harmonization.utils import nodeproperty_to_curie
 
 DEFAULT_SSSOM_METADATA: Dict[str, str | dict] = {
     "mapping_set_id": "https://example.org/mappings/example.sssom.tsv",

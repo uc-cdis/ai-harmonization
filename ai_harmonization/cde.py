@@ -7,7 +7,7 @@ import requests
 from langchain_community.document_loaders import JSONLoader
 from langchain_core.documents import Document
 
-from harmonization.utils import TEMP_DIR
+from ai_harmonization.utils import TEMP_DIR
 
 """
 Examples:

@@ -68,8 +68,8 @@ jobs:
 
                 if [ $? -eq 0 ]; then
                     echo "Package installation successful, uninstalling..."
-                    pip uninstall ai_harmonization
-                    pip cache purge
+                    pip uninstall ai_harmonization --no-input
+                    pip cache purge --no-input
                 fi
             fi
 

@@ -1,6 +1,6 @@
 [project]
 name = "ai_harmonization"
-version = "0.2.3"
+version = "0.2.4"
 description = "AI-backed harmonization framework"
 readme = "README.md"
 requires-python = ">=3.13,<4.0.0"

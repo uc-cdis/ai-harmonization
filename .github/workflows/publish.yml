@@ -40,12 +40,10 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Install uv dependencies
+      - name: Clean pip cache
         run: |
-          df -h
-          uv sync --locked --all-extras
-          df -h
-          uv tree
+          pip cache purge
+        shell: bash
 
       - name: uv Build
         run: |
@@ -71,7 +69,7 @@ jobs:
                 if [ $? -eq 0 ]; then
                     echo "Package installation successful, uninstalling..."
                     pip uninstall ai_harmonization
-                    df -h
+                    pip cache purge
                 fi
             fi
 

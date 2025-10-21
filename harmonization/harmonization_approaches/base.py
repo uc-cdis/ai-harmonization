@@ -61,10 +61,10 @@ class HarmonizationSuggestions(BaseModel):
                     "Original Node.Property": f"{suggestion.source_node}.{suggestion.source_property}",
                     "Suggested Target Node.Property": f"{suggestion.target_node}.{suggestion.target_property}",
                     "Similarity": suggestion.similarity,
-                    "Original Description": suggestion.source_description,
                     "Target Description": suggestion.target_description,
                     "Ranking": suggestion.ranking,
                     # "Additional Metad": suggestion.target_description,
+                    "Original Description": suggestion.source_description,
                 }
             )
         return pd.DataFrame(data)

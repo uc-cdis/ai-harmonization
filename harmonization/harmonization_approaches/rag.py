@@ -20,42 +20,34 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
 
     def __init__(
         self,
-        vectordb_persist_directory_name: str,
-        input_target_model: SimpleDataModel,
-        embedding_function = None,
-        force_vectorstore_recreation: bool = False,
-        embedding_batch_size: int | None = None,
-        similarity_search_k_value: int = 5,
-        similarity_search_score_threshold: float = 0.5,
+        similarity_search_approach_class = None,
         llm_model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         llm_max_model_len: int = 2048,
         llm_dtype: str = "float16",
         llm_max_num_seqs: int = 1,
         llm_max_num_batched_tokens: int = 2048,
         llm_gpu_memory_utilization: float = 0.9,
+        llm_lora_model_path: str | None = None,
         inference_max_tokens: int = 256,
         inference_temperature: float = 0.0,
         inference_max_retries: int = 3,
         max_suggestions_num: int = 5,
+        query_template: str | None = None,
     ):
         super().__init__()
-        self.vectordb_persist_directory_name = vectordb_persist_directory_name
-        self.input_target_model = input_target_model
-        self.embedding_function = embedding_function
-        self.force_vectorstore_recreation = force_vectorstore_recreation
-        self.embedding_batch_size = embedding_batch_size
-        self.similarity_search_k_value = similarity_search_k_value
-        self.similarity_search_score_threshold = similarity_search_score_threshold
+        self.similarity_search_approach_class = similarity_search_approach_class
         self.llm_model_name = llm_model_name
         self.llm_max_model_len = llm_max_model_len
         self.llm_dtype = llm_dtype
         self.llm_max_num_seqs = llm_max_num_seqs
         self.llm_max_num_batched_tokens = llm_max_num_batched_tokens
         self.llm_gpu_memory_utilization = llm_gpu_memory_utilization
+        self.llm_lora_model_path = llm_lora_model_path
         self.inference_max_tokens = inference_max_tokens
         self.inference_temperature = inference_temperature
         self.inference_max_retries = inference_max_retries
         self.max_suggestions_num = max_suggestions_num
+        self.query_template = query_template
 
 
     def get_harmonization_suggestions(
@@ -64,7 +56,13 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
         input_target_model: SimpleDataModel,
         **kwargs
     ):
-        similarity_search_output_df = self._get_similarity_search_suggestions(input_source_model).to_dataframe()
+        similarity_search_suggestions = self.similarity_search_approach_class.get_harmonization_suggestions(
+            input_source_model=input_source_model,
+            input_target_model=input_target_model,
+            **kwargs
+        )
+
+        similarity_search_output_df = similarity_search_suggestions.to_dataframe()
         
         llm_client = LLMClient(
             model_name=self.llm_model_name,
@@ -76,6 +74,8 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
             inference_max_tokens=self.inference_max_tokens,
             inference_temperature=self.inference_temperature,
             inference_max_retries=self.inference_max_retries,
+            lora_model_path=self.llm_lora_model_path,
+            query_template=self.query_template,
         )
 
         suggestions = []
@@ -114,25 +114,3 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
                 suggestions.append(single_suggestion)
 
         return HarmonizationSuggestions(suggestions=suggestions)
-
-
-    def _get_similarity_search_suggestions(
-        self, input_source_model: SimpleDataModel
-    ) -> HarmonizationSuggestions:
-        similarity_search = SimilaritySearchInMemoryVectorDb(
-            vectordb_persist_directory_name=self.vectordb_persist_directory_name,
-            input_target_model=self.input_target_model,
-            embedding_function=self.embedding_function,
-            force_vectorstore_recreation=self.force_vectorstore_recreation,
-            batch_size=self.embedding_batch_size,
-        )
-
-        suggestions = similarity_search.get_harmonization_suggestions(
-            input_source_model=input_source_model,
-            input_target_model=self.input_target_model,
-            score_threshold=self.similarity_search_score_threshold,
-            k=self.similarity_search_k_value,
-        )
-
-        return suggestions
-            

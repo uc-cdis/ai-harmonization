@@ -184,43 +184,6 @@ class SimpleDataModel(BaseModel):
 
         return data_model
 
-    def from_dict(input_json):
-        """
-        Converts JSON model created from CSV to SimpleDataModel.
-        Accepts either a JSON string or dict.
-        Returns a SimpleDataModel instance.
-        """
-        # Load if string
-        if isinstance(input_json, str):
-            model = json.loads(input_json)
-        else:
-            model = input_json
-
-        # Get top-level name if available, default to "Source"
-        node_name = model.get("name", "Source")
-        node_description = model.get("description", "")
-
-        properties = []
-        for prop in model.get("properties", []):
-            properties.append(
-                Property(
-                    name=prop.get("name", ""),
-                    type=prop.get("type", ""),
-                    description=prop.get("description", ""),
-                    histogram=prop.get("histogram", {}),
-                )
-            )
-
-        node = Node(
-            name=node_name,
-            description=node_description,
-            properties=properties,
-            links=[],
-        )
-
-        data_model = SimpleDataModel(nodes=[node])
-        return data_model
-
     @staticmethod
     def from_gdc_model(input_json: str):
         """
@@ -288,12 +251,6 @@ class SimpleDataModel(BaseModel):
 
         try:
             simple_data_model = SimpleDataModel.from_simple_json(input_json)
-        except BaseException as exc:
-            exception = exc
-            pass
-
-        try:
-            simple_data_model = SimpleDataModel.from_dict(input_json)
         except BaseException as exc:
             exception = exc
             pass

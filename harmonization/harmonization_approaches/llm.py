@@ -70,11 +70,7 @@ class LLMClient:
         )
 
         self.inference_max_retries = inference_max_retries
-
-        if query_template:
-            self.query_template = query_template
-        else:
-            self.query_template = DEFAULT_QUERY_TEMPLATE
+        self.query_template = query_template or DEFAULT_QUERY_TEMPLATE
 
 
     def load_llm(self):
@@ -90,8 +86,9 @@ class LLMClient:
         return LLM(
             model=self.model_name, 
             max_model_len=self.max_model_len,
-            dtype=self.dtype,             
-            max_num_seqs=self.max_num_seqs,              # how many requests at a time
+            dtype=self.dtype,
+            # max_num_seqs define how many requests at a time  
+            max_num_seqs=self.max_num_seqs,              
             tensor_parallel_size=tensor_parallel_size,
             max_num_batched_tokens=self.max_num_batched_tokens,
             gpu_memory_utilization=self.gpu_memory_utilization,

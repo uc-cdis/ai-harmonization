@@ -3,7 +3,6 @@ import torch
 from transformers import AutoModel, AutoTokenizer
 
 
-
 class BaseEmbeddings:
     def __init__(self, model_name, device=None, trust_remote_code=False):
         # Load tokenizer/model, set device, set eval()

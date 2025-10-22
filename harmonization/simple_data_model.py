@@ -12,6 +12,7 @@ class Property(BaseModel):
     type: Union[str, List[str]]
     name: str
     additional_metadata: Optional[dict] = None
+    values: Optional[List] = None
 
 
 class Node(BaseModel):
@@ -234,11 +235,19 @@ class SimpleDataModel(BaseModel):
             properties = []
 
             for prop_name, prop_data in node_data.get("properties", {}).items():
+                # Exctract values
+                values = None
+                if "enum" in prop_data:
+                    values = prop_data["enum"]
+                elif "values" in prop_data:
+                    values = prop_data["values"]
+
                 # Build a Property object
                 prop = Property(
                     name=prop_name,
                     description=prop_data.get("description", ""),
                     type=prop_data.get("type", ""),
+                    values=values,
                 )
                 properties.append(prop)
 

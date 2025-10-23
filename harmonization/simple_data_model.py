@@ -376,21 +376,19 @@ def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, st
     Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
     and returns a tuple containing the node name, property name, property type, and property description.
     """
-    match = re.match(r"^(.*?)\.(.*)\s+\(([^)]*)\):\s*(.*)$", input_string)
+    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):|:)(.*)$", input_string)
     if match:
-        node_name = match.group(1).strip()
-        prop_name = match.group(2).strip()
-        prop_type = match.group(3)
-        prop_desc = match.group(4)
-        return node_name, prop_name, prop_type, prop_desc
-    # Fallback:
-    match = re.match(r"^(.*?)\.(.*?):\s*(.*)$", input_string)
-    if match:
-        node_name = match.group(1).strip()
-        prop_name = match.group(2).strip()
-        prop_type = ""
-        prop_desc = match.group(3)
-    return "", "", "", ""
+        node_name = match.group(1) or ""
+        prop_name = match.group(2) or ""
+        prop_type = match.group(3) or ""
+        prop_desc = match.group(4) or ""
+        return (
+            node_name.strip(),
+            prop_name.strip(),
+            prop_type.strip(),
+            prop_desc.strip(),
+        )
+    return ("", "", "", "")
 
 
 def get_data_model_as_node_prop_type_descriptions(

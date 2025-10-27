@@ -40,6 +40,7 @@ class SingleHarmonizationSuggestion(BaseModel):
     target_description: str
     target_additional_metadata: Optional[dict] = None
     similarity: Optional[float] = None
+    ranking: Optional[int] = None
 
 
 class HarmonizationSuggestions(BaseModel):
@@ -61,6 +62,8 @@ class HarmonizationSuggestions(BaseModel):
                     "Suggested Target Node.Property": f"{suggestion.target_node}.{suggestion.target_property}",
                     "Similarity": suggestion.similarity,
                     "Target Description": suggestion.target_description,
+                    "Ranking": suggestion.ranking,
+                    # "Additional Metad": suggestion.target_description,
                     "Original Description": suggestion.source_description,
                 }
             )

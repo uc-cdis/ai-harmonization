@@ -2,6 +2,7 @@ from vllm import LLM, SamplingParams
 from vllm.sampling_params import GuidedDecodingParams
 from vllm.lora.request import LoRARequest
 from pydantic import BaseModel, Field
+from typing import List
 from transformers import AutoConfig
 import torch
 import json
@@ -9,7 +10,7 @@ import logging
 
 
 DEFAULT_QUERY_TEMPLATE = """
-You are a helpful schema-matching assistant that outputs in JSON. Given an INPUT and some target CANDIDATES, choose the best mapping. You have to choose one from the CANDIDATES.
+You are a helpful schema-matching assistant that outputs in JSON. Given an INPUT and some target CANDIDATES, choose the best mappings. You have to choose the top {top_k} from the CANDIDATES.
 
 INPUT:
 Node: {input_node}
@@ -23,9 +24,12 @@ CANDIDATES:
 """
 
 
-class BestMatch(BaseModel):
+class SingleMatch(BaseModel):
     node: str = Field(..., description="The name of the node")
     property: str = Field(..., description="The name of the property")
+
+class Answer(BaseModel):
+    answer: List[SingleMatch]
 
 
 class LLMClient:
@@ -40,6 +44,7 @@ class LLMClient:
         inference_max_tokens: int = 4096,
         inference_temperature: float = 0.0,
         inference_max_retries: int = 3,
+        inference_top_k: int = 5,
         lora_model_path: str | None = None,
         query_template: str | None = None,
     ):
@@ -61,7 +66,7 @@ class LLMClient:
 
         self.llm = self.load_llm()
 
-        json_schema = BestMatch.model_json_schema()
+        json_schema = Answer.model_json_schema()
         guided_decoding_params_json = GuidedDecodingParams(json=json_schema)
         self.sampling_params_json = SamplingParams(
             guided_decoding=guided_decoding_params_json,
@@ -70,6 +75,7 @@ class LLMClient:
         )
 
         self.inference_max_retries = inference_max_retries
+        self.inference_top_k = inference_top_k
         self.query_template = query_template or DEFAULT_QUERY_TEMPLATE
 
 
@@ -96,7 +102,7 @@ class LLMClient:
             )
     
 
-    def get_decision(self, group_df):
+    def inference(self, group_df):
 
         source_node = group_df["source_node"].iloc[0]
         source_property = group_df["source_property"].iloc[0]
@@ -112,45 +118,59 @@ class LLMClient:
         cand_str = "\n\n".join(cand_strs)
         invalid_answers = []
         
-        for attempt in range(self.inference_max_retries):
-            invalid_note = ""
-            if invalid_answers:
-                invalid_note = f"Previous invalid answers: {', '.join(invalid_answers)}. Do NOT repeat them."
+        node_property_pairs_len = len(node_property_pairs)
 
-            query = self.query_template.format(
-                input_node=source_node, 
-                input_property=source_property,
-                input_description=source_description,
-                candidates=cand_str,
-                invalid_note=invalid_note
-            )
-            
-            outputs = self.llm.generate(
-                query,
-                sampling_params=self.sampling_params_json,
-                lora_request=self.lora_request,
-            )
+        top_k = min(self.inference_top_k, node_property_pairs_len)
+        
+        if node_property_pairs_len > 0:
+            for attempt in range(self.inference_max_retries):
+                invalid_note = ""
+                if invalid_answers:
+                    invalid_note = f"Previous invalid answers: {', '.join(invalid_answers)}. Do NOT repeat them."
 
-            decision = None
-            node_property_pair = None
-            try:
-                decision = json.loads(outputs[0].outputs[0].text)
-                node_property_pair = (decision["node"], decision["property"])
-            except Exception as e:
-                logging.debug(
-                    f"Invalid LLM output(invalid json): {outputs[0].outputs[0].text}. " 
-                    f"Process detail: mapping {source_node},{source_property} to {node_property_pairs}"
+                query = self.query_template.format(
+                    top_k=top_k,
+                    input_node=source_node,
+                    input_property=source_property,
+                    input_description=source_description,
+                    candidates=cand_str,
+                    invalid_note=invalid_note
                 )
-                invalid_answers.append(outputs[0].outputs[0].text)
-            
-            if decision and node_property_pair:
-                if node_property_pair in node_property_pairs:
-                    return decision
-                else:
+                logging.debug(f"query: {query}")
+                
+                outputs = self.llm.generate(
+                    query,
+                    sampling_params=self.sampling_params_json,
+                    lora_request=self.lora_request,
+                )
+
+                output_list = None
+                output_node_property_pairs = set()
+                try:
+                    output_list = json.loads(outputs[0].outputs[0].text)["answer"]
+                    logging.debug(f"outputs: {output_list}")
+                    for item in output_list:
+                        output_node_property_pairs.add((item["node"], item["property"]))
+                    logging.debug(f"output_node_property_pairs: {output_node_property_pairs}")
+                except Exception as e:
                     logging.debug(
-                        f"Invalid LLM output(invalid answer): {decision}. " 
+                        f"Invalid LLM output(invalid json): {outputs[0].outputs[0].text}. " 
                         f"Process detail: mapping {source_node},{source_property} to {node_property_pairs}"
                     )
-                    invalid_answers.append(str(decision))
+                    invalid_answers.append(outputs[0].outputs[0].text)
+                
+                if output_list and output_node_property_pairs:
+                    if output_node_property_pairs <= node_property_pairs:
+                        return output_node_property_pairs
+                    else:
+                        invalid_pairs = output_node_property_pairs - node_property_pairs
+                        for item in invalid_pairs:
+                            item_converted = f'{{"node": "{item[0]}", "property": "{item[1]}"}}'
+                            if item_converted not in invalid_answers:
+                                invalid_answers.append(item_converted)
+                        logging.debug(
+                            f"Invalid LLM output(invalid answer): {invalid_pairs}. " 
+                            f"Process detail: mapping {source_node},{source_property} to {node_property_pairs}"
+                        )
         
         return None

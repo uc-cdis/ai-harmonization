@@ -16,6 +16,9 @@ from harmonization.simple_data_model import (
     SimpleDataModel,
 )
 
+import pandas as pd 
+import logging
+
 class RetrievalAugmentedGeneration(HarmonizationApproach):
 
     def __init__(
@@ -31,7 +34,8 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
         inference_max_tokens: int = 4096,
         inference_temperature: float = 0.0,
         inference_max_retries: int = 3,
-        max_suggestions_num: int = 5,
+        inference_top_k: int = 5,
+        max_suggestions_num: int = 10,
         query_template: str | None = None,
     ):
         super().__init__()
@@ -46,6 +50,7 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
         self.inference_max_tokens = inference_max_tokens
         self.inference_temperature = inference_temperature
         self.inference_max_retries = inference_max_retries
+        self.inference_top_k = inference_top_k
         self.max_suggestions_num = max_suggestions_num
         self.query_template = query_template
 
@@ -74,22 +79,36 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
             inference_max_tokens=self.inference_max_tokens,
             inference_temperature=self.inference_temperature,
             inference_max_retries=self.inference_max_retries,
+            inference_top_k=self.inference_top_k,
             lora_model_path=self.llm_lora_model_path,
             query_template=self.query_template,
         )
 
         suggestions = []
         for (source_node, source_property), group_df in similarity_search_output_df.groupby(["source_node", "source_property"]):
-            decision = llm_client.get_decision(group_df)
-            if decision is not None:
-                group_df.loc[(group_df["target_node"] == decision["node"]) & (group_df["target_property"] == decision["property"]), 'ranking'] = 1
-                mask = group_df["ranking"] != 1  
-                start_rank = 1
-                group_df.loc[mask, "ranking"] = (
-                    group_df.loc[mask, "similarity"]
-                    .rank(method="first", ascending=False)
-                    .astype(int) + start_rank
+            outputs = llm_client.inference(group_df)
+            if outputs is not None:
+                # 1. Mark rows that are in outputs
+                group_df["in_outputs"] = group_df.apply(
+                    lambda row: (row["target_node"], row["target_property"]) in outputs, axis=1
                 )
+                logging.debug(f"group_df: {group_df[["target_node", "target_property", "similarity", "ranking", "in_outputs"]]}")
+                n = len(outputs)
+                # 2. Rank entries in outputs by similarity (descending)
+                in_outputs_df = group_df[group_df["in_outputs"]].sort_values("similarity", ascending=False).copy()
+                in_outputs_df["ranking"] = range(1, n+1)
+                logging.debug(f"in_outputs_df: {in_outputs_df[["target_node", "target_property", "similarity", "ranking", "in_outputs"]]}")
+
+                # 3. Rank the rest by similarity (descending), starting at n+1
+                rest_df = group_df[~group_df["in_outputs"]].sort_values("similarity", ascending=False).copy()
+                rest_df["ranking"] = range(n+1, n+len(rest_df)+1)
+                logging.debug(f"rest_df: {rest_df[["target_node", "target_property", "similarity", "ranking", "in_outputs"]]}")
+
+                # 4. Concatenate and restore original DataFrame
+                final_df = pd.concat([in_outputs_df, rest_df])
+                group_df.update(final_df)
+                group_df = group_df.drop("in_outputs", axis=1)
+                logging.debug(f"final group_df: {group_df[["target_node", "target_property", "similarity", "ranking"]]}")
             else:
                 group_df["ranking"] = (
                     group_df["similarity"]
@@ -97,6 +116,7 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
                     .astype(int)
                 )
             suggestions_df = group_df[group_df["ranking"] <= self.max_suggestions_num]
+            logging.debug(f"suggestions_df: {suggestions_df[["target_node", "target_property", "similarity", "ranking"]]}")
 
             for index, row in suggestions_df.iterrows():
                 single_suggestion = SingleHarmonizationSuggestion(

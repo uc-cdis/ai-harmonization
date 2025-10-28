@@ -32,7 +32,7 @@ testpaths = [
 ]
 
 [tool.setuptools]
-packages = ["ai_harmonization"]
+packages = ["ai_harmonization", "ai_harmonization.harmonization_approaches"]
 
 [[tool.uv.index]]
 name = "testpypi"

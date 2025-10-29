@@ -4,12 +4,12 @@ from typing import List, TypedDict
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
-from harmonization.harmonization_approaches.base import (
+from ai_harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,
 )
-from harmonization.simple_data_model import (
+from ai_harmonization.simple_data_model import (
     Node,
     Property,
     SimpleDataModel,
@@ -17,7 +17,7 @@ from harmonization.simple_data_model import (
     get_node_prop_type_desc_from_string,
     get_node_property_as_string,
 )
-from harmonization.utils import (
+from ai_harmonization.utils import (
     TEMP_DIR,
     add_documents_to_vectorstore,
     get_langchain_vectorstore_and_persistent_client,

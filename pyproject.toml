@@ -1,27 +1,27 @@
 [project]
-name = "harmonization"
-version = "0.1.0"
-description = "Add your description here"
+name = "ai_harmonization"
+version = "0.2.7"
+description = "AI-backed harmonization framework"
 readme = "README.md"
-requires-python = ">=3.12,<4.0.0"
+requires-python = ">=3.13,<4.0.0"
 dependencies = [
-    "anywidget>=0.9.18",
-    "accelerate>=1.10.0",
     "chromadb>=1.0.15",
-    "ipykernel>=6.30.0",
-    "itables>=2.4.4",
     "langchain-chroma>=0.2.5",
     "langchain-community>=0.3.27",
     "langchain-core>=0.3.72",
     "langchain-huggingface>=0.3.1",
     "matplotlib>=3.10.5",
+    "numpy>=2.3.2",
     "pandas>=2.3.1",
     "pydantic>=2.11.7",
     "requests>=2.32.4",
-    "sentence-transformers>=5.0.0",
     "sssom>=0.4.16",
+    "sssom-schema>=1.0.0",
+    "torch>=2.9.0",
     "tqdm>=4.67.1",
-    "nbconvert>=7.16.6,<8.0.0",
+    "transformers>=4.57.1",
+    "itables>=2.4.4",
+    "ipython>=9.4.0",
 ]
 
 [tool.pytest.ini_options]
@@ -32,4 +32,18 @@ testpaths = [
 ]
 
 [tool.setuptools]
-packages = ["harmonization"]
+packages = ["ai_harmonization", "ai_harmonization.harmonization_approaches"]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple/"
+publish-url = "https://test.pypi.org/legacy/"
+explicit = true
+
+[dependency-groups]
+dev = [
+    "deptry>=0.23.1",
+    "anywidget>=0.9.18",
+    "nbconvert>=7.16.6,<8.0.0",
+    "ipykernel>=6.30.0",
+]

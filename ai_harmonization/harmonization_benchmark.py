@@ -6,13 +6,13 @@ import re
 from collections import Counter
 from typing import Callable, Dict
 
-from harmonization.harmonization_approaches.base import (
+from ai_harmonization.harmonization_approaches.base import (
     HarmonizationApproach,
     HarmonizationSuggestions,
     SingleHarmonizationSuggestion,
     harmonization_suggestions_to_sssom,
 )
-from harmonization.simple_data_model import (
+from ai_harmonization.simple_data_model import (
     SimpleDataModel,
     get_node_prop_type_desc_from_string,
 )

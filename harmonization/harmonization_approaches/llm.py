@@ -37,7 +37,7 @@ class LLMClient:
         self,
         model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         max_model_len: int = 4096,
-        dtype: str = "float16",
+        dtype: str = "bfloat16",
         max_num_seqs: int = 1,
         max_num_batched_tokens: int = 2048,
         gpu_memory_utilization: float = 0.9,
@@ -81,11 +81,14 @@ class LLMClient:
 
     def load_llm(self):
         if torch.cuda.is_available():
-            model_config = AutoConfig.from_pretrained(self.model_name)
-            num_heads = model_config.num_attention_heads
-            n_gpus = torch.cuda.device_count()
-            valid_divisors = [d for d in range(1, n_gpus+1) if num_heads % d == 0]
-            tensor_parallel_size = max(valid_divisors)
+            try:
+                model_config = AutoConfig.from_pretrained(self.model_name)
+                num_heads = model_config.num_attention_heads
+                n_gpus = torch.cuda.device_count()
+                valid_divisors = [d for d in range(1, n_gpus+1) if num_heads % d == 0]
+                tensor_parallel_size = max(valid_divisors)
+            except:
+                tensor_parallel_size = 1
         else:
             tensor_parallel_size = 1
 
@@ -149,7 +152,12 @@ class LLMClient:
                 try:
                     output_list = json.loads(outputs[0].outputs[0].text)["answer"]
                     logging.debug(f"outputs: {output_list}")
+                    no_duplicates = []
                     for item in output_list:
+                        if item not in no_duplicates:
+                            no_duplicates.append(item)
+                    curated_output_list = no_duplicates[0:top_k]
+                    for item in curated_output_list:
                         output_node_property_pairs.add((item["node"], item["property"]))
                     logging.debug(f"output_node_property_pairs: {output_node_property_pairs}")
                 except Exception as e:

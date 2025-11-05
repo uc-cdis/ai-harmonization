@@ -26,7 +26,7 @@ class RetrievalAugmentedGeneration(HarmonizationApproach):
         similarity_search_approach_class = None,
         llm_model_name: str = "meta-llama/Llama-3.1-8B-Instruct",
         llm_max_model_len: int = 4096,
-        llm_dtype: str = "float16",
+        llm_dtype: str = "bfloat16",
         llm_max_num_seqs: int = 1,
         llm_max_num_batched_tokens: int = 2048,
         llm_gpu_memory_utilization: float = 0.9,

@@ -1,9 +1,9 @@
 [project]
 name = "ai_harmonization"
-version = "0.2.7"
+version = "0.3.0"
 description = "AI-backed harmonization framework"
 readme = "README.md"
-requires-python = ">=3.13,<4.0.0"
+requires-python = ">=3.12,<4.0.0"
 dependencies = [
     "chromadb>=1.0.15",
     "langchain-chroma>=0.2.5",

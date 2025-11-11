@@ -4,6 +4,12 @@ This contains code and related artifacts for powering an AI-assisted data model 
 
 ## Usage
 
+```
+pip install ai_harmonization
+```
+
+> NOTE: Tested on Python 3.12
+
 ### **AI-Assisted Data Curation Toolkit**
 
 - **[Demo](./jupyter/ai_assisted_data_curation.ipynb)**

@@ -1,6 +1,6 @@
 [project]
 name = "ai_harmonization"
-version = "0.3.0"
+version = "0.3.1"
 description = "AI-backed harmonization framework"
 readme = "README.md"
 requires-python = ">=3.12,<4.0.0"
@@ -12,16 +12,24 @@ dependencies = [
     "langchain-huggingface>=0.3.1",
     "matplotlib>=3.10.5",
     "numpy>=2.3.2",
-    "pandas>=2.3.1",
+    # This is the latest version of pandas supported in
+    # Google collab as of 11 NOV 2025
+    "pandas>=2.2.2",
     "pydantic>=2.11.7",
+    # This is the latest version of requests supported in
+    # Google collab as of 11 NOV 2025
     "requests>=2.32.4",
     "sssom>=0.4.16",
     "sssom-schema>=1.0.0",
-    "torch>=2.9.0",
+    # This is the latest version of torch supported in
+    # Google collab as of 11 NOV 2025
+    "torch>=2.8.0",
     "tqdm>=4.67.1",
     "transformers>=4.57.1",
     "itables>=2.4.4",
-    "ipython>=9.4.0",
+    # This is the latest version of ipython supported in
+    # Google collab as of 11 NOV 2025
+    "ipython>=7.34.0",
 ]
 
 [tool.pytest.ini_options]

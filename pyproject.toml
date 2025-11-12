@@ -1,35 +1,41 @@
 [project]
 name = "ai_harmonization"
-version = "0.3.1"
+version = "0.3.2"
 description = "AI-backed harmonization framework"
 readme = "README.md"
 requires-python = ">=3.12,<4.0.0"
 dependencies = [
-    "chromadb>=1.0.15",
     "langchain-chroma>=0.2.5",
     "langchain-community>=0.3.27",
     "langchain-core>=0.3.72",
     "langchain-huggingface>=0.3.1",
-    "matplotlib>=3.10.5",
-    "numpy>=2.3.2",
-    # This is the latest version of pandas supported in
-    # Google collab as of 11 NOV 2025
-    "pandas>=2.2.2",
     "pydantic>=2.11.7",
-    # This is the latest version of requests supported in
-    # Google collab as of 11 NOV 2025
-    "requests>=2.32.4",
     "sssom>=0.4.16",
     "sssom-schema>=1.0.0",
-    # This is the latest version of torch supported in
-    # Google collab as of 11 NOV 2025
-    "torch>=2.8.0",
     "tqdm>=4.67.1",
     "transformers>=4.57.1",
     "itables>=2.4.4",
-    # This is the latest version of ipython supported in
-    # Google collab as of 11 NOV 2025
+    # We want this to work in a Google Colab environment.
+    # In such environments, Google's pre-installs a ton of Google
+    # Python SDKs which don't always work with the latest version
+    # of popular packages. As such, we have to be more lenient and
+    # allow older versions of specific packages so the dep resolution
+    # is successful when this is pip installed in Google Colab.
+    #
+    # The packages after this comment are the latest versions
+    # supported in Google Colab as of 11 NOV 2025. Leaving >=
+    # so that they can be updated to later version as Colab supports
+    # newer versions (and so non-Colab environments get the latest)
+    "numpy>=2.0.2",
+    "pandas>=2.2.2",
+    "requests>=2.32.4",
     "ipython>=7.34.0",
+    "torch>=2.8.0",
+    "matplotlib>=3.10.0",
+    # The following have sub-deps that have restrictions in other Google Colab deps
+    # Similar to the above, leaving >= on an older version to
+    # automatically get the latest version possible during dep resolution
+    "chromadb>=1.0.0",
 ]
 
 [tool.pytest.ini_options]

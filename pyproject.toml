@@ -13,7 +13,6 @@ dependencies = [
     "sssom>=0.4.16",
     "sssom-schema>=1.0.0",
     "tqdm>=4.67.1",
-    "transformers>=4.57.1",
     "itables>=2.4.4",
     # We want this to work in a Google Colab environment.
     # In such environments, Google's pre-installs a ton of Google
@@ -36,6 +35,9 @@ dependencies = [
     # Similar to the above, leaving >= on an older version to
     # automatically get the latest version possible during dep resolution
     "chromadb>=1.0.0",
+    "sentence-transformers>=5.1.2",
+    "datasets>=4.4.1",
+    "accelerate>=1.11.0",
 ]
 
 [tool.pytest.ini_options]

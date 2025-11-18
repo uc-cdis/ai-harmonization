@@ -45,7 +45,9 @@ class BaseEmbeddings:
 
 class MedGemmaEmbeddings(BaseEmbeddings):
     def __init__(self, model_name="google/medgemma-4b-it", model=None, device=None):
-        super().__init__(model_name, device, model=model, trust_remote_code=True)
+        super().__init__(
+            model_name=model_name, device=device, model=model, trust_remote_code=True
+        )
 
     def embed_documents(self, texts):
         inputs = self.tokenizer(
@@ -66,7 +68,9 @@ class MedGemmaEmbeddings(BaseEmbeddings):
 
 class QwenEmbeddings(BaseEmbeddings):
     def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B", model=None, device=None):
-        super().__init__(model_name, device, model=model, trust_remote_code=True)
+        super().__init__(
+            model_name=model_name, device=device, model=model, trust_remote_code=True
+        )
 
     def embed_documents(self, texts):
         inputs = self.tokenizer(

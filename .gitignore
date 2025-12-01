@@ -10,8 +10,12 @@ selected_suggestions.tsv
 
 tmp_*
 
+*.zip
+
 **/*custom_metrics*/*.md
 *custom_metrics*.md
+
+models/
 
 *.csv/
 

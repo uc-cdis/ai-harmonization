@@ -4,6 +4,12 @@ This contains code and related artifacts for powering an AI-assisted data model 
 
 ## Usage
 
+```
+pip install ai_harmonization
+```
+
+> NOTE: Tested on Python 3.12
+
 ### **AI-Assisted Data Curation Toolkit**
 
 - **[Demo](./jupyter/ai_assisted_data_curation.ipynb)**
@@ -17,7 +23,7 @@ This contains code and related artifacts for powering an AI-assisted data model 
 
 ## Details
 
-Reference `harmonization.harmonization_approaches.similarity_inmem.SimilaritySearchInMemoryVectorDb` to understand how to build new harmonization approaches.
+Reference `ai_harmonization.harmonization_approaches.similarity_inmem.SimilaritySearchInMemoryVectorDb` to understand how to build new harmonization approaches.
 
 Abtractions have been built to allow the evaluation of different overall approaches. There is a base class to implement for a new `HarmonizationApproach`.
 
@@ -74,8 +80,8 @@ class NewApproachExample(HarmonizationApproach):
 And now, if you have a benchmark and want to evaluate the new approach:
 
 ```python
-from harmonization.harmonization_benchmark import get_metrics_for_approach
-from harmonization.harmonization_approaches.new_approach import (
+from ai_harmonization.harmonization_benchmark import get_metrics_for_approach
+from ai_harmonization.harmonization_approaches.new_approach import (
     NewApproachExample,
 )
 

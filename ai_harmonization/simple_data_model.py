@@ -12,6 +12,7 @@ class Property(BaseModel):
     type: Union[str, List[str]]
     name: str
     additional_metadata: Optional[dict] = None
+    values: Optional[List] = None
 
 
 class Node(BaseModel):
@@ -212,6 +213,74 @@ class SimpleDataModel(BaseModel):
         return data_model
 
     @staticmethod
+    def from_gdc_model(input_json: str):
+        """
+        Converts a GDC model to a standard SimpleDataModel
+        Accepts input as a json string or a parsed dict.
+        """
+        # If input is a string, parse it
+        if isinstance(input_json, str):
+            gdc_dict = json.loads(input_json)
+        else:
+            gdc_dict = input_json
+
+        nodes = []
+        for node_name, node_data in gdc_dict.items():
+            # Skip metadata/_definitions nodes
+            if node_name.startswith("_"):
+                continue
+
+            # Node might have description missing, so use empty string
+            node_description = node_data.get("description", "")
+            properties = []
+
+            for prop_name, prop_data in node_data.get("properties", {}).items():
+                # Exctract values
+                values = None
+                if "enum" in prop_data:
+                    values = prop_data["enum"]
+                elif "values" in prop_data:
+                    values = prop_data["values"]
+
+                # Build a Property object
+                prop = Property(
+                    name=prop_name,
+                    description=prop_data.get("description", ""),
+                    type=prop_data.get("type", ""),
+                    values=values,
+                )
+                properties.append(prop)
+
+            # Links: GDC rarely has links, but may add as empty list
+            links = []
+            if isinstance(node_data.get("links", []), list):
+                links = [
+                    link.get("name", "")
+                    for link in node_data.get("links", [])
+                    if "name" in link
+                ]
+            elif (
+                isinstance(node_data.get("links", {}), dict)
+                and "subgroup" in node_data["links"]
+            ):
+                links = [
+                    link_info["name"] for link_info in node_data["links"]["subgroup"]
+                ]()
+
+            # Build Node
+            node = Node(
+                name=node_name,
+                description=node_description,
+                properties=properties,
+                links=links,
+            )
+
+            nodes.append(node)
+
+        data_model = SimpleDataModel(nodes=nodes)
+        return data_model
+
+    @staticmethod
     def from_linkml_jsonschema(input_json: str, ignore_properties_with_endings=None):
         """
         Converts a LinkML JSON model to a standard format
@@ -287,6 +356,12 @@ class SimpleDataModel(BaseModel):
             exception = exc
             pass
 
+        try:
+            simple_data_model = SimpleDataModel.from_gdc_model(input_json)
+        except BaseException as exc:
+            exception = exc
+            pass
+
         if not simple_data_model:
             print(
                 "Could not convert from unknown format to SimpleDataModel. Consider writing a custom converter."
@@ -301,18 +376,19 @@ def get_node_prop_type_desc_from_string(input_string: str) -> tuple[str, str, st
     Parses a string of the format "node.property_name (type): desc" or "node.property_name: desc"
     and returns a tuple containing the node name, property name, property type, and property description.
     """
-    match = re.match(r"^(.*?)\.(.*?)\s*(?:\((.*?)\):\s*(.*)|:\s*(.*))$", input_string)
+    match = re.match(r"^(.*?)\.(.*?)\s*(?:\(((?:(?!\)).)*?)\):|:)(.*)$", input_string)
     if match:
-        node_name = match.group(1)
-        prop_name = match.group(2)
-        if match.group(3):
-            prop_type = match.group(3)
-            prop_desc = match.group(4)
-        else:
-            prop_type = ""
-            prop_desc = match.group(5)
-        return node_name or "", prop_name or "", prop_type or "", prop_desc or ""
-    return "", "", "", ""
+        node_name = match.group(1) or ""
+        prop_name = match.group(2) or ""
+        prop_type = match.group(3) or ""
+        prop_desc = match.group(4) or ""
+        return (
+            node_name.strip(),
+            prop_name.strip(),
+            prop_type.strip(),
+            prop_desc.strip(),
+        )
+    return ("", "", "", "")
 
 
 def get_data_model_as_node_prop_type_descriptions(

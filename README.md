@@ -12,7 +12,7 @@ pip install ai_harmonization
 
 ### **AI-Assisted Data Curation Toolkit**
 
-- **[Demo](./jupyter/ai_assisted_data_curation.ipynb)**
+- **[Demo](https://huggingface.co/spaces/uc-ctds/ai_assisted_data_curation_toolkit/blob/main/ai_assisted_data_curation.ipynb)**
 
 ### Harmonization Benchmarking and AI Training
 

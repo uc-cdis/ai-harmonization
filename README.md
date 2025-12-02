@@ -10,7 +10,7 @@ pip install ai_harmonization
 
 > NOTE: Tested on Python 3.12
 
-### **AI-Assisted Data Curation Toolkit**
+### **AI-Assisted Data Harmonization Toolkit**
 
 - **[Demo](https://huggingface.co/spaces/uc-ctds/ai_assisted_data_curation_toolkit/blob/main/ai_assisted_data_curation.ipynb)**
 

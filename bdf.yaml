@@ -42,7 +42,7 @@ output:
     dataClass: structured
     dataType: "List of strings"
     format:
-      - structured
+      - dataframe
     dataStandard:
       - JSONSchema
     proprietary: false

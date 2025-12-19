@@ -13,6 +13,8 @@ dependencies = [
     "sssom>=0.4.16",
     "sssom-schema>=1.0.0",
     "tqdm>=4.67.1",
+    "vllm>=0.9.2",
+    "nbconvert>=7.16.6,<8.0.0",
     "itables>=2.4.4",
     # We want this to work in a Google Colab environment.
     # In such environments, Google's pre-installs a ton of Google

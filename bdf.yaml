@@ -1,0 +1,90 @@
+version: 0.0.1
+
+tool:
+  name: AI-Assisted Data Harmonization Toolkit - ABDI-ADHT
+  repo_url: https://github.com/uc-cdis/ai-harmonization
+  tool_homepage: https://github.com/uc-cdis/ai-harmonization
+  documentation_url: https://github.com/uc-cdis/ai-harmonization/blob/main/README.md
+  tool_type: Library
+
+llm:
+  usesLlm: true
+  modelsSupported:
+  - uc-ctds
+  bringOwnKey: false
+
+input:
+  - name: Source Data Model
+    dataCategory: "Graph-like data schemas"
+    dataClass: structured
+    dataType: "Schema"
+    format:
+      - json
+    dataStandard:
+      - "A structured representation of a data model"
+    proprietary: false
+    source: https://github.com/uc-cdis/ai-harmonization/
+
+  - name: Target Data Model
+    dataCategory: "Graph-like data schemas"
+    dataClass: structured
+    dataType: "Schema"
+    format:
+      - json
+    dataStandard:
+      - "A structured representation of a data model"
+    proprietary: false
+    source: https://github.com/uc-cdis/ai-harmonization/
+
+output:
+  - name: Harmonization Suggestions
+    dataCategory: "List of source to target mapping suggestions (with similarity/ranking)"
+    dataClass: structured
+    dataType: "List of strings"
+    format:
+      - dataframe
+    dataStandard:
+      - JSONSchema
+    proprietary: false
+    source: https://github.com/uc-cdis/ai-harmonization/
+
+license:
+  license_type: Apache-2.0
+  link: https://github.com/uc-cdis/ai-harmonization/blob/main/LICENSE
+
+funding:
+  source: None
+  agreement: Not specified
+  link: ""
+
+domains:
+  - biomedical
+
+credit:
+  - name: Gen3
+    role: Developer
+    org: University of Chicago Center for Translational Data Science
+    url: https://gen3.org/
+
+target_users:
+  primary_user:
+    user_type: researcher
+    technical_literacy_level:
+      - advanced
+    biomedical_literacy_level:
+      - intermediate
+  # Secondary user serves as the primary user type with specific user type
+  secondary_user:
+    user_type: "Data scientists interested in curating and harmonizing data models or data contributions"
+    technical_literacy_level:
+      - advanced
+    biomedical_literacy_level:
+      - intermediate
+
+maturity:
+  beginning_maturity: 1
+  current_maturity: 6
+
+media: [{ "link": "https://github.com/uc-cdis/ai-harmonization" }]
+
+collaborations: []

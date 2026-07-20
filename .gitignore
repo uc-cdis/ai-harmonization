@@ -156,3 +156,5 @@ unprocessable_temp_output.csv
 # data
 input_data_models/
 output_metrics/
+inputs*
+outputs*

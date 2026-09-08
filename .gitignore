@@ -2,6 +2,17 @@
 datasets/
 data/
 output/
+outputs/
+
+# Notebook working directories (jupyter/bdchm). These hold downloaded study
+# PFBs, dbGaP XML and mapping CSVs — gigabytes of data, none of it source.
+inputs/
+
+# Gen3 API keys. Never commit these.
+gen3-credentials/
+
+# PFB files
+*.avro
 
 jupyter/*.json
 real_benchmarks/

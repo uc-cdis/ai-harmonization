@@ -15,3 +15,25 @@ jobs:
     with:
       python-poetry: 'true'
     secrets: inherit  # pragma: allowlist secret
+
+  UnitTest:
+    name: Unit Tests
+    uses: uc-cdis/.github/.github/workflows/python_unit_test.yaml@master
+    with:
+      python-version: '3.12'
+      # Must be a concrete version. The reusable workflow interpolates this into
+      # astral.sh/uv/<version>/install.sh, where the literal 'latest' 404s, and an
+      # empty string routes to the Poetry install path instead of uv.
+      uv-version: '0.9.7'
+      # The workflow installs uv but never runs `uv sync`, so the test command is what
+      # resolves dependencies. --locked fails the run when uv.lock disagrees with
+      # pyproject.toml rather than silently re-resolving and passing.
+      run-tests-command: 'uv run --locked pytest -vv'
+
+  Lint:
+    name: Lint (advisory)
+    # NOT wired up as a blocking check, but we should eventually do that once everything is fixed.
+    uses: uc-cdis/.github/.github/workflows/required_lint_check.yaml@master
+    with:
+      python-version: '3.12'
+      uv-version: '0.9.7'

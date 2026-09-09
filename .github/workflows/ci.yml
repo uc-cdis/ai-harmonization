@@ -28,7 +28,7 @@ jobs:
       # The workflow installs uv but never runs `uv sync`, so the test command is what
       # resolves dependencies. --locked fails the run when uv.lock disagrees with
       # pyproject.toml rather than silently re-resolving and passing.
-      run-tests-command: 'uv pip install -e . && uv run pytest -vv'
+      run-tests-command: 'uv sync && uv pip install -e . && uv run pytest -vv'
 
   Lint:
     name: Lint (advisory)

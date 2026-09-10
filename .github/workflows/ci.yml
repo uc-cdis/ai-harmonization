@@ -26,7 +26,7 @@ jobs:
       uv-version: 'latest'
       # The workflow syncs dependencies itself, but pyproject.toml declares no
       # [build-system], so uv treats this as a virtual project and `uv sync` leaves
-      # ai_harmonization uninstalled. The tests import it, hence the explicit install.
+      # ai_harmonization uninstalled. The tests need it, hence the explicit install.
       run-tests-command: 'uv pip install -e . && uv run pytest -vv'
 
   Lint:

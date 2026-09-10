@@ -22,7 +22,6 @@ jobs:
     uses: uc-cdis/.github/.github/workflows/python_unit_test.yaml@fix/lint
     with:
       python-version: '3.12'
-      # An empty string routes to the Poetry install path instead of uv.
       uv-version: 'latest'
       # The workflow syncs dependencies itself, but pyproject.toml declares no
       # [build-system], so uv treats this as a virtual project and `uv sync` leaves

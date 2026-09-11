@@ -2,6 +2,7 @@
 archive extraction, delimited-file reading and PFB conversion."""
 
 import io
+import logging
 import os
 import tarfile
 import zipfile
@@ -11,6 +12,7 @@ import pytest
 
 from ai_harmonization.gen3_utils import (
     convert_pfb_to_tsv,
+    drs_guid,
     extract_metadata_from_archive,
     is_direct_metadata,
     is_metadata_archive,
@@ -106,9 +108,10 @@ class TestSelectStudies:
         )
         assert [r[0] for r in result] == ["phs001", "phs003"]
 
-    def test_mode_selected_warns_on_missing(self, studies, capsys):
-        select_studies(studies, mode="selected", selected_ids=["phs001", "phs999"])
-        assert "not found" in capsys.readouterr().out
+    def test_mode_selected_warns_on_missing(self, studies, caplog):
+        with caplog.at_level(logging.WARNING):
+            select_studies(studies, mode="selected", selected_ids=["phs001", "phs999"])
+        assert "not found" in caplog.text
 
     def test_mode_selected_skips_missing(self, studies):
         result = select_studies(
@@ -119,6 +122,14 @@ class TestSelectStudies:
     def test_unknown_mode_raises(self, studies):
         with pytest.raises(ValueError):
             select_studies(studies, mode="random")
+
+    def test_mode_max_without_max_count_raises(self, studies):
+        """Without this, [:None] is a full slice and every study comes back."""
+        with pytest.raises(ValueError, match="max_count is required"):
+            select_studies(studies, mode="max")
+
+    def test_mode_max_respects_max_count(self, studies):
+        assert len(select_studies(studies, mode="max", max_count=1)) == 1
 
 
 class TestExtractMetadataFromArchive:
@@ -278,3 +289,31 @@ class TestConvertPfbToTsv:
 
     def test_no_pfbs_present_succeeds(self, tmp_path):
         assert convert_pfb_to_tsv(str(tmp_path)) is True
+
+
+class TestDrsGuid:
+    """DRS URIs come in three shapes and splitting on ":" only handles one."""
+
+    def test_bdc_hybrid_form(self):
+        """From BDC PFBs: compact prefix in the authority *and* a path."""
+        assert (
+            drs_guid("drs://dg.4503:dg.4503/abcd1234-5678-90ab-cdef-1234567890ab")
+            == "dg.4503/abcd1234-5678-90ab-cdef-1234567890ab"
+        )
+
+    def test_bdc_hybrid_form_anvil_prefix(self):
+        assert (
+            drs_guid("drs://dg.ANV0:dg.ANV0/abcd5678-90ab-cdef-1234-567890abcdef")
+            == "dg.ANV0/abcd5678-90ab-cdef-1234-567890abcdef"
+        )
+
+    def test_compact_identifier_keeps_prefix(self):
+        """Per the DRS spec the compact identifier itself is the object id, so
+        the prefix must survive."""
+        assert (
+            drs_guid("drs://dg.4503:abcd1234-5678-90ab") == "dg.4503:abcd1234-5678-90ab"
+        )
+
+    def test_hostname_form(self):
+        """A real host in the authority: the id is just the path."""
+        assert drs_guid("drs://server.example.org/abc123") == "abc123"

@@ -391,10 +391,7 @@ def add_documents_to_vectorstore(
     documents, vectorstore, persistent_client, batch_size=None
 ):
     batch_size = batch_size or persistent_client.get_max_batch_size()
-    logging.info(
-        "Number of documents that can be inserted at once:",
-        batch_size,
-    )
+    logging.info(f"Number of documents that can be inserted at once: {batch_size}")
     ids = range(len(documents))
     batches = create_batches(
         batch_size=batch_size, ids=list(ids), documents=list(documents)

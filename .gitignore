@@ -10,6 +10,8 @@ inputs/
 
 # Gen3 API keys. Never commit these.
 gen3-credentials/
+**/bdc.json
+**/credentials.json
 
 # PFB files
 *.avro

@@ -4,6 +4,8 @@ Everything here runs headlessly: decisions are driven through accept/skip/prev
 rather than through the ipywidgets buttons, which only wrap those same calls.
 """
 
+import logging
+
 import pandas as pd
 import pytest
 
@@ -105,9 +107,10 @@ class TestEmptyMappingFile:
         session = VariableReviewSession.from_csv(empty_csv)
         assert session.n_variables == 0
 
-    def test_from_csv_reports_the_problem(self, empty_csv, capsys):
-        VariableReviewSession.from_csv(empty_csv)
-        assert "nothing to review" in capsys.readouterr().out
+    def test_from_csv_reports_the_problem(self, empty_csv, caplog):
+        with caplog.at_level(logging.WARNING):
+            VariableReviewSession.from_csv(empty_csv)
+        assert "nothing to review" in caplog.text
 
     def test_progress_does_not_divide_by_zero(self, empty_csv):
         session = VariableReviewSession.from_csv(empty_csv)
@@ -118,10 +121,11 @@ class TestEmptyMappingFile:
         with pytest.raises(IndexError, match="no variables"):
             session.accept()
 
-    def test_start_reports_instead_of_rendering(self, empty_csv, capsys):
+    def test_start_reports_instead_of_rendering(self, empty_csv, caplog):
         session = VariableReviewSession.from_csv(empty_csv)
-        session.start()
-        assert "Nothing to review" in capsys.readouterr().out
+        with caplog.at_level(logging.WARNING):
+            session.start()
+        assert "Nothing to review" in caplog.text
 
     def test_resume_from_is_skipped(self, empty_csv, tmp_path):
         state = tmp_path / "state.csv"
@@ -129,13 +133,14 @@ class TestEmptyMappingFile:
         session = VariableReviewSession.from_csv(empty_csv, resume_from=str(state))
         assert session.n_variables == 0
 
-    def test_zero_byte_file_does_not_raise(self, tmp_path, capsys):
+    def test_zero_byte_file_does_not_raise(self, tmp_path, caplog):
         """An interrupted harmonization run can leave a truly empty file."""
         path = tmp_path / "phs999997.v1.p1.c1_preliminary_mappings.csv"
         path.write_text("")
-        session = VariableReviewSession.from_csv(str(path))
+        with caplog.at_level(logging.WARNING):
+            session = VariableReviewSession.from_csv(str(path))
         assert session.n_variables == 0
-        assert "nothing to review" in capsys.readouterr().out
+        assert "nothing to review" in caplog.text
 
 
 class TestAccept:
@@ -159,10 +164,11 @@ class TestAccept:
         session.accept(rank=3)
         assert session._current[0] == "pht001.WEIRDVAR"
 
-    def test_out_of_range_rank_explains_itself(self, session, capsys):
+    def test_out_of_range_rank_explains_itself(self, session, caplog):
         session.goto(2)
-        session.accept(rank=3)
-        assert "no rank-3 candidate" in capsys.readouterr().out
+        with caplog.at_level(logging.WARNING):
+            session.accept(rank=3)
+        assert "no rank-3 candidate" in caplog.text
 
     def test_accepting_clears_a_previous_skip(self, session):
         session.skip()
@@ -264,6 +270,47 @@ class TestOutputFiles:
             "phs999999.v1.p1.c1_skipped_variables.csv",
         }
 
+    def test_writes_all_three_files_for_an_unconventional_name(self, session, tmp_path):
+        """The sibling paths come from the stem, so a state file without the
+        conventional suffix still yields three distinct paths."""
+        session.accept(rank=1)
+        session.skip()
+        session.save(str(tmp_path / "mystate.csv"), quiet=True)
+
+        names = {f.name for f in tmp_path.iterdir()}
+        assert names == {
+            "mystate.csv",
+            "mystate_curated_mappings.csv",
+            "mystate_skipped_variables.csv",
+        }
+
+    def test_output_paths_never_collide_with_the_state_path(self):
+        for name in ("s_review_state.csv", "mystate.csv", "no_extension"):
+            curated, skipped = VariableReviewSession.output_paths(name)
+            assert curated != name and skipped != name
+            assert curated != skipped
+
+    def test_output_paths_does_not_substitute_inside_a_directory_name(self):
+        """Only a trailing suffix may be stripped: a directory name that
+        happens to contain it must survive intact."""
+        curated, _ = VariableReviewSession.output_paths(
+            "out/_review_state.csv_runs/phs1_review_state.csv"
+        )
+        assert curated == "out/_review_state.csv_runs/phs1_curated_mappings.csv"
+
+    def test_saving_twice_is_byte_identical(self, session, tmp_path):
+        """Row order is sorted, so an unchanged session re-saves identically."""
+        session.accept(rank=1)
+        session.skip()
+        first = tmp_path / "a_review_state.csv"
+        second = tmp_path / "b_review_state.csv"
+        session.save(str(first), quiet=True)
+        session.save(str(second), quiet=True)
+        assert first.read_text() == second.read_text()
+        assert (tmp_path / "a_curated_mappings.csv").read_text() == (
+            tmp_path / "b_curated_mappings.csv"
+        ).read_text()
+
     def test_state_records_both_decision_types(self, session, state_path):
         session.accept(rank=2)
         session.skip()
@@ -332,9 +379,8 @@ class TestResume:
     def test_accepted_rank_survives_a_skip_in_the_same_session(
         self, session, state_path, mapping_csv
     ):
-        """Skipped rows carry no rank, which must not change how accepted
-        ranks are written. If the column were widened to float, ranks would
-        serialise as "2.0" and resume would silently reset them all to 1."""
+        """Skipped rows carry no rank, so the column is a nullable integer:
+        accepted ranks stay whole numbers in the file rather than "3.0"."""
         session.accept(rank=3)
         session.skip()
         session.save(state_path, quiet=True)
@@ -362,12 +408,13 @@ class TestResume:
         resumed = VariableReviewSession.from_csv(mapping_csv, resume_from=state_path)
         assert resumed._current[0] == "pht001.WEIRDVAR"
 
-    def test_missing_state_file_starts_fresh(self, mapping_csv, tmp_path, capsys):
-        resumed = VariableReviewSession.from_csv(
-            mapping_csv, resume_from=str(tmp_path / "nope.csv")
-        )
+    def test_missing_state_file_starts_fresh(self, mapping_csv, tmp_path, caplog):
+        with caplog.at_level(logging.INFO):
+            resumed = VariableReviewSession.from_csv(
+                mapping_csv, resume_from=str(tmp_path / "nope.csv")
+            )
         assert resumed._accepted == {}
-        assert "starting fresh" in capsys.readouterr().out
+        assert "starting fresh" in caplog.text
 
     def test_unknown_variable_in_state_is_ignored(self, mapping_csv, state_path):
         pd.DataFrame(
@@ -383,7 +430,10 @@ class TestResume:
         resumed = VariableReviewSession.from_csv(mapping_csv, resume_from=state_path)
         assert resumed._skipped == set()
 
-    def test_stale_rank_falls_back_to_best_candidate(self, mapping_csv, state_path):
+    def test_stale_rank_is_left_unreviewed_not_guessed(
+        self, mapping_csv, state_path, caplog
+    ):
+        """A rank with no matching candidate is dropped rather than rewritten."""
         pd.DataFrame(
             [
                 {
@@ -394,5 +444,29 @@ class TestResume:
             ]
         ).to_csv(state_path, index=False)
 
-        resumed = VariableReviewSession.from_csv(mapping_csv, resume_from=state_path)
-        assert resumed._accepted["pht001.WEIRDVAR"]["rank"] == 1
+        with caplog.at_level(logging.WARNING):
+            resumed = VariableReviewSession.from_csv(
+                mapping_csv, resume_from=state_path
+            )
+        assert "pht001.WEIRDVAR" not in resumed._accepted
+        assert "pht001.WEIRDVAR" not in resumed._skipped
+        assert "No rank-9 candidate" in caplog.text
+
+    def test_unreadable_rank_is_left_unreviewed(self, mapping_csv, state_path, caplog):
+        """A rank that will not parse at all is dropped the same way."""
+        pd.DataFrame(
+            [
+                {
+                    "Original Node.Property": "pht001.AGE",
+                    "rank": "not-a-number",
+                    "review_decision": "accepted",
+                },
+            ]
+        ).to_csv(state_path, index=False)
+
+        with caplog.at_level(logging.WARNING):
+            resumed = VariableReviewSession.from_csv(
+                mapping_csv, resume_from=state_path
+            )
+        assert "pht001.AGE" not in resumed._accepted
+        assert "Unreadable rank" in caplog.text

@@ -13,7 +13,10 @@ front ends differ in whether they preserve a stylesheet there; inline
 attributes always survive.
 """
 
+import html
 from typing import TYPE_CHECKING
+
+from ai_harmonization.formatters import VALUE_SEPARATOR
 
 if TYPE_CHECKING:  # pragma: no cover - import only needed for type checking
     import pandas as pd
@@ -50,8 +53,8 @@ WEAK_CELL_CSS = "background-color:#f8d7da;color:#721c24"
 
 # The summary gradient tops out where "strong" begins, so a study whose mean
 # rank-1 similarity is strong renders fully green. Starting at MODERATE keeps
-# the observed spread of study means (roughly 0.50-0.58) discriminable rather
-# than squashing every study into one shade.
+# the observed spread of study means discriminable rather than squashing every
+# study into one shade.
 SUMMARY_GRADIENT_VMIN = MODERATE_SIMILARITY
 SUMMARY_GRADIENT_VMAX = STRONG_SIMILARITY
 SUMMARY_GRADIENT_CMAP = "RdYlGn"
@@ -130,6 +133,86 @@ def style_mapping_quality_summary(
         .set_table_styles(SUMMARY_TABLE_STYLES)
         .format({column: "{:.3f}" for column in gradient_columns})
     )
+
+
+# ── Abbreviating long value lists ────────────────────────────────────────────
+
+# How many characters of a joined value list to show before abbreviating.
+#
+# A slot ranging over a large enum runs to thousands of characters in one cell,
+# which takes the table width the descriptions need. The leading values are
+# kept, so the cell still shows what the slot ranges over, and the count tells
+# the curator how much is hidden. Display only — the CSVs keep every value.
+MAX_VALUE_CHARS = 160
+
+# Columns holding joined value lists. Matched by suffix so the renamed
+# variants ("Best Target Values") are covered too.
+VALUE_COLUMN_SUFFIX = "Values"
+
+
+def abbreviate_value_list(
+    text: str, max_chars: int = MAX_VALUE_CHARS, separator: str = VALUE_SEPARATOR
+) -> str:
+    """Shorten a joined value list, keeping whole values and the count.
+
+    Args:
+        text: The joined value list, e.g. ``"1=Yes | 2=No | 3=Unknown"``.
+        max_chars: Length to abbreviate beyond.
+        separator: What the values are joined by. Defaults to the separator
+            the package joins with, so the split back into values is exact.
+
+    Returns:
+        str: ``text`` unchanged when short enough, otherwise the leading whole
+            values followed by ``… (N values)``. Cuts fall between values.
+    """
+    if not isinstance(text, str) or len(text) <= max_chars:
+        return text
+
+    values = text.split(separator)
+    kept: list = []
+    used = 0
+    for value in values:
+        cost = len(value) + (len(separator) if kept else 0)
+        if used + cost > max_chars:
+            break
+        kept.append(value)
+        used += cost
+    # A single value longer than the budget has to be cut mid-value; there is
+    # no boundary to cut on.
+    if not kept:
+        kept = [values[0][:max_chars]]
+
+    total = len(values)
+    noun = "value" if total == 1 else "values"
+    return f"{separator.join(kept)} … ({total} {noun})"
+
+
+def abbreviate_value_columns(
+    frame: "pd.DataFrame", max_chars: int = MAX_VALUE_CHARS
+) -> "pd.DataFrame":
+    """Return a copy of ``frame`` with its value columns abbreviated.
+
+    Args:
+        frame: Any table headed for display.
+        max_chars: Passed to ``abbreviate_value_list``.
+
+    Returns:
+        pd.DataFrame: A copy — the caller's frame, and the CSVs written from
+            it, are left with their full value lists.
+    """
+    columns = [
+        column
+        for column in frame.columns
+        if isinstance(column, str) and column.endswith(VALUE_COLUMN_SUFFIX)
+    ]
+    if not columns:
+        return frame
+    abbreviated = frame.copy()
+    for column in columns:
+        abbreviated[column] = abbreviated[column].map(
+            lambda value: abbreviate_value_list(value, max_chars)
+        )
+    return abbreviated
 
 
 # ── Review widget: button dimensions ─────────────────────────────────────────
@@ -219,12 +302,17 @@ def variable_panel_html(
     Args:
         variable: The ``table.variable`` identifier.
         description: The variable's description from the study's data dictionary.
-        values: Comma-joined ``code=meaning`` labels, omitted when empty.
+        values: ``code=meaning`` labels joined by VALUE_SEPARATOR, omitted
+            when empty. Abbreviated past MAX_VALUE_CHARS.
         status_html: Output of ``accepted_status_html`` or ``skipped_status_html``.
 
     Returns:
         str: HTML for an ipywidgets ``HTML`` widget.
     """
+    variable = html.escape(str(variable))
+    description = html.escape(str(description))
+    values = html.escape(abbreviate_value_list(str(values))) if values else values
+
     values_line = ""
     if values:
         values_line = (
@@ -252,6 +340,8 @@ def candidates_table_html(
 ) -> str:
     """Render the ranked candidate table, colour-banded by similarity.
 
+    Value columns are abbreviated for display.
+
     Args:
         candidates: One row per candidate, already column-filtered and renamed.
         similarity_column: Column to band and draw bars for.
@@ -259,10 +349,11 @@ def candidates_table_html(
     Returns:
         str: HTML table.
     """
+    candidates = abbreviate_value_columns(candidates)
     return (
         candidates.style.map(similarity_cell_css, subset=[similarity_column])
         .bar(subset=[similarity_column], color=ACCENT, vmin=0, vmax=1)
-        .format({similarity_column: "{:.3f}"})
+        .format({similarity_column: "{:.3f}"}, escape="html")
         .hide(axis="index")
         .to_html()
     )

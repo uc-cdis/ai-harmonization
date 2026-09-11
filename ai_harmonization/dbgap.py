@@ -6,13 +6,15 @@ for use as source variables in harmonization. Also provides helpers for finding
 study files and writing output CSV rows.
 """
 
+import logging
 import os
 import re
 import xml.etree.ElementTree as ET
 
 import pandas as pd
 
-from ai_harmonization.simple_data_model import SimpleDataModel, Node, Property
+from ai_harmonization.formatters import VALUE_SEPARATOR
+from ai_harmonization.simple_data_model import Node, Property, SimpleDataModel
 from ai_harmonization.styles import STRONG_SIMILARITY, VERY_STRONG_SIMILARITY
 
 
@@ -57,7 +59,10 @@ def parse_dbgap_table(dict_path, report_path=None):
         tuple[str, SimpleDataModel]: (table_id, model).
             Property.values contains value meanings (for embedding prompts);
             Property.additional_metadata['value_labels'] contains code=meaning
-            pairs (for CSV display).
+            pairs (for CSV display). Both hold every value the variable
+            declares — the prompt formatters cap how many they use, so the
+            source and target sides are capped identically. See
+            ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
     """
     root = ET.parse(dict_path).getroot()
     table_id = root.attrib.get("id", os.path.basename(dict_path))
@@ -74,8 +79,9 @@ def parse_dbgap_table(dict_path, report_path=None):
                         v_type_node.text.strip().lower(), "string"
                     )
         except Exception as e:
-            print(
-                f"Warning: could not parse var report {os.path.basename(report_path)}: {e}"
+            logging.warning(
+                f"Could not parse var report {os.path.basename(report_path)}, "
+                f"falling back to string types: {e}"
             )
 
     properties = []
@@ -85,7 +91,7 @@ def parse_dbgap_table(dict_path, report_path=None):
             continue
 
         value_meanings, value_labels = [], []
-        for val in var.findall("value")[:5]:
+        for val in var.findall("value"):
             if not val.text:
                 continue
             meaning = val.text.strip()
@@ -165,7 +171,7 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
             single source variable, best first — one variable's worth of output
             from MultiPromptSimilaritySearch.
         slot_values_lookup (dict[str, str]): Maps target slot keys to
-            comma-joined enum values.
+            enum values joined by VALUE_SEPARATOR.
         study_id (str): Study identifier to embed in every row.
 
     Returns:
@@ -186,7 +192,7 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
                 "Target Description": suggestion.target_description,
                 "Target Values": slot_values_lookup.get(slot_key, ""),
                 "Original Description": suggestion.source_description,
-                "Original Values": ", ".join(value_labels),
+                "Original Values": VALUE_SEPARATOR.join(value_labels),
                 "study_id": study_id,
                 "source_table_id": suggestion.source_node,
                 "source_variable_name": suggestion.source_property,
@@ -219,7 +225,8 @@ def generate_variable_mappings(
         var_report_by_pht (dict[str, str]): Maps pht accession to full var_report path.
         harmonization_approach (MultiPromptSimilaritySearch): Search index with
             the target schema already embedded.
-        slot_values_lookup (dict[str, str]): Maps slot keys to comma-joined enum values.
+        slot_values_lookup (dict[str, str]): Maps slot keys to enum values
+            joined by VALUE_SEPARATOR.
         study_id (str): Study identifier embedded in every CSV row.
         k (int): Number of top suggestions to return per variable.
 
@@ -236,7 +243,7 @@ def generate_variable_mappings(
         try:
             _, source_model = parse_dbgap_table(full_dict_path, full_report_path)
         except Exception as e:
-            print(f"Warning: could not parse {dict_filename}: {e}")
+            logging.warning(f"Could not parse {dict_filename}, skipping it: {e}")
             continue
 
         for suggestions in harmonization_approach.iter_suggestions_by_property(

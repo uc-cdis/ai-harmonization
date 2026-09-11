@@ -8,11 +8,13 @@ Covers two workflows:
 
 import csv
 import json
+import logging
 import os
 import subprocess
 import tarfile
 import zipfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
@@ -99,8 +101,8 @@ def extract_metadata_from_archive(archive_path, dest_dir):
                                 dst.write(f.read())
                             extracted.append(filename)
     except Exception as e:
-        print(
-            f"  [! Error] Failed to extract archive {os.path.basename(archive_path)}: {e}"
+        logging.error(
+            f"Failed to extract archive {os.path.basename(archive_path)}: {e}"
         )
     return extracted
 
@@ -158,13 +160,15 @@ def select_studies(studies, mode, selected_ids=None, max_count=None):
     if mode == "all":
         return list(studies.items())
     elif mode == "max":
+        if max_count is None:
+            raise ValueError("max_count is required when mode='max'.")
         return list(studies.items())[:max_count]
     elif mode == "selected":
         result = [(sid, studies[sid]) for sid in (selected_ids or []) if sid in studies]
         not_found = [sid for sid in (selected_ids or []) if sid not in studies]
         if not_found:
-            print(
-                f"Warning: {len(not_found)} selected IDs not found in the catalog: {not_found}"
+            logging.warning(
+                f"{len(not_found)} selected IDs not found in the catalog: {not_found}"
             )
         return result
     else:
@@ -190,7 +194,7 @@ def download_pfb_for_study(study_metadata, study_dir, file_client):
         (f for f in os.listdir(study_dir) if f.endswith(".avro")), None
     )
     if avro_filename:
-        print("  Archive already exists. Skipping download.")
+        logging.info("Archive already exists, skipping download.")
         return avro_filename
 
     for obj in study_metadata.get("gen3_discovery", {}).get("objects", []):
@@ -201,14 +205,14 @@ def download_pfb_for_study(study_metadata, study_dir, file_client):
         ):
             guid = obj.get("guid")
             if guid:
-                print(f"  Downloading PFB (GUID: {guid})...")
+                logging.info(f"Downloading PFB (GUID: {guid})...")
                 try:
                     file_client.download_single(guid, path=study_dir)
                     return next(
                         (f for f in os.listdir(study_dir) if f.endswith(".avro")), None
                     )
                 except Exception as e:
-                    print(f"  [! Error] Failed to download {guid}: {e}")
+                    logging.error(f"Failed to download {guid}: {e}")
             break
     return None
 
@@ -236,7 +240,7 @@ def convert_pfb_to_tsv(directory, output_dir=None):
         if not pfb_path.is_file():
             continue
         if pfb_path.suffix != ".avro":
-            print(f"  Skipping non-avro ({pfb_path.suffix}) file: {pfb_path.name}")
+            logging.info(f"Skipping non-avro ({pfb_path.suffix}) file: {pfb_path.name}")
             continue
 
         target = output_dir or f"{pfb_path.stem}__TSVS"
@@ -244,10 +248,10 @@ def convert_pfb_to_tsv(directory, output_dir=None):
         if os.path.exists(target_path) and any(
             f.endswith(".tsv") for f in os.listdir(target_path)
         ):
-            print(f"  TSVs already exist in {target}/. Skipping conversion.")
+            logging.info(f"TSVs already exist in {target}/, skipping conversion.")
             continue
 
-        print(f"  Converting {pfb_path.name} to TSVs in {target}/...")
+        logging.info(f"Converting {pfb_path.name} to TSVs in {target}/...")
         try:
             subprocess.run(
                 ["gen3", "pfb", "to", "-i", pfb_path.name, "tsv", target],
@@ -256,13 +260,52 @@ def convert_pfb_to_tsv(directory, output_dir=None):
                 stdout=subprocess.DEVNULL,
             )
         except Exception as e:
-            print(f"  [! Error] PFB conversion failed for {pfb_path.name}: {e}")
+            logging.error(f"PFB conversion failed for {pfb_path.name}: {e}")
             all_succeeded = False
 
     return all_succeeded
 
 
 # ── Metadata (data_dict / var_report) workflow ────────────────────────────────
+
+
+def drs_guid(drs_uri):
+    """Extract the object identifier from a GA4GH DRS URI.
+
+    For example ``drs://dg.4503:dg.4503/abcd1234`` returns ``dg.4503/abcd1234``.
+
+    ``drs_uri`` can take three forms:
+
+    * ``drs://<prefix>:<prefix>/<id>`` — used in the BDC PFB files; returns
+      ``<prefix>/<id>``
+    * ``drs://<prefix>:<id>`` — GA4GH compact identifier format; returns
+      ``<prefix>:<id>``
+    * ``drs://<host>/<id>`` — hostname format; returns ``<id>``
+
+    Args:
+        drs_uri (str): A ``drs://`` URI.
+
+    Returns:
+        str: The object identifier to pass to the Gen3 file client.
+    """
+    parsed = urlparse(drs_uri)
+    netloc, path = parsed.netloc, parsed.path.lstrip("/")
+    if ":" in netloc:
+        if not path:
+            # GA4GH compact identifier form: the whole authority is the
+            # identifier.
+            return netloc
+        # BDC PFB form: the identifier is an indexd DID, "<namespace>/<id>",
+        # and urlparse ends the authority at that "/" — so the namespace is
+        # left behind in the authority and has to be rejoined with the path.
+        #
+        #   drs://dg.4503:dg.4503/abcd1234
+        #                 └──┬──┘ └───┬──┘
+        #              dg.4503    /   abcd1234
+        namespace = netloc.partition(":")[2]
+        return f"{namespace}/{path}"
+    # Hostname form: the authority names the server, the path is the identifier.
+    return path
 
 
 def download_study_metadata(study_dir, file_client, session=None):
@@ -282,12 +325,12 @@ def download_study_metadata(study_dir, file_client, session=None):
     session = session or requests.Session()
     tsvs_dir = os.path.join(study_dir, "tsvs")
     if not os.path.exists(tsvs_dir):
-        print("  No tsvs/ directory found. Run the PFB workflow first.")
+        logging.warning("No tsvs/ directory found. Run the PFB workflow first.")
         return []
 
     tsv_files = [f for f in os.listdir(tsvs_dir) if f.endswith(".tsv")]
     if not tsv_files:
-        print("  tsvs/ directory is empty.")
+        logging.warning("tsvs/ directory is empty.")
         return []
 
     metadata_dir = os.path.join(study_dir, "metadata")
@@ -309,15 +352,14 @@ def download_study_metadata(study_dir, file_client, session=None):
             if file_name in downloaded:
                 continue
 
-            parts = drs_uri.split(":")
-            guid = ":".join(parts[2:]) if len(parts) >= 3 else parts[-1].lstrip("/")
+            guid = drs_guid(drs_uri)
             destination = os.path.join(metadata_dir, file_name)
 
-            print(f"  Downloading: {file_name}")
+            logging.info(f"Downloading: {file_name}")
             try:
                 presigned_data = file_client.get_presigned_url(guid)
                 if not presigned_data or "url" not in presigned_data:
-                    print(f"    [! Error] No presigned URL for {guid}")
+                    logging.error(f"No presigned URL for {guid}")
                     failed.append(file_name)
                     continue
 
@@ -331,22 +373,22 @@ def download_study_metadata(study_dir, file_client, session=None):
                 downloaded.add(file_name)
 
                 if is_metadata_archive(file_name):
-                    print("    Extracting archive...")
+                    logging.info("Extracting archive...")
                     try:
                         extracted = extract_metadata_from_archive(
                             destination, metadata_dir
                         )
                         if extracted:
-                            print(f"    Extracted: {extracted}")
+                            logging.info(f"Extracted: {extracted}")
                             downloaded.update(extracted)
                     finally:
                         if os.path.exists(destination):
                             os.remove(destination)
                 else:
-                    print("    Saved.")
+                    logging.info(f"Saved {file_name}.")
 
             except Exception as e:
-                print(f"    [! Error] {file_name}: {e}")
+                logging.error(f"{file_name}: {e}")
                 failed.append(file_name)
                 if os.path.exists(destination) and not os.path.isdir(destination):
                     os.remove(destination)
@@ -355,7 +397,7 @@ def download_study_metadata(study_dir, file_client, session=None):
         failed_path = os.path.join(study_dir, "failed_downloads.json")
         with open(failed_path, "w", encoding="utf-8") as f:
             json.dump(failed, f, indent=4)
-        print(f"  Saved {len(failed)} failed download(s) to {failed_path}")
+        logging.warning(f"Saved {len(failed)} failed download(s) to {failed_path}")
 
     return failed
 

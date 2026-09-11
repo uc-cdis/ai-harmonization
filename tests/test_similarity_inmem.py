@@ -23,10 +23,11 @@ from ai_harmonization.simple_data_model import (
 class StubIndex:
     """Returns canned matches, recording the query text it was given."""
 
-    def __init__(self, matches, document_formatter=None):
+    def __init__(self, matches, document_formatter=None, input_target_model=None):
         self._matches = matches
         self.document_formatter = document_formatter or get_node_property_as_string
         self.embedding_function = None
+        self.input_target_model = input_target_model
         self.queries = []
 
     def find_similar_target_slots(self, query_text, **kwargs):
@@ -244,13 +245,63 @@ class TestIterAndBatchInterface:
         assert len(result.suggestions) == 6
 
     def test_conforms_to_the_benchmark_call_signature(self, search, source_model):
-        """The benchmark harness calls this with both models as keywords."""
+        """The benchmark harness calls this with both models as keywords, and
+        HarmonizationApproach declares input_target_model required, so passing
+        it must keep working."""
+        search.input_target_model = source_model
         result = search.get_harmonization_suggestions(
             input_source_model=source_model,
             input_target_model=source_model,
             k=1,
         )
         assert len(result.suggestions) == 3
+
+    def test_passing_the_same_target_model_is_accepted(self, source_model):
+        """The benchmark harness and the curation notebooks pass the target
+        model explicitly, and it is the model the instance embedded."""
+        search = MultiPromptSimilaritySearch.from_indexes(
+            {"A": StubIndex([match("TargetClass.field_a", 0.8)])}
+        )
+        search.input_target_model = source_model
+        result = search.get_harmonization_suggestions(
+            source_model, input_target_model=source_model
+        )
+        assert len(result.suggestions) == 3
+
+    def test_passing_a_different_target_model_raises(self, source_model):
+        """Answering against the embedded target while the caller asked for
+        another one would be a silently wrong result."""
+        search = MultiPromptSimilaritySearch.from_indexes(
+            {"A": StubIndex([match("TargetClass.field_a", 0.8)])}
+        )
+        search.input_target_model = source_model
+        other = SimpleDataModel(
+            nodes=[
+                Node(
+                    name="somethingelse",
+                    description="",
+                    links=[],
+                    properties=[
+                        Property(name="x", description="x", type="string"),
+                    ],
+                )
+            ]
+        )
+        with pytest.raises(ValueError, match="different input_target_model"):
+            search.get_harmonization_suggestions(source_model, input_target_model=other)
+
+    def test_from_indexes_takes_the_target_model_from_its_indexes(self, source_model):
+        """Instances built this way still know their target, so the check in
+        get_harmonization_suggestions applies to them too."""
+        search = MultiPromptSimilaritySearch.from_indexes(
+            {
+                "A": StubIndex(
+                    [match("TargetClass.field_a", 0.8)],
+                    input_target_model=source_model,
+                )
+            }
+        )
+        assert search.input_target_model is source_model
 
     def test_to_simlified_dataframe_round_trip(self, search, source_model):
         df = search.get_harmonization_suggestions(source_model).to_simlified_dataframe()

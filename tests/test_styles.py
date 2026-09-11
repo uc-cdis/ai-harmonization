@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from ai_harmonization import styles
+from ai_harmonization.formatters import VALUE_SEPARATOR
 
 
 class TestSimilarityCellCss:
@@ -202,3 +203,151 @@ class TestReviewWidgetHtml:
         ):
             assert css.split("background-color:")[1].split(";")[0] in html
         assert "0.910" in html  # formatted to three decimals
+
+
+class TestStudyTextIsEscaped:
+    """Study metadata is third-party text rendered into notebook HTML."""
+
+    HOSTILE = '<script>alert("xss")</script>'
+
+    def test_variable_panel_escapes_variable_description_and_values(self):
+        out = styles.variable_panel_html(
+            variable=self.HOSTILE,
+            description=f"desc {self.HOSTILE}",
+            values=f"1={self.HOSTILE}",
+            status_html="",
+        )
+        assert "<script>" not in out
+        assert "&lt;script&gt;" in out
+
+    def test_variable_panel_keeps_our_own_status_markup(self):
+        """status_html is built by this module, so it must not be escaped."""
+        out = styles.variable_panel_html(
+            variable="v",
+            description="d",
+            values="",
+            status_html='<span style="color:green">accepted</span>',
+        )
+        assert '<span style="color:green">accepted</span>' in out
+
+    def test_candidates_table_escapes_cell_text(self):
+        html = styles.candidates_table_html(
+            pd.DataFrame([{"Target": self.HOSTILE, "Similarity": 0.9}])
+        )
+        assert "<script>" not in html
+        assert "&lt;script&gt;" in html
+
+    def test_candidates_table_still_formats_similarity(self):
+        """Guards the call order: escaping and formatting must both survive,
+        which they only do when set in a single format() call."""
+        html = styles.candidates_table_html(
+            pd.DataFrame([{"Target": self.HOSTILE, "Similarity": 0.9}])
+        )
+        assert "0.900" in html
+
+
+class TestAbbreviateValueList:
+    def test_short_list_is_returned_unchanged(self):
+        short = VALUE_SEPARATOR.join(["1=Yes", "2=No"])
+        assert styles.abbreviate_value_list(short) == short
+
+    def test_non_strings_pass_through(self):
+        """Cells can hold NaN when a variable has no values."""
+        assert styles.abbreviate_value_list(None) is None
+        assert styles.abbreviate_value_list(3.5) == 3.5
+
+    def test_long_list_is_cut_and_counted(self):
+        values = [f"{i}=meaning number {i}" for i in range(1, 120)]
+        out = styles.abbreviate_value_list(VALUE_SEPARATOR.join(values))
+        assert out.endswith("… (119 values)")
+        assert len(out) < 200
+
+    def test_cut_falls_between_values_not_inside_one(self):
+        """A cell must not end on half an identifier."""
+        values = [f"OBA:{i:07d}" for i in range(60)]
+        out = styles.abbreviate_value_list(VALUE_SEPARATOR.join(values))
+        shown = out.split(" … ")[0]
+        assert all(part in values for part in shown.split(VALUE_SEPARATOR))
+
+    def test_count_is_exact_when_values_contain_commas(self):
+        """Some dbGaP value meanings contain ", " themselves. Splitting such a
+        list on a comma would report more values than there are, and could end
+        a cell on the back half of one."""
+        values = [f"{i}=exercise class, level {i}" for i in range(1, 40)]
+        out = styles.abbreviate_value_list(VALUE_SEPARATOR.join(values))
+        assert out.endswith("… (39 values)")
+        shown = out.split(" … ")[0]
+        assert all(part in values for part in shown.split(VALUE_SEPARATOR))
+
+    def test_singular_noun_for_one_value(self):
+        out = styles.abbreviate_value_list("x" * 500)
+        assert out.endswith("(1 value)")
+
+    def test_single_oversized_value_is_still_bounded(self):
+        """No separator to cut on, so the value itself has to be cut."""
+        out = styles.abbreviate_value_list("x" * 5000, max_chars=50)
+        assert len(out) < 100
+
+    def test_respects_an_explicit_limit(self):
+        values = VALUE_SEPARATOR.join(f"v{i}" for i in range(100))
+        assert len(styles.abbreviate_value_list(values, max_chars=20)) < 60
+
+
+class TestAbbreviateValueColumns:
+    def _frame(self):
+        long_values = VALUE_SEPARATOR.join(f"{i}=meaning {i}" for i in range(1, 100))
+        return pd.DataFrame(
+            [
+                {
+                    "Rank": 1,
+                    "Target Description": "a description",
+                    "Target Values": long_values,
+                    "Best Target Values": long_values,
+                    "Original Values": long_values,
+                    "Similarity": 0.9,
+                }
+            ]
+        )
+
+    def test_abbreviates_every_column_ending_in_values(self):
+        out = styles.abbreviate_value_columns(self._frame())
+        for column in ("Target Values", "Best Target Values", "Original Values"):
+            assert out[column][0].endswith("(99 values)")
+
+    def test_leaves_other_columns_alone(self):
+        frame = self._frame()
+        out = styles.abbreviate_value_columns(frame)
+        assert out["Target Description"][0] == "a description"
+        assert out["Similarity"][0] == 0.9
+
+    def test_does_not_mutate_the_input_frame(self):
+        """The CSVs are written from the same frames, so they must keep the
+        full value lists."""
+        frame = self._frame()
+        before = frame["Target Values"][0]
+        styles.abbreviate_value_columns(frame)
+        assert frame["Target Values"][0] == before
+
+    def test_frame_without_value_columns_is_returned_as_is(self):
+        frame = pd.DataFrame([{"Rank": 1, "Similarity": 0.5}])
+        assert styles.abbreviate_value_columns(frame) is frame
+
+
+class TestCandidatesTableAbbreviates:
+    def test_wide_value_cell_does_not_dominate_the_table(self):
+        long_values = VALUE_SEPARATOR.join(f"OBA:{i:07d}" for i in range(255))
+        frame = pd.DataFrame(
+            [
+                {
+                    "Target Description": "the type of measurement observed",
+                    "Target Values": long_values,
+                    "Similarity": 0.9 - rank / 100,
+                }
+                for rank in range(1, 11)
+            ]
+        )
+        html = styles.candidates_table_html(frame)
+        assert long_values not in html
+        assert "(255 values)" in html
+        # Ten candidates of a 3.5k-character cell would run past 35k.
+        assert len(html) < 15000

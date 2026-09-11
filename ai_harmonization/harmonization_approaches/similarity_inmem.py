@@ -35,6 +35,22 @@ class SuggestionInfo(TypedDict):
     matches: List[Document]
 
 
+def _reject_foreign_target_model(embedded, requested):
+    """Raise unless the requested target model is the embedded one.
+
+    The target model is embedded at construction, so a request may only repeat
+    the same model; the parameter is kept to satisfy the HarmonizationApproach
+    interface.
+    """
+    if requested is None or requested == embedded:
+        return
+    raise ValueError(
+        "The target model is embedded at construction time. A different "
+        "input_target_model cannot be honoured; pass it to __init__ on a new "
+        "instance instead."
+    )
+
+
 class TargetSlotMatch(TypedDict):
     """A single target slot returned by a similarity query."""
 
@@ -81,6 +97,9 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         )
         self.vectorstore = vectorstore
         self.persistent_client = persistent_client
+        # Retained so get_harmonization_suggestions can tell a harmless
+        # redundant pass of the same model from a request for a different one.
+        self.input_target_model = input_target_model
 
         try:
             self._add_target_to_vector_database(
@@ -167,12 +186,18 @@ class SimilaritySearchInMemoryVectorDb(HarmonizationApproach):
         """
         Args:
             input_source_model: The model whose properties get mapped.
-            input_target_model: Unused. The target model is embedded in the
-                vectorstore at construction time; the parameter is kept to
-                satisfy the HarmonizationApproach interface.
+            input_target_model: The target model, or None. It is embedded
+                at construction, so this may only repeat the same model;
+                the parameter is kept to satisfy the HarmonizationApproach
+                interface.
             **kwargs: Passed through to the vectorstore, e.g. ``k`` and
                 ``score_threshold``.
+
+        Raises:
+            ValueError: If input_target_model is a different model from the
+                one embedded at construction.
         """
+        _reject_foreign_target_model(self.input_target_model, input_target_model)
         suggestions_for_output_model = self._get_suggestions_for_source_model(
             input_source_model, **kwargs
         )
@@ -302,6 +327,9 @@ class MultiPromptSimilaritySearch(HarmonizationApproach):
         self.embedding_function = embedding_function or HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-mpnet-base-v2"
         )
+        # Retained so get_harmonization_suggestions can tell a harmless
+        # redundant pass of the same model from a request for a different one.
+        self.input_target_model = input_target_model
         self.indexes: Dict[str, SimilaritySearchInMemoryVectorDb] = {
             label: SimilaritySearchInMemoryVectorDb(
                 vectordb_persist_directory_name=(
@@ -336,7 +364,11 @@ class MultiPromptSimilaritySearch(HarmonizationApproach):
 
         instance = cls.__new__(cls)
         instance.indexes = dict(indexes)
-        instance.embedding_function = next(iter(indexes.values())).embedding_function
+        # The indexes all embed the same target model with the same embedding
+        # function, so read both from one of them.
+        index = next(iter(indexes.values()))
+        instance.embedding_function = index.embedding_function
+        instance.input_target_model = index.input_target_model
         return instance
 
     def get_suggestions_for_property(
@@ -418,11 +450,17 @@ class MultiPromptSimilaritySearch(HarmonizationApproach):
         """
         Args:
             input_source_model: The model whose properties get mapped.
-            input_target_model: Unused. The target model is embedded in the
-                vectorstores at construction time; the parameter is kept to
-                satisfy the HarmonizationApproach interface.
+            input_target_model: The target model, or None. It is embedded
+                at construction, so this may only repeat the same model;
+                the parameter is kept to satisfy the HarmonizationApproach
+                interface.
             **kwargs: Passed through to each variant's vectorstore, e.g. ``k``.
+
+        Raises:
+            ValueError: If input_target_model is a different model from the
+                one embedded at construction.
         """
+        _reject_foreign_target_model(self.input_target_model, input_target_model)
         suggestions = [
             suggestion
             for property_suggestions in self.iter_suggestions_by_property(

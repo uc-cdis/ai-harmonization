@@ -12,6 +12,7 @@ from ai_harmonization.dbgap import (
     parse_dbgap_table,
     summarize_rank1_similarity,
 )
+from ai_harmonization.formatters import VALUE_SEPARATOR
 
 
 DATA_DICT_XML = textwrap.dedent(
@@ -187,7 +188,9 @@ class TestBuildMappingRows:
             )
         ]
         rows = build_mapping_rows(suggestions, {}, "phs999999")
-        assert rows[0]["Original Values"] == "1=Male, 2=Female"
+        assert rows[0]["Original Values"] == VALUE_SEPARATOR.join(
+            ["1=Male", "2=Female"]
+        )
 
 
 class TestSummarizeRank1Similarity:

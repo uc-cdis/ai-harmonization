@@ -17,7 +17,9 @@ Usage:
     session.start()
 """
 
+import logging
 import os
+
 import pandas as pd
 import ipywidgets as widgets
 from IPython.display import display
@@ -123,7 +125,7 @@ class VariableReviewSession:
             df = pd.DataFrame(columns=CSV_HEADERS)
         session = cls(df, sort_by=sort_by, auto_save=auto_save)
         if session.n_variables == 0:
-            print(
+            logging.warning(
                 f"No mapping rows found in {path} — nothing to review. "
                 "Re-run harmonize_studies.ipynb for this study."
             )
@@ -134,62 +136,81 @@ class VariableReviewSession:
 
     # ── Persistence ───────────────────────────────────────────────────────────
 
+    STATE_SUFFIX = "_review_state.csv"
+
+    @classmethod
+    def output_paths(cls, state_path):
+        """Return the (curated, skipped) CSV paths that go with a state path.
+
+        Args:
+            state_path (str): Destination for the review state CSV. The
+                conventional ``*_review_state.csv`` suffix is stripped if
+                present; any other name has its extension replaced.
+
+        Returns:
+            tuple[str, str]: (curated mappings path, skipped variables path).
+        """
+        if state_path.endswith(cls.STATE_SUFFIX):
+            stem = state_path[: -len(cls.STATE_SUFFIX)]
+        else:
+            stem = os.path.splitext(state_path)[0]
+        return f"{stem}_curated_mappings.csv", f"{stem}_skipped_variables.csv"
+
     def save(self, path, quiet=False):
         """Write session state and derived output files to disk.
 
-        Writes three files derived from ``path``:
+        Writes three files:
         - ``path`` — 3-column state CSV (variable, rank, decision) for resuming.
         - ``*_curated_mappings.csv`` — accepted variables with full mapping columns.
         - ``*_skipped_variables.csv`` — skipped variables + empty ``manual_mapping`` column.
 
+        The latter two are derived by ``output_paths``.
+
         Args:
             path (str): Destination for the review state CSV.
-            quiet (bool): Suppress printed confirmation messages.
+            quiet (bool): Suppress logged confirmation messages.
         """
-        rows = []
-        for var_name, row in self._accepted.items():
-            rows.append(
-                {
-                    "Original Node.Property": var_name,
-                    "rank": int(row["rank"]),
-                    "review_decision": "accepted",
-                }
-            )
-        for var_name in self._skipped:
-            rows.append(
-                {
-                    "Original Node.Property": var_name,
-                    "rank": None,
-                    "review_decision": "skipped",
-                }
-            )
-        # Columns are declared so a session with no decisions yet still writes a
-        # header row, and rank uses the nullable integer dtype so that skipped
-        # rows (rank=None) do not promote the column to float and serialise
-        # accepted ranks as "2.0", which resume cannot parse.
+        # All three output files are ordered by variable name, so a re-save of
+        # an unchanged session is identical and the same row is in the same
+        # place in each. These CSVs get diffed and version-controlled.
+        rows = [
+            {
+                "Original Node.Property": var_name,
+                "rank": int(self._accepted[var_name]["rank"]),
+                "review_decision": "accepted",
+            }
+            for var_name in self._accepted
+        ] + [
+            {
+                "Original Node.Property": var_name,
+                "rank": None,
+                "review_decision": "skipped",
+            }
+            for var_name in self._skipped
+        ]
+        rows.sort(key=lambda row: row["Original Node.Property"])
+        # Columns are declared so a session with no decisions yet still writes
+        # a header row. rank uses the nullable integer dtype because skipped
+        # rows carry no rank.
         state_df = pd.DataFrame(rows, columns=self.STATE_COLUMNS)
         state_df["rank"] = state_df["rank"].astype("Int64")
         state_df.to_csv(path, index=False)
 
-        curated_path = path.replace("_review_state.csv", "_curated_mappings.csv")
-        if curated_path != path:
-            self.curated_df.to_csv(curated_path, index=False, na_rep="N/A")
-        skipped_path = path.replace("_review_state.csv", "_skipped_variables.csv")
-        if skipped_path != path:
-            self.skipped_df.to_csv(skipped_path, index=False, na_rep="N/A")
+        curated_path, skipped_path = self.output_paths(path)
+        self.curated_df.to_csv(curated_path, index=False, na_rep="N/A")
+        self.skipped_df.to_csv(skipped_path, index=False, na_rep="N/A")
 
         if not quiet:
-            print(
-                f"Saved: {len(self._accepted)} accepted, {len(self._skipped)} skipped → {path}"
+            logging.info(
+                f"Saved: {len(self._accepted)} accepted, "
+                f"{len(self._skipped)} skipped → {path}"
             )
-            if curated_path != path:
-                print(f"Curated mappings → {curated_path}")
-            if skipped_path != path:
-                print(f"Skipped variables → {skipped_path}")
+            logging.info(f"Curated mappings → {curated_path}")
+            logging.info(f"Skipped variables → {skipped_path}")
 
     def _load_state(self, path):
         if not os.path.exists(path):
-            print(f"No state file found at {path} — starting fresh.")
+            logging.info(f"No state file found at {path} — starting fresh.")
             return
         try:
             state_df = pd.read_csv(path, dtype=str)
@@ -204,20 +225,30 @@ class VariableReviewSession:
             if decision == "skipped" and var_name in groups:
                 self._skipped.add(var_name)
             elif decision == "accepted" and var_name in groups:
-                # float() first: state files written before the Int64 fix hold
-                # ranks like "2.0", which int() rejects outright.
+                # A rank that cannot be read, or that matches no candidate,
+                # leaves the variable unreviewed so it returns to the queue.
+                #
+                # float() before int() because a rank may be serialised as
+                # "2.0" if the column became a float.
                 try:
-                    rank = int(float(state_row.get("rank", 1)))
-                except (ValueError, TypeError):
-                    rank = 1
+                    rank = int(float(state_row["rank"]))
+                except Exception:
+                    logging.warning(
+                        f"Unreadable rank for {var_name}; leaving it unreviewed."
+                    )
+                    continue
                 group_df = groups[var_name]
                 match = group_df[group_df["rank"] == rank]
-                self._accepted[var_name] = (
-                    match.iloc[0] if not match.empty else group_df.iloc[0]
-                )
+                if match.empty:
+                    logging.warning(
+                        f"No rank-{rank} candidate for {var_name} in this mapping "
+                        "file; leaving it unreviewed."
+                    )
+                    continue
+                self._accepted[var_name] = match.iloc[0]
         self._goto_first_unreviewed()
         reviewed = len(self._accepted) + len(self._skipped)
-        print(
+        logging.info(
             f"Resumed: {len(self._accepted)} accepted, {len(self._skipped)} skipped"
             f" — starting at variable {self._idx + 1} of {self.n_variables}"
             f" ({self.n_variables - reviewed} remaining)"
@@ -251,7 +282,9 @@ class VariableReviewSession:
     def curated_df(self):
         if not self._accepted:
             return pd.DataFrame(columns=self._df.columns)
-        return pd.DataFrame(list(self._accepted.values()))
+        # Sorted by variable name, so a fresh session and a resumed one
+        # produce the same file.
+        return pd.DataFrame([self._accepted[name] for name in sorted(self._accepted)])
 
     @property
     def skipped_df(self):
@@ -263,7 +296,8 @@ class VariableReviewSession:
             )
         groups = dict(self._variables)
         rows = []
-        for var_name in self._skipped:
+        # Sorted so the skipped CSV has a stable row order between saves.
+        for var_name in sorted(self._skipped):
             if var_name not in groups:
                 continue
             group_df = groups[var_name]
@@ -295,7 +329,9 @@ class VariableReviewSession:
         var_name, group_df = self._current
         match = group_df[group_df["rank"] == rank]
         if match.empty:
-            print(f"{var_name} has no rank-{rank} candidate — nothing accepted.")
+            logging.warning(
+                f"{var_name} has no rank-{rank} candidate — nothing accepted."
+            )
             return
         self._accepted[var_name] = match.iloc[0]
         self._skipped.discard(var_name)
@@ -399,8 +435,8 @@ class VariableReviewSession:
     def _update_decision_buttons(self):
         """Highlight the buttons matching the current variable's decision.
 
-        The skip button doubles as its own state indicator, so a variable that
-        was already skipped is visibly distinguishable from an undecided one.
+        The skip button doubles as its own state indicator, reading
+        "⊘ Skipped" when the current variable is skipped.
         """
         var_name, group_df = self._current
         accepted_rank = None
@@ -487,14 +523,13 @@ class VariableReviewSession:
     def start(self):
         """Render the interactive review UI in the current Jupyter cell.
 
-        Displays navigation buttons (repeated at top and bottom), a progress bar,
-        the current variable panel, and the ranked candidates table. One accept
-        button is rendered per candidate rank present in the mapping file. Call
+        Displays navigation buttons (repeated at top and bottom), a progress
+        bar, the current variable panel, and the ranked candidates table. Call
         once per session; subsequent accept/skip/prev/next calls refresh the UI
         in place.
         """
         if not self._variables:
-            print("Nothing to review — this session has no variables.")
+            logging.warning("Nothing to review — this session has no variables.")
             return
 
         self._progress_w = widgets.HTML()

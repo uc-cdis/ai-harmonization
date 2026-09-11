@@ -15,3 +15,23 @@ jobs:
     with:
       python-poetry: 'true'
     secrets: inherit  # pragma: allowlist secret
+
+  # TODO: point UnitTest and Lint back at @master once uc-cdis/.github#fix/lint merges.
+  UnitTest:
+    name: Unit Tests
+    uses: uc-cdis/.github/.github/workflows/python_unit_test.yaml@fix/lint
+    with:
+      python-version: '3.12'
+      uv-version: 'latest'
+      # The workflow syncs dependencies itself, but pyproject.toml declares no
+      # [build-system], so uv treats this as a virtual project and `uv sync` leaves
+      # ai_harmonization uninstalled. The tests need it, hence the explicit install.
+      run-tests-command: 'uv pip install -e . && uv run pytest -vv'
+
+  Lint:
+    name: Lint (advisory)
+    # NOT wired up as a blocking check, but we should eventually do that once everything is fixed.
+    uses: uc-cdis/.github/.github/workflows/required_lint_check.yaml@fix/lint
+    with:
+      python-version: '3.12'
+      uv-version: 'latest'

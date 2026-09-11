@@ -6,7 +6,6 @@ import json
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 import pytest
-from typing import List
 
 from ai_harmonization.harmonization_approaches.base import (
     SingleHarmonizationSuggestion,
@@ -41,7 +40,7 @@ def example_suggestions():
 
 
 def test_get_metrics_for_approach(
-    tmp_path: Path, example_suggestions: List[SingleHarmonizationSuggestion]
+    tmp_path: Path, example_suggestions: HarmonizationSuggestions
 ):
     test1 = {
         "nodes": [
@@ -84,7 +83,7 @@ x\ty
 
     # Mock HarmonizationApproach and get_metrics_for_test_case
     mock_approach = MagicMock(spec=HarmonizationApproach)
-    mock_approach.get_harmonization_suggestions.return_value = example_suggestion
+    mock_approach.get_harmonization_suggestions.return_value = example_suggestions
     with patch(
         "ai_harmonization.harmonization_benchmark.get_metrics_for_test_case",
         return_value={"accuracy": 0.9},

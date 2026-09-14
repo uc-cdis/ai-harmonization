@@ -1,10 +1,19 @@
 import json
 import re
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import pandas as pd
+import yaml
 from langchain_core.documents import Document
 from pydantic import BaseModel
+
+# Stand-in for a schema field that declares no description. This text is
+# embedded like any other description, so it is deliberately neutral: anything
+# with domain words in it pulls unrelated source variables toward the handful of
+# slots that lack a description. Not left empty, because Property.description is
+# a required str and an empty one is falsy, which makes the review UI fall back
+# to showing the whole embedded string.
+DEFAULT_PROPERTY_DESCRIPTION = "No description provided."
 
 
 class Property(BaseModel):
@@ -265,7 +274,7 @@ class SimpleDataModel(BaseModel):
             ):
                 links = [
                     link_info["name"] for link_info in node_data["links"]["subgroup"]
-                ]()
+                ]
 
             # Build Node
             node = Node(
@@ -334,6 +343,74 @@ class SimpleDataModel(BaseModel):
             )
 
         return data_model
+
+    @staticmethod
+    def from_linkml_yaml(input_yaml: str):
+        """
+        Converts a LinkML YAML schema to a standard format.
+
+        Resolves ``is_a`` and ``mixin`` inheritance so every class carries its
+        full set of attributes, and populates ``Property.values`` with enum
+        ``permissible_values`` keys, following ``inherits`` and ``include`` chains.
+
+        This is a source-schema alternative to ``from_linkml_jsonschema``, which
+        reads LinkML that has already been compiled to JSON Schema. Prefer this
+        one when you have the ``.yaml`` schema, since compilation to JSON Schema
+        discards enum permissible values and flattens inheritance.
+
+        Args:
+            input_yaml: The contents of a LinkML schema YAML file.
+
+        Returns:
+            SimpleDataModel: Model containing one Node per class with properties.
+        """
+        schema_dict = yaml.safe_load(input_yaml) or {}
+
+        classes = schema_dict.get("classes") or {}
+        schema_slots = schema_dict.get("slots") or {}
+        enums = schema_dict.get("enums") or {}
+
+        nodes = []
+        for class_name, class_meta in classes.items():
+            class_description = ((class_meta or {}).get("description") or "").strip()
+            features = _collect_linkml_class_features(class_name, classes, schema_slots)
+
+            properties = []
+            for attribute_name, attribute_meta in features.items():
+                attribute_meta = attribute_meta or {}
+                description = (
+                    attribute_meta.get("description") or DEFAULT_PROPERTY_DESCRIPTION
+                ).strip()
+                attribute_range = attribute_meta.get("range") or "string"
+
+                values = None
+                if attribute_range in enums:
+                    permissible_values = _resolve_linkml_enum_values(
+                        attribute_range, enums
+                    )
+                    if permissible_values:
+                        values = list(permissible_values.keys())
+
+                properties.append(
+                    Property(
+                        name=attribute_name,
+                        description=description,
+                        type=attribute_range,
+                        values=values,
+                    )
+                )
+
+            if properties:
+                nodes.append(
+                    Node(
+                        name=class_name,
+                        description=class_description,
+                        links=[],
+                        properties=properties,
+                    )
+                )
+
+        return SimpleDataModel(nodes=nodes)
 
     @staticmethod
     def get_from_unknown_json_format(input_json: str, *args, **kwargs):
@@ -416,18 +493,143 @@ def get_node_property_as_string(node: Node, node_property: Property) -> str:
 
 def get_data_model_as_langchain_documents(
     data_model: SimpleDataModel,
+    document_formatter: Optional[Callable[[Node, Property], str]] = None,
 ) -> List[Document]:
     """
     Retrieves and converts a data model output to LangChain documents.
 
+    Args:
+        data_model: The model whose properties become one Document each.
+        document_formatter: Turns a (Node, Property) pair into the text that
+            gets embedded. Defaults to ``get_node_property_as_string``. The
+            description is also stored in ``Document.metadata`` so it survives
+            formatters that leave it out of the embedded text.
+
     Returns:
         List[Document]: A list of Document objects representing the converted LangChain documents.
     """
-    documents = []
-    node_prop_descs = get_data_model_as_node_prop_type_descriptions(data_model)
+    document_formatter = document_formatter or get_node_property_as_string
 
-    for value in node_prop_descs:
-        document = Document(page_content=value, metadata={})
-        documents.append(document)
+    documents = []
+    for node in data_model.nodes:
+        for node_property in node.properties:
+            documents.append(
+                Document(
+                    page_content=document_formatter(node, node_property),
+                    metadata={"description": node_property.description},
+                )
+            )
 
     return documents
+
+
+# ── LinkML YAML inheritance resolution (helpers for from_linkml_yaml) ──────────
+
+
+def _collect_linkml_class_features(class_name, classes, schema_slots, visited=None):
+    """
+    Recursively collect the attributes of a LinkML class and all of its
+    ancestors, following both ``is_a`` and ``mixins``.
+
+    Later updates win, so the effective priority order is (highest first):
+    own attributes, own slots, is_a parent, mixins.
+
+    Args:
+        class_name: Name of the class to resolve.
+        classes: The full ``classes`` section of the LinkML schema.
+        schema_slots: The full ``slots`` section, for resolving slot references.
+        visited: Already-visited class names, to stop inheritance cycles.
+
+    Returns:
+        dict: Merged ``{attribute_name: attribute_metadata}``.
+    """
+    if visited is None:
+        visited = set()
+    if class_name in visited or class_name not in classes:
+        return {}
+    visited.add(class_name)
+    class_meta = classes.get(class_name) or {}
+    features = {}
+
+    for mixin in class_meta.get("mixins") or []:
+        features.update(
+            _collect_linkml_class_features(mixin, classes, schema_slots, set(visited))
+        )
+
+    parent = class_meta.get("is_a")
+    if parent:
+        features.update(
+            _collect_linkml_class_features(parent, classes, schema_slots, set(visited))
+        )
+
+    for slot_name in class_meta.get("slots") or []:
+        slot_meta = schema_slots.get(slot_name, {})
+        features[slot_name] = slot_meta if isinstance(slot_meta, dict) else {}
+
+    for attribute_name, attribute_meta in (class_meta.get("attributes") or {}).items():
+        features[attribute_name] = (
+            attribute_meta if isinstance(attribute_meta, dict) else {}
+        )
+
+    return features
+
+
+def _resolve_linkml_enum_values(enum_name, enums, visited=None):
+    """
+    Recursively collect the permissible values of a LinkML enum, following
+    ``inherits`` and ``include``.
+
+    Args:
+        enum_name: Name of the enum to resolve.
+        enums: The full ``enums`` section of the LinkML schema.
+        visited: Already-visited enum names, to stop inheritance cycles.
+
+    Returns:
+        dict: Merged ``{value_text: value_metadata}`` from the enum and its ancestors.
+    """
+    if visited is None:
+        visited = set()
+    if enum_name in visited or enum_name not in enums:
+        return {}
+    visited.add(enum_name)
+
+    enum_meta = enums[enum_name] or {}
+    values = {}
+
+    for parent in enum_meta.get("inherits") or []:
+        values.update(_resolve_linkml_enum_values(parent, enums, set(visited)))
+
+    values.update(_as_permissible_value_map(enum_meta.get("permissible_values")))
+
+    for included in enum_meta.get("include") or []:
+        values.update(
+            _as_permissible_value_map((included or {}).get("permissible_values"))
+        )
+
+    return values
+
+
+def _as_permissible_value_map(permissible_values) -> dict:
+    """
+    Normalise a LinkML ``permissible_values`` block to ``{text: metadata}``.
+
+    LinkML accepts both the canonical map form, where each value may carry a
+    ``description`` and a ``meaning`` CURIE, and a bare list of value strings.
+    bdchm uses the map form, but the list form is equally valid and would
+    otherwise reach ``dict.update`` and raise ValueError.
+
+    Args:
+        permissible_values: The raw block, a map, a list, or None.
+
+    Returns:
+        dict: ``{value_text: metadata}``, with an empty dict for list entries.
+    """
+    if not permissible_values:
+        return {}
+    if isinstance(permissible_values, dict):
+        return permissible_values
+    return {
+        str(value): {}
+        for value in permissible_values
+        if value is not None and not isinstance(value, (dict, list))
+    }

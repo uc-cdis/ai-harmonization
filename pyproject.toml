@@ -14,6 +14,10 @@ dependencies = [
     "sssom-schema>=1.0.0",
     "tqdm>=4.67.1",
     "itables>=2.4.4",
+    # Required by ai_harmonization.simple_data_model.from_linkml_yaml
+    "pyyaml>=6.0.1",
+    # Required by ai_harmonization.review (interactive review widget)
+    "ipywidgets>=8.1.0",
     # We want this to work in a Google Colab environment.
     # In such environments, Google's pre-installs a ton of Google
     # Python SDKs which don't always work with the latest version

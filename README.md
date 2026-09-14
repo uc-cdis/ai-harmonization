@@ -14,6 +14,22 @@ pip install ai_harmonization
 
 - **[Demo](https://huggingface.co/spaces/uc-ctds/ai_assisted_data_curation_toolkit/blob/main/ai_assisted_data_curation.ipynb)**
 
+### BioData Catalyst Study Harmonization
+
+An end-to-end workflow that maps dbGaP study variables onto the
+[BioData Catalyst Harmonized Model (bdchm)](https://github.com/RTIInternational/NHLBI-BDC-DMC-HM).
+Run the notebooks in order; each one reads what the previous one wrote.
+
+1. [Download Studies Metadata](./jupyter/bdchm/download_studies_data_dictionaries.ipynb) — fetch
+   preharmonized PFBs from BDC and extract the dbGaP data dictionary and variable report XMLs.
+2. [Generate Preliminary Harmonization Mappings](./jupyter/bdchm/harmonize_studies.ipynb) — embed
+   the bdchm schema once per prompt variant, then map each study variable to ranked target slots.
+3. [Review Harmonization Suggestions](./jupyter/bdchm/review_harmonization_suggestions.ipynb) —
+   step through the candidates in a widget, accepting or skipping one variable at a time.
+
+Steps 1 and 2 write into `inputs/` and `outputs/` relative to the notebook's working directory;
+both are gitignored, as is the `gen3-credentials/` directory holding your Gen3 API key.
+
 ### Harmonization Benchmarking and AI Training
 
 - [Example of Evaluating a Harmonization Approach](./jupyter/harmonization_approach_evaluation.ipynb)

@@ -72,27 +72,27 @@ def unzip_files(directory: str, remove_compressed_file: bool = True) -> None:
             elif file.endswith(".tar"):
                 # Handle .tar files
                 with tarfile.open(compressed_file_path, "r") as tar:
-                    tar.extractall(
-                        path=root
-                    )  # Extract all files into the same directory as the .tar
+                    # Extract into the same directory as the .tar. The "data"
+                    # filter rejects members that would land outside `root`
+                    # (absolute paths, "..", escaping links) rather than
+                    # silently writing them.
+                    tar.extractall(path=root, filter="data")
 
                 logging.info(f"Extracted: {compressed_file_path} to {root}")
 
             elif file.endswith(".tar.gz") or file.endswith(".tgz"):
                 # Handle .tar.gz files
                 with tarfile.open(compressed_file_path, "r:gz") as tar:
-                    tar.extractall(
-                        path=root
-                    )  # Extract all files into the same directory as the .tar.gz
+                    tar.extractall(path=root, filter="data")
 
                 logging.info(f"Extracted: {compressed_file_path} to {root}")
 
             elif file.endswith(".zip"):
                 # Handle .zip files
                 with zipfile.ZipFile(compressed_file_path, "r") as zip_ref:
-                    zip_ref.extractall(
-                        root
-                    )  # Extract all files into the same directory as the .zip
+                    _reject_escaping_members(root, zip_ref.namelist())
+                    # Extract all files into the same directory as the .zip
+                    zip_ref.extractall(root)
 
                 logging.info(f"Extracted: {compressed_file_path} to {root}")
 
@@ -114,6 +114,30 @@ def unzip_files(directory: str, remove_compressed_file: bool = True) -> None:
             if is_compressed_file and remove_compressed_file:
                 logging.info(f"Removing: {compressed_file_path}")
                 os.remove(compressed_file_path)
+
+
+def _reject_escaping_members(destination: str, member_names: list[str]) -> None:
+    """
+    Reject archive member names that resolve outside the destination directory.
+
+    Args:
+        destination (str): Directory the archive is being extracted into.
+        member_names (list[str]): Member names as recorded in the archive.
+
+    Raises:
+        ValueError: If any member resolves outside `destination`.
+    """
+    resolved_destination = os.path.realpath(destination)
+    for name in member_names:
+        resolved_member = os.path.realpath(os.path.join(resolved_destination, name))
+        # The separator matters: a bare startswith would accept "/dest-evil"
+        # as living under "/dest".
+        if resolved_member != resolved_destination and not resolved_member.startswith(
+            resolved_destination + os.sep
+        ):
+            raise ValueError(
+                f"Refusing to extract {name!r}: resolves outside {destination}"
+            )
 
 
 def remove_unwanted_files(
@@ -367,10 +391,7 @@ def add_documents_to_vectorstore(
     documents, vectorstore, persistent_client, batch_size=None
 ):
     batch_size = batch_size or persistent_client.get_max_batch_size()
-    logging.info(
-        "Number of documents that can be inserted at once:",
-        batch_size,
-    )
+    logging.info(f"Number of documents that can be inserted at once: {batch_size}")
     ids = range(len(documents))
     batches = create_batches(
         batch_size=batch_size, ids=list(ids), documents=list(documents)

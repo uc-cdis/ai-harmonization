@@ -16,10 +16,9 @@ jobs:
       python-poetry: 'true'
     secrets: inherit  # pragma: allowlist secret
 
-  # TODO: point UnitTest and Lint back at @master once uc-cdis/.github#fix/lint merges.
   UnitTest:
     name: Unit Tests
-    uses: uc-cdis/.github/.github/workflows/python_unit_test.yaml@fix/lint
+    uses: uc-cdis/.github/.github/workflows/python_unit_test.yaml@master
     with:
       python-version: '3.12'
       uv-version: 'latest'
@@ -31,7 +30,7 @@ jobs:
   Lint:
     name: Lint (advisory)
     # NOT wired up as a blocking check, but we should eventually do that once everything is fixed.
-    uses: uc-cdis/.github/.github/workflows/required_lint_check.yaml@fix/lint
+    uses: uc-cdis/.github/.github/workflows/required_lint_check.yaml@master
     with:
       python-version: '3.12'
       uv-version: 'latest'

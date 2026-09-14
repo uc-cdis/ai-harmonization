@@ -232,7 +232,7 @@ class VariableReviewSession:
                 # "2.0" if the column became a float.
                 try:
                     rank = int(float(state_row["rank"]))
-                except Exception:
+                except (ValueError, TypeError, KeyError):
                     logging.warning(
                         f"Unreadable rank for {var_name}; leaving it unreviewed."
                     )

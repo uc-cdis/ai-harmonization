@@ -63,6 +63,9 @@ def parse_dbgap_table(dict_path, report_path=None):
             declares — the prompt formatters cap how many they use, so the
             source and target sides are capped identically. See
             ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
+            Property.additional_metadata['variable_accession'] carries dbGaP's
+            accession for the variable, e.g. 'phv00000479.v1', which is how
+            external resources cite it.
     """
     root = ET.parse(dict_path).getroot()
     table_id = root.attrib.get("id", os.path.basename(dict_path))
@@ -99,6 +102,18 @@ def parse_dbgap_table(dict_path, report_path=None):
             code = val.attrib.get("code")
             value_labels.append(f"{code}={meaning}" if code else meaning)
 
+        metadata = {}
+        if value_labels:
+            metadata["value_labels"] = value_labels
+        # dbGaP's own accession for the variable, e.g. 'phv00000479.v1'. It is
+        # how external resources cite a variable — the TOPMed harmonized
+        # phenotypes reference their component variables this way — so it is
+        # needed to join a dictionary against them. The variable name alone
+        # does not identify one: names repeat across tables and studies.
+        variable_accession = var.attrib.get("id")
+        if variable_accession:
+            metadata["variable_accession"] = variable_accession
+
         properties.append(
             Property(
                 name=var_name,
@@ -107,9 +122,7 @@ def parse_dbgap_table(dict_path, report_path=None):
                 ).strip(),
                 type=var_types.get(var_name, "string"),
                 values=value_meanings or None,
-                additional_metadata=(
-                    {"value_labels": value_labels} if value_labels else None
-                ),
+                additional_metadata=metadata or None,
             )
         )
 

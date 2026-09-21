@@ -81,6 +81,22 @@ class TestParseDbgapTable:
         assert sex.values == ["Male", "Female"]
         assert "1=Male" in sex.additional_metadata["value_labels"]
 
+    def test_variable_accession_is_captured(self, dict_path):
+        """External resources cite variables by accession, not by name."""
+        _, model = parse_dbgap_table(dict_path)
+        accessions = {
+            p.name: p.additional_metadata["variable_accession"]
+            for p in model.nodes[0].properties
+        }
+        assert accessions == {"SUBJID": "phv001", "SEX": "phv002"}
+
+    def test_accession_present_on_variables_without_values(self, dict_path):
+        """The metadata dict is built even when there are no value labels."""
+        _, model = parse_dbgap_table(dict_path)
+        subjid = next(p for p in model.nodes[0].properties if p.name == "SUBJID")
+        assert subjid.values is None
+        assert subjid.additional_metadata == {"variable_accession": "phv001"}
+
     def test_var_report_sets_type(self, dict_path, report_path):
         _, model = parse_dbgap_table(dict_path, report_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")

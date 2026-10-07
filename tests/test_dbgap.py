@@ -83,23 +83,23 @@ class TestParseDbgapTable:
         assert "1=Male" in sex.additional_metadata["value_labels"]
 
     def test_variable_id_is_captured(self, dict_path):
-        """Each variable carries its accession verbatim, version suffix included."""
+        """Each variable carries its variable_id verbatim, version suffix included."""
         _, model = parse_dbgap_table(dict_path)
-        accessions = {
+        variable_ids = {
             p.name: p.additional_metadata["variable_id"]
             for p in model.nodes[0].properties
         }
-        assert accessions == {"SUBJID": "phv99999901.v1", "SEX": "phv99999902.v1"}
+        assert variable_ids == {"SUBJID": "phv99999901.v1", "SEX": "phv99999902.v1"}
 
-    def test_accession_present_on_variables_without_values(self, dict_path):
+    def test_variable_id_present_on_variables_without_values(self, dict_path):
         """The metadata dict is built even when there are no value labels."""
         _, model = parse_dbgap_table(dict_path)
         subjid = next(p for p in model.nodes[0].properties if p.name == "SUBJID")
         assert subjid.values is None
         assert subjid.additional_metadata == {"variable_id": "phv99999901.v1"}
 
-    def test_accession_and_value_labels_share_the_metadata(self, dict_path):
-        """Adding the accession leaves the value labels in place beside it."""
+    def test_variable_id_and_value_labels_share_the_metadata(self, dict_path):
+        """Adding the variable_id leaves the value labels in place beside it."""
         _, model = parse_dbgap_table(dict_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
         assert sex.additional_metadata == {
@@ -107,47 +107,45 @@ class TestParseDbgapTable:
             "variable_id": "phv99999902.v1",
         }
 
-    def test_variable_without_an_id_has_no_accession(self, tmp_path):
-        """Without an id there is no accession key.
+    def test_variable_without_an_id_has_no_metadata_variable_id(self, tmp_path):
+        """Without an id there is no variable_id key.
 
-        CODED keeps only its value labels; BARE, with neither an id nor
-        values, has nothing to record, so its additional_metadata is None.
+        A variable with values keeps only its value labels; one with neither an
+        id nor values has nothing to record, so its additional_metadata is None.
         """
-        p = tmp_path / "pht999998.v1_data_dict.xml"
-        p.write_text(
+        path = tmp_path / "pht999998.v1_data_dict.xml"
+        path.write_text(
             '<data_table id="pht999998.v1" study_id="phs999999">'
-            "<variable><name>BARE</name><description>No id, no values</description></variable>"
-            "<variable><name>CODED</name><description>No id</description>"
+            "<variable><name>NO_VALUES</name><description>No id, no values</description></variable>"
+            "<variable><name>WITH_VALUES</name><description>No id</description>"
             '<value code="1">Yes</value><value code="0">No</value></variable>'
             "</data_table>"
         )
-        _, model = parse_dbgap_table(str(p))
-        bare, coded = model.nodes[0].properties
-        assert bare.additional_metadata is None
-        assert coded.additional_metadata == {"value_labels": ["1=Yes", "0=No"]}
+        _, model = parse_dbgap_table(str(path))
+        without_values, with_values = model.nodes[0].properties
+        assert without_values.additional_metadata is None
+        assert with_values.additional_metadata == {"value_labels": ["1=Yes", "0=No"]}
 
     def test_same_name_in_two_tables_is_two_variables(self, tmp_path):
-        """A name is unique only within its table; the accession tells two apart."""
-        found = []
-        for table, accession in (
+        """A name is unique only within its table; the variable_id tells two apart."""
+        variable_names, variable_ids = [], []
+        for table, variable_id in (
             ("pht999998.v1", "phv99999801.v1"),
             ("pht999997.v1", "phv99999701.v1"),
         ):
-            p = tmp_path / f"{table}_data_dict.xml"
-            p.write_text(
+            path = tmp_path / f"{table}_data_dict.xml"
+            path.write_text(
                 f'<data_table id="{table}" study_id="phs999999">'
-                f'<variable id="{accession}"><name>SUBJID</name>'
+                f'<variable id="{variable_id}"><name>SUBJID</name>'
                 "<description>Subject identifier</description></variable>"
                 "</data_table>"
             )
-            _, model = parse_dbgap_table(str(p))
-            properties = model.nodes[0].properties
-            assert len(properties) == 1
-            prop = properties[0]
-            found.append((prop.name, prop.additional_metadata["variable_id"]))
-        (name_a, acc_a), (name_b, acc_b) = found
-        assert name_a == name_b == "SUBJID"
-        assert acc_a != acc_b
+            _, model = parse_dbgap_table(str(path))
+            variable = model.nodes[0].properties[0]
+            variable_names.append(variable.name)
+            variable_ids.append(variable.additional_metadata["variable_id"])
+        assert variable_names == ["SUBJID", "SUBJID"]
+        assert variable_ids == ["phv99999801.v1", "phv99999701.v1"]
 
     def test_var_report_sets_type(self, dict_path, report_path):
         _, model = parse_dbgap_table(dict_path, report_path)
@@ -267,7 +265,7 @@ class TestBuildMappingRows:
         )
 
     def test_variable_id_carried_into_rows(self):
-        """Each row names exactly one source variable, by its accession."""
+        """Each row names exactly one source variable, by its variable_id."""
         suggestions = [
             make_suggestion(
                 "target.slot_a", 0.9, "d", "A", variable_id="phv99999903.v1"
@@ -279,8 +277,8 @@ class TestBuildMappingRows:
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert [r["source_variable_id"] for r in rows] == ["phv99999903.v1"] * 2
 
-    def test_missing_accession_is_an_empty_cell(self, suggestions):
-        """A source with no recorded accession still writes a complete row."""
+    def test_missing_variable_id_is_an_empty_cell(self, suggestions):
+        """A source with no recorded variable_id still writes a complete row."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert all(r["source_variable_id"] == "" for r in rows)
 

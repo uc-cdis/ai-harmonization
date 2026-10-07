@@ -65,7 +65,7 @@ def parse_dbgap_table(dict_path, report_path=None):
             source and target sides are capped identically. See
             ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
             Property.additional_metadata['variable_id'] carries the
-            variable's dbGaP accession (its `id`), verbatim with its version, e.g.
+            variable's dbGaP id, verbatim with its version, e.g.
             'phv99999999.v1' -- unique within dbGaP, and the only identifier
             of one variable, since a name is unique only within its table.
     """

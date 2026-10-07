@@ -42,7 +42,7 @@ CSV_HEADERS = [
     "study_id",
     "source_table_id",
     "source_variable_name",
-    "source_variable_accession",
+    "source_variable_id",
     "prompt_variant",
     "rank",
 ]
@@ -64,8 +64,8 @@ def parse_dbgap_table(dict_path, report_path=None):
             declares — the prompt formatters cap how many they use, so the
             source and target sides are capped identically. See
             ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
-            Property.additional_metadata['variable_accession'] carries the
-            variable's dbGaP accession, verbatim with its version, e.g.
+            Property.additional_metadata['variable_id'] carries the
+            variable's dbGaP accession (its `id`), verbatim with its version, e.g.
             'phv99999999.v1' -- unique within dbGaP, and the only identifier
             of one variable, since a name is unique only within its table.
     """
@@ -107,9 +107,9 @@ def parse_dbgap_table(dict_path, report_path=None):
         metadata = {}
         if value_labels:
             metadata["value_labels"] = value_labels
-        variable_accession = var.attrib.get("id")
-        if variable_accession:
-            metadata["variable_accession"] = variable_accession
+        variable_id = var.attrib.get("id")
+        if variable_id:
+            metadata["variable_id"] = variable_id
 
         properties.append(
             Property(
@@ -205,9 +205,7 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
                 "study_id": study_id,
                 "source_table_id": suggestion.source_node,
                 "source_variable_name": suggestion.source_property,
-                "source_variable_accession": (
-                    source_metadata.get("variable_accession") or ""
-                ),
+                "source_variable_id": (source_metadata.get("variable_id") or ""),
                 "prompt_variant": (suggestion.target_additional_metadata or {}).get(
                     "prompt_variant", ""
                 ),

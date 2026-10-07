@@ -157,7 +157,7 @@ class TestGetSuggestionsForProperty:
             type="string/encoded",
             additional_metadata={
                 "value_labels": ["1=Male", "2=Female"],
-                "variable_accession": "phv99999902.v1",
+                "variable_id": "phv99999902.v1",
             },
         )
         search = MultiPromptSimilaritySearch.from_indexes(
@@ -178,7 +178,7 @@ class TestGetSuggestionsForProperty:
             "1=Male",
             "2=Female",
         ]
-        assert suggestion.source_additional_metadata["variable_accession"] == (
+        assert suggestion.source_additional_metadata["variable_id"] == (
             "phv99999902.v1"
         )
         assert suggestion.target_description == "Sex of the participant"

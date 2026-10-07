@@ -82,11 +82,11 @@ class TestParseDbgapTable:
         assert sex.values == ["Male", "Female"]
         assert "1=Male" in sex.additional_metadata["value_labels"]
 
-    def test_variable_accession_is_captured(self, dict_path):
+    def test_variable_id_is_captured(self, dict_path):
         """Each variable carries its accession verbatim, version suffix included."""
         _, model = parse_dbgap_table(dict_path)
         accessions = {
-            p.name: p.additional_metadata["variable_accession"]
+            p.name: p.additional_metadata["variable_id"]
             for p in model.nodes[0].properties
         }
         assert accessions == {"SUBJID": "phv99999901.v1", "SEX": "phv99999902.v1"}
@@ -96,7 +96,7 @@ class TestParseDbgapTable:
         _, model = parse_dbgap_table(dict_path)
         subjid = next(p for p in model.nodes[0].properties if p.name == "SUBJID")
         assert subjid.values is None
-        assert subjid.additional_metadata == {"variable_accession": "phv99999901.v1"}
+        assert subjid.additional_metadata == {"variable_id": "phv99999901.v1"}
 
     def test_accession_and_value_labels_share_the_metadata(self, dict_path):
         """Adding the accession leaves the value labels in place beside it."""
@@ -104,7 +104,7 @@ class TestParseDbgapTable:
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
         assert sex.additional_metadata == {
             "value_labels": ["1=Male", "2=Female"],
-            "variable_accession": "phv99999902.v1",
+            "variable_id": "phv99999902.v1",
         }
 
     def test_variable_without_an_id_has_no_accession(self, tmp_path):
@@ -142,7 +142,7 @@ class TestParseDbgapTable:
             )
             _, model = parse_dbgap_table(str(p))
             (prop,) = model.nodes[0].properties
-            found.append((prop.name, prop.additional_metadata["variable_accession"]))
+            found.append((prop.name, prop.additional_metadata["variable_id"]))
         (name_a, acc_a), (name_b, acc_b) = found
         assert name_a == name_b == "SUBJID"
         assert acc_a != acc_b
@@ -190,7 +190,7 @@ def make_suggestion(
     target_description,
     prompt_variant,
     value_labels=None,
-    variable_accession=None,
+    variable_id=None,
 ):
     """Build one suggestion as MultiPromptSimilaritySearch would emit it."""
     target_node, target_property = slot_key.rsplit(".", 1)
@@ -201,7 +201,7 @@ def make_suggestion(
         source_additional_metadata={
             "type": "integer",
             "value_labels": value_labels or [],
-            "variable_accession": variable_accession,
+            "variable_id": variable_id,
         },
         target_node=target_node,
         target_property=target_property,
@@ -264,23 +264,23 @@ class TestBuildMappingRows:
             ["1=Male", "2=Female"]
         )
 
-    def test_variable_accession_carried_into_rows(self):
+    def test_variable_id_carried_into_rows(self):
         """Each row names exactly one source variable, by its accession."""
         suggestions = [
             make_suggestion(
-                "target.slot_a", 0.9, "d", "A", variable_accession="phv99999903.v1"
+                "target.slot_a", 0.9, "d", "A", variable_id="phv99999903.v1"
             ),
             make_suggestion(
-                "target.slot_b", 0.7, "d", "B", variable_accession="phv99999903.v1"
+                "target.slot_b", 0.7, "d", "B", variable_id="phv99999903.v1"
             ),
         ]
         rows = build_mapping_rows(suggestions, {}, "phs999999")
-        assert [r["source_variable_accession"] for r in rows] == ["phv99999903.v1"] * 2
+        assert [r["source_variable_id"] for r in rows] == ["phv99999903.v1"] * 2
 
     def test_missing_accession_is_an_empty_cell(self, suggestions):
         """A source with no recorded accession still writes a complete row."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
-        assert all(r["source_variable_accession"] == "" for r in rows)
+        assert all(r["source_variable_id"] == "" for r in rows)
 
     def test_rows_match_the_csv_headers(self, suggestions):
         """Every row has exactly the CSV's columns, so DictWriter accepts it."""

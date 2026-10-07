@@ -413,9 +413,9 @@ class MultiPromptSimilaritySearch(HarmonizationApproach):
                     "value_labels": (source_property.additional_metadata or {}).get(
                         "value_labels", []
                     ),
-                    "variable_accession": (
-                        source_property.additional_metadata or {}
-                    ).get("variable_accession"),
+                    "variable_id": (source_property.additional_metadata or {}).get(
+                        "variable_id"
+                    ),
                 },
                 target_node=match["slot_key"].rsplit(".", 1)[0],
                 target_property=match["slot_key"].rsplit(".", 1)[-1],

@@ -42,6 +42,7 @@ CSV_HEADERS = [
     "study_id",
     "source_table_id",
     "source_variable_name",
+    "source_variable_accession",
     "prompt_variant",
     "rank",
 ]
@@ -63,9 +64,10 @@ def parse_dbgap_table(dict_path, report_path=None):
             declares — the prompt formatters cap how many they use, so the
             source and target sides are capped identically. See
             ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
-            Property.additional_metadata['variable_accession'] carries dbGaP's
-            accession for the variable, e.g. 'phv00000479.v1', which is how
-            external resources cite it.
+            Property.additional_metadata['variable_accession'] carries the
+            variable's dbGaP accession, verbatim with its version, e.g.
+            'phv99999999.v1' -- unique within dbGaP, and the only identifier
+            of one variable, since a name is unique only within its table.
     """
     root = ET.parse(dict_path).getroot()
     table_id = root.attrib.get("id", os.path.basename(dict_path))
@@ -105,11 +107,6 @@ def parse_dbgap_table(dict_path, report_path=None):
         metadata = {}
         if value_labels:
             metadata["value_labels"] = value_labels
-        # dbGaP's own accession for the variable, e.g. 'phv00000479.v1'. It is
-        # how external resources cite a variable — the TOPMed harmonized
-        # phenotypes reference their component variables this way — so it is
-        # needed to join a dictionary against them. The variable name alone
-        # does not identify one: names repeat across tables and studies.
         variable_accession = var.attrib.get("id")
         if variable_accession:
             metadata["variable_accession"] = variable_accession
@@ -194,9 +191,8 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
     rows = []
     for rank, suggestion in enumerate(suggestions, start=1):
         slot_key = f"{suggestion.target_node}.{suggestion.target_property}"
-        value_labels = (suggestion.source_additional_metadata or {}).get(
-            "value_labels", []
-        )
+        source_metadata = suggestion.source_additional_metadata or {}
+        value_labels = source_metadata.get("value_labels", [])
         rows.append(
             {
                 "Original Node.Property": f"{suggestion.source_node}.{suggestion.source_property}",
@@ -209,6 +205,9 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
                 "study_id": study_id,
                 "source_table_id": suggestion.source_node,
                 "source_variable_name": suggestion.source_property,
+                "source_variable_accession": (
+                    source_metadata.get("variable_accession") or ""
+                ),
                 "prompt_variant": (suggestion.target_additional_metadata or {}).get(
                     "prompt_variant", ""
                 ),

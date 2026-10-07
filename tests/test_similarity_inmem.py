@@ -155,7 +155,10 @@ class TestGetSuggestionsForProperty:
             name="SEX",
             description="Biological sex",
             type="string/encoded",
-            additional_metadata={"value_labels": ["1=Male", "2=Female"]},
+            additional_metadata={
+                "value_labels": ["1=Male", "2=Female"],
+                "variable_accession": "phv99999902.v1",
+            },
         )
         search = MultiPromptSimilaritySearch.from_indexes(
             {
@@ -175,6 +178,9 @@ class TestGetSuggestionsForProperty:
             "1=Male",
             "2=Female",
         ]
+        assert suggestion.source_additional_metadata["variable_accession"] == (
+            "phv99999902.v1"
+        )
         assert suggestion.target_description == "Sex of the participant"
 
     def test_slot_key_splits_on_the_last_dot(self, source_node, source_property):

@@ -141,7 +141,9 @@ class TestParseDbgapTable:
                 "</data_table>"
             )
             _, model = parse_dbgap_table(str(p))
-            (prop,) = model.nodes[0].properties
+            properties = model.nodes[0].properties
+            assert len(properties) == 1
+            prop = properties[0]
             found.append((prop.name, prop.additional_metadata["variable_id"]))
         (name_a, acc_a), (name_b, acc_b) = found
         assert name_a == name_b == "SUBJID"

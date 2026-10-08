@@ -358,6 +358,7 @@ class TestOutputFiles:
         assert skipped.loc[0, "Best Suggested Target"] == "TargetClass.field_a"
 
     def test_skipped_file_carries_the_variable_id(self, session, state_path):
+        """A skipped variable keeps its variable_id."""
         session.skip()
         session.save(state_path, quiet=True)
 
@@ -365,6 +366,7 @@ class TestOutputFiles:
         assert skipped.loc[0, "source_variable_id"] == "phv99999901.v1"
 
     def test_curated_file_carries_the_variable_id(self, session, state_path):
+        """An accepted variable's row in the curated file keeps its variable_id."""
         session.accept(rank=1)
         session.save(state_path, quiet=True)
 

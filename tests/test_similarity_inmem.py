@@ -151,6 +151,8 @@ class TestGetSuggestionsForProperty:
         assert index_b.queries == ["ONLY NAME AGE"]
 
     def test_source_fields_copied_onto_suggestions(self, source_node):
+        """A suggestion carries its source variable's name, description, value
+        labels and variable_id."""
         source_property = Property(
             name="SEX",
             description="Biological sex",

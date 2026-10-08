@@ -66,6 +66,7 @@ class VariableReviewSession:
         "study_id",
         "source_table_id",
         "source_variable_name",
+        "source_variable_id",
         "Original Description",
         "Original Values",
     ]

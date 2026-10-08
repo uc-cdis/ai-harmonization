@@ -42,6 +42,7 @@ CSV_HEADERS = [
     "study_id",
     "source_table_id",
     "source_variable_name",
+    "source_variable_id",
     "prompt_variant",
     "rank",
 ]
@@ -63,6 +64,9 @@ def parse_dbgap_table(dict_path, report_path=None):
             declares — the prompt formatters cap how many they use, so the
             source and target sides are capped identically. See
             ai_harmonization.formatters.MAX_VALUES_IN_PROMPT.
+            Property.additional_metadata['variable_id'] carries the
+            variable's dbGaP id, e.g. 'phv99999999.v1'. This id is used for
+            variable tracking.
     """
     root = ET.parse(dict_path).getroot()
     table_id = root.attrib.get("id", os.path.basename(dict_path))
@@ -99,6 +103,13 @@ def parse_dbgap_table(dict_path, report_path=None):
             code = val.attrib.get("code")
             value_labels.append(f"{code}={meaning}" if code else meaning)
 
+        metadata = {}
+        if value_labels:
+            metadata["value_labels"] = value_labels
+        variable_id = var.attrib.get("id")
+        if variable_id:
+            metadata["variable_id"] = variable_id
+
         properties.append(
             Property(
                 name=var_name,
@@ -107,9 +118,7 @@ def parse_dbgap_table(dict_path, report_path=None):
                 ).strip(),
                 type=var_types.get(var_name, "string"),
                 values=value_meanings or None,
-                additional_metadata=(
-                    {"value_labels": value_labels} if value_labels else None
-                ),
+                additional_metadata=metadata or None,
             )
         )
 
@@ -181,9 +190,8 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
     rows = []
     for rank, suggestion in enumerate(suggestions, start=1):
         slot_key = f"{suggestion.target_node}.{suggestion.target_property}"
-        value_labels = (suggestion.source_additional_metadata or {}).get(
-            "value_labels", []
-        )
+        source_metadata = suggestion.source_additional_metadata or {}
+        value_labels = source_metadata.get("value_labels", [])
         rows.append(
             {
                 "Original Node.Property": f"{suggestion.source_node}.{suggestion.source_property}",
@@ -196,6 +204,7 @@ def build_mapping_rows(suggestions, slot_values_lookup, study_id):
                 "study_id": study_id,
                 "source_table_id": suggestion.source_node,
                 "source_variable_name": suggestion.source_property,
+                "source_variable_id": (source_metadata.get("variable_id") or ""),
                 "prompt_variant": (suggestion.target_additional_metadata or {}).get(
                     "prompt_variant", ""
                 ),

@@ -7,6 +7,7 @@ import pytest
 
 from ai_harmonization.harmonization_approaches.base import SingleHarmonizationSuggestion
 from ai_harmonization.dbgap import (
+    CSV_HEADERS,
     build_mapping_rows,
     find_study_metadata_files,
     parse_dbgap_table,
@@ -19,11 +20,11 @@ DATA_DICT_XML = textwrap.dedent(
     """\
     <?xml version="1.0" encoding="UTF-8"?>
     <data_table id="pht999999.v1.p1" study_id="phs999999" date_created="2024-01-01">
-      <variable id="phv001">
+      <variable id="phv99999901.v1">
         <name>SUBJID</name>
         <description>Subject identifier</description>
       </variable>
-      <variable id="phv002">
+      <variable id="phv99999902.v1">
         <name>SEX</name>
         <description>Biological sex</description>
         <value code="1">Male</value>
@@ -81,6 +82,71 @@ class TestParseDbgapTable:
         assert sex.values == ["Male", "Female"]
         assert "1=Male" in sex.additional_metadata["value_labels"]
 
+    def test_variable_id_is_captured(self, dict_path):
+        """Each variable carries its variable_id verbatim, version suffix included."""
+        _, model = parse_dbgap_table(dict_path)
+        variable_ids = {
+            p.name: p.additional_metadata["variable_id"]
+            for p in model.nodes[0].properties
+        }
+        assert variable_ids == {"SUBJID": "phv99999901.v1", "SEX": "phv99999902.v1"}
+
+    def test_variable_id_present_on_variables_without_values(self, dict_path):
+        """The metadata dict is built even when there are no value labels."""
+        _, model = parse_dbgap_table(dict_path)
+        subjid = next(p for p in model.nodes[0].properties if p.name == "SUBJID")
+        assert subjid.values is None
+        assert subjid.additional_metadata == {"variable_id": "phv99999901.v1"}
+
+    def test_variable_id_and_value_labels_share_the_metadata(self, dict_path):
+        """Adding the variable_id leaves the value labels in place beside it."""
+        _, model = parse_dbgap_table(dict_path)
+        sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
+        assert sex.additional_metadata == {
+            "value_labels": ["1=Male", "2=Female"],
+            "variable_id": "phv99999902.v1",
+        }
+
+    def test_variable_without_an_id_has_no_metadata_variable_id(self, tmp_path):
+        """Without an id there is no variable_id key.
+
+        A variable with values keeps only its value labels; one with neither an
+        id nor values has nothing to record, so its additional_metadata is None.
+        """
+        path = tmp_path / "pht999998.v1_data_dict.xml"
+        path.write_text(
+            '<data_table id="pht999998.v1" study_id="phs999999">'
+            "<variable><name>NO_VALUES</name><description>No id, no values</description></variable>"
+            "<variable><name>WITH_VALUES</name><description>No id</description>"
+            '<value code="1">Yes</value><value code="0">No</value></variable>'
+            "</data_table>"
+        )
+        _, model = parse_dbgap_table(str(path))
+        without_values, with_values = model.nodes[0].properties
+        assert without_values.additional_metadata is None
+        assert with_values.additional_metadata == {"value_labels": ["1=Yes", "0=No"]}
+
+    def test_same_name_in_two_tables_is_two_variables(self, tmp_path):
+        """A name is unique only within its table; the variable_id tells two apart."""
+        variable_names, variable_ids = [], []
+        for table, variable_id in (
+            ("pht999998.v1", "phv99999801.v1"),
+            ("pht999997.v1", "phv99999701.v1"),
+        ):
+            path = tmp_path / f"{table}_data_dict.xml"
+            path.write_text(
+                f'<data_table id="{table}" study_id="phs999999">'
+                f'<variable id="{variable_id}"><name>SUBJID</name>'
+                "<description>Subject identifier</description></variable>"
+                "</data_table>"
+            )
+            _, model = parse_dbgap_table(str(path))
+            variable = model.nodes[0].properties[0]
+            variable_names.append(variable.name)
+            variable_ids.append(variable.additional_metadata["variable_id"])
+        assert variable_names == ["SUBJID", "SUBJID"]
+        assert variable_ids == ["phv99999801.v1", "phv99999701.v1"]
+
     def test_var_report_sets_type(self, dict_path, report_path):
         _, model = parse_dbgap_table(dict_path, report_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
@@ -119,7 +185,12 @@ class TestFindStudyMetadataFiles:
 
 
 def make_suggestion(
-    slot_key, similarity, target_description, prompt_variant, value_labels=None
+    slot_key,
+    similarity,
+    target_description,
+    prompt_variant,
+    value_labels=None,
+    variable_id=None,
 ):
     """Build one suggestion as MultiPromptSimilaritySearch would emit it."""
     target_node, target_property = slot_key.rsplit(".", 1)
@@ -130,6 +201,7 @@ def make_suggestion(
         source_additional_metadata={
             "type": "integer",
             "value_labels": value_labels or [],
+            "variable_id": variable_id,
         },
         target_node=target_node,
         target_property=target_property,
@@ -191,6 +263,29 @@ class TestBuildMappingRows:
         assert rows[0]["Original Values"] == VALUE_SEPARATOR.join(
             ["1=Male", "2=Female"]
         )
+
+    def test_variable_id_carried_into_rows(self):
+        """Each row names exactly one source variable, by its variable_id."""
+        suggestions = [
+            make_suggestion(
+                "target.slot_a", 0.9, "d", "A", variable_id="phv99999903.v1"
+            ),
+            make_suggestion(
+                "target.slot_b", 0.7, "d", "B", variable_id="phv99999903.v1"
+            ),
+        ]
+        rows = build_mapping_rows(suggestions, {}, "phs999999")
+        assert [r["source_variable_id"] for r in rows] == ["phv99999903.v1"] * 2
+
+    def test_missing_variable_id_is_an_empty_cell(self, suggestions):
+        """A source with no recorded variable_id still writes a complete row."""
+        rows = build_mapping_rows(suggestions, {}, "phs999999")
+        assert all(r["source_variable_id"] == "" for r in rows)
+
+    def test_rows_match_the_csv_headers(self, suggestions):
+        """Every row has exactly the CSV's columns, so DictWriter accepts it."""
+        rows = build_mapping_rows(suggestions, {}, "phs999999")
+        assert all(list(r) == CSV_HEADERS for r in rows)
 
 
 class TestSummarizeRank1Similarity:

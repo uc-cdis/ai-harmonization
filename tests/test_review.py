@@ -24,6 +24,12 @@ CANDIDATES = [
     ("pht001.WEIRDVAR", 1, "OtherClass.field_e", 0.31, "C"),
 ]
 
+VARIABLE_IDS = {
+    "pht001.AGE": "phv99999901.v1",
+    "pht001.SEX": "phv99999902.v1",
+    "pht001.WEIRDVAR": "phv99999903.v1",
+}
+
 
 def make_mappings_df(rows=CANDIDATES):
     """Build a mapping DataFrame shaped exactly like harmonize_studies.ipynb writes.
@@ -44,6 +50,7 @@ def make_mappings_df(rows=CANDIDATES):
                 "study_id": "phs999999.v1.p1.c1",
                 "source_table_id": variable.split(".")[0],
                 "source_variable_name": variable.split(".")[1],
+                "source_variable_id": VARIABLE_IDS[variable],
                 "prompt_variant": variant,
                 "rank": rank,
             }
@@ -349,6 +356,32 @@ class TestOutputFiles:
 
         skipped = pd.read_csv(state_path.replace("_review_state", "_skipped_variables"))
         assert skipped.loc[0, "Best Suggested Target"] == "TargetClass.field_a"
+
+    def test_skipped_file_carries_the_variable_id(self, session, state_path):
+        session.skip()
+        session.save(state_path, quiet=True)
+
+        skipped = pd.read_csv(state_path.replace("_review_state", "_skipped_variables"))
+        assert skipped.loc[0, "source_variable_id"] == "phv99999901.v1"
+
+    def test_curated_file_carries_the_variable_id(self, session, state_path):
+        session.accept(rank=1)
+        session.save(state_path, quiet=True)
+
+        curated = pd.read_csv(state_path.replace("_review_state", "_curated_mappings"))
+        assert curated.loc[0, "source_variable_id"] == "phv99999901.v1"
+
+    def test_mapping_without_variable_ids_still_writes_skipped(self, state_path):
+        """A mapping file written before the id column existed still reviews."""
+        session = VariableReviewSession(
+            make_mappings_df().drop(columns=["source_variable_id"])
+        )
+        session.skip()
+        session.save(state_path, quiet=True)
+
+        skipped = pd.read_csv(state_path.replace("_review_state", "_skipped_variables"))
+        assert len(skipped) == 1
+        assert "source_variable_id" not in skipped.columns
 
     def test_no_decisions_writes_empty_but_valid_files(self, session, state_path):
         session.save(state_path, quiet=True)

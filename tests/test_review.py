@@ -4,6 +4,10 @@ Everything here runs headlessly: decisions are driven through accept/skip/prev
 rather than through the ipywidgets buttons, which only wrap those same calls.
 """
 
+# The tests read the session's internal state directly, which is what they
+# check, so protected access is expected here.
+# pylint: disable=protected-access
+
 import logging
 
 import pandas as pd
@@ -62,6 +66,7 @@ def make_mappings_df(rows=CANDIDATES):
 
 @pytest.fixture
 def mapping_csv(tmp_path):
+    """Write the sample mappings to a preliminary-mappings CSV and return its path."""
     path = tmp_path / "phs999999.v1.p1.c1_preliminary_mappings.csv"
     make_mappings_df().to_csv(path, index=False)
     return str(path)
@@ -69,11 +74,13 @@ def mapping_csv(tmp_path):
 
 @pytest.fixture
 def session():
+    """Build a review session over the sample mappings."""
     return VariableReviewSession(make_mappings_df())
 
 
 class TestLoading:
     def test_groups_rows_into_variables(self, session):
+        """The seven candidate rows group into one entry per source variable."""
         assert session.n_variables == 3
 
     def test_max_rank_derived_from_data(self, session):
@@ -81,6 +88,7 @@ class TestLoading:
         assert session._max_rank == 3
 
     def test_csv_order_preserved_by_default(self, session):
+        """Without sort_by, variables stay in the order the mapping rows list them."""
         assert [name for name, _ in session._variables] == [
             "pht001.AGE",
             "pht001.SEX",
@@ -88,6 +96,7 @@ class TestLoading:
         ]
 
     def test_sort_by_similarity_orders_by_best_candidate(self):
+        """sort_by="similarity" orders variables by best candidate, highest first."""
         session = VariableReviewSession(make_mappings_df(), sort_by="similarity")
         assert [name for name, _ in session._variables] == [
             "pht001.AGE",
@@ -96,6 +105,7 @@ class TestLoading:
         ]
 
     def test_from_csv_loads_rows(self, mapping_csv):
+        """from_csv reads a mapping file from disk and finds all three variables."""
         session = VariableReviewSession.from_csv(mapping_csv)
         assert session.n_variables == 3
 
@@ -106,35 +116,42 @@ class TestEmptyMappingFile:
 
     @pytest.fixture
     def empty_csv(self, tmp_path):
+        """Write a header-only mapping CSV and return its path."""
         path = tmp_path / "phs999997.v1.p1.c1_preliminary_mappings.csv"
         make_mappings_df(rows=[]).to_csv(path, index=False)
         return str(path)
 
     def test_from_csv_does_not_raise(self, empty_csv):
+        """A header-only mapping file loads as a session with zero variables."""
         session = VariableReviewSession.from_csv(empty_csv)
         assert session.n_variables == 0
 
     def test_from_csv_reports_the_problem(self, empty_csv, caplog):
+        """Loading a header-only file logs a warning that there is nothing to review."""
         with caplog.at_level(logging.WARNING):
             VariableReviewSession.from_csv(empty_csv)
         assert "nothing to review" in caplog.text
 
     def test_progress_does_not_divide_by_zero(self, empty_csv):
+        """With zero variables the progress HTML still renders "0 remaining"."""
         session = VariableReviewSession.from_csv(empty_csv)
         assert "0 remaining" in session._progress_html()
 
     def test_accept_raises_a_clear_error(self, empty_csv):
+        """accept on an empty session raises IndexError saying it has no variables."""
         session = VariableReviewSession.from_csv(empty_csv)
         with pytest.raises(IndexError, match="no variables"):
             session.accept()
 
     def test_start_reports_instead_of_rendering(self, empty_csv, caplog):
+        """start on an empty session logs a warning that there is nothing to review."""
         session = VariableReviewSession.from_csv(empty_csv)
         with caplog.at_level(logging.WARNING):
             session.start()
         assert "Nothing to review" in caplog.text
 
     def test_resume_from_is_skipped(self, empty_csv, tmp_path):
+        """An empty mapping file loads with zero variables even with resume_from set."""
         state = tmp_path / "state.csv"
         make_mappings_df(rows=[]).to_csv(state, index=False)
         session = VariableReviewSession.from_csv(empty_csv, resume_from=str(state))
@@ -152,11 +169,13 @@ class TestEmptyMappingFile:
 
 class TestAccept:
     def test_records_the_chosen_rank(self, session):
+        """accept(rank=2) records the rank-2 candidate, not the top one."""
         session.accept(rank=2)
         accepted = session._accepted["pht001.AGE"]
         assert accepted["Suggested Target Node.Property"] == "TargetClass.field_b"
 
     def test_advances_to_the_next_variable(self, session):
+        """Accepting moves the session on to the next variable."""
         session.accept(rank=1)
         assert session._current[0] == "pht001.SEX"
 
@@ -167,17 +186,20 @@ class TestAccept:
         assert "pht001.WEIRDVAR" not in session._accepted
 
     def test_out_of_range_rank_does_not_advance(self, session):
+        """Accepting a rank the variable lacks leaves the session on that variable."""
         session.goto(2)
         session.accept(rank=3)
         assert session._current[0] == "pht001.WEIRDVAR"
 
     def test_out_of_range_rank_explains_itself(self, session, caplog):
+        """Accepting a rank the variable lacks logs a warning naming that rank."""
         session.goto(2)
         with caplog.at_level(logging.WARNING):
             session.accept(rank=3)
         assert "no rank-3 candidate" in caplog.text
 
     def test_accepting_clears_a_previous_skip(self, session):
+        """Accepting a skipped variable drops the skip and records the accept."""
         session.skip()
         session.goto(0)
         session.accept(rank=1)
@@ -185,6 +207,7 @@ class TestAccept:
         assert "pht001.AGE" in session._accepted
 
     def test_last_variable_stays_put(self, session):
+        """Accepting on the last variable leaves the session on it."""
         session.goto(2)
         session.accept(rank=1)
         assert session._current[0] == "pht001.WEIRDVAR"
@@ -192,6 +215,7 @@ class TestAccept:
 
 class TestSkipToggle:
     def test_skip_marks_and_advances(self, session):
+        """Skipping marks the variable as skipped and moves on to the next one."""
         session.skip()
         assert "pht001.AGE" in session._skipped
         assert session._current[0] == "pht001.SEX"
@@ -205,12 +229,14 @@ class TestSkipToggle:
         assert "pht001.AGE" not in session._skipped
 
     def test_un_skipping_stays_on_the_variable(self, session):
+        """Un-skipping leaves the session on that variable instead of advancing."""
         session.skip()
         session.prev()
         session.skip()
         assert session._current[0] == "pht001.AGE"
 
     def test_skip_clears_a_previous_accept(self, session):
+        """Skipping an accepted variable drops the accept and records the skip."""
         session.accept(rank=1)
         session.prev()
         session.skip()
@@ -218,6 +244,7 @@ class TestSkipToggle:
         assert "pht001.AGE" in session._skipped
 
     def test_un_skip_is_persisted(self, session, tmp_path):
+        """With auto-save on, un-skipping rewrites the state file without the skip."""
         state = str(tmp_path / "phs999999_review_state.csv")
         session._auto_save = state
         session.skip()
@@ -226,12 +253,14 @@ class TestSkipToggle:
         assert pd.read_csv(state).empty
 
     def test_clear_decision_removes_accept(self, session):
+        """clear_decision drops the accept recorded for the current variable."""
         session.accept(rank=1)
         session.goto(0)
         session.clear_decision()
         assert "pht001.AGE" not in session._accepted
 
     def test_clear_decision_removes_skip(self, session):
+        """clear_decision drops the skip recorded for the current variable."""
         session.skip()
         session.goto(0)
         session.clear_decision()
@@ -240,20 +269,24 @@ class TestSkipToggle:
 
 class TestNavigation:
     def test_prev_does_not_change_decisions(self, session):
+        """Navigating back to an accepted variable leaves its accept in place."""
         session.accept(rank=1)
         session.prev()
         assert "pht001.AGE" in session._accepted
 
     def test_prev_stops_at_the_first_variable(self, session):
+        """prev on the first variable leaves the session on it."""
         session.prev()
         assert session._current[0] == "pht001.AGE"
 
     def test_next_stops_at_the_last_variable(self, session):
+        """Repeated next calls stop at the last variable instead of running past it."""
         for _ in range(10):
             session.next()
         assert session._current[0] == "pht001.WEIRDVAR"
 
     def test_goto_clamps_out_of_range_index(self, session):
+        """goto clamps an index beyond either end to the first or last variable."""
         session.goto(99)
         assert session._current[0] == "pht001.WEIRDVAR"
         session.goto(-5)
@@ -263,9 +296,11 @@ class TestNavigation:
 class TestOutputFiles:
     @pytest.fixture
     def state_path(self, tmp_path):
+        """Return a state file path under tmp_path with the conventional suffix."""
         return str(tmp_path / "phs999999.v1.p1.c1_review_state.csv")
 
     def test_writes_all_three_files(self, session, state_path, tmp_path):
+        """save writes exactly the state, curated and skipped files, sharing a stem."""
         session.accept(rank=1)
         session.skip()
         session.save(state_path, quiet=True)
@@ -292,6 +327,7 @@ class TestOutputFiles:
         }
 
     def test_output_paths_never_collide_with_the_state_path(self):
+        """Both output paths differ from the state path and from each other."""
         for name in ("s_review_state.csv", "mystate.csv", "no_extension"):
             curated, skipped = VariableReviewSession.output_paths(name)
             assert curated != name and skipped != name
@@ -319,6 +355,7 @@ class TestOutputFiles:
         ).read_text()
 
     def test_state_records_both_decision_types(self, session, state_path):
+        """The state file records an accept with its rank and a skip as skipped."""
         session.accept(rank=2)
         session.skip()
         session.save(state_path, quiet=True)
@@ -331,6 +368,7 @@ class TestOutputFiles:
     def test_curated_file_holds_one_row_per_accepted_variable(
         self, session, state_path
     ):
+        """The curated file holds one row per accept, each with the chosen target."""
         session.accept(rank=1)
         session.accept(rank=2)
         session.save(state_path, quiet=True)
@@ -343,6 +381,7 @@ class TestOutputFiles:
         }
 
     def test_skipped_file_has_a_manual_mapping_column(self, session, state_path):
+        """The skipped file has one row per skip and a manual_mapping column."""
         session.skip()
         session.save(state_path, quiet=True)
 
@@ -351,6 +390,7 @@ class TestOutputFiles:
         assert len(skipped) == 1
 
     def test_skipped_file_carries_the_best_automated_guess(self, session, state_path):
+        """A skipped variable's row gives its rank-1 target as Best Suggested Target."""
         session.skip()
         session.save(state_path, quiet=True)
 
@@ -386,10 +426,12 @@ class TestOutputFiles:
         assert "source_variable_id" not in skipped.columns
 
     def test_no_decisions_writes_empty_but_valid_files(self, session, state_path):
+        """With no decisions, save writes a state file that parses as an empty table."""
         session.save(state_path, quiet=True)
         assert pd.read_csv(state_path).empty
 
     def test_auto_save_writes_after_every_decision(self, session, state_path):
+        """With auto-save on, the state file is rewritten after each accept and skip."""
         session._auto_save = state_path
         session.accept(rank=1)
         assert len(pd.read_csv(state_path)) == 1
@@ -400,9 +442,11 @@ class TestOutputFiles:
 class TestResume:
     @pytest.fixture
     def state_path(self, tmp_path):
+        """Return a state file path under tmp_path with the conventional suffix."""
         return str(tmp_path / "phs999999.v1.p1.c1_review_state.csv")
 
     def test_round_trip_restores_decisions(self, session, state_path, mapping_csv):
+        """A saved session resumes with the same accepted rank and skipped variable."""
         session.accept(rank=2)
         session.skip()
         session.save(state_path, quiet=True)
@@ -436,6 +480,7 @@ class TestResume:
         assert resumed._accepted["pht001.AGE"]["rank"] == 2
 
     def test_resume_jumps_to_first_unreviewed(self, session, state_path, mapping_csv):
+        """A resumed session opens on the first variable with no decision yet."""
         session.accept(rank=1)
         session.skip()
         session.save(state_path, quiet=True)
@@ -444,6 +489,7 @@ class TestResume:
         assert resumed._current[0] == "pht001.WEIRDVAR"
 
     def test_missing_state_file_starts_fresh(self, mapping_csv, tmp_path, caplog):
+        """A missing state file logs "starting fresh" and nothing is accepted."""
         with caplog.at_level(logging.INFO):
             resumed = VariableReviewSession.from_csv(
                 mapping_csv, resume_from=str(tmp_path / "nope.csv")
@@ -452,6 +498,7 @@ class TestResume:
         assert "starting fresh" in caplog.text
 
     def test_unknown_variable_in_state_is_ignored(self, mapping_csv, state_path):
+        """A skip for a variable absent from the mapping file is dropped on resume."""
         pd.DataFrame(
             [
                 {

@@ -26,12 +26,34 @@ class BaseEmbeddings:
         )
 
     def embed_query(self, text):
+        """
+        Embeds one query text.
+
+        A SentenceTransformer model encodes the text directly; any other model
+        goes through ``embed_documents``.
+
+        Args:
+            text (str): The text to embed.
+
+        Returns:
+            list[float]: The embedding.
+        """
         if isinstance(self.model, SentenceTransformer):
             return self.model.encode([text], device=self.device).tolist()[0]
         else:
             return self.embed_documents([text])[0]
 
     def mean_pool(self, last_hidden, mask):
+        """
+        Averages token embeddings over the positions the mask keeps.
+
+        Args:
+            last_hidden (torch.Tensor): Token embeddings, (batch, seq_len, dim).
+            mask (torch.Tensor): The attention mask, (batch, seq_len, 1).
+
+        Returns:
+            torch.Tensor: One mean embedding per sequence, (batch, dim).
+        """
         # Shape: (batch, seq_len, dim), mask: (batch, seq_len, 1)
         masked = last_hidden * mask
         summed = masked.sum(1)
@@ -40,6 +62,15 @@ class BaseEmbeddings:
         return mean_pooled
 
     def embed_documents(self, texts):
+        """
+        Embeds a list of texts. Each subclass implements this for its model.
+
+        Args:
+            texts (list[str]): The texts to embed.
+
+        Returns:
+            list[list[float]]: One embedding per text.
+        """
         raise NotImplementedError("Implement in subclass.")
 
 

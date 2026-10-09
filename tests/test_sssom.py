@@ -10,6 +10,7 @@ from ai_harmonization.harmonization_approaches.base import (
 
 @pytest.fixture
 def example_suggestions():
+    """Return a list of two suggestions with distinct source and target nodes."""
     return [
         SingleHarmonizationSuggestion(
             source_node="Table1",

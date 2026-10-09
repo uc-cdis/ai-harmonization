@@ -4,6 +4,7 @@ import gzip
 import json
 import logging
 import os
+import pprint
 import re
 import shutil
 import tarfile
@@ -26,6 +27,16 @@ TEMP_DIR = os.path.abspath(f"{CURRENT_DIR}/../output/temp")
 
 
 def read_in_json(file_location):
+    """
+    Loads a JSON file, returning any error instead of raising it.
+
+    Args:
+        file_location (str): The path to the JSON file.
+
+    Returns:
+        tuple: ``(data, None)`` when the file loads, ``(None, exception)``
+        when it does not.
+    """
     try:
         with open(file_location, "r") as f:
             data = json.load(f)
@@ -35,6 +46,15 @@ def read_in_json(file_location):
 
 
 def make_dir(dirname):
+    """
+    Creates a directory and any missing parents.
+
+    An existing directory is left as it is; any other failure is logged
+    rather than raised.
+
+    Args:
+        dirname (str): The path of the directory to create.
+    """
     logging.info(f"outputting to: {dirname}")
     try:
         os.makedirs(dirname, exist_ok=True)
@@ -390,6 +410,16 @@ def create_batches(
 def add_documents_to_vectorstore(
     documents, vectorstore, persistent_client, batch_size=None
 ):
+    """
+    Adds documents to a vector store in batches.
+
+    Args:
+        documents (list[Document]): The documents to embed and store.
+        vectorstore (Chroma): The vector store to add them to.
+        persistent_client (chromadb.PersistentClient): The store's client, which
+            supplies the largest accepted batch when ``batch_size`` is not given.
+        batch_size (int, optional): The number of documents added per call.
+    """
     batch_size = batch_size or persistent_client.get_max_batch_size()
     logging.info(f"Number of documents that can be inserted at once: {batch_size}")
     ids = range(len(documents))

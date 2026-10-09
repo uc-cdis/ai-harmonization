@@ -414,6 +414,23 @@ class SimpleDataModel(BaseModel):
 
     @staticmethod
     def get_from_unknown_json_format(input_json: str, *args, **kwargs):
+        """
+        Converts a data model in any supported JSON format to a SimpleDataModel.
+
+        Each converter is tried in turn -- simple JSON, Gen3 and GDC -- and the
+        result of the last one that succeeds is returned.
+
+        Args:
+            input_json (str): The data model as a JSON string.
+            *args: Passed to the simple JSON and Gen3 converters.
+            **kwargs: Passed to the simple JSON and Gen3 converters.
+
+        Returns:
+            SimpleDataModel: The converted data model.
+
+        Raises:
+            BaseException: The last converter's error, when none succeeds.
+        """
         simple_data_model = None
         exception: BaseException = BaseException()
 
@@ -487,6 +504,18 @@ def get_data_model_as_node_prop_type_descriptions(
 
 
 def get_node_property_as_string(node: Node, node_property: Property) -> str:
+    """
+    Formats a property as ``node.property (type): description`` on one line.
+
+    Tabs in the description become four spaces and newlines become spaces.
+
+    Args:
+        node (Node): The node the property belongs to.
+        node_property (Property): The property to format.
+
+    Returns:
+        str: The formatted property.
+    """
     property_desc = node_property.description.replace("\t", "    ").replace("\n", " ")
     return f"{node.name}.{node_property.name} ({node_property.type}): {property_desc}"
 

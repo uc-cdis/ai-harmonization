@@ -50,9 +50,17 @@ class HarmonizationSuggestions(BaseModel):
     suggestions: List[SingleHarmonizationSuggestion]
 
     def to_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the suggestions as a DataFrame with one column per field.
+        """
         return pd.DataFrame([suggestion.__dict__ for suggestion in self.suggestions])
 
     def to_simlified_dataframe(self) -> pd.DataFrame:
+        """
+        Returns the suggestions as a DataFrame of the columns a reviewer reads:
+        Original Node.Property, Suggested Target Node.Property, Similarity,
+        Target Description and Original Description.
+        """
         data = []
         for suggestion in self.suggestions:
             data.append(

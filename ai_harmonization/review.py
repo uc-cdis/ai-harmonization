@@ -282,7 +282,7 @@ class VariableReviewSession:
 
     @property
     def curated_df(self):
-        """Accepted candidates, one row per variable, sorted by variable name.
+        """Accepted candidates, one row per variable, sorted by table and variable name.
 
         Returns:
             pd.DataFrame: The accepted rows with the mapping file's columns,
@@ -296,7 +296,7 @@ class VariableReviewSession:
 
     @property
     def skipped_df(self):
-        """Skipped variables, one row per variable, sorted by variable name.
+        """Skipped variables, one row per variable, sorted by table and variable name.
 
         Returns:
             pd.DataFrame: For each skipped variable, its source columns, its
@@ -492,24 +492,25 @@ class VariableReviewSession:
     # ── Widget UI ─────────────────────────────────────────────────────────────
 
     def _make_controls(self, handlers):
-        W = widgets.Layout
         btn_prev = widgets.Button(
-            description="← Back", layout=W(width=styles.BACK_BUTTON_WIDTH)
+            description="← Back", layout=widgets.Layout(width=styles.BACK_BUTTON_WIDTH)
         )
         btn_next = widgets.Button(
-            description="→", layout=W(width=styles.NEXT_BUTTON_WIDTH)
+            description="→", layout=widgets.Layout(width=styles.NEXT_BUTTON_WIDTH)
         )
         btn_skip = widgets.Button(
             description="Skip →",
             button_style=styles.SKIP_BUTTON_STYLE,
-            layout=W(width=styles.SKIP_BUTTON_WIDTH),
+            layout=widgets.Layout(width=styles.SKIP_BUTTON_WIDTH),
         )
         btn_accept1 = widgets.Button(
-            description="✓ #1", layout=W(width=styles.ACCEPT_FIRST_BUTTON_WIDTH)
+            description="✓ #1",
+            layout=widgets.Layout(width=styles.ACCEPT_FIRST_BUTTON_WIDTH),
         )
         rank_btns = [
             widgets.Button(
-                description=f"#{rank}", layout=W(width=styles.ACCEPT_RANK_BUTTON_WIDTH)
+                description=f"#{rank}",
+                layout=widgets.Layout(width=styles.ACCEPT_RANK_BUTTON_WIDTH),
             )
             for rank in range(2, self._max_rank + 1)
         ]

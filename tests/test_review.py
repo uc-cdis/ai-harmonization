@@ -4,6 +4,10 @@ Everything here runs headlessly: decisions are driven through accept/skip/prev
 rather than through the ipywidgets buttons, which only wrap those same calls.
 """
 
+# The tests read the session's internal state directly, which is what they
+# check, so protected access is expected here.
+# pylint: disable=protected-access
+
 import logging
 
 import pandas as pd

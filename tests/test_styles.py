@@ -159,6 +159,8 @@ class TestReviewWidgetUsesSharedPalette:
             ],
             columns=CSV_HEADERS,
         )
+        # The session renders its candidate table in a private helper.
+        # pylint: disable-next=protected-access
         html = VariableReviewSession(df)._candidates_html()
         # One candidate in each band, so all three band colours must appear.
         for css in (

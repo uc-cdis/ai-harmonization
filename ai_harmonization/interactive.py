@@ -6,6 +6,22 @@ from itables.widget import ITable
 def get_interactive_table_for_suggestions(
     suggestions_df, column_for_filtering=1, table_description=None, **kwargs
 ):
+    """
+    Builds an interactive table of harmonization suggestions.
+
+    The table has a search pane that filters on one column, allows selecting
+    several rows, and prints ``table_description`` as usage notes.
+
+    Args:
+        suggestions_df (pd.DataFrame): The suggestions to show.
+        column_for_filtering (int): Index of the column the search pane filters.
+        table_description (str, optional): The usage notes to print; a default
+            set of instructions is used when not given.
+        **kwargs: Passed to ``itables.widget.ITable``.
+
+    Returns:
+        ITable: The table widget.
+    """
     table_description = (
         table_description
         or """

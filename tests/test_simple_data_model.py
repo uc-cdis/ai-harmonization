@@ -131,33 +131,39 @@ CYCLIC_SCHEMA = textwrap.dedent(
 
 class TestFromLinkmlYaml:
     def test_parses_non_empty_classes(self):
+        """A class with attributes becomes a node."""
         model = SimpleDataModel.from_linkml_yaml(MINIMAL_SCHEMA)
         names = [n.name for n in model.nodes]
         assert "Subject" in names
 
     def test_empty_class_excluded(self):
+        """A class with no attributes yields no node rather than an empty one."""
         model = SimpleDataModel.from_linkml_yaml(MINIMAL_SCHEMA)
         names = [n.name for n in model.nodes]
         assert "Empty" not in names
 
     def test_node_description_preserved(self):
+        """The class description carries over to the node."""
         model = SimpleDataModel.from_linkml_yaml(MINIMAL_SCHEMA)
         subject = next(n for n in model.nodes if n.name == "Subject")
         assert subject.description == "A study participant"
 
     def test_enum_values_resolved(self):
+        """A slot whose range is an enum gets that enum's permissible values."""
         model = SimpleDataModel.from_linkml_yaml(MINIMAL_SCHEMA)
         subject = next(n for n in model.nodes if n.name == "Subject")
         sex = next(p for p in subject.properties if p.name == "sex")
         assert set(sex.values) == {"Male", "Female", "Unknown"}
 
     def test_non_enum_range_has_no_values(self):
+        """A slot whose range is not an enum leaves values as None."""
         model = SimpleDataModel.from_linkml_yaml(MINIMAL_SCHEMA)
         subject = next(n for n in model.nodes if n.name == "Subject")
         age = next(p for p in subject.properties if p.name == "age")
         assert age.values is None
 
     def test_is_a_inheritance(self):
+        """A child class carries its is_a parent's attributes as well as its own."""
         model = SimpleDataModel.from_linkml_yaml(INHERITANCE_SCHEMA)
         child = next(n for n in model.nodes if n.name == "Child")
         prop_names = {p.name for p in child.properties}
@@ -165,6 +171,7 @@ class TestFromLinkmlYaml:
         assert "extra" in prop_names
 
     def test_mixin_inheritance(self):
+        """A class carries its mixin's attributes as well as its own."""
         model = SimpleDataModel.from_linkml_yaml(MIXIN_SCHEMA)
         record = next(n for n in model.nodes if n.name == "Record")
         prop_names = {p.name for p in record.properties}
@@ -172,12 +179,14 @@ class TestFromLinkmlYaml:
         assert "value" in prop_names
 
     def test_enum_inherits_chain(self):
+        """An enum that inherits carries its parent's values as well as its own."""
         model = SimpleDataModel.from_linkml_yaml(ENUM_INHERITANCE_SCHEMA)
         sample = next(n for n in model.nodes if n.name == "Sample")
         status = next(p for p in sample.properties if p.name == "status")
         assert set(status.values) == {"Active", "Inactive", "Pending"}
 
     def test_global_slots_resolved(self):
+        """Slot references take their range and description from the slots section."""
         model = SimpleDataModel.from_linkml_yaml(GLOBAL_SLOTS_SCHEMA)
         observation = next(n for n in model.nodes if n.name == "Observation")
         by_name = {p.name: p for p in observation.properties}
@@ -186,6 +195,7 @@ class TestFromLinkmlYaml:
         assert by_name["observation_id"].description == "Primary key"
 
     def test_undescribed_field_gets_default_description(self):
+        """A field without a description gets DEFAULT_PROPERTY_DESCRIPTION."""
         model = SimpleDataModel.from_linkml_yaml(
             "classes:\n  Thing:\n    attributes:\n      key: {}\n"
         )
@@ -193,6 +203,7 @@ class TestFromLinkmlYaml:
         assert thing.properties[0].description == DEFAULT_PROPERTY_DESCRIPTION
 
     def test_missing_range_defaults_to_string(self):
+        """A field without a range is typed "string"."""
         model = SimpleDataModel.from_linkml_yaml(
             "classes:\n  Thing:\n    attributes:\n      key:\n        description: A key\n"
         )
@@ -200,12 +211,14 @@ class TestFromLinkmlYaml:
         assert thing.properties[0].type == "string"
 
     def test_inheritance_cycle_does_not_recurse_forever(self):
+        """An is_a cycle terminates, with A still picking up B's attributes."""
         model = SimpleDataModel.from_linkml_yaml(CYCLIC_SCHEMA)
         by_name = {n.name: n for n in model.nodes}
         assert {p.name for p in by_name["A"].properties} == {"a_field", "b_field"}
 
     @pytest.mark.parametrize("empty_yaml", ["", "{}", "classes: {}"])
     def test_empty_schema_returns_empty_model(self, empty_yaml):
+        """Empty YAML, an empty map and an empty classes section all give no nodes."""
         model = SimpleDataModel.from_linkml_yaml(empty_yaml)
         assert model.nodes == []
 
@@ -272,9 +285,11 @@ class TestPermissibleValueForms:
 
     @pytest.mark.parametrize("form", ["MAP_FORM", "RICH_MAP_FORM", "LIST_FORM"])
     def test_all_forms_yield_the_same_values(self, form):
+        """Map, rich map and list forms all give the same values, in schema order."""
         assert self._status_values(getattr(self, form)) == ["ACTIVE", "INACTIVE"]
 
     def test_empty_permissible_values_leaves_values_unset(self):
+        """An enum that lists no permissible values leaves values as None."""
         schema = (
             "classes:\n  S:\n    attributes:\n      f: {range: E}\nenums:\n  E: {}\n"
         )

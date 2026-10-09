@@ -31,6 +31,7 @@ class StubIndex:
         self.queries = []
 
     def find_similar_target_slots(self, query_text, **kwargs):
+        """Stand-in vector search: log the query, return the canned matches up to k."""
         self.queries.append(query_text)
         matches = self._matches
         limit = kwargs.get("k")
@@ -38,6 +39,7 @@ class StubIndex:
 
 
 def match(slot_key, similarity, target_description="a description"):
+    """Build the TargetSlotMatch an index returns for one target slot."""
     return TargetSlotMatch(
         slot_key=slot_key,
         similarity=similarity,
@@ -47,20 +49,24 @@ def match(slot_key, similarity, target_description="a description"):
 
 @pytest.fixture
 def source_node():
+    """An empty source node with no description or properties."""
     return Node(name="pht999999", description="", links=[], properties=[])
 
 
 @pytest.fixture
 def source_property():
+    """An integer source variable with a name and description."""
     return Property(name="AGE", description="Age at enrollment", type="integer")
 
 
 class TestFromIndexes:
     def test_rejects_empty_indexes(self):
+        """An empty index mapping raises ValueError."""
         with pytest.raises(ValueError):
             MultiPromptSimilaritySearch.from_indexes({})
 
     def test_keeps_variant_labels(self):
+        """Each index stays keyed by the variant label it was passed under."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {"A": StubIndex([]), "B": StubIndex([])}
         )
@@ -69,6 +75,7 @@ class TestFromIndexes:
 
 class TestGetSuggestionsForProperty:
     def test_merges_across_variants(self, source_node, source_property):
+        """Suggestions combine the matches from every variant."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex([match("TargetClass.field_a", 0.7)]),
@@ -82,6 +89,7 @@ class TestGetSuggestionsForProperty:
     def test_deduplicates_by_slot_keeping_best_similarity(
         self, source_node, source_property
     ):
+        """A slot matched by two variants appears once, with the higher similarity."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex([match("TargetClass.field_a", 0.55)]),
@@ -93,6 +101,7 @@ class TestGetSuggestionsForProperty:
         assert suggestions[0].similarity == 0.91
 
     def test_records_the_winning_variant(self, source_node, source_property):
+        """The merged suggestion's prompt_variant is the variant that scored higher."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex([match("TargetClass.field_a", 0.55)]),
@@ -103,6 +112,7 @@ class TestGetSuggestionsForProperty:
         assert suggestions[0].target_additional_metadata["prompt_variant"] == "B"
 
     def test_sorted_by_similarity_descending(self, source_node, source_property):
+        """Suggestions come back best first, whatever order the index returned."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex(
@@ -118,6 +128,7 @@ class TestGetSuggestionsForProperty:
         assert [s.similarity for s in suggestions] == [0.95, 0.62, 0.4]
 
     def test_k_caps_the_merged_result(self, source_node, source_property):
+        """With k=3, the four distinct slots from two variants are cut to three."""
         search = MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex(
@@ -139,6 +150,7 @@ class TestGetSuggestionsForProperty:
     def test_each_variant_queried_with_its_own_formatter(
         self, source_node, source_property
     ):
+        """Each variant formats the source query with its own document_formatter."""
         index_a = StubIndex(
             [], document_formatter=lambda n, p: f"{n.name}.{p.name}: {p.description}"
         )
@@ -199,6 +211,7 @@ class TestGetSuggestionsForProperty:
         assert suggestion.target_property == "field_a"
 
     def test_no_matches_yields_no_suggestions(self, source_node, source_property):
+        """When no variant matches anything the result is an empty list."""
         search = MultiPromptSimilaritySearch.from_indexes({"A": StubIndex([])})
         assert search.get_suggestions_for_property(source_node, source_property) == []
 
@@ -206,6 +219,7 @@ class TestGetSuggestionsForProperty:
 class TestIterAndBatchInterface:
     @pytest.fixture
     def source_model(self):
+        """Two source tables holding three variables between them."""
         return SimpleDataModel(
             nodes=[
                 Node(
@@ -232,6 +246,7 @@ class TestIterAndBatchInterface:
 
     @pytest.fixture
     def search(self):
+        """A one-variant search whose index returns two matches for any query."""
         return MultiPromptSimilaritySearch.from_indexes(
             {
                 "A": StubIndex(
@@ -244,11 +259,13 @@ class TestIterAndBatchInterface:
         )
 
     def test_iter_yields_one_group_per_property(self, search, source_model):
+        """One group per source variable across all tables, each with both matches."""
         groups = list(search.iter_suggestions_by_property(source_model))
         assert len(groups) == 3
         assert all(len(group) == 2 for group in groups)
 
     def test_get_harmonization_suggestions_flattens(self, search, source_model):
+        """The batch call flattens the groups into one list of six suggestions."""
         result = search.get_harmonization_suggestions(source_model)
         assert len(result.suggestions) == 6
 
@@ -312,6 +329,7 @@ class TestIterAndBatchInterface:
         assert search.input_target_model is source_model
 
     def test_to_simlified_dataframe_round_trip(self, search, source_model):
+        """The simplified frame shows source node.property and a Similarity column."""
         df = search.get_harmonization_suggestions(source_model).to_simlified_dataframe()
         assert list(df["Original Node.Property"])[0] == "pht001.AGE"
         assert "Similarity" in df.columns
@@ -320,6 +338,7 @@ class TestIterAndBatchInterface:
 class TestDocumentFormatterHook:
     @pytest.fixture
     def target_model(self):
+        """A target model with a single described integer slot."""
         return SimpleDataModel(
             nodes=[
                 Node(
@@ -336,12 +355,14 @@ class TestDocumentFormatterHook:
         )
 
     def test_defaults_to_node_property_as_string(self, target_model):
+        """With no formatter, document text is "node.property (type): description"."""
         documents = get_data_model_as_langchain_documents(target_model)
         assert (
             documents[0].page_content == "TargetClass.field_a (integer): Age in years"
         )
 
     def test_custom_formatter_controls_embedded_text(self, target_model):
+        """A custom formatter's output is the document text, verbatim."""
         documents = get_data_model_as_langchain_documents(
             target_model, document_formatter=lambda n, p: f"{n.name}.{p.name}"
         )
@@ -360,6 +381,7 @@ class TestDocumentFormatterHook:
         assert documents[0].metadata["description"] == "Age in years"
 
     def test_one_document_per_property(self, target_model):
+        """Each property of a node becomes its own document."""
         target_model.nodes[0].properties.append(
             Property(name="field_b", description="Sex", type="string")
         )

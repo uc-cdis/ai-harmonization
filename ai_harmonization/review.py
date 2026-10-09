@@ -271,6 +271,7 @@ class VariableReviewSession:
 
     @property
     def n_variables(self):
+        """The number of source variables in the session."""
         return len(self._variables)
 
     @property
@@ -281,6 +282,12 @@ class VariableReviewSession:
 
     @property
     def curated_df(self):
+        """Accepted candidates, one row per variable, sorted by variable name.
+
+        Returns:
+            pd.DataFrame: The accepted rows with the mapping file's columns,
+            empty but with those columns when nothing has been accepted.
+        """
         if not self._accepted:
             return pd.DataFrame(columns=self._df.columns)
         # Sorted by variable name, so a fresh session and a resumed one
@@ -289,6 +296,13 @@ class VariableReviewSession:
 
     @property
     def skipped_df(self):
+        """Skipped variables, one row per variable, sorted by variable name.
+
+        Returns:
+            pd.DataFrame: For each skipped variable, its source columns, its
+            rank-1 suggestion under the ``Best ...`` columns, and an empty
+            ``manual_mapping`` column to fill in by hand.
+        """
         if not self._skipped:
             return pd.DataFrame(
                 columns=self.SOURCE_COLUMNS

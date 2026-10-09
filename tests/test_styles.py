@@ -10,14 +10,17 @@ from ai_harmonization.formatters import VALUE_SEPARATOR
 class TestSimilarityCellCss:
     @pytest.mark.parametrize("value", [0.75, 0.78, 0.88, 1.0])
     def test_strong_band(self, value):
+        """Scores from 0.75 to 1.0 take the strong (green) cell CSS."""
         assert styles.similarity_cell_css(value) == styles.STRONG_CELL_CSS
 
     @pytest.mark.parametrize("value", [0.5, 0.66, 0.74])
     def test_moderate_band(self, value):
+        """Scores from 0.5 to below 0.75 take the moderate (yellow) cell CSS."""
         assert styles.similarity_cell_css(value) == styles.MODERATE_CELL_CSS
 
     @pytest.mark.parametrize("value", [0.0, 0.31, 0.49])
     def test_weak_band(self, value):
+        """Scores below 0.5, down to 0.0, take the weak (red) cell CSS."""
         assert styles.similarity_cell_css(value) == styles.WEAK_CELL_CSS
 
     def test_boundaries_are_inclusive_at_the_lower_edge(self):
@@ -58,6 +61,7 @@ class TestSimilarityCellCss:
         )
 
     def test_bands_are_distinct(self):
+        """The strong, moderate and weak bands each get a different CSS string."""
         assert (
             len(
                 {styles.STRONG_CELL_CSS, styles.MODERATE_CELL_CSS, styles.WEAK_CELL_CSS}
@@ -69,6 +73,7 @@ class TestSimilarityCellCss:
 class TestStyleMappingQualitySummary:
     @pytest.fixture
     def summary(self):
+        """Return a two-study quality summary with four-decimal similarity columns."""
         return pd.DataFrame(
             {
                 "study_id": ["phs999998.v1.p1.c1", "phs999999.v1.p1.c1"],
@@ -80,31 +85,37 @@ class TestStyleMappingQualitySummary:
         )
 
     def test_caption_is_set(self, summary):
+        """The default SUMMARY_CAPTION appears in the rendered table."""
         assert (
             styles.SUMMARY_CAPTION
             in styles.style_mapping_quality_summary(summary).to_html()
         )
 
     def test_caption_is_overridable(self, summary):
+        """A caption passed by the caller is rendered."""
         html = styles.style_mapping_quality_summary(summary, caption="Custom").to_html()
         assert "Custom" in html
 
     def test_header_background_applied(self, summary):
+        """The header background colour, HEADER_BG, reaches the rendered HTML."""
         assert (
             styles.HEADER_BG in styles.style_mapping_quality_summary(summary).to_html()
         )
 
     def test_similarity_columns_formatted_to_three_decimals(self, summary):
+        """The mean and median similarity columns render rounded to three decimals."""
         html = styles.style_mapping_quality_summary(summary).to_html()
         assert "0.500" in html and "0.679" in html
         assert "0.5001" not in html
 
     def test_non_similarity_columns_left_alone(self, summary):
+        """Variable counts and target names still appear in the rendered table."""
         html = styles.style_mapping_quality_summary(summary).to_html()
         assert "400" in html
         assert "TargetClass.field_c" in html
 
     def test_gradient_colours_the_similarity_columns(self, summary):
+        """Cells carry background colours beyond those the table styles set."""
         html = styles.style_mapping_quality_summary(summary).to_html()
         assert html.count("background-color") > len(styles.SUMMARY_TABLE_STYLES)
 
@@ -114,6 +125,7 @@ class TestStyleMappingQualitySummary:
         assert "<table" in styles.style_mapping_quality_summary(minimal).to_html()
 
     def test_empty_summary_does_not_raise(self):
+        """A summary with no rows should still render a table rather than raise."""
         empty = pd.DataFrame(columns=["study_id", "Mean sim (rank 1)", "Median sim"])
         assert "<table" in styles.style_mapping_quality_summary(empty).to_html()
 
@@ -122,6 +134,7 @@ class TestReviewWidgetUsesSharedPalette:
     """The widget and the summary table must not drift apart on colour."""
 
     def test_candidate_table_uses_the_shared_bands(self):
+        """The review session's candidate table shows all three band colours."""
         from ai_harmonization.dbgap import CSV_HEADERS
         from ai_harmonization.review import VariableReviewSession
 
@@ -159,12 +172,14 @@ class TestReviewWidgetUsesSharedPalette:
 
 class TestReviewWidgetHtml:
     def test_progress_reports_counts_and_remaining(self):
+        """The progress line shows position, total, decision counts and remaining."""
         html = styles.progress_html(position=3, total=10, accepted=2, skipped=1)
         assert "Variable <b>3</b> of 10" in html
         assert "2 accepted" in html and "1 skipped" in html
         assert "7 remaining" in html
 
     def test_progress_bar_width_tracks_completion(self):
+        """The bar width follows accepted plus skipped, not the current position."""
         assert "width:30.0%" in styles.progress_html(1, 10, 2, 1)
         assert "width:100.0%" in styles.progress_html(10, 10, 6, 4)
 
@@ -173,27 +188,33 @@ class TestReviewWidgetHtml:
         assert "width:0.0%" in styles.progress_html(1, 0, 0, 0)
 
     def test_autosave_note_only_when_enabled(self):
+        """The auto-saving note appears only when auto_saving is set."""
         assert "auto-saving" in styles.progress_html(1, 5, 0, 0, auto_saving=True)
         assert "auto-saving" not in styles.progress_html(1, 5, 0, 0, auto_saving=False)
 
     def test_variable_panel_shows_name_and_description(self):
+        """The panel shows the variable's name and its description."""
         html = styles.variable_panel_html("pht1.AGE", "Age at enrollment")
         assert "pht1.AGE" in html and "Age at enrollment" in html
 
     def test_values_line_omitted_when_empty(self):
+        """The Values line is left out for an empty value list and shown otherwise."""
         assert "Values:" not in styles.variable_panel_html("v", "d", values="")
         assert "Values: 1=One" in styles.variable_panel_html("v", "d", values="1=One")
 
     def test_status_badges_use_the_decision_colours(self):
+        """Accepted badges show the score in ACCEPTED; skipped ones use SKIPPED."""
         assert styles.ACCEPTED in styles.accepted_status_html("T.slot", 0.912)
         assert "0.912" in styles.accepted_status_html("T.slot", 0.912)
         assert styles.SKIPPED in styles.skipped_status_html()
 
     def test_status_badge_embeds_into_the_panel(self):
+        """A status badge passed to the panel appears in its HTML."""
         badge = styles.skipped_status_html()
         assert "⊘ Skipped" in styles.variable_panel_html("v", "d", status_html=badge)
 
     def test_candidates_table_bands_each_similarity(self):
+        """Each similarity is banded by colour and shown to three decimals."""
         candidates = pd.DataFrame({"Rank": [1, 2, 3], "Similarity": [0.91, 0.66, 0.42]})
         html = styles.candidates_table_html(candidates)
         for css in (
@@ -211,6 +232,7 @@ class TestStudyTextIsEscaped:
     HOSTILE = '<script>alert("xss")</script>'
 
     def test_variable_panel_escapes_variable_description_and_values(self):
+        """Markup in the variable, description and values is escaped, never rendered."""
         out = styles.variable_panel_html(
             variable=self.HOSTILE,
             description=f"desc {self.HOSTILE}",
@@ -231,6 +253,7 @@ class TestStudyTextIsEscaped:
         assert '<span style="color:green">accepted</span>' in out
 
     def test_candidates_table_escapes_cell_text(self):
+        """Markup in a candidate's text cells is escaped rather than rendered."""
         html = styles.candidates_table_html(
             pd.DataFrame([{"Target": self.HOSTILE, "Similarity": 0.9}])
         )
@@ -248,6 +271,7 @@ class TestStudyTextIsEscaped:
 
 class TestAbbreviateValueList:
     def test_short_list_is_returned_unchanged(self):
+        """A list within the length limit comes back exactly as given."""
         short = VALUE_SEPARATOR.join(["1=Yes", "2=No"])
         assert styles.abbreviate_value_list(short) == short
 
@@ -257,6 +281,7 @@ class TestAbbreviateValueList:
         assert styles.abbreviate_value_list(3.5) == 3.5
 
     def test_long_list_is_cut_and_counted(self):
+        """A long list is cut to under 200 characters and ends with its total count."""
         values = [f"{i}=meaning number {i}" for i in range(1, 120)]
         out = styles.abbreviate_value_list(VALUE_SEPARATOR.join(values))
         assert out.endswith("… (119 values)")
@@ -280,6 +305,7 @@ class TestAbbreviateValueList:
         assert all(part in values for part in shown.split(VALUE_SEPARATOR))
 
     def test_singular_noun_for_one_value(self):
+        """A single over-long value is counted as "1 value", not "1 values"."""
         out = styles.abbreviate_value_list("x" * 500)
         assert out.endswith("(1 value)")
 
@@ -289,6 +315,7 @@ class TestAbbreviateValueList:
         assert len(out) < 100
 
     def test_respects_an_explicit_limit(self):
+        """An explicit max_chars is honoured instead of the default limit."""
         values = VALUE_SEPARATOR.join(f"v{i}" for i in range(100))
         assert len(styles.abbreviate_value_list(values, max_chars=20)) < 60
 
@@ -310,11 +337,13 @@ class TestAbbreviateValueColumns:
         )
 
     def test_abbreviates_every_column_ending_in_values(self):
+        """Every column whose name ends in "Values" is abbreviated with its count."""
         out = styles.abbreviate_value_columns(self._frame())
         for column in ("Target Values", "Best Target Values", "Original Values"):
             assert out[column][0].endswith("(99 values)")
 
     def test_leaves_other_columns_alone(self):
+        """Description and similarity columns pass through unchanged."""
         frame = self._frame()
         out = styles.abbreviate_value_columns(frame)
         assert out["Target Description"][0] == "a description"
@@ -329,12 +358,14 @@ class TestAbbreviateValueColumns:
         assert frame["Target Values"][0] == before
 
     def test_frame_without_value_columns_is_returned_as_is(self):
+        """With no value columns the input frame itself comes back, not a copy."""
         frame = pd.DataFrame([{"Rank": 1, "Similarity": 0.5}])
         assert styles.abbreviate_value_columns(frame) is frame
 
 
 class TestCandidatesTableAbbreviates:
     def test_wide_value_cell_does_not_dominate_the_table(self):
+        """Long value cells are cut to a count; ten rows stay under 15k characters."""
         long_values = VALUE_SEPARATOR.join(f"OBA:{i:07d}" for i in range(255))
         frame = pd.DataFrame(
             [

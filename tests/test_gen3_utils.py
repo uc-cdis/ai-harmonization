@@ -31,6 +31,7 @@ class TestIsDirectMetadata:
         ],
     )
     def test_returns_true(self, fname):
+        """data_dict and var_report XMLs match, whatever the case of the name."""
         assert is_direct_metadata(fname)
 
     @pytest.mark.parametrize(
@@ -43,6 +44,7 @@ class TestIsDirectMetadata:
         ],
     )
     def test_returns_false(self, fname):
+        """Archives and non-XML files do not match, even with a metadata keyword."""
         assert not is_direct_metadata(fname)
 
 
@@ -64,6 +66,7 @@ class TestIsMetadataArchive:
         ],
     )
     def test_returns_true(self, fname):
+        """Long- and short-form dbGaP archive names both match, case ignored."""
         assert is_metadata_archive(fname)
 
     @pytest.mark.parametrize(
@@ -76,6 +79,7 @@ class TestIsMetadataArchive:
         ],
     )
     def test_returns_false(self, fname):
+        """An archive needs both a metadata keyword and an archive suffix."""
         assert not is_metadata_archive(fname)
 
     def test_xml_and_archive_checks_do_not_overlap(self):
@@ -88,6 +92,7 @@ class TestIsMetadataArchive:
 class TestSelectStudies:
     @pytest.fixture
     def studies(self):
+        """A three-study catalog keyed by study ID."""
         return {
             "phs001": {"name": "Study 1"},
             "phs002": {"name": "Study 2"},
@@ -95,31 +100,37 @@ class TestSelectStudies:
         }
 
     def test_mode_all_returns_all(self, studies):
+        """mode="all" returns every study in the catalog."""
         result = select_studies(studies, mode="all")
         assert len(result) == 3
 
     def test_mode_max_limits_count(self, studies):
+        """mode="max" cuts the catalog down to max_count studies."""
         result = select_studies(studies, mode="max", max_count=2)
         assert len(result) == 2
 
     def test_mode_selected_returns_only_selected(self, studies):
+        """mode="selected" returns the requested studies and nothing else."""
         result = select_studies(
             studies, mode="selected", selected_ids=["phs001", "phs003"]
         )
         assert [r[0] for r in result] == ["phs001", "phs003"]
 
     def test_mode_selected_warns_on_missing(self, studies, caplog):
+        """A requested ID missing from the catalog logs a "not found" warning."""
         with caplog.at_level(logging.WARNING):
             select_studies(studies, mode="selected", selected_ids=["phs001", "phs999"])
         assert "not found" in caplog.text
 
     def test_mode_selected_skips_missing(self, studies):
+        """A missing ID is skipped without raising, and the found one is returned."""
         result = select_studies(
             studies, mode="selected", selected_ids=["phs001", "phs999"]
         )
         assert len(result) == 1
 
     def test_unknown_mode_raises(self, studies):
+        """A mode outside all/max/selected raises ValueError."""
         with pytest.raises(ValueError):
             select_studies(studies, mode="random")
 
@@ -129,6 +140,7 @@ class TestSelectStudies:
             select_studies(studies, mode="max")
 
     def test_mode_max_respects_max_count(self, studies):
+        """mode="max" with max_count=1 returns a single study."""
         assert len(select_studies(studies, mode="max", max_count=1)) == 1
 
 
@@ -147,6 +159,7 @@ class TestExtractMetadataFromArchive:
                 tf.addfile(info, io.BytesIO(data))
 
     def test_extracts_xml_from_zip(self, tmp_path):
+        """From a zip only the metadata XML is extracted, flat, without its folder."""
         archive = tmp_path / "data_dictionary.zip"
         dest = tmp_path / "out"
         dest.mkdir()
@@ -162,6 +175,7 @@ class TestExtractMetadataFromArchive:
         assert (dest / "pht001_data_dict.xml").exists()
 
     def test_extracts_xml_from_tar(self, tmp_path):
+        """From a gzipped tar only the var_report XML is extracted."""
         archive = tmp_path / "variable_report.tar.gz"
         dest = tmp_path / "out"
         dest.mkdir()
@@ -176,6 +190,7 @@ class TestExtractMetadataFromArchive:
         assert extracted == ["pht001_var_report.xml"]
 
     def test_non_metadata_files_skipped(self, tmp_path):
+        """An archive with no metadata XML in it yields an empty list."""
         archive = tmp_path / "data_dictionary.zip"
         dest = tmp_path / "out"
         dest.mkdir()
@@ -184,6 +199,7 @@ class TestExtractMetadataFromArchive:
         assert extracted == []
 
     def test_bad_archive_returns_empty(self, tmp_path):
+        """A corrupt archive yields an empty list rather than raising."""
         bad = tmp_path / "bad.zip"
         bad.write_bytes(b"not a zip")
         dest = tmp_path / "out"
@@ -194,12 +210,14 @@ class TestExtractMetadataFromArchive:
 
 class TestReadSvAsList:
     def test_reads_csv(self, tmp_path):
+        """Each data row becomes a dict keyed by the header, values left as strings."""
         path = tmp_path / "rows.csv"
         path.write_text("name,age\nada,36\ngrace,45\n")
         rows = read_sv_as_list(str(path))
         assert rows == [{"name": "ada", "age": "36"}, {"name": "grace", "age": "45"}]
 
     def test_reads_tsv_with_delimiter(self, tmp_path):
+        """A tab delimiter splits TSV rows into the header's columns."""
         path = tmp_path / "rows.tsv"
         path.write_text(
             "submitter_id\tga4gh_drs_uri\npht1_data_dict.xml\tdrs://dg.4503:abc\n"
@@ -208,6 +226,7 @@ class TestReadSvAsList:
         assert rows[0]["ga4gh_drs_uri"] == "drs://dg.4503:abc"
 
     def test_header_only_returns_empty(self, tmp_path):
+        """A file with a header and no data rows gives an empty list."""
         path = tmp_path / "rows.tsv"
         path.write_text("a\tb\n")
         assert read_sv_as_list(str(path), delimiter="\t") == []
@@ -230,6 +249,7 @@ class TestConvertPfbToTsv:
             f.write("a\tb\n")
 
     def test_converts_avro_with_explicit_output_dir(self, tmp_path):
+        """The gen3 command uses output_dir as given and runs inside directory."""
         (tmp_path / "study.avro").write_bytes(b"avro")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
             assert convert_pfb_to_tsv(str(tmp_path), output_dir="tsvs") is True
@@ -238,18 +258,21 @@ class TestConvertPfbToTsv:
         assert run.call_args.kwargs["cwd"] == str(tmp_path)
 
     def test_default_output_dir_is_per_pfb(self, tmp_path):
+        """Without output_dir each PFB gets its own <stem>__TSVS directory."""
         (tmp_path / "study.avro").write_bytes(b"avro")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
             convert_pfb_to_tsv(str(tmp_path))
         assert run.call_args.args[0][-1] == "study__TSVS"
 
     def test_skips_non_avro_files(self, tmp_path):
+        """Non-avro files never reach the CLI, and skipping them is not a failure."""
         (tmp_path / "notes.txt").write_text("ignore me")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
             assert convert_pfb_to_tsv(str(tmp_path)) is True
         run.assert_not_called()
 
     def test_skips_when_tsvs_already_exist(self, tmp_path):
+        """TSVs already in output_dir count as converted: no CLI call, True returned."""
         (tmp_path / "study.avro").write_bytes(b"avro")
         self._write_tsv(str(tmp_path), "tsvs")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
@@ -257,6 +280,7 @@ class TestConvertPfbToTsv:
         run.assert_not_called()
 
     def test_empty_output_dir_does_not_count_as_converted(self, tmp_path):
+        """An empty output_dir does not count as converted, so the CLI still runs."""
         (tmp_path / "study.avro").write_bytes(b"avro")
         os.makedirs(tmp_path / "tsvs")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
@@ -264,6 +288,7 @@ class TestConvertPfbToTsv:
         run.assert_called_once()
 
     def test_converts_every_pfb_in_directory(self, tmp_path):
+        """Each .avro in the directory gets its own CLI call."""
         (tmp_path / "one.avro").write_bytes(b"avro")
         (tmp_path / "two.avro").write_bytes(b"avro")
         with patch("ai_harmonization.gen3_utils.subprocess.run") as run:
@@ -271,6 +296,7 @@ class TestConvertPfbToTsv:
         assert run.call_count == 2
 
     def test_returns_false_when_cli_fails(self, tmp_path):
+        """A failed CLI call makes the result False instead of raising."""
         (tmp_path / "study.avro").write_bytes(b"avro")
         with patch(
             "ai_harmonization.gen3_utils.subprocess.run", side_effect=OSError("boom")
@@ -278,6 +304,7 @@ class TestConvertPfbToTsv:
             assert convert_pfb_to_tsv(str(tmp_path)) is False
 
     def test_one_failure_does_not_stop_the_others(self, tmp_path):
+        """After one PFB fails the rest are still converted, and the result is False."""
         (tmp_path / "one.avro").write_bytes(b"avro")
         (tmp_path / "two.avro").write_bytes(b"avro")
         with patch(
@@ -288,6 +315,7 @@ class TestConvertPfbToTsv:
         assert run.call_count == 2
 
     def test_no_pfbs_present_succeeds(self, tmp_path):
+        """An empty directory is a success: there was nothing to convert."""
         assert convert_pfb_to_tsv(str(tmp_path)) is True
 
 
@@ -302,6 +330,7 @@ class TestDrsGuid:
         )
 
     def test_bdc_hybrid_form_anvil_prefix(self):
+        """The hybrid form with an AnVIL prefix keeps that prefix in the id."""
         assert (
             drs_guid("drs://dg.ANV0:dg.ANV0/abcd5678-90ab-cdef-1234-567890abcdef")
             == "dg.ANV0/abcd5678-90ab-cdef-1234-567890abcdef"

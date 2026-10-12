@@ -136,6 +136,17 @@ def filter_jsonl_by_length(input_file, max_length, output_file=None):
 
 
 def jsonl_to_csv(jsonl_path, csv_path):
+    """
+    Converts a JSONL file to a CSV file with one row per record.
+
+    Blank lines are skipped, and a line that is not valid JSON is printed with a
+    warning and skipped. The CSV columns are the keys of the first record.
+    Nothing is written when the file holds no records.
+
+    Args:
+        jsonl_path (str): The path to the JSONL file to read.
+        csv_path (str): The path to the CSV file to write.
+    """
     records = []
     with open(jsonl_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):

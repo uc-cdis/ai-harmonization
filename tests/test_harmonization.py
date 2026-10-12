@@ -15,6 +15,7 @@ from ai_harmonization.harmonization_approaches.base import (
 
 @pytest.fixture
 def example_suggestions():
+    """Return two suggestions wrapped in HarmonizationSuggestions."""
     return HarmonizationSuggestions(
         suggestions=[
             SingleHarmonizationSuggestion(
@@ -42,6 +43,7 @@ def example_suggestions():
 def test_get_metrics_for_approach(
     tmp_path: Path, example_suggestions: HarmonizationSuggestions
 ):
+    """The written row keeps its source model and adds the named metrics column."""
     test1 = {
         "nodes": [
             {

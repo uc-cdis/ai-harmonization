@@ -157,6 +157,18 @@ def get_metrics_for_approach(
 def get_harmonization_suggestions_from_harmonized_mapping(
     harmonized_mapping: str,
 ) -> HarmonizationSuggestions:
+    """
+    Parses a harmonized mapping into harmonization suggestions.
+
+    Args:
+        harmonized_mapping (str): Tab-separated text with a header row, then one
+            row per mapping holding the source and the target property, each
+            written as ``node.property (type): description``.
+
+    Returns:
+        HarmonizationSuggestions: One suggestion per row, each side's type
+        recorded in its additional metadata.
+    """
     suggestions = []
 
     # Use io.StringIO to treat the string as a file-like object
@@ -202,6 +214,22 @@ def get_harmonization_suggestions_from_harmonized_mapping(
 def get_metrics_for_test_case(
     suggestions: HarmonizationSuggestions, expected_mappings: HarmonizationSuggestions
 ) -> Dict:
+    """
+    Scores suggestions against the expected mappings.
+
+    A suggestion counts as correct when its source node and property and its
+    target node and property all match an expected mapping.
+
+    Args:
+        suggestions (HarmonizationSuggestions): The suggestions to score.
+        expected_mappings (HarmonizationSuggestions): The correct mappings.
+
+    Returns:
+        Dict: ``n_suggested``, ``n_expected``, ``n_correct``,
+        ``overall_accuracy``, ``precision``, ``recall``, ``f1_score``, and
+        ``missing_mappings``, the expected mappings not suggested, written as
+        ``node.property -> node.property``.
+    """
     HarmonizationSuggestions.model_validate(suggestions)
     HarmonizationSuggestions.model_validate(expected_mappings)
 

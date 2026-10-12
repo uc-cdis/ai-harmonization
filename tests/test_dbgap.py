@@ -53,6 +53,7 @@ VAR_REPORT_XML = textwrap.dedent(
 
 @pytest.fixture
 def dict_path(tmp_path):
+    """Write the two-variable data dictionary to a temp file and return its path."""
     p = tmp_path / "pht999999.v1_data_dict.xml"
     p.write_text(DATA_DICT_XML)
     return str(p)
@@ -60,6 +61,7 @@ def dict_path(tmp_path):
 
 @pytest.fixture
 def report_path(tmp_path):
+    """Write the var report for both variables to a temp file and return its path."""
     p = tmp_path / "pht999999.v1_var_report.xml"
     p.write_text(VAR_REPORT_XML)
     return str(p)
@@ -67,16 +69,19 @@ def report_path(tmp_path):
 
 class TestParseDbgapTable:
     def test_returns_table_id_and_model(self, dict_path):
+        """The table id comes from the data_table element and the model has one node."""
         table_id, model = parse_dbgap_table(dict_path)
         assert table_id == "pht999999.v1.p1"
         assert len(model.nodes) == 1
 
     def test_property_names(self, dict_path):
+        """Each variable becomes a property named after it, in document order."""
         _, model = parse_dbgap_table(dict_path)
         names = [p.name for p in model.nodes[0].properties]
         assert names == ["SUBJID", "SEX"]
 
     def test_enum_values_populated(self, dict_path):
+        """Values hold the value meanings and value_labels hold code=meaning pairs."""
         _, model = parse_dbgap_table(dict_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
         assert sex.values == ["Male", "Female"]
@@ -148,11 +153,13 @@ class TestParseDbgapTable:
         assert variable_ids == ["phv99999801.v1", "phv99999701.v1"]
 
     def test_var_report_sets_type(self, dict_path, report_path):
+        """The var report's "encoded value" type maps to string/encoded."""
         _, model = parse_dbgap_table(dict_path, report_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
         assert sex.type == "string/encoded"
 
     def test_missing_report_defaults_to_string(self, dict_path):
+        """Without a var report every property gets the string type."""
         _, model = parse_dbgap_table(dict_path, report_path=None)
         for prop in model.nodes[0].properties:
             assert prop.type == "string"
@@ -160,10 +167,12 @@ class TestParseDbgapTable:
 
 class TestFindStudyMetadataFiles:
     def test_raises_when_missing(self, tmp_path):
+        """A study without a metadata directory raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             find_study_metadata_files(str(tmp_path), "phs999000.v1.p1.c1")
 
     def test_finds_dict_and_report(self, tmp_path):
+        """The data dict is listed and the var report is keyed by its pht accession."""
         study_dir = tmp_path / "phs999999.v1.p1.c1" / "metadata"
         study_dir.mkdir(parents=True)
         (study_dir / "pht999999_data_dict.xml").write_text("<x/>")
@@ -176,6 +185,7 @@ class TestFindStudyMetadataFiles:
         assert "pht999999" in reports
 
     def test_returns_correct_path(self, tmp_path):
+        """The returned path is the study's metadata subdirectory."""
         study_dir = tmp_path / "phs999999.v1.p1.c1" / "metadata"
         study_dir.mkdir(parents=True)
         (study_dir / "pht001_data_dict.xml").write_text("<x/>")
@@ -214,23 +224,28 @@ def make_suggestion(
 class TestBuildMappingRows:
     @pytest.fixture
     def suggestions(self):
+        """Return one variable's two suggestions, best first, from variants A and B."""
         return [
             make_suggestion("target.slot_a", 0.9, "desc a", "A"),
             make_suggestion("target.slot_b", 0.7, "desc b", "B"),
         ]
 
     def test_row_count_matches_suggestions(self, suggestions):
+        """Each suggestion becomes one row."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert len(rows) == 2
 
     def test_ranks_are_sequential(self, suggestions):
+        """Ranks run from 1 in the order the suggestions are given."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert [r["rank"] for r in rows] == [1, 2]
 
     def test_no_suggestions_yields_no_rows(self):
+        """An empty suggestion list yields no rows."""
         assert build_mapping_rows([], {}, "phs999999") == []
 
     def test_slot_values_lookup_used(self):
+        """Target Values is looked up by the suggested target's node.property key."""
         suggestions = [make_suggestion("target.slot_a", 0.9, "d", "A")]
         rows = build_mapping_rows(
             suggestions, {"target.slot_a": "Yes, No"}, "phs999999"
@@ -238,22 +253,27 @@ class TestBuildMappingRows:
         assert rows[0]["Target Values"] == "Yes, No"
 
     def test_study_id_in_rows(self, suggestions):
+        """Every row carries the study id passed in."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert all(r["study_id"] == "phs999999" for r in rows)
 
     def test_original_node_property_format(self, suggestions):
+        """Original Node.Property is the source node and property joined by a dot."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert rows[0]["Original Node.Property"] == "subject.age"
 
     def test_suggested_target_reassembles_slot_key(self, suggestions):
+        """The suggested target rejoins target node and property into the slot key."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert rows[0]["Suggested Target Node.Property"] == "target.slot_a"
 
     def test_prompt_variant_recorded(self, suggestions):
+        """Each row records the prompt variant of its suggestion."""
         rows = build_mapping_rows(suggestions, {}, "phs999999")
         assert [r["prompt_variant"] for r in rows] == ["A", "B"]
 
     def test_value_labels_become_original_values(self):
+        """Source value labels are joined with VALUE_SEPARATOR into Original Values."""
         suggestions = [
             make_suggestion(
                 "target.slot_a", 0.9, "d", "A", value_labels=["1=Male", "2=Female"]
@@ -291,6 +311,7 @@ class TestBuildMappingRows:
 class TestSummarizeRank1Similarity:
     @pytest.fixture
     def rank1_df(self):
+        """Return rank-1 rows for four variables, two of them at or above 0.75."""
         return pd.DataFrame(
             {
                 "Similarity": [0.85, 0.72, 0.90, 0.60],
@@ -299,18 +320,22 @@ class TestSummarizeRank1Similarity:
         )
 
     def test_variable_count(self, rank1_df):
+        """Variables counts the rank-1 rows."""
         result = summarize_rank1_similarity(rank1_df)
         assert result["Variables"] == 4
 
     def test_top_target_is_highest_similarity(self, rank1_df):
+        """The top target is the target of the highest-similarity row."""
         result = summarize_rank1_similarity(rank1_df)
         assert result["Top bdchm target"] == "a.x"
 
     def test_strong_match_percentage(self, rank1_df):
+        """The strong column is the percentage of rows at or above 0.75."""
         result = summarize_rank1_similarity(rank1_df)
         assert result["≥0.75 (strong)"] == "50%"
 
     def test_mean_and_median_rounded(self, rank1_df):
+        """Mean and median similarity are returned as floats."""
         result = summarize_rank1_similarity(rank1_df)
         assert isinstance(result["Mean sim (rank 1)"], float)
         assert isinstance(result["Median sim"], float)

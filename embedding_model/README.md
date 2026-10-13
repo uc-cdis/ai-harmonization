@@ -1,15 +1,16 @@
 # Embedding model
 
 Tools to build, train and evaluate a small embedding model that maps study
-variables to data-model slots: a benchmark of expert mappings, the training
-data, a tokenizer, the model, and the experiments that decide between
-versions of it. The model is a static embedding table trained from scratch,
-small enough to encode thousands of texts a second on a CPU. Everything here
-runs from the command line, from a checkout of this repository.
+variables to data-model properties: a benchmark of expert mappings, the
+training data, a tokenizer, the model, and the experiments that decide
+between versions of it. The model is a static embedding table trained from
+scratch, small enough to encode thousands of texts a second on a CPU.
+Everything here runs from the command line, from a checkout of this
+repository.
 
 ### How it fits with the rest of the repository
 
-- Every text a model reads -- a study variable, a data-model slot -- is
+- Every text a model reads -- a study variable, a data-model property -- is
   written by `ai_harmonization.formatters`, the same functions the
   harmonization approaches use, so a model is trained and evaluated on texts
   laid out the way it will see them in use: the same structure, never the
@@ -124,8 +125,9 @@ two words.
 
 The table is trained from scratch with a contrastive loss (in-batch
 negatives) on pairs of texts that mean the same thing -- a variable and its
-description, a term and its synonym, two names for one data-model slot. Each
-pair is pulled together, and pushed apart from every other text in its batch.
+description, a term and its synonym, two names for one data-model property.
+Each pair is pulled together, and pushed apart from every other text in its
+batch.
 
 ## The workflow
 

@@ -18,6 +18,9 @@ dependencies = [
     "pyyaml>=6.0.1",
     # Required by ai_harmonization.review (interactive review widget)
     "ipywidgets>=8.1.0",
+    # Required by embedding_model.benchmarks.gdc (publishers' .xlsx tables,
+    # read through pandas.read_excel)
+    "openpyxl>=3.1.5",
     # We want this to work in a Google Colab environment.
     # In such environments, Google's pre-installs a ton of Google
     # Python SDKs which don't always work with the latest version
@@ -45,11 +48,14 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "7.0"
 addopts = "-v"
 testpaths = [
     "tests",
 ]
+# embedding_model runs from a checkout rather than being installed, so the
+# tests import it from the repository root.
+pythonpath = ["."]
 
 [tool.setuptools]
 packages = ["ai_harmonization", "ai_harmonization.harmonization_approaches"]

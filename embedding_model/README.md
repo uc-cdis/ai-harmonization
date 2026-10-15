@@ -13,7 +13,7 @@ The model is a static embedding table trained from scratch. It is small enough
 to encode thousands of texts a second on a CPU. Everything here runs from the
 command line, from a checkout of this repository.
 
-### How it fits with the rest of the repository
+## How it fits with the rest of the repository
 
 - Every text a model reads, such as a study variable or a data-model
   property, is written by `ai_harmonization.formatters`. The harmonization
@@ -71,7 +71,7 @@ examples use a small vocabulary and a short run, so they finish in minutes.
 They are small examples to see every step work. A model meant for use should
 be trained on more sources.
 
-**Train and score one model**:
+### Train and score one model
 
 ```
 python -m embedding_model benchmarks build --topmed
@@ -87,11 +87,12 @@ python -m embedding_model score --run independent_run_example_s0 --benchmark top
 A run is named after its configuration file and seed, so this one is
 `outputs/independent_runs/independent_run_example_s0/`.
 
-**Run a small series**: `small_series_example.yaml` declares a base
-configuration and two arms at five seeds. Each arm changes one setting, so the
-series has fifteen runs. The example shows how a series of experiments is run
-and read. A series meant to decide something needs more seeds, as
-[PROCESS.md](PROCESS.md) explains.
+### Run a small series
+
+`small_series_example.yaml` declares a base configuration and two arms at five
+seeds. Each arm changes one setting, so the series has fifteen runs. The
+example shows how a series of experiments is run and read. A series meant to
+decide something needs more seeds, as [PROCESS.md](PROCESS.md) explains.
 
 ```
 # The same data as the example above: skip these if you have run it.

@@ -146,12 +146,13 @@ description and values come from that release's data dictionary. dbGaP
 publishes data dictionaries without controlled access. Only the cited tables
 are downloaded.
 
-**How the targets are composed.** The documentation keeps one file per
-harmonized variable, in a folder per dataset:
-`atherosclerosis/cac_score_1.json`. The harmonized data has a column for each
-phenotype. For 70 of the 78, it also has a column for the age at which the
-phenotype was measured: `cac_score_1` beside `age_at_cac_score_1`. Each column
-is a target, written `node.property` with the dataset as the node:
+### How the targets are composed
+
+The documentation keeps one file per harmonized variable, in a folder per
+dataset: `atherosclerosis/cac_score_1.json`. The harmonized data has a column
+for each phenotype. For 70 of the 78, it also has a column for the age at which
+the phenotype was measured: `cac_score_1` beside `age_at_cac_score_1`. Each
+column is a target, written `node.property` with the dataset as the node:
 
 - the phenotype, `atherosclerosis.cac_score_1` (78 targets), with the type,
   description and values of its documentation file (`data_type`,
@@ -160,11 +161,13 @@ is a target, written `node.property` with the dataset as the node:
   at measurement of cac_score_1 (years)", as the BioData Catalyst data model
   describes the same properties.
 
-**Which target a variable maps to.** The documentation lists a unit's
-variables without saying which is the phenotype and which the age. Its README
-says only that there is "at least one representing the phenotype itself, and
-at least one for the age at measurement". So the builder decides with a rule.
-A variable maps to the age target when both of these hold:
+### Which target a variable maps to
+
+The documentation lists a unit's variables without saying which is the
+phenotype and which the age. Its README says only that there is "at least one
+representing the phenotype itself, and at least one for the age at
+measurement". So the builder decides with a rule. A variable maps to the age
+target when both of these hold:
 
 - its dbGaP description says "age" as a word, so "Age when CAC score was
   obtained" counts and "Tumor stage" does not;
@@ -194,7 +197,7 @@ The rule is deterministic, and about 2% of variables get a debatable label:
 - An age that is itself the measure maps to the age, for example "Age when
   first smoked cigarettes" for ever smoker.
 
-One row per variable:
+### One row per variable
 
 - A variable that several harmonized variables use appears once, with all
   its targets. 284 of the 1,162 rows have more than one target.
@@ -206,9 +209,11 @@ Each variable's type comes from its table's variable report.
 `ai_harmonization.dbgap` reads it as for any study, so the benchmark sees the
 same text the harmonization approaches see.
 
-**License:** the documentation repository states none.
+### License
 
-**Reference:**
+The documentation repository states no license.
+
+### Reference
 
 > Stilp, A. M., Emery, L. S., Broome, J. G., Buth, E. J., Khan, A. T.,
 > Laurie, C. A., Wang, F. F., Wong, Q., Chen, D., D'Augustine, C. M.,
@@ -235,11 +240,12 @@ Built from three published inputs:
   record). GDC-SM describes no variable, so the description is empty.
 - the live **GDC submission dictionary** (Apache-2.0), for the targets.
 
-**The targets.** Every data property of the dictionary is a target, as
-`node.property`, with its type, description and values.
-`SimpleDataModel.from_gdc_model` reads the dictionary as the harmonization
-approaches read it, so a target's text is the text they build. These
-properties are not targets:
+### The targets
+
+Every data property of the dictionary is a target, as `node.property`, with its
+type, description and values. `SimpleDataModel.from_gdc_model` reads the
+dictionary as the harmonization approaches read it, so a target's text is the
+text they build. These properties are not targets:
 
 - link properties, which point to other nodes rather than hold data;
 - the bookkeeping fields each node lists as `systemProperties`, such as `id`,
@@ -259,6 +265,8 @@ is gdcdictionary release
 loader resolves them, are identical to what the API served (checked
 2026-10-14).
 
+### Which targets a variable maps to
+
 The ground truth names a property without its node: `race`, not
 `demographic.race`. The targets, though, are `node.property`. Where two nodes
 carry the property and mean the same thing by it, both are accepted: `race`
@@ -276,17 +284,18 @@ The GDC benchmark built by
 (`harmonization_benchmark_real_GDC_v0.0.1`) accepts one node per property, so
 its scores and these are not comparable.
 
-**Licenses:** the ground truth is CC BY 4.0, and the GDC dictionary is
-Apache-2.0. Seven of the ten papers are published under CC BY-NC-ND, a
-Creative Commons NoDerivatives license. It allows sharing a file as published,
-but not a modified version of it. A benchmark table is a modified version: it
-is repaired and joined to the expert mappings. So GDC-SM distributes only the
-ground truth, with instructions for rebuilding the tables from the publishers'
-originals. Likewise, this repository distributes no
-benchmark files: the builder downloads the originals and makes the tables on
-your machine.
+### Licenses
 
-**References:**
+The ground truth is CC BY 4.0, and the GDC dictionary is Apache-2.0. Seven of
+the ten papers are published under CC BY-NC-ND, a Creative Commons
+NoDerivatives license. It allows sharing a file as published, but not a
+modified version of it. A benchmark table is a modified version: it is repaired
+and joined to the expert mappings. So GDC-SM distributes only the ground truth,
+with instructions for rebuilding the tables from the publishers' originals.
+Likewise, this repository distributes no benchmark files: the builder downloads
+the originals and makes the tables on your machine.
+
+### References
 
 > Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
 > Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*

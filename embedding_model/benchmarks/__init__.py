@@ -57,7 +57,7 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
         mappings (list[dict]): One row per source variable, keyed by
             MAPPING_COLUMNS.
         sources (list[dict]): What the benchmark was built from; see
-            BENCHMARKS.md for the fields.
+            ``embedding_model/docs/benchmarks.md`` for the fields.
 
     Returns:
         dict: The manifest, also written as ``<name>_manifest.json`` beside

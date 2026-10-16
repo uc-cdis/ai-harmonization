@@ -19,7 +19,7 @@ The first build downloads the inputs into
 minutes, most of it for dbGaP's variable summaries for TOPMed. A rebuild reuses
 the downloads and takes about half a minute. `--inputs DIR` puts everything a
 build writes under `DIR`, in place of `embedding_model/inputs/`; see
-[Inputs and outputs](README.md#inputs-and-outputs).
+[Inputs and outputs](../README.md#inputs-and-outputs).
 
 Every build is checked against the benchmark's committed manifest; see
 [The manifest](#the-manifest). To build a benchmark from updated sources, see

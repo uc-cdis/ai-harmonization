@@ -306,7 +306,7 @@ def build(downloads, manifest):
             # new dictionary.
             "sha256": sha256(json.dumps(dictionary, sort_keys=True).encode()),
             "license": "Apache-2.0",
-            "citation": "BENCHMARKS.md#gdc",
+            "citation": "embedding_model/docs/benchmarks.md#gdc",
         },
     ]
     return targets, mappings, sources

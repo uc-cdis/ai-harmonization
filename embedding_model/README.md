@@ -64,8 +64,8 @@ own:
 - `independent_run_example.yaml`: the configuration for one training run;
 - `small_series_example.yaml`: a small series of experiments.
 
-Both use one benchmark, [TOPMed](BENCHMARKS.md#topmed), and one training
-source, [NHANES](SOURCES.md#nhanes). NHANES gives about 21,000 pairs of
+Both use one benchmark, [TOPMed](docs/benchmarks.md#topmed), and one training
+source, [NHANES](docs/sources.md#nhanes). NHANES gives about 21,000 pairs of
 variable names, descriptions and values from CDC's public codebooks. The
 examples use a small vocabulary and a short run, so they finish in minutes.
 They are small examples to see every step work. A model meant for use should
@@ -92,7 +92,7 @@ A run is named after its configuration file and seed, so this one is
 `small_series_example.yaml` declares a base configuration and two arms at five
 seeds. Each arm changes one setting, so the series has fifteen runs. The
 example shows how a series of experiments is run and read. A series meant to
-decide something needs more seeds, as [PROCESS.md](PROCESS.md) explains.
+decide something needs more seeds, as [docs/process.md](docs/process.md) explains.
 
 ```
 # The same data as the example above: skip these if you have run it.
@@ -154,8 +154,8 @@ its own.
 
 | | step | what it does | writes |
 |---|---|---|---|
-| benchmarks | `benchmarks build --topmed` | builds [TOPMed](BENCHMARKS.md#topmed), the benchmark models are developed on | `inputs/benchmarks/` |
-| | `benchmarks build --gdc` | builds [GDC](BENCHMARKS.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
+| benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark models are developed on | `inputs/benchmarks/` |
+| | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark>` | scores any model, trained here or elsewhere | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/` for a model trained elsewhere: the metrics and every mapping's rank |
 | training data | `sources fetch [--source <source>]` | downloads the training sources, or one of them | `inputs/sources/` |
 | | `pairs prepare [--source <source>]` | turns each source into pairs of texts that mean the same thing | `inputs/pairs/` |
@@ -210,17 +210,17 @@ are compared mapping by mapping, not only on their averages.
 
 There are two benchmarks:
 
-- **[TOPMed](BENCHMARKS.md#topmed)**: dbGaP study variables mapped by experts
+- **[TOPMed](docs/benchmarks.md#topmed)**: dbGaP study variables mapped by experts
   to the harmonized variables of the TOPMed Data Coordinating Center. As built
   here, it has 1,162 source variables and 148 targets. Models are developed on
   it.
-- **[GDC](BENCHMARKS.md#gdc)**: the GDC-SM ground truth, published with the
+- **[GDC](docs/benchmarks.md#gdc)**: the GDC-SM ground truth, published with the
   Magneto paper: variables from ten cancer papers, mapped by experts to the
   GDC data dictionary. As built here, it has 165 source variables and 1,217
   targets. It is held back, and scored once on a series' pick (the series'
   winner).
 
-[BENCHMARKS.md](BENCHMARKS.md) describes each one: what it is built from, its
+[docs/benchmarks.md](docs/benchmarks.md) describes each one: what it is built from, its
 license, and how to cite it.
 
 `get_metrics_for_approach` evaluates a harmonization approach end to end. The
@@ -278,7 +278,7 @@ The only files the tools write that are committed are the benchmark
 manifests, under `embedding_model/benchmarks/manifests/`. A manifest holds the
 SHA-256 of every benchmark file, and the version and license of each source.
 So a rebuilt benchmark either matches its manifest or names what does not.
-[BENCHMARKS.md](BENCHMARKS.md#the-manifest) says how a new version is
+[docs/benchmarks.md](docs/benchmarks.md#the-manifest) says how a new version is
 accepted. The benchmark files themselves carry third-party text, such as dbGaP
 variable descriptions and the GDC dictionary. So they are built rather than
 redistributed.
@@ -305,7 +305,7 @@ The record holds:
 - the run that ships;
 - how it compares with the model in use.
 
-[PROCESS.md](PROCESS.md) describes how a series is planned, run, read and
+[docs/process.md](docs/process.md) describes how a series is planned, run, read and
 decided. It covers:
 
 - the stages a series goes through, from choosing the corpus to confirming

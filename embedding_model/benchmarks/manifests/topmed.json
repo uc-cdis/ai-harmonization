@@ -1,0 +1,235 @@
+{
+  "benchmark": "topmed",
+  "version": "1",
+  "built": "2026-10-14",
+  "files": {
+    "topmed_mappings.csv": {
+      "rows": 1162,
+      "sha256": "32dd3f6e2554cbe8a35d9239073008ae7a589a228c40356856cfca812a69bd20"
+    },
+    "topmed_targets.csv": {
+      "rows": 148,
+      "sha256": "9a48d94c53e308e03a7ca33e9b5ac216f5fada4b3522d06617f7f7da53920c61"
+    }
+  },
+  "sources": [
+    {
+      "role": "mappings and targets",
+      "name": "TOPMed DCC harmonized phenotype documentation",
+      "location": "https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes",
+      "version": "14960eb088d9057f3fcd04c65f609a31e0d981a1",
+      "license": "none stated",
+      "citation": "embedding_model/docs/benchmarks.md#topmed"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000007.v29.p10",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000007/phs000007.v29.p10/pheno_variable_summaries/",
+      "version": "phs000007.v29.p10"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000007.v30.p11",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000007/phs000007.v30.p11/pheno_variable_summaries/",
+      "version": "phs000007.v30.p11"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000179.v5.p2",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000179/phs000179.v5.p2/pheno_variable_summaries/",
+      "version": "phs000179.v5.p2"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000200.v11.p3",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000200/phs000200.v11.p3/pheno_variable_summaries/",
+      "version": "phs000200.v11.p3"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000209.v13.p3",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000209/phs000209.v13.p3/pheno_variable_summaries/",
+      "version": "phs000209.v13.p3"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000280.v3.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000280/phs000280.v3.p1/pheno_variable_summaries/",
+      "version": "phs000280.v3.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000280.v4.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000280/phs000280.v4.p1/pheno_variable_summaries/",
+      "version": "phs000280.v4.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000280.v5.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000280/phs000280.v5.p1/pheno_variable_summaries/",
+      "version": "phs000280.v5.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000284.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000284/phs000284.v1.p1/pheno_variable_summaries/",
+      "version": "phs000284.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000284.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000284/phs000284.v2.p1/pheno_variable_summaries/",
+      "version": "phs000284.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000285.v3.p2",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000285/phs000285.v3.p2/pheno_variable_summaries/",
+      "version": "phs000285.v3.p2"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000286.v5.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000286/phs000286.v5.p1/pheno_variable_summaries/",
+      "version": "phs000286.v5.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000287.v6.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000287/phs000287.v6.p1/pheno_variable_summaries/",
+      "version": "phs000287.v6.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000289.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000289/phs000289.v2.p1/pheno_variable_summaries/",
+      "version": "phs000289.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000741.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000741/phs000741.v2.p1/pheno_variable_summaries/",
+      "version": "phs000741.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000810.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000810/phs000810.v1.p1/pheno_variable_summaries/",
+      "version": "phs000810.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000914.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000914/phs000914.v1.p1/pheno_variable_summaries/",
+      "version": "phs000914.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000921.v3.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000921/phs000921.v3.p1/pheno_variable_summaries/",
+      "version": "phs000921.v3.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000956.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000956/phs000956.v2.p1/pheno_variable_summaries/",
+      "version": "phs000956.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000956.v3.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000956/phs000956.v3.p1/pheno_variable_summaries/",
+      "version": "phs000956.v3.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000988.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000988/phs000988.v2.p1/pheno_variable_summaries/",
+      "version": "phs000988.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs000997.v3.p2",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs000997/phs000997.v3.p2/pheno_variable_summaries/",
+      "version": "phs000997.v3.p2"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001001.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001001/phs001001.v1.p1/pheno_variable_summaries/",
+      "version": "phs001001.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001013.v3.p2",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001013/phs001013.v3.p2/pheno_variable_summaries/",
+      "version": "phs001013.v3.p2"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001024.v3.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001024/phs001024.v3.p1/pheno_variable_summaries/",
+      "version": "phs001024.v3.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001032.v4.p2",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001032/phs001032.v4.p2/pheno_variable_summaries/",
+      "version": "phs001032.v4.p2"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001040.v3.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001040/phs001040.v3.p1/pheno_variable_summaries/",
+      "version": "phs001040.v3.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001143.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001143/phs001143.v2.p1/pheno_variable_summaries/",
+      "version": "phs001143.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001180.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001180/phs001180.v1.p1/pheno_variable_summaries/",
+      "version": "phs001180.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001189.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001189/phs001189.v2.p1/pheno_variable_summaries/",
+      "version": "phs001189.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001218.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001218/phs001218.v1.p1/pheno_variable_summaries/",
+      "version": "phs001218.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001238.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001238/phs001238.v1.p1/pheno_variable_summaries/",
+      "version": "phs001238.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001238.v2.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001238/phs001238.v2.p1/pheno_variable_summaries/",
+      "version": "phs001238.v2.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001402.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001402/phs001402.v1.p1/pheno_variable_summaries/",
+      "version": "phs001402.v1.p1"
+    },
+    {
+      "role": "source text",
+      "name": "dbGaP variable summaries, phs001412.v1.p1",
+      "location": "https://ftp.ncbi.nlm.nih.gov/dbgap/studies/phs001412/phs001412.v1.p1/pheno_variable_summaries/",
+      "version": "phs001412.v1.p1"
+    }
+  ]
+}

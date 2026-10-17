@@ -27,6 +27,8 @@ DBGAP_TYPE_MAP = {
     "string": "string",
     "text": "string",
     "encoded value": "string/encoded",
+    "encoded": "string/encoded",
+    "enum_integer": "string/encoded",
     "date": "datetime",
     "datetime": "datetime",
 }
@@ -48,13 +50,68 @@ CSV_HEADERS = [
 ]
 
 
+def map_dbgap_type(spelling):
+    """Map a dbGaP type name to the type a SimpleDataModel uses.
+
+    dbGaP can give several type names separated by commas, such as
+    ``integer, encoded value``; the first one DBGAP_TYPE_MAP knows is used, so
+    that example is an integer.
+
+    Args:
+        spelling (str | None): The type as dbGaP gives it.
+
+    Returns:
+        str | None: The mapped type, or None if the map knows none of its names.
+    """
+    for part in (spelling or "").lower().split(","):
+        if part.strip() in DBGAP_TYPE_MAP:
+            return DBGAP_TYPE_MAP[part.strip()]
+    return None
+
+
+def resolve_variable_type(calculated, declared, has_codes):
+    """The type of a dbGaP variable.
+
+    A variable can have two types: one declared in the study's data
+    dictionary, and one calculated by dbGaP from the data itself, in the
+    variable report. Declarations are sometimes inaccurate and calculated
+    types more precise, so a specific calculated type -- a number or an
+    enumeration -- is returned. If the calculated type is the generic
+    ``string``, or there is none, the declared type is returned, except that a
+    variable with value codes that is not declared a number is
+    ``string/encoded``. If neither gives a type, ``string``.
+
+    Args:
+        calculated (str | None): The calculated type, from the variable report.
+        declared (str | None): The declared type, from the data dictionary.
+        has_codes (bool): Whether the data dictionary lists value codes.
+
+    Returns:
+        str: The variable's type.
+    """
+    computed = map_dbgap_type(calculated)
+    if computed not in (None, "string"):
+        return computed
+    stated = map_dbgap_type(declared)
+    if stated in ("integer", "float"):
+        return stated
+    if has_codes or stated == "string/encoded":
+        return "string/encoded"
+    return stated or "string"
+
+
 def parse_dbgap_table(dict_path, report_path=None):
     """Parse a dbGaP data_dict XML (+ optional var_report XML) into a SimpleDataModel.
 
+    Each variable's type comes from resolve_variable_type, from its declared
+    type in the data dictionary, its calculated type in the report, and
+    whether the dictionary lists value codes.
+
     Args:
         dict_path (str): Path to the *_data_dict.xml file.
-        report_path (str | None): Path to the matching *_var_report.xml file.
-            Used to resolve property types; skipped if None or missing.
+        report_path (str | None): Path to the matching *_var_report.xml file,
+            which gives each variable's calculated type; skipped if None or
+            missing.
 
     Returns:
         tuple[str, SimpleDataModel]: (table_id, model).
@@ -71,21 +128,19 @@ def parse_dbgap_table(dict_path, report_path=None):
     root = ET.parse(dict_path).getroot()
     table_id = root.attrib.get("id", os.path.basename(dict_path))
 
-    var_types = {}
+    computed_types = {}
     if report_path and os.path.exists(report_path):
         try:
-            report_root = ET.parse(report_path).getroot()
-            for var_node in report_root.findall(".//variable"):
-                v_name = var_node.findtext("name")
-                v_type_node = var_node.find(".//type")
-                if v_name and v_type_node is not None and v_type_node.text:
-                    var_types[v_name.strip()] = DBGAP_TYPE_MAP.get(
-                        v_type_node.text.strip().lower(), "string"
-                    )
+            for var_node in ET.parse(report_path).getroot().findall(".//variable"):
+                v_name = var_node.get("var_name")
+                if v_name:
+                    computed_types[v_name.strip()] = var_node.get("calculated_type")
         except Exception as e:
+            # Typed from the dictionary alone rather than half from the report.
+            computed_types = {}
             logging.warning(
                 f"Could not parse var report {os.path.basename(report_path)}, "
-                f"falling back to string types: {e}"
+                f"typing its variables from the data dictionary: {e}"
             )
 
     properties = []
@@ -110,13 +165,17 @@ def parse_dbgap_table(dict_path, report_path=None):
         if variable_id:
             metadata["variable_id"] = variable_id
 
+        var_type = resolve_variable_type(
+            computed_types.get(var_name), var.findtext("type"), bool(value_meanings)
+        )
+
         properties.append(
             Property(
                 name=var_name,
                 description=(
                     var.findtext("description") or "No description available."
                 ).strip(),
-                type=var_types.get(var_name, "string"),
+                type=var_type,
                 values=value_meanings or None,
                 additional_metadata=metadata or None,
             )

@@ -96,7 +96,7 @@ def target_rows(variables):
     The age target is described the way the BioData Catalyst data model
     describes the same properties: "age at measurement of <name> (years)".
     Types are spelled as ``ai_harmonization.dbgap`` spells the sources', so the
-    two sides of a pair name a type alike.
+    two sides of a mapping name a type alike.
 
     Args:
         variables (list[dict]): From read_documentation.
@@ -268,7 +268,8 @@ def mapping_rows(variables, resolved):
 
     Returns:
         list[dict]: The rows, keyed by MAPPING_COLUMNS and sorted by study,
-            variable name and accession.
+            variable name and accession. ``expected_target`` is a sorted list
+            of target keys.
     """
     rows = {}
     for variable in variables:
@@ -284,7 +285,7 @@ def mapping_rows(variables, resolved):
         (
             {
                 **{k: v for k, v in row.items() if k not in ("release", "targets")},
-                "expected_target": ";".join(sorted(row["targets"])),
+                "expected_target": sorted(row["targets"]),
             }
             for row in rows.values()
         ),
@@ -324,7 +325,9 @@ def build(downloads, manifest):
     resolved, dbgap_sources = resolve_components(references, downloads / "dbgap")
     targets = target_rows(variables)
     mappings = mapping_rows(variables, resolved)
-    ages = sum(".age_at_" in row["expected_target"] for row in mappings)
+    ages = sum(
+        any(".age_at_" in key for key in row["expected_target"]) for row in mappings
+    )
     print(
         f"  {len(variables)} harmonized variables, {len(targets)} targets; "
         f"{len(references):,} component references in {len(dbgap_sources)} "

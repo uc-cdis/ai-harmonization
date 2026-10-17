@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from embedding_model import benchmarks
+from embedding_model import benchmarks, scoring
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -24,6 +24,13 @@ def main(argv=None):
         type=Path,
         default=PACKAGE / "inputs",
         help="where prepared data is written and read (default: %(default)s)",
+    )
+    writes_outputs = argparse.ArgumentParser(add_help=False)
+    writes_outputs.add_argument(
+        "--outputs",
+        type=Path,
+        default=PACKAGE / "outputs",
+        help="where models and scores are written (default: %(default)s)",
     )
 
     parser = argparse.ArgumentParser(
@@ -50,7 +57,56 @@ def main(argv=None):
         ),
     )
 
+    score = steps.add_parser(
+        "score",
+        parents=[common, writes_outputs],
+        help="score a model on benchmarks: each source variable's rank, MRR and accuracy@k",
+    )
+    score.add_argument(
+        "--model",
+        required=True,
+        help="a Hugging Face model id or a model folder on disk",
+    )
+    score.add_argument(
+        "--benchmark",
+        required=True,
+        nargs="+",
+        choices=sorted(benchmarks.BUILDERS),
+        help="one or more benchmarks. The model is loaded once for all of them.",
+    )
+    score.add_argument(
+        "--format",
+        default=scoring.DEFAULT_FORMAT,
+        choices=sorted(scoring.FORMATS),
+        help="the shape of the source and target texts (default: %(default)s)",
+    )
+    score.add_argument(
+        "--device",
+        help="cpu or cuda (default: a GPU if there is one, else the CPU)",
+    )
+    score.add_argument(
+        "--batch-size",
+        type=int,
+        default=scoring.BATCH_SIZE,
+        help="texts encoded at a time (default: %(default)s)",
+    )
+
     args = parser.parse_args(argv)
+    if args.step == "score":
+        try:
+            scoring.score(
+                args.model,
+                args.benchmark,
+                args.inputs,
+                args.outputs,
+                args.format,
+                args.device,
+                args.batch_size,
+            )
+        except (FileNotFoundError, ValueError) as error:
+            print(f"score: {error}", file=sys.stderr)
+            return 1
+        return 0
     if args.step == "benchmarks" and args.action == "build":
         names = [name for name in benchmarks.BUILDERS if getattr(args, name)]
         if not names:

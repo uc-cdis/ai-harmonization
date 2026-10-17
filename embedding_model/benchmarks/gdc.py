@@ -27,12 +27,12 @@ GDC_STATUS = "https://api.gdc.cancer.gov/status"
 # Entries the API serves beside the nodes: the JSON meta-schema and the root.
 NOT_NODES = {"metaschema", "root"}
 
-# The ground truth names a property, not a node, so a property that several
-# nodes carry is accepted in each of them -- except where a node gives the name
-# another meaning. A project's primary site and disease type describe the
-# project, not a patient; a portion's weight is a sample's, in milligrams, not
-# a patient's.
-NOT_ACCEPTED = {"project.primary_site", "project.disease_type", "portion.weight"}
+# The ground truth names a property, not a node. So a property that several
+# nodes carry is an expected target in each of them, except where a node gives
+# the name another meaning. A project's primary site and disease type describe
+# the project, not a patient. A portion's weight is a sample's, in milligrams,
+# not a patient's.
+NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"}
 
 
 def dictionary_targets(dictionary):
@@ -149,10 +149,10 @@ def read_source_table(spreadsheet, sheet, paper):
 
 
 def mapping_rows(truth, tables, targets):
-    """One row per source variable, with every target the experts accept.
+    """One row per source variable, with every target the experts mapped it to.
 
     A variable keeps every distinct value its column holds; the prompt
-    formatters cap how many they show. A published pair whose property the
+    formatters cap how many they show. A published mapping whose property the
     dictionary does not carry is left out and named, since a new dictionary
     can drop or rename a property.
 
@@ -165,7 +165,7 @@ def mapping_rows(truth, tables, targets):
 
     Returns:
         list[dict]: The rows, keyed by MAPPING_COLUMNS and sorted by paper and
-            variable.
+            variable. ``expected_target`` is a sorted list of target keys.
 
     Raises:
         ValueError: If a mapped variable is not a column of its paper's table.
@@ -173,14 +173,15 @@ def mapping_rows(truth, tables, targets):
     nodes_by_property = {}
     for target in targets:
         key = target["target_property"]
-        if key not in NOT_ACCEPTED:
+        if key not in NOT_EXPECTED:
             nodes_by_property.setdefault(key.split(".", 1)[1], []).append(key)
 
-    accepted, missing, dropped = {}, [], []
-    for paper, pairs in sorted(truth.items()):
+    variables, missing, dropped = {}, [], []
+    for paper, published in sorted(truth.items()):
         table = tables.get(paper, pd.DataFrame())
         for source, target in zip(
-            pairs["original_paper_variable_names"], pairs["GDC_format_variable_names"]
+            published["original_paper_variable_names"],
+            published["GDC_format_variable_names"],
         ):
             if source not in table.columns:
                 missing.append(f"{paper}: {source}")
@@ -189,9 +190,9 @@ def mapping_rows(truth, tables, targets):
             if not keys:
                 dropped.append(f"{paper}: {source} -> {target}")
                 continue
-            if (paper, source) not in accepted:
+            if (paper, source) not in variables:
                 column = table[source]
-                accepted[(paper, source)] = {
+                variables[(paper, source)] = {
                     "type": (
                         "number" if pd.api.types.is_numeric_dtype(column) else "string"
                     ),
@@ -203,16 +204,16 @@ def mapping_rows(truth, tables, targets):
                     ],
                     "keys": set(),
                 }
-            accepted[(paper, source)]["keys"].update(keys)
+            variables[(paper, source)]["keys"].update(keys)
     if missing:
         raise ValueError(
             f"{len(missing)} mapped variables are not columns of their paper's "
             "table: " + "; ".join(missing[:12])
         )
     if dropped:
-        print(f"  {len(dropped)} published pairs have no target in this dictionary:")
-        for pair in dropped:
-            print(f"    {pair}")
+        print(f"  {len(dropped)} published mappings have no target in this dictionary:")
+        for mapping in dropped:
+            print(f"    {mapping}")
 
     return [
         {
@@ -224,9 +225,9 @@ def mapping_rows(truth, tables, targets):
             # GDC-SM describes no variable, so the description is left empty.
             "source_description": "",
             "source_values": VALUE_SEPARATOR.join(entry["values"]),
-            "expected_target": ";".join(sorted(entry["keys"])),
+            "expected_target": sorted(entry["keys"]),
         }
-        for (paper, source), entry in sorted(accepted.items())
+        for (paper, source), entry in sorted(variables.items())
     ]
 
 

@@ -1,0 +1,494 @@
+"""Score a model on a benchmark: where it ranks each variable's expected targets.
+
+For each source variable, the model ranks every target of the benchmark by
+cosine similarity. sentence-transformers' ``InformationRetrievalEvaluator`` encodes
+the texts, ranks the targets and computes MRR and accuracy@k.
+
+A variable with several expected targets takes the rank of the best placed of
+them. accuracy@k is the share of variables with an expected target among the
+first k. It is what a reviewer of the top k suggestions sees.
+"""
+
+import json
+import os
+import platform
+import subprocess
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from ai_harmonization.formatters import (
+    VALUE_SEPARATOR,
+    format_values,
+    get_node_property_as_name_description,
+    get_node_property_as_name_type_description,
+    get_node_property_as_name_type_description_values,
+    get_node_property_as_name_type_values,
+)
+from ai_harmonization.simple_data_model import Node, Property
+from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
+
+ACCURACY_AT_K = (1, 5, 10)
+METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
+BATCH_SIZE = 128
+
+
+def stdelement(node, prop):
+    """A property in the shape of StdElement-Mapper's NCIt training pairs.
+
+    The model card shows ``name: ... | description: ... | values: a; b``, with
+    no node and no type. This format scores the model in the shape it was
+    trained on.
+
+    It is not in ai_harmonization.formatters: the approaches read a target's
+    node.property back from its text, and this shape has none.
+
+    Args:
+        node (Node): Not part of this shape.
+        prop (Property): The property. The first MAX_VALUES_IN_PROMPT of its
+            values are kept.
+
+    Returns:
+        str: The text.
+    """
+    parts = [f"name: {prop.name}"]
+    if prop.description:
+        parts.append(f"description: {prop.description}")
+    values = format_values(prop.values, separator="; ")
+    if values:
+        parts.append(f"values: {values}")
+    return " | ".join(parts)
+
+
+# Each format is a formatter: (Node, Property) -> text. Four are the formatters
+# of ai_harmonization.formatters, under their own names. The default is the
+# shape this pipeline's models are trained on, and the one models are compared
+# in.
+FORMATS = {
+    "name_description": get_node_property_as_name_description,
+    "name_type_description": get_node_property_as_name_type_description,
+    "name_type_description_values": get_node_property_as_name_type_description_values,
+    "name_type_values": get_node_property_as_name_type_values,
+    "stdelement": stdelement,
+}
+DEFAULT_FORMAT = "name_type_description_values"
+
+
+def property_text(formatter, node, name, type_, description, values):
+    """The text of a target property or a source property/variable, by a formatter.
+
+    A source variable is written without a node: its node would be its dbGaP
+    table or GDC paper, which says nothing about what it means. Its text then
+    starts at its name, without the formatters' leading dot.
+
+    Args:
+        formatter (Callable[[Node, Property], str]): A value of FORMATS.
+        node (str): The node, or "" for a source variable.
+        name (str): The target property's or source property/variable's name.
+        type_ (str): Its type.
+        description (str): Its description.
+        values (list[str] | None): Its values.
+
+    Returns:
+        str: The text.
+    """
+    written = formatter(
+        Node(name=node, description="", links=[], properties=[]),
+        Property(name=name, description=description, type=type_, values=values),
+    )
+    return written if node else written.removeprefix(".")
+
+
+def split_values(cell):
+    """A benchmark cell's values as a list, or None when it has none."""
+    return [value for value in cell.split(VALUE_SEPARATOR) if value] or None
+
+
+def benchmark_texts(targets, mappings, text_format):
+    """A benchmark's texts, in the three dicts InformationRetrievalEvaluator takes.
+
+    Args:
+        targets (pd.DataFrame): The benchmark's targets.
+        mappings (pd.DataFrame): The benchmark's mappings.
+        text_format (str): A key of FORMATS.
+
+    Returns:
+        tuple[dict, dict, dict]: The evaluator's queries, corpus and relevant
+        documents:
+
+        - source_texts: each source variable's text, by its row number in the
+          mappings;
+        - target_texts: each target property's text, by its ``node.property``
+          key;
+        - expected: each source variable's expected ``node.property`` keys, by
+          its row number.
+
+    Raises:
+        ValueError: If an expected target is not among the benchmark's targets.
+    """
+    formatter = FORMATS[text_format]
+    target_texts = {}
+    for row in targets.itertuples():
+        node, _, name = row.target_property.rpartition(".")
+        target_texts[row.target_property] = property_text(
+            formatter,
+            node,
+            name,
+            row.target_type,
+            row.target_description,
+            split_values(row.target_values),
+        )
+    source_texts, expected, unknown = {}, {}, []
+    for number, row in enumerate(mappings.itertuples()):
+        source_texts[str(number)] = property_text(
+            formatter,
+            "",
+            row.source_variable_name,
+            row.source_type,
+            row.source_description,
+            split_values(row.source_values),
+        )
+        expected[str(number)] = set(row.expected_target.split(TARGET_SEPARATOR))
+        unknown += sorted(expected[str(number)] - target_texts.keys())
+    if unknown:
+        raise ValueError(
+            f"{len(unknown)} expected targets are not in the benchmark's targets: "
+            + ", ".join(unknown[:5])
+        )
+    return source_texts, target_texts, expected
+
+
+def evaluator_class():
+    """The InformationRetrievalEvaluator of the installed sentence-transformers.
+
+    Version 6 and later 5.x releases, such as 5.4, keep it in
+    ``sentence_transformers.sentence_transformer.evaluation``. Earlier 5.x
+    releases, such as 5.1, keep it in ``sentence_transformers.evaluation``.
+    Version 6 still accepts that path, with a deprecation warning.
+    """
+    try:
+        from sentence_transformers.sentence_transformer.evaluation import (
+            InformationRetrievalEvaluator,
+        )
+    except ImportError:
+        from sentence_transformers.evaluation import InformationRetrievalEvaluator
+    return InformationRetrievalEvaluator
+
+
+def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_SIZE):
+    """Rank every target for each source, and score the ranks.
+
+    Targets are ranked by cosine similarity. The evaluator gives the results
+    two ways. What it returns, in memory, is the averages: MRR and accuracy@k
+    over all source variables. Its predictions file, written to a temporary
+    folder, holds each source variable's full ranking. Each source variable's
+    rank and top-1 target are read from that file, and the folder is deleted.
+
+    Args:
+        model (SentenceTransformer): The model to score.
+        source_texts (dict[str, str]): The source variables' texts, by id.
+        target_texts (dict[str, str]): The target properties' texts, by key.
+        expected (dict[str, set[str]]): Each source variable's expected
+            target keys.
+        batch_size (int): Texts encoded at a time.
+
+    Returns:
+        tuple[dict, dict]: The metrics (METRIC_COLUMNS), and for each source
+            id its rank, its top-1 target and that target's similarity.
+    """
+    # The approaches embed both sides with model.encode(), which adds only the
+    # model's default prompt, if its config names one. Left alone, the
+    # evaluator would add the model's "query" and "document" prompts instead.
+    # A model with a Router module still has its two sides routed apart.
+    #
+    # The approaches rank by cosine similarity, whatever similarity function a
+    # model's config names, so the evaluator does too.
+    from sentence_transformers.util import cos_sim
+
+    prompt = model.prompts.get(model.default_prompt_name, "")
+    evaluator = evaluator_class()(
+        queries=source_texts,
+        corpus=target_texts,
+        relevant_docs=expected,
+        query_prompt=prompt,
+        corpus_prompt=prompt,
+        score_functions={"cosine": cos_sim},
+        mrr_at_k=[len(target_texts)],
+        accuracy_at_k=list(ACCURACY_AT_K),
+        batch_size=batch_size,
+        show_progress_bar=False,
+        write_csv=False,
+        write_predictions=True,
+    )
+    with tempfile.TemporaryDirectory() as folder:
+        scores = evaluator(model, output_path=folder)
+        # The evaluator writes one predictions file per score function.
+        files = list(Path(folder).glob("*_predictions_cosine.jsonl"))
+        if len(files) != 1:
+            raise RuntimeError(f"the evaluator wrote {len(files)} predictions files")
+        lines = files[0].read_text(encoding="utf-8").splitlines()
+        ranked = {}
+        for entry in map(json.loads, lines):
+            query, results = entry["query_id"], entry["results"]
+            for position, hit in enumerate(results):
+                if hit["corpus_id"] in expected[query]:
+                    break
+            else:
+                raise RuntimeError(
+                    f"no expected target in the ranking of source {query}"
+                )
+            ranked[query] = {
+                "rank": position + 1,
+                "top1_target": results[0]["corpus_id"],
+                "top1_similarity": round(results[0]["score"], 4),
+            }
+
+    # The evaluator names each metric after its score function, as in
+    # ``cosine_mrr@148``.
+    metrics = {
+        "mrr": round(float(scores[f"cosine_mrr@{len(target_texts)}"]), 4),
+        **{
+            f"accuracy@{k}": round(float(scores[f"cosine_accuracy@{k}"]), 4)
+            for k in ACCURACY_AT_K
+        },
+        "median_rank": float(np.median([r["rank"] for r in ranked.values()])),
+    }
+    return metrics, ranked
+
+
+def code_commit():
+    """The ai-harmonization commit of the code that wrote the texts and ranked them.
+
+    Returns:
+        dict: ``commit``, the commit at ``HEAD``, and ``uncommitted_changes``,
+            whether ``ai_harmonization/`` or ``embedding_model/`` differ from
+            it. Both are None when git cannot be asked.
+    """
+    git = ["git", "-C", str(Path(__file__).resolve().parent)]
+    paths = ["--", ":/ai_harmonization", ":/embedding_model"]
+    try:
+        commit = subprocess.run(
+            [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        status = subprocess.run(
+            [*git, "status", "--porcelain", *paths],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    except Exception:
+        return {"commit": None, "uncommitted_changes": None}
+    return {"commit": commit, "uncommitted_changes": bool(status.strip())}
+
+
+def model_revision(model):
+    """The Hugging Face commit of a model loaded by its id, read from the cache.
+
+    Loading a model by id downloads it into the Hugging Face cache, under its
+    commit. The commit is read from there, with no network, in the cache
+    SentenceTransformer uses: ``SENTENCE_TRANSFORMERS_HOME``, where set.
+
+    The id is looked up as given. SentenceTransformer reads an id with no
+    owner, such as ``all-MiniLM-L6-v2``, as a ``sentence-transformers/``
+    model, so such an id gives None.
+
+    Args:
+        model (str): A Hugging Face model id or a model folder on disk.
+
+    Returns:
+        str | None: The commit, or None for a model folder on disk or an id
+            the cache does not hold.
+    """
+    if Path(model).is_dir():
+        return None
+    from huggingface_hub import snapshot_download
+
+    try:
+        folder = snapshot_download(
+            model,
+            local_files_only=True,
+            cache_dir=os.getenv("SENTENCE_TRANSFORMERS_HOME"),
+        )
+    except Exception:
+        return None
+    return Path(folder).name
+
+
+def scores_folder(outputs, model, benchmark, text_format):
+    """Where a model's scores on a benchmark, in one format, are written.
+
+    ``--model`` is either a Hugging Face model id or a path to a model folder,
+    and the scores folder is named after it:
+
+    - a Hugging Face model keeps its owner and name, so two models of the same
+      name from different owners stay apart:
+      ``scores/uc-ctds/StdElement-Mapper/topmed/stdelement``;
+    - a model folder on disk gives only its own name, whether the path is full
+      or relative: ``/home/me/models/abcd-model`` gives
+      ``scores/abcd-model/topmed/name_type_description_values``.
+
+    It tells them apart as SentenceTransformer does: an existing folder is a
+    model on disk, anything else a Hugging Face id. A downloaded Hugging Face
+    model sits in the Hugging Face cache under another name
+    (``models--uc-ctds--StdElement-Mapper``), so its id stays an id.
+
+    The format has a folder of its own, so a model scored in two formats keeps
+    both scores.
+
+    Args:
+        outputs (Path): The outputs folder.
+        model (str): The Hugging Face model id or folder that was scored.
+        benchmark (str): The benchmark.
+        text_format (str): The key of FORMATS the texts were written in.
+
+    Returns:
+        Path: ``<outputs>/scores/<model>/<benchmark>/<format>``.
+    """
+    local = Path(model)
+    name = local.resolve().name if local.is_dir() else model
+    return Path(outputs) / "scores" / name / benchmark / text_format
+
+
+def write_scores(folder, row, mappings, ranked, config):
+    """Write one scoring's files: metrics.csv, per_variable.csv and config.yaml.
+
+    The old config.yaml is removed first and the new one written last. So a
+    folder with a config.yaml always holds the scores that config describes.
+
+    Args:
+        folder (Path): The scores folder, from scores_folder.
+        row (dict): The metrics row.
+        mappings (pd.DataFrame): The benchmark's mappings, in the order they
+            were ranked.
+        ranked (dict): Each source variable's rank and top-1 target, by row
+            number, from rank_targets.
+        config (dict): What config.yaml holds.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "config.yaml").unlink(missing_ok=True)
+    pd.DataFrame([row]).to_csv(folder / "metrics.csv", index=False)
+    per_variable = mappings[
+        [
+            "source_study_id",
+            "source_table_id",
+            "source_variable_id",
+            "source_variable_name",
+            "expected_target",
+        ]
+    ].copy()
+    for column in ("rank", "top1_target", "top1_similarity"):
+        per_variable[column] = [ranked[str(i)][column] for i in range(len(mappings))]
+    per_variable.to_csv(folder / "per_variable.csv", index=False)
+    (folder / "config.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+    )
+
+
+def score(
+    model,
+    benchmarks,
+    inputs,
+    outputs,
+    text_format=DEFAULT_FORMAT,
+    device=None,
+    batch_size=BATCH_SIZE,
+):
+    """Score a model on built benchmarks and write the results.
+
+    Every benchmark is read and checked first. So a missing or changed one
+    stops scoring before the model is loaded. The model is then loaded once,
+    and scored on each benchmark in turn. A model on disk is recorded by its
+    full path, and a Hugging Face model by its id.
+
+    For each benchmark, it writes:
+
+    - ``metrics.csv``: one row of metrics;
+    - ``per_variable.csv``: every source variable's rank and top-1 target;
+    - ``config.yaml``: the settings, the model's revision, the
+      ai-harmonization commit, and the benchmark's version and checksums.
+
+    Args:
+        model (str): A Hugging Face model id or a model folder on disk.
+        benchmarks (list[str]): The benchmarks, such as ``["topmed"]``.
+        inputs (Path): The inputs folder the benchmarks were built into.
+        outputs (Path): The outputs folder.
+        text_format (str): A key of FORMATS: the shape the texts are written
+            in.
+        device (str | None): ``cpu`` or ``cuda``. None uses a GPU if there is
+            one, and the CPU otherwise.
+        batch_size (int): Texts encoded at a time.
+
+    Returns:
+        list[dict]: The metrics rows, one per benchmark.
+    """
+    import sentence_transformers
+    from sentence_transformers import SentenceTransformer
+
+    built = {name: read_benchmark(inputs, name) for name in benchmarks}
+    texts = {
+        name: benchmark_texts(targets, mappings, text_format)
+        for name, (targets, mappings, _) in built.items()
+    }
+    encoder = SentenceTransformer(model, device=device)
+    scored = str(Path(model).resolve()) if Path(model).is_dir() else model
+    code = code_commit()
+    revision = model_revision(model)
+    rows = []
+    for name, (_, mappings, manifest) in built.items():
+        source_texts, target_texts, expected = texts[name]
+        print(
+            f"{name} version {manifest['version']}: {len(source_texts):,} source "
+            f"variables, {len(target_texts):,} targets; format {text_format}"
+        )
+        metrics, ranked = rank_targets(
+            encoder, source_texts, target_texts, expected, batch_size
+        )
+        row = {
+            "model": scored,
+            "benchmark": name,
+            "benchmark_version": manifest["version"],
+            "format": text_format,
+            "n": len(source_texts),
+            "targets": len(target_texts),
+            **metrics,
+        }
+        config = {
+            "model": scored,
+            "model_revision": revision,
+            "benchmark": name,
+            "format": text_format,
+            "device": str(encoder.device),
+            "batch_size": batch_size,
+            "benchmark_manifest": {
+                key: manifest[key]
+                for key in ("version", "built", "files")
+                if key in manifest
+            },
+            "ai_harmonization": code,
+            "python": platform.python_version(),
+            "sentence_transformers": sentence_transformers.__version__,
+            "scored": datetime.now().isoformat(timespec="seconds"),
+        }
+        folder = scores_folder(outputs, model, name, text_format)
+        if (folder / "config.yaml").exists():
+            text = (folder / "config.yaml").read_text(encoding="utf-8")
+            previous = (yaml.safe_load(text) or {}).get("model")
+            if previous and previous != scored:
+                print(
+                    f"warning: {folder} held the scores of {previous}. They are "
+                    f"replaced by those of {scored}.",
+                    file=sys.stderr,
+                )
+        write_scores(folder, row, mappings, ranked, config)
+        print(
+            "  "
+            + ", ".join(f"{metric} {metrics[metric]}" for metric in METRIC_COLUMNS)
+            + f"\n  written to {folder}"
+        )
+        rows.append(row)
+    return rows

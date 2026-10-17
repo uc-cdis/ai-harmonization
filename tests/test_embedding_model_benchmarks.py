@@ -192,7 +192,7 @@ class TestBuilders:
                 tmp_path / "abcd1234.tar.gz",
             )
         ]
-        assert [row["expected_target"] for row in mappings] == ["demographic.sex_1"]
+        assert [row["expected_target"] for row in mappings] == [["demographic.sex_1"]]
         assert sources == [pin]
 
     @pytest.mark.parametrize("builder", [topmed, gdc])
@@ -366,17 +366,18 @@ class TestTopmedMappingRows:
         """A phenotype maps to its variable, an age to the variable's age_at_ target."""
         rows = topmed.mapping_rows(self.variables(), self.resolved())
         by_name = {row["source_variable_name"]: row["expected_target"] for row in rows}
-        assert by_name["CAC"] == "atherosclerosis.cac_1"
-        assert by_name["HT"] == "anthropometry.height_1"
+        assert by_name["CAC"] == ["atherosclerosis.cac_1"]
+        assert by_name["HT"] == ["anthropometry.height_1"]
 
     def test_a_shared_age_is_one_row_with_all_its_targets(self):
         """An age cited by two units is one row carrying both age_at_ targets."""
         rows = topmed.mapping_rows(self.variables(), self.resolved())
         ages = [row for row in rows if row["source_variable_name"] == "AGE01"]
         assert len(ages) == 1
-        assert ages[0]["expected_target"] == (
-            "anthropometry.age_at_height_1;atherosclerosis.age_at_cac_1"
-        )
+        assert ages[0]["expected_target"] == [
+            "anthropometry.age_at_height_1",
+            "atherosclerosis.age_at_cac_1",
+        ]
 
     def test_no_age_column_means_phenotype(self):
         """Without an age column, even an age variable maps to the phenotype."""
@@ -385,7 +386,7 @@ class TestTopmedMappingRows:
              "components": [("phs999999", "1", "pht999999", "1", "phv99999901")]},
         ]  # fmt: skip
         (row,) = topmed.mapping_rows(variables, self.resolved())
-        assert row["expected_target"] == "demographic.subcohort_1"
+        assert row["expected_target"] == ["demographic.subcohort_1"]
 
     def test_the_latest_cited_release_gives_the_text(self):
         """A variable cited from two releases takes its text from the later one."""
@@ -556,31 +557,33 @@ class TestGdcMappingRows:
         )
     ]
 
-    def test_property_in_several_nodes_is_accepted_in_each(self):
-        """A property two nodes carry is correct in both; the description is empty."""
+    def test_a_property_two_nodes_carry_is_expected_in_both(self):
+        """A property two nodes carry is an expected target in both. The description is empty."""
         truth = {"Abcd": ground_truth([("Race", "race")])}
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian", "White", None]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
-        assert row["expected_target"] == "clinical.race;demographic.race"
+        assert row["expected_target"] == ["clinical.race", "demographic.race"]
         assert row["source_type"] == "string"
         assert row["source_description"] == ""
         assert row["source_values"] == f"Asian{VALUE_SEPARATOR}White"
 
-    def test_not_accepted_nodes_are_left_out(self):
-        """A node that gives the property another meaning is not an answer."""
+    def test_a_node_with_another_meaning_is_left_out(self):
+        """A node that gives the property another meaning is not an expected target."""
         truth = {"Abcd": ground_truth([("Tumor site", "primary_site")])}
         tables = {"Abcd": pd.DataFrame({"Tumor site": ["Ovary"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
-        assert row["expected_target"] == "case.primary_site"
+        assert row["expected_target"] == ["case.primary_site"]
 
     def test_several_published_targets_merge_into_one_row(self):
         """Two ground-truth pairs for one variable give one row with both targets."""
         truth = {"Abcd": ground_truth([("Site", "primary_site"), ("Site", "race")])}
         tables = {"Abcd": pd.DataFrame({"Site": ["Ovary"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
-        assert row["expected_target"] == (
-            "case.primary_site;clinical.race;demographic.race"
-        )
+        assert row["expected_target"] == [
+            "case.primary_site",
+            "clinical.race",
+            "demographic.race",
+        ]
 
     def test_integers_with_blanks_read_as_integers(self):
         """An integer column with a blank keeps integer values, 64 rather than 64.0."""
@@ -599,8 +602,8 @@ class TestGdcMappingRows:
             len(row["source_values"].split(VALUE_SEPARATOR)) == MAX_VALUES_IN_PROMPT + 5
         )
 
-    def test_target_not_in_the_dictionary_drops_the_pair(self, capsys):
-        """A published target the dictionary does not carry gives no answer, and is named."""
+    def test_target_not_in_the_dictionary_drops_the_mapping(self, capsys):
+        """A published mapping to a target the dictionary does not carry is dropped, and named."""
         truth = {"Abcd": ground_truth([("Stage", "retired_property")])}
         tables = {"Abcd": pd.DataFrame({"Stage": ["I"]})}
         assert gdc.mapping_rows(truth, tables, self.TARGETS) == []
@@ -614,10 +617,10 @@ class TestGdcMappingRows:
             gdc.mapping_rows(truth, tables, self.TARGETS)
 
 
-def mapping(name, target):
-    """A mapping row with every column, for the manifest tests."""
+def mapping(name, targets):
+    """A row of a mappings file, with every column, for the manifest tests."""
     row = dict.fromkeys(benchmarks.MAPPING_COLUMNS, "")
-    return {**row, "source_variable_name": name, "expected_target": target}
+    return {**row, "source_variable_name": name, "expected_target": targets}
 
 
 TARGET = dict.fromkeys(benchmarks.TARGET_COLUMNS, "")
@@ -628,7 +631,7 @@ class TestWriteBenchmark:
     def test_files_and_manifest(self, tmp_path):
         """Both files are written with their columns, and the manifest describes them."""
         manifest = benchmarks.write_benchmark(
-            tmp_path, "abcd", "1", [TARGET], [mapping("AGE", "a.age")], [PIN]
+            tmp_path, "abcd", "1", [TARGET], [mapping("AGE", ["a.age"])], [PIN]
         )
         with open(tmp_path / "abcd_mappings.csv", newline="") as handle:
             assert next(csv.reader(handle)) == benchmarks.MAPPING_COLUMNS
@@ -637,6 +640,63 @@ class TestWriteBenchmark:
             (tmp_path / "abcd_targets.csv").read_bytes()
         )
         assert json.loads((tmp_path / "abcd_manifest.json").read_text()) == manifest
+
+    def test_a_string_expected_target_is_refused(self, tmp_path):
+        """An expected_target given as a string, not a list, is a TypeError."""
+        with pytest.raises(TypeError, match="list of target keys"):
+            benchmarks.write_benchmark(
+                tmp_path, "abcd", "1", [TARGET], [mapping("AGE", "a.age")], [PIN]
+            )
+
+
+class TestReadBenchmark:
+    @pytest.fixture
+    def written(self, tmp_path):
+        """A benchmark named abcd, written into a temp inputs folder."""
+        folder = tmp_path / "benchmarks"
+        folder.mkdir()
+        mappings = [mapping("RACE", ["b.race", "a.race"])]
+        return benchmarks.write_benchmark(
+            folder, "abcd", "1", [TARGET], mappings, [PIN]
+        )
+
+    def test_an_unbuilt_benchmark_names_the_build_command(self, tmp_path):
+        """Reading a benchmark before building it says how to build it."""
+        with pytest.raises(FileNotFoundError, match="benchmarks build --gdc"):
+            benchmarks.read_benchmark(tmp_path, "gdc")
+
+    def test_reads_what_was_written(self, written, tmp_path):
+        """The files read back as strings, with several expected targets sorted and joined by ;."""
+        targets, mappings, manifest = benchmarks.read_benchmark(tmp_path, "abcd")
+        assert len(targets) == 1
+        assert mappings.loc[0, "expected_target"] == "a.race;b.race"
+        assert mappings.loc[0, "source_values"] == ""
+        assert manifest == written
+
+    def test_a_corrupt_manifest_names_the_rebuild(self, written, tmp_path):
+        """A manifest that is not JSON is named, with the rebuild command."""
+        (tmp_path / "benchmarks" / "abcd_manifest.json").write_text("")
+        with pytest.raises(ValueError, match="abcd_manifest.json cannot be read"):
+            benchmarks.read_benchmark(tmp_path, "abcd")
+
+    def test_a_version_not_committed_is_a_warning(
+        self, written, monkeypatch, capsys, tmp_path
+    ):
+        """A build of another version than the committed one is read, with a warning."""
+        (tmp_path / "manifests").mkdir()
+        (tmp_path / "manifests" / "abcd.json").write_text(json.dumps({"version": "2"}))
+        monkeypatch.setattr(benchmarks, "MANIFESTS", tmp_path / "manifests")
+        benchmarks.read_benchmark(tmp_path, "abcd")
+        assert "is version 1, and the committed manifest is version 2" in (
+            capsys.readouterr().err
+        )
+
+    def test_a_changed_file_is_refused(self, written, tmp_path):
+        """A file whose SHA-256 is not the manifest's is named, with the rebuild command."""
+        with open(tmp_path / "benchmarks" / "abcd_mappings.csv", "a") as handle:
+            handle.write(",,,,,,,\n")
+        with pytest.raises(ValueError, match="abcd_mappings.csv: rebuild with"):
+            benchmarks.read_benchmark(tmp_path, "abcd")
 
 
 class TestIdentities:
@@ -692,7 +752,7 @@ class TestBuild:
     @pytest.fixture
     def setup(self, monkeypatch, tmp_path):
         """A fictional builder for 'topmed', with its pins-only manifest in a temp folder."""
-        built = {"mappings": [mapping("AGE", "a.age")]}
+        built = {"mappings": [mapping("AGE", ["a.age"])]}
         monkeypatch.setattr(
             topmed,
             "build",
@@ -727,7 +787,7 @@ class TestBuild:
         built, manifest, working = setup
         benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True)
         before = (working / "topmed_mappings.csv").read_bytes(), manifest.read_text()
-        built["mappings"] = [mapping("AGE", "a.age_at_exam")]
+        built["mappings"] = [mapping("AGE", ["a.age_at_exam"])]
         assert benchmarks.build(["topmed"], tmp_path / "inputs") == 1
         assert (working / "topmed_mappings.csv").read_bytes() == before[0]
         assert manifest.read_text() == before[1]
@@ -738,7 +798,7 @@ class TestBuild:
         benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True)
         monkeypatch.setattr(benchmarks, "committed_version", lambda name: "1")
         before = (working / "topmed_mappings.csv").read_bytes(), manifest.read_text()
-        built["mappings"] = [mapping("AGE", "a.age_at_exam")]
+        built["mappings"] = [mapping("AGE", ["a.age_at_exam"])]
         assert (
             benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True) == 1
         )
@@ -761,7 +821,7 @@ class TestBuild:
 
         monkeypatch.setattr(benchmarks, "committed_version", no_answer)
         before = manifest.read_text()
-        built["mappings"] = [mapping("AGE", "a.age_at_exam")]
+        built["mappings"] = [mapping("AGE", ["a.age_at_exam"])]
         assert (
             benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True) == 1
         )

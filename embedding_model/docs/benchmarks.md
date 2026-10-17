@@ -32,12 +32,15 @@ Each benchmark is two files under `embedding_model/inputs/benchmarks/`:
 
 - **`<benchmark>_mappings.csv`**: one row per source variable. A row holds the
   variable's study, table, identifier, name, type, description and values. Its
-  `expected_target` is the key of its correct target. Where experts accept
-  more than one target, the keys are separated by `;`.
+  `expected_target` holds its expected targets: the targets the experts
+  mapped it to, any of which counts as correct. Each is one mapping, and
+  several are separated by `;`. GDC's experts named a property without its
+  node. So on GDC, each node that carries the property gives a target of its
+  own: see [Which targets a variable maps to](#which-targets-a-variable-maps-to).
 - **`<benchmark>_targets.csv`**: one row per target property, with its key
-  (`node.property`), type, description and values. These are the texts the
-  model reads on the target side. `ai_harmonization.formatters` writes them,
-  like every other text.
+  (`node.property`), type, description and values. A format turns each row
+  into the text the model reads on the target side.
+  [scoring.md](scoring.md#running-score) lists the formats.
 
 Both files keep every value a variable or property has, joined by ` | `. The
 formatters cap how many values a prompt shows.
@@ -50,19 +53,20 @@ by default. `pandas.read_csv` reads the files as they are. `csv` needs
 ### Why the targets are a file of their own
 
 Every source is ranked against every target in the file, not only against
-the correct ones. Harmonizing a real study means searching a whole data model.
+the expected ones. Harmonizing a real study means searching a whole data model.
 So the targets file holds the whole candidate set, and most of it is there to
-be ranked below the right answer:
+be ranked below the expected targets:
 
-| benchmark | targets | targets that are some mapping's answer |
+| benchmark | targets | targets that are some variable's expected target |
 |---|---|---|
 | `topmed` | 148 | 146 |
 | `gdc` | 1,217 | 87 |
 
 Without the other targets, the task would shrink to choosing among the
-answers. A score would then overstate how a model does on a full schema. The
-table also explains part of why the two benchmarks score differently: TOPMed's
-candidates are nearly all answers, and GDC's are mostly not.
+expected targets. A score would then overstate how a model does on a full
+schema. The table also explains part of why the two benchmarks score
+differently: TOPMed's candidates are nearly all expected targets, and GDC's
+mostly are not.
 
 Kept apart, the targets are written once per benchmark rather than once per
 mapping. Mappings can also be added without touching them.
@@ -72,10 +76,10 @@ They have three parts:
 
 - a corpus to search: here, the targets file;
 - queries: here, the source variables;
-- which corpus entries answer each query: here, `expected_target`.
+- which corpus entries are relevant to each query: here, `expected_target`.
 
-They keep the queries and their answers in separate files. The mappings file
-keeps them together, one row per query.
+They keep the queries and their relevant entries in separate files. The
+mappings file keeps them together, one row per query.
 
 ### The manifest
 
@@ -131,8 +135,8 @@ refuses a differing build.
 
 dbGaP study variables mapped by the experts of the TOPMed Data Coordinating
 Center to its harmonized variables. As built here, the benchmark has **1,162
-source variables from 29 dbGaP studies, 2,144 accepted pairs and 148
-targets**.
+source variables from 29 dbGaP studies, with 2,144 expected mappings, and
+148 targets**.
 
 It is built from the Center's harmonized phenotype documentation,
 [UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes),
@@ -228,12 +232,12 @@ The documentation repository states no license.
 
 Variables from the supplementary tables of ten cancer papers, mapped by
 experts to the GDC data dictionary. As built here, the benchmark has **165
-source variables, 298 accepted pairs and 1,217 targets**.
+source variables with 298 expected mappings, and 1,217 targets**.
 
 Built from three published inputs:
 
 - the ground truth of **GDC-SM**, the GDC Schema Matching Benchmark (CC BY
-  4.0): 259 pairs of a paper's variable and a GDC property;
+  4.0): 259 mappings from a paper's variable to a GDC property;
 - the ten papers' **supplementary tables**, downloaded from their
   publishers, for each variable's type and values. They are prepared as
   GDC-SM's own download script prepares them (`gdc_download.py` in the Zenodo
@@ -269,11 +273,11 @@ loader resolves them, are identical to what the API served (checked
 
 The ground truth names a property without its node: `race`, not
 `demographic.race`. The targets, though, are `node.property`. Where two nodes
-carry the property and mean the same thing by it, both are accepted: `race`
-in `clinical` and in `demographic`, say. Where one of them gives the name
-another meaning, that node is not accepted:
+carry the property and mean the same thing by it, both are expected targets:
+`race` in `clinical` and in `demographic`, say. Where one of them gives the
+name another meaning, that node's property is not an expected target:
 
-| not accepted | why |
+| not an expected target | why |
 |---|---|
 | `project.primary_site` | describes the project, not a patient's tumor site |
 | `project.disease_type` | describes the project, not a patient's disease |
@@ -281,8 +285,8 @@ another meaning, that node is not accepted:
 
 The GDC benchmark built by
 `jupyter/harmonization_real_benchmark_creation_gdc.ipynb`
-(`harmonization_benchmark_real_GDC_v0.0.1`) accepts one node per property, so
-its scores and these are not comparable.
+(`harmonization_benchmark_real_GDC_v0.0.1`) maps each property to one node
+only, so its scores and these are not comparable.
 
 ### Licenses
 

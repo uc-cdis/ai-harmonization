@@ -2,11 +2,10 @@
 
 Each benchmark is two CSV files under ``<inputs>/benchmarks/``:
 
-- ``<benchmark>_mappings.csv``: one row per source variable, with the key of
-  its correct target, or several keys separated by ``;`` where more than one
-  is accepted;
+- ``<benchmark>_mappings.csv``: one row per source variable, with the keys of
+  its expected targets, separated by ``;`` where there are several;
 - ``<benchmark>_targets.csv``: every target property a source is ranked
-  against, the correct ones and all the others.
+  against, the expected ones and all the others.
 
 The files carry third-party text, so they are built from their published
 inputs rather than redistributed. A manifest committed under ``manifests/``
@@ -16,12 +15,16 @@ differs.
 """
 
 import csv
+import io
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import date
 from pathlib import Path
+
+import pandas as pd
 
 from embedding_model.benchmarks import gdc, topmed
 from embedding_model.download import sha256
@@ -42,6 +45,7 @@ TARGET_COLUMNS = [
     "target_description",
     "target_values",
 ]
+TARGET_SEPARATOR = ";"
 MANIFESTS = Path(__file__).resolve().parent / "manifests"
 BUILDERS = {"topmed": topmed, "gdc": gdc}
 
@@ -55,14 +59,27 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
         version (str): The benchmark's version.
         targets (list[dict]): One row per target, keyed by TARGET_COLUMNS.
         mappings (list[dict]): One row per source variable, keyed by
-            MAPPING_COLUMNS.
+            MAPPING_COLUMNS. Its ``expected_target`` is a list of target keys,
+            written sorted and joined by TARGET_SEPARATOR.
         sources (list[dict]): What the benchmark was built from; see
             ``embedding_model/docs/benchmarks.md`` for the fields.
 
     Returns:
         dict: The manifest, also written as ``<name>_manifest.json`` beside
             the files.
+
+    Raises:
+        TypeError: If a mapping's ``expected_target`` is a string, not a list.
     """
+    if any(isinstance(row["expected_target"], str) for row in mappings):
+        raise TypeError("a mapping's expected_target must be a list of target keys")
+    mappings = [
+        {
+            **row,
+            "expected_target": TARGET_SEPARATOR.join(sorted(row["expected_target"])),
+        }
+        for row in mappings
+    ]
     files = {}
     for kind, columns, rows in (
         ("mappings", MAPPING_COLUMNS, mappings),
@@ -85,6 +102,71 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return manifest
+
+
+def read_benchmark(inputs, name):
+    """A built benchmark: its targets, its mappings and its manifest.
+
+    Each file must have the SHA-256 its manifest records. So scores made from
+    the files can name exactly what was scored. Each file is read once, and
+    the bytes checked are the bytes parsed. A warning is printed when the
+    build's version is not the version committed under ``manifests/``.
+
+    Args:
+        inputs (Path): The inputs folder the benchmark was built into.
+        name (str): The benchmark, such as ``topmed``.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame, dict]: The targets, the mappings and
+            the build's manifest. Every cell is a string, and an empty cell is
+            ``""``.
+
+    Raises:
+        FileNotFoundError: If the benchmark has not been built there.
+        ValueError: If a file differs from its manifest, or the manifest
+            cannot be read.
+    """
+    directory = Path(inputs) / "benchmarks"
+    paths = [directory / f"{name}_{kind}.csv" for kind in ("targets", "mappings")]
+    manifest_path = directory / f"{name}_manifest.json"
+    command = f"`python -m embedding_model benchmarks build --{name}`"
+    missing = [path for path in [*paths, manifest_path] if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            f"{missing[0]} is missing: build the benchmark first with {command}"
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except ValueError as error:
+        raise ValueError(
+            f"{manifest_path} cannot be read ({error}): rebuild with {command}"
+        ) from error
+    committed_path = MANIFESTS / f"{name}.json"
+    if committed_path.exists():
+        committed = json.loads(committed_path.read_text(encoding="utf-8"))["version"]
+        if committed != manifest["version"]:
+            print(
+                f"warning: {name} in {directory} is version {manifest['version']}, "
+                f"and the committed manifest is version {committed}. Rebuild "
+                f"with {command} to score version {committed}.",
+                file=sys.stderr,
+            )
+    data = {path: path.read_bytes() for path in paths}
+    changed = [
+        path.name
+        for path in paths
+        if sha256(data[path]) != manifest["files"].get(path.name, {}).get("sha256")
+    ]
+    if changed:
+        raise ValueError(
+            f"{manifest_path.name} records another SHA-256 for "
+            f"{', '.join(changed)}: rebuild with {command}"
+        )
+    targets, mappings = (
+        pd.read_csv(io.BytesIO(data[path]), dtype=str, keep_default_na=False)
+        for path in paths
+    )
+    return targets, mappings, manifest
 
 
 def identities(manifest):

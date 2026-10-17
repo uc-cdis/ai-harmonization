@@ -15,12 +15,15 @@ command line, from a checkout of this repository.
 
 ## How it fits with the rest of the repository
 
-- Every text a model reads, such as a study variable or a data-model
-  property, is written by `ai_harmonization.formatters`. The harmonization
-  approaches use the same functions. So a model is trained and evaluated on
-  texts laid out as it will see them in use. The layout is the same, but
-  never the texts themselves. The corpus is audited for leakage, so no benchmark text,
-  and no near copy of one, reaches training.
+- The texts a model trains and is scored on, such as a study variable or a
+  data-model property, are written by `ai_harmonization.formatters`. The
+  harmonization approaches use the same functions. So a model is trained and
+  evaluated on texts laid out as it will see them in use. There are two
+  exceptions, explained in [docs/scoring.md](docs/scoring.md#running-score): a
+  source's node is left out, and one format is a released model's own shape.
+  Training and benchmark texts share their layout, but never a text. The
+  corpus is audited for leakage, so no benchmark text, and no near copy of
+  one, reaches training.
 - A trained model is used through `ai_harmonization`'s embedding approach,
   like any other sentence-transformers model. It can be evaluated end to end
   with `get_metrics_for_approach`
@@ -156,7 +159,7 @@ its own.
 |---|---|---|---|
 | benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark models are developed on | `inputs/benchmarks/` |
 | | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
-| | `score --model <model> --benchmark <benchmark>` | scores any model, trained here or elsewhere | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/` for a model trained elsewhere: the metrics and every mapping's rank |
+| | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source>]` | downloads the training sources, or one of them | `inputs/sources/` |
 | | `pairs prepare [--source <source>]` | turns each source into pairs of texts that mean the same thing | `inputs/pairs/` |
 | | `pairs audit` | checks no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
@@ -186,27 +189,13 @@ for leakage.
 
 ## Evaluating a model
 
-`score` gives the metrics model development needs. For each source variable,
-the model ranks every target of the benchmark by similarity: all 148 on
-TOPMed, and all 1,217 on GDC. The variable's score is where its expected
-target lands: rank 1 if it comes first.
+`score` ranks every target of a benchmark for each source variable. It reports
+where the expected targets land: the mean reciprocal rank (MRR), accuracy@1, @5
+and @10, and the median rank. [docs/scoring.md](docs/scoring.md) explains:
 
-For example, for the variable `age`, the model sorts the 1,217 GDC targets
-from most to least similar. If `demographic.age_at_index` comes third, that
-mapping's rank is 3. Some variables have more than one correct target, and
-then the best placed of them counts. `age` has four.
-
-From those ranks:
-
-- **MRR**, mean reciprocal rank: the average of 1 / rank. A right answer at
-  the top counts fully, second counts half, and so on. MRR is one number with
-  no cut-off, and models are compared on it.
-- **recall@k**, for k of 1, 5 and 10: how often the expected target is among
-  the first k. It is what someone reviewing the top k suggestions sees.
-- **median rank**: where the expected target typically lands.
-
-A rank is kept for every mapping. So two models, or two sets of training runs,
-are compared mapping by mapping, not only on their averages.
+- how a model is scored, and what each metric means;
+- how to run `score`, and in which text format;
+- what its output files hold.
 
 There are two benchmarks:
 
@@ -220,8 +209,10 @@ There are two benchmarks:
   targets. It is held back, and scored once on a series' pick (the series'
   winner).
 
-[docs/benchmarks.md](docs/benchmarks.md) describes each one: what it is built from, its
-license, and how to cite it.
+[docs/benchmarks.md](docs/benchmarks.md) describes each one:
+
+- what it is built from, and how to build it or make a new version;
+- its license, and how to cite it.
 
 `get_metrics_for_approach` evaluates a harmonization approach end to end. The
 approach suggests a set of mappings for a source and a target model, and the
@@ -257,7 +248,7 @@ outputs/
             train_log.txt
             loss_curve.csv
             model/               the trained model, loadable with sentence-transformers
-            scores/<benchmark>/  metrics.csv and per_mapping.csv: the metrics, and every mapping's rank
+            scores/<benchmark>/  metrics.csv and per_variable.csv: the metrics, and every source variable's rank
         ledger.csv               one row per run: its settings, validation loss and training time
         index.csv                one row per scoring: the run, the benchmark and the metrics
     series/<series>/
@@ -266,7 +257,8 @@ outputs/
         tables/                  the comparison tables `experiment report` writes
         figures/                 its figures, one per comparison family
         pick.md                  the record `experiment pick` writes
-    scores/<model>/<benchmark>/  the scores of a model trained elsewhere, such as uc-ctds/StdElement-Mapper
+    scores/<model>/              the scores of a model trained elsewhere, such as uc-ctds/StdElement-Mapper
+        <benchmark>/<format>/    one folder per benchmark and text format
 ```
 
 A series is read from two tables: the ledger, with one row per training run,

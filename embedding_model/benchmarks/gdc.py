@@ -4,7 +4,8 @@ Variables from the supplementary tables of ten cancer papers, mapped by
 experts to the GDC data dictionary: the ground truth of GDC-SM, the schema
 matching benchmark published with Magneto. GDC-SM distributes the mappings
 only, so the source tables are downloaded from their publishers and the
-targets from the live GDC submission dictionary.
+targets from the live GDC submission dictionary. Each variable's study is the
+dbGaP study of its paper's cohort.
 """
 
 import io
@@ -33,6 +34,28 @@ NOT_NODES = {"metaschema", "root"}
 # the project, not a patient. A portion's weight is a sample's, in milligrams,
 # not a patient's.
 NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"}
+
+# Each paper's dbGaP study and DOI, by its name in GDC-SM. A paper's patients
+# are the cases of one GDC project, and each project is one dbGaP study.
+# CPTAC-2 (breast, colon, ovary) is phs000892. CPTAC-3 (brain, head and neck,
+# kidney, lung, pancreas, uterus) is phs001287. This was checked through the
+# GDC API on 2026-10-22. Its /cases endpoint gave each case's project, from the
+# case ids in each paper's table, which GDC calls submitter_id. All of a
+# paper's cases belong to the project given here. Its /projects endpoint gave
+# each project's dbGaP study. The DOIs are Crossref's for each paper's
+# publisher id, with matching titles.
+PAPERS = {
+    "Cao": {"study": "phs001287", "doi": "10.1016/j.cell.2021.08.023"},
+    "Clark": {"study": "phs001287", "doi": "10.1016/j.cell.2019.10.007"},
+    "Dou": {"study": "phs001287", "doi": "10.1016/j.cell.2020.01.026"},
+    "Gillette": {"study": "phs001287", "doi": "10.1016/j.cell.2020.06.013"},
+    "Huang": {"study": "phs001287", "doi": "10.1016/j.ccell.2020.12.007"},
+    "Krug": {"study": "phs000892", "doi": "10.1016/j.cell.2020.10.036"},
+    "McDermott": {"study": "phs000892", "doi": "10.1016/j.xcrm.2020.100004"},
+    "Satpathy": {"study": "phs001287", "doi": "10.1016/j.cell.2021.07.016"},
+    "Vasaikar": {"study": "phs000892", "doi": "10.1016/j.cell.2019.03.030"},
+    "Wang": {"study": "phs001287", "doi": "10.1016/j.ccell.2021.01.006"},
+}
 
 
 def dictionary_targets(dictionary):
@@ -78,6 +101,56 @@ def dictionary_targets(dictionary):
             )
     targets.sort(key=lambda row: row["target_property"])
     return targets
+
+
+def require_papers(listed, mapped, papers):
+    """Stop when a paper lacks its source table or its study and DOI.
+
+    Args:
+        listed (Iterable[str]): The papers whose tables GDC-SM's
+            ``papers_info.json`` lists, by name, such as ``Clark``.
+        mapped (Iterable[str]): The papers the ground truth maps.
+        papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
+
+    Raises:
+        ValueError: Naming each mapped paper whose table is not listed, and
+            each paper without an entry in ``papers``.
+    """
+    listed, mapped = set(listed), set(mapped)
+    problems = []
+    no_table = sorted(mapped - listed)
+    if no_table:
+        problems.append(
+            "the ground truth maps papers with no listed table: " + ", ".join(no_table)
+        )
+    no_entry = sorted((listed | mapped) - set(papers))
+    if no_entry:
+        problems.append(
+            "these papers have no dbGaP study and DOI: " + ", ".join(no_entry)
+        )
+    if problems:
+        raise ValueError("; ".join(problems))
+
+
+def paper_source(paper, info, spreadsheet, papers):
+    """The manifest entry for a paper's supplementary table, cited by its DOI.
+
+    Args:
+        paper (str): The paper's name in GDC-SM, such as ``Clark``.
+        info (dict): The paper's entry in ``papers_info.json``.
+        spreadsheet (bytes): The table's file, as downloaded.
+        papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
+
+    Returns:
+        dict: The source, keyed as the manifest's sources are.
+    """
+    return {
+        "role": "source text",
+        "name": f"{paper}, supplementary table",
+        "location": info["Dataset URL"],
+        "sha256": sha256(spreadsheet),
+        "citation": f"https://doi.org/{papers[paper]['doi']}",
+    }
 
 
 def read_ground_truth(archive):
@@ -148,7 +221,7 @@ def read_source_table(spreadsheet, sheet, paper):
     return pd.read_csv(io.StringIO(table.to_csv(index=False)))
 
 
-def mapping_rows(truth, tables, targets):
+def mapping_rows(truth, tables, targets, papers):
     """One row per source variable, with every target the experts mapped it to.
 
     A variable keeps every distinct value its column holds; the prompt
@@ -162,6 +235,7 @@ def mapping_rows(truth, tables, targets):
         tables (dict[str, pd.DataFrame]): The source tables, by paper.
         targets (list[dict]): The dictionary's targets, from
             dictionary_targets.
+        papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
 
     Returns:
         list[dict]: The rows, keyed by MAPPING_COLUMNS and sorted by paper and
@@ -178,7 +252,7 @@ def mapping_rows(truth, tables, targets):
 
     variables, missing, dropped = {}, [], []
     for paper, published in sorted(truth.items()):
-        table = tables.get(paper, pd.DataFrame())
+        table = tables[paper]
         for source, target in zip(
             published["original_paper_variable_names"],
             published["GDC_format_variable_names"],
@@ -217,7 +291,7 @@ def mapping_rows(truth, tables, targets):
 
     return [
         {
-            "source_study_id": "GDC",
+            "source_study_id": papers[paper]["study"],
             "source_table_id": paper,
             "source_variable_id": "",
             "source_variable_name": source,
@@ -258,35 +332,28 @@ def build(downloads, manifest):
         ZENODO_FILE.format(record=record, name="gdc-sm-data.zip"),
         downloads / record / "gdc-sm-data.zip",
     )
-    papers = json.loads(
+    papers_info = json.loads(
         cached(
             ZENODO_FILE.format(record=record, name="papers_info.json"),
             downloads / record / "papers_info.json",
         )
     )
     truth = read_ground_truth(archive)
+    require_papers((name.removesuffix(".csv") for name in papers_info), truth, PAPERS)
 
     tables, sources = {}, []
-    for name, info in sorted(papers.items()):
+    for name, info in sorted(papers_info.items()):
         paper = name.removesuffix(".csv")
         spreadsheet = cached(
             info["Dataset URL"], downloads / PurePosixPath(info["Dataset URL"]).name
         )
         tables[paper] = read_source_table(spreadsheet, info["Sheet Name"], paper)
-        sources.append(
-            {
-                "role": "source text",
-                "name": f"{paper}, supplementary table",
-                "location": info["Dataset URL"],
-                "sha256": sha256(spreadsheet),
-                "citation": info["Paper URL"],
-            }
-        )
+        sources.append(paper_source(paper, info, spreadsheet, PAPERS))
 
     status = json.loads(fetch(GDC_STATUS))
     dictionary = json.loads(fetch(GDC_DICTIONARY))
     targets = dictionary_targets(dictionary)
-    mappings = mapping_rows(truth, tables, targets)
+    mappings = mapping_rows(truth, tables, targets, PAPERS)
     print(
         f"  {len(truth)} papers, {len(mappings)} source variables, "
         f"{len(targets):,} targets ({status['data_release']})"

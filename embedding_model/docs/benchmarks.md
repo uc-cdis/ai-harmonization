@@ -30,25 +30,57 @@ commit of the TOPMed documentation, or a new GDC dictionary.
 
 Each benchmark is two files under `embedding_model/inputs/benchmarks/`:
 
-- **`<benchmark>_mappings.csv`**: one row per source variable. A row holds the
-  variable's study, table, identifier, name, type, description and values. Its
-  `expected_target` holds its expected targets: the targets the experts
-  mapped it to, any of which counts as correct. Each is one mapping, and
-  several are separated by `;`. GDC's experts named a property without its
+- **`<benchmark>_mappings.csv`**: one row per source variable, with its
+  expected targets: the targets the experts mapped it to, any of which counts
+  as correct. Each is one mapping. GDC's experts named a property without its
   node. So on GDC, each node that carries the property gives a target of its
   own: see [Which targets a variable maps to](#which-targets-a-variable-maps-to).
-- **`<benchmark>_targets.csv`**: one row per target property, with its key
-  (`node.property`), type, description and values. A format turns each row
-  into the text the model reads on the target side.
+- **`<benchmark>_targets.csv`**: one row per target property. A format turns
+  each row into the text the model reads on the target side.
   [scoring.md](scoring.md#running-score) lists the formats.
 
-Both files keep every value a variable or property has, joined by ` | `. The
-formatters cap how many values a prompt shows.
+[The columns](#the-columns) lists every column of both files. Both files keep
+every value a variable or property has. The formatters cap how many values a
+prompt shows.
 
 **If you load the files in your own code:** one GDC target's values run to
 132,058 characters. That is over the 131,072 that Python's `csv` module reads
 by default. `pandas.read_csv` reads the files as they are. `csv` needs
 `csv.field_size_limit` raised first.
+
+### The columns
+
+Every benchmark writes the same columns. A column that a benchmark has no data
+for is left empty.
+
+`<benchmark>_mappings.csv`:
+
+| column | what it holds | TOPMed | GDC |
+|---|---|---|---|
+| `source_study_id` | the dbGaP study of the variable's cohort, without its version | the variable's study: `phs000956` | the study of the paper's cohort: `phs001287` |
+| `source_table_id` | the table that holds the variable | its dbGaP table, at the version cited: `pht005002.v1` | the paper, named as in GDC-SM: `Clark` |
+| `source_variable_id` | the variable's own identifier | its dbGaP variable, at the version cited: `phv00252986.v1` | empty: GDC-SM gives none |
+| `source_variable_name` | the variable's name in its table | `cac_agatston_score` | `Race` |
+| `source_type` | the variable's type, in the source's own words | `float`; also `integer`, `string` or `string/encoded` | `string`; also `number`, from the table's column |
+| `source_description` | the variable's description | from its data dictionary: "Coronary artery calcification score" | empty: GDC-SM describes no variable |
+| `source_values` | the variable's values, joined by ` \| ` | the value labels its data dictionary declares | the distinct values in the paper's table |
+| `expected_target` | the targets the experts mapped the variable to, joined by `;` | `atherosclerosis.cac_score_1` | `clinical.race;demographic.race` |
+
+The examples are one row of each benchmark. The TOPMed row is the one in
+[Which target a variable maps to](#which-target-a-variable-maps-to).
+
+`<benchmark>_targets.csv`:
+
+| column | what it holds | TOPMed | GDC |
+|---|---|---|---|
+| `target_property` | the target, as `node.property` | `atherosclerosis.cac_score_1` | `demographic.race` |
+| `target_type` | the target's type, in the data model's own words | `float`, `integer` or `string/encoded` | `enum`, `string`, `integer`, `number`, `boolean` or `array` |
+| `target_description` | the target's description | from its documentation file | from the dictionary |
+| `target_values` | the target's permissible values, joined by ` \| ` | its documented `encoded_values` | the dictionary's permissible values |
+
+A study is written without its version, so that every release of a study
+counts as the same study. A table and a variable keep the version the experts
+cited, because their text comes from that release.
 
 ### Why the targets are a file of their own
 
@@ -244,6 +276,16 @@ Built from three published inputs:
   record). GDC-SM describes no variable, so the description is empty.
 - the live **GDC submission dictionary** (Apache-2.0), for the targets.
 
+Each variable's study is the dbGaP study of its paper's cohort:
+
+| GDC project | dbGaP study | papers |
+|---|---|---|
+| CPTAC-2 | `phs000892` | Krug, McDermott, Vasaikar |
+| CPTAC-3 | `phs001287` | Cao, Clark, Dou, Gillette, Huang, Satpathy, Wang |
+
+The patients in each paper's table are all cases of that GDC project. This was
+checked through the GDC API on 2026-10-22, by looking up the table's case ids.
+
 ### The targets
 
 Every data property of the dictionary is a target, as `node.property`, with its
@@ -262,12 +304,13 @@ data release and the SHA-256 of its content, with keys sorted. A build on a
 changed dictionary then shows as a different benchmark. After GDC publishes a
 new dictionary, a build reports the difference and keeps the files it had. To
 build from the new dictionary, raise the benchmark's version; see
-[Making a new version](#making-a-new-version). Version 1's dictionary
-is gdcdictionary release
+[Making a new version](#making-a-new-version). Version 2's dictionary is
+gdcdictionary release
 [4.0.3](https://github.com/NCI-GDC/gdcdictionary/releases/tag/4.0.3) (commit
 `bd56b99`). Its schemas, with their `$ref`s resolved as gdcdictionary's own
 loader resolves them, are identical to what the API served (checked
-2026-10-14).
+2026-10-14). The dictionary that version 2 was built from on 2026-10-22 has
+the same SHA-256 as the one checked.
 
 ### Which targets a variable maps to
 
@@ -311,5 +354,5 @@ the originals and makes the tables on your machine.
 > https://doi.org/10.14778/3742728.3742757
 
 Magneto's code: [VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher).
-Each paper's table, with its SHA-256, and its article are listed in
+Each paper's table, with its SHA-256, and its article's DOI are listed in
 `embedding_model/benchmarks/manifests/gdc.json`.

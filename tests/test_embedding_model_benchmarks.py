@@ -97,6 +97,10 @@ def ground_truth(rows):
     )
 
 
+# A fictional paper's dbGaP study and DOI, in the shape of gdc.PAPERS.
+GDC_PAPERS = {"Abcd": {"study": "phs999999", "doi": "10.9999/abcd"}}
+
+
 class TestReadDocumentation:
     def test_variables_with_their_values_and_components(self):
         """Each harmonized variable is read with its coded values and cited components."""
@@ -546,6 +550,50 @@ class TestReadSourceTable:
         ].tolist() == ["No", "Yes"]
 
 
+class TestGdcPapers:
+    def test_listed_and_mapped_papers_with_entries_pass(self):
+        """Papers that are listed, mapped and in the paper table pass the check."""
+        gdc.require_papers(["Abcd"], ["Abcd"], GDC_PAPERS)
+
+    def test_a_paper_without_an_entry_raises(self):
+        """A listed paper missing from the paper table fails the build, and is named."""
+        with pytest.raises(ValueError, match="no dbGaP study and DOI: Efgh"):
+            gdc.require_papers(["Abcd", "Efgh"], ["Abcd"], GDC_PAPERS)
+
+    def test_a_mapped_paper_without_a_listed_table_raises(self):
+        """A paper the ground truth maps but papers_info does not list is named."""
+        with pytest.raises(ValueError, match="no listed table: Efgh"):
+            gdc.require_papers(["Abcd"], ["Abcd", "Efgh"], GDC_PAPERS)
+
+    def test_a_papers_source_is_cited_by_its_doi(self):
+        """A paper's manifest entry points to its file and cites its DOI."""
+        source = gdc.paper_source(
+            "Abcd",
+            {"Dataset URL": "https://example.org/abcd.xlsx"},
+            b"abcd",
+            GDC_PAPERS,
+        )
+        assert source == {
+            "role": "source text",
+            "name": "Abcd, supplementary table",
+            "location": "https://example.org/abcd.xlsx",
+            "sha256": download.sha256(b"abcd"),
+            "citation": "https://doi.org/10.9999/abcd",
+        }
+
+    def test_every_pinned_paper_has_an_entry_cited_by_its_doi(self):
+        """The paper table covers exactly the papers the manifest pins, cited by DOI."""
+        manifest = json.loads((benchmarks.MANIFESTS / "gdc.json").read_text())
+        cited = {
+            source["name"].removesuffix(", supplementary table"): source["citation"]
+            for source in manifest["sources"]
+            if source["role"] == "source text"
+        }
+        assert set(cited) == set(gdc.PAPERS)
+        for paper, entry in gdc.PAPERS.items():
+            assert cited[paper] == f"https://doi.org/{entry['doi']}"
+
+
 class TestGdcMappingRows:
     TARGETS = [
         {"target_property": key}
@@ -557,11 +605,19 @@ class TestGdcMappingRows:
         )
     ]
 
+    def test_the_study_is_the_papers_dbgap_study(self):
+        """Each row's study is its paper's dbGaP study, and its table is the paper."""
+        truth = {"Abcd": ground_truth([("Race", "race")])}
+        tables = {"Abcd": pd.DataFrame({"Race": ["Asian"]})}
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
+        assert row["source_study_id"] == "phs999999"
+        assert row["source_table_id"] == "Abcd"
+
     def test_a_property_two_nodes_carry_is_expected_in_both(self):
         """A property two nodes carry is an expected target in both. The description is empty."""
         truth = {"Abcd": ground_truth([("Race", "race")])}
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian", "White", None]})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["clinical.race", "demographic.race"]
         assert row["source_type"] == "string"
         assert row["source_description"] == ""
@@ -571,14 +627,14 @@ class TestGdcMappingRows:
         """A node that gives the property another meaning is not an expected target."""
         truth = {"Abcd": ground_truth([("Tumor site", "primary_site")])}
         tables = {"Abcd": pd.DataFrame({"Tumor site": ["Ovary"]})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["case.primary_site"]
 
     def test_several_published_targets_merge_into_one_row(self):
         """Two ground-truth pairs for one variable give one row with both targets."""
         truth = {"Abcd": ground_truth([("Site", "primary_site"), ("Site", "race")])}
         tables = {"Abcd": pd.DataFrame({"Site": ["Ovary"]})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == [
             "case.primary_site",
             "clinical.race",
@@ -589,14 +645,14 @@ class TestGdcMappingRows:
         """An integer column with a blank keeps integer values, 64 rather than 64.0."""
         truth = {"Abcd": ground_truth([("Age", "race")])}
         tables = {"Abcd": pd.DataFrame({"Age": [64, None, 58]})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["source_values"] == f"64{VALUE_SEPARATOR}58"
 
     def test_numeric_column_keeps_every_value(self):
         """A numeric column is a number, and every distinct value is kept."""
         truth = {"Abcd": ground_truth([("Age", "race")])}
         tables = {"Abcd": pd.DataFrame({"Age": range(MAX_VALUES_IN_PROMPT + 5)})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS)
+        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["source_type"] == "number"
         assert (
             len(row["source_values"].split(VALUE_SEPARATOR)) == MAX_VALUES_IN_PROMPT + 5
@@ -606,7 +662,7 @@ class TestGdcMappingRows:
         """A published mapping to a target the dictionary does not carry is dropped, and named."""
         truth = {"Abcd": ground_truth([("Stage", "retired_property")])}
         tables = {"Abcd": pd.DataFrame({"Stage": ["I"]})}
-        assert gdc.mapping_rows(truth, tables, self.TARGETS) == []
+        assert gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS) == []
         assert "Abcd: Stage -> retired_property" in capsys.readouterr().out
 
     def test_variable_missing_from_its_table_raises(self):
@@ -614,7 +670,7 @@ class TestGdcMappingRows:
         truth = {"Abcd": ground_truth([("Missing", "race")])}
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian"]})}
         with pytest.raises(ValueError, match="Abcd: Missing"):
-            gdc.mapping_rows(truth, tables, self.TARGETS)
+            gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
 
 
 def mapping(name, targets):

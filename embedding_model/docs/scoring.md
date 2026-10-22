@@ -73,7 +73,7 @@ In every format but `stdelement`, a target's text includes its node, as in
 `atherosclerosis.cac_score_1 (float): Coronary artery calcification (CAC)
 score ...`. `stdelement` leaves the node out, as StdElement-Mapper's training
 pairs do. So a property that several nodes carry alike has the same text in
-each. On GDC version 1, 494 of the 1,217 targets share their text with
+each. On GDC version 2, 494 of the 1,217 targets share their text with
 another. Each copy of a wrong target then takes a rank of its own. Identical
 texts tie, up to float noise between encoding batches. sentence-transformers 6
 breaks a tie by target key, and earlier releases in no fixed order.

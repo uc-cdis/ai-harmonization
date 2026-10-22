@@ -1,11 +1,11 @@
 {
   "benchmark": "gdc",
-  "version": "1",
-  "built": "2026-10-14",
+  "version": "2",
+  "built": "2026-10-22",
   "files": {
     "gdc_mappings.csv": {
       "rows": 165,
-      "sha256": "0851cbb50916b5ea15f96762f5c27c089ad0888d783f43630df5f37ddd746ea8"
+      "sha256": "1f15bd3812edd0f7f60d53cfe82f3204bb3ca0d1c1e6183c2835644481df7b14"
     },
     "gdc_targets.csv": {
       "rows": 1217,
@@ -27,77 +27,77 @@
       "name": "Cao, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867421009971-mmc1.xlsx",
       "sha256": "ceb984e2c29cf197bfff3514e3d4267be69d8b8402afdb4c53739daaf453d9d7",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867421009971"
+      "citation": "https://doi.org/10.1016/j.cell.2021.08.023"
     },
     {
       "role": "source text",
       "name": "Clark, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867419311237-mmc1.xlsx",
       "sha256": "3174a83fa98e0416bedaf28e4f7526b8a70f0fe1954da5994dbabe470f6fd078",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867419311237"
+      "citation": "https://doi.org/10.1016/j.cell.2019.10.007"
     },
     {
       "role": "source text",
       "name": "Dou, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420301070-mmc1.xlsx",
       "sha256": "cefdda0a26bbf667639f8787f426f046545453cb911252e05f5e3a16dcc9c9d2",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867420301070"
+      "citation": "https://doi.org/10.1016/j.cell.2020.01.026"
     },
     {
       "role": "source text",
       "name": "Gillette, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420307443-mmc1.xlsx",
       "sha256": "00ef1caa741c211546d9d2c6c3051fa3febf5a040d1cd5d6fc98955a326af56a",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867420307443"
+      "citation": "https://doi.org/10.1016/j.cell.2020.06.013"
     },
     {
       "role": "source text",
       "name": "Huang, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S1535610820306553-mmc2.xlsx",
       "sha256": "fccbd91635d2eb9b368ca5da705ef7fea4e6bb61c341120c1b852c372a969086",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S1535610820306553"
+      "citation": "https://doi.org/10.1016/j.ccell.2020.12.007"
     },
     {
       "role": "source text",
       "name": "Krug, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420314008-mmc1.xlsx",
       "sha256": "9c0fb08c65541d8c24a71a8d5737d9a0389135c17d5e2456c3da3806f9029526",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867420314008"
+      "citation": "https://doi.org/10.1016/j.cell.2020.10.036"
     },
     {
       "role": "source text",
       "name": "McDermott, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S2666379120300045-mmc2.xlsx",
       "sha256": "1dbb62061c3d8e0f86a0c90cbec999ccceed2fdaecbd08ac6f8e52381c256e03",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S2666379120300045"
+      "citation": "https://doi.org/10.1016/j.xcrm.2020.100004"
     },
     {
       "role": "source text",
       "name": "Satpathy, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867421008576-mmc1.xlsx",
       "sha256": "8cdff61042eca53c09c42ea9fef2340e22e3eca1d6d7c8eaa96c6e2cca768fde",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867421008576"
+      "citation": "https://doi.org/10.1016/j.cell.2021.07.016"
     },
     {
       "role": "source text",
       "name": "Vasaikar, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867419302922-mmc1.xlsx",
       "sha256": "dc9c970097d6b4aaf51e0e74ae900fbce2bd0a60b5ccd9a61c037e6e05a91c76",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S0092867419302922"
+      "citation": "https://doi.org/10.1016/j.cell.2019.03.030"
     },
     {
       "role": "source text",
       "name": "Wang, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S1535610821000507-mmc2.xlsx",
       "sha256": "c1fa2a7c67136dde22700dcbf648f659a3e7630e47b0524b3644731d3617de65",
-      "citation": "https://www.sciencedirect.com/science/article/pii/S1535610821000507"
+      "citation": "https://doi.org/10.1016/j.ccell.2021.01.006"
     },
     {
       "role": "targets",
       "name": "GDC submission dictionary",
       "location": "https://api.gdc.cancer.gov/v0/submission/_dictionary/_all",
       "version": "Data Release 46.0 - August 10, 2026; API 8.5.0, commit 8f7c2a51ab0084b216ad1b62a3fae8b945439c53",
-      "fetched": "2026-10-14",
+      "fetched": "2026-10-22",
       "sha256": "ad0e70170564ad07396ab5f6d1b135eb44c25edafd38c86cf08da121c9470a6f",
       "license": "Apache-2.0",
       "citation": "embedding_model/docs/benchmarks.md#gdc"

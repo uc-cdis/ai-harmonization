@@ -17,15 +17,13 @@ differs.
 import csv
 import io
 import json
-import shutil
-import subprocess
-import sys
 import tempfile
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
+from embedding_model import manifests
 from embedding_model.benchmarks import gdc, topmed
 from embedding_model.download import sha256
 
@@ -141,16 +139,12 @@ def read_benchmark(inputs, name):
         raise ValueError(
             f"{manifest_path} cannot be read ({error}): rebuild with {command}"
         ) from error
-    committed_path = MANIFESTS / f"{name}.json"
-    if committed_path.exists():
-        committed = json.loads(committed_path.read_text(encoding="utf-8"))["version"]
-        if committed != manifest["version"]:
-            print(
-                f"warning: {name} in {directory} is version {manifest['version']}, "
-                f"and the committed manifest is version {committed}. Rebuild "
-                f"with {command} to score version {committed}.",
-                file=sys.stderr,
-            )
+    manifests.warn_if_not_committed(
+        f"{name} in {directory}",
+        manifest["version"],
+        MANIFESTS / f"{name}.json",
+        command,
+    )
     data = {path: path.read_bytes() for path in paths}
     changed = [
         path.name
@@ -167,84 +161,6 @@ def read_benchmark(inputs, name):
         for path in paths
     )
     return targets, mappings, manifest
-
-
-def identities(manifest):
-    """What a build is compared by: its files, then its sources.
-
-    A file is identified by its rows and SHA-256, and a source by its SHA-256,
-    or by its version where it has none.
-
-    Args:
-        manifest (dict): A benchmark manifest.
-
-    Returns:
-        dict: One entry per file, by name, and per source, by role and name.
-    """
-    return {
-        **manifest["files"],
-        **{
-            f"{source['role']} {source['name']!r}": source.get("sha256")
-            or source.get("version")
-            for source in manifest["sources"]
-        },
-    }
-
-
-def differences(committed, built):
-    """What differs between a committed manifest and a new build's.
-
-    A source is identified by its SHA-256 where it has one, and otherwise by
-    its version, so a dictionary served under a new release label but with the
-    same content is the same source. Dates are not compared.
-
-    Args:
-        committed (dict): The manifest under ``manifests/``.
-        built (dict): The manifest of the build just made.
-
-    Returns:
-        list[str]: One line per difference; empty when the two match.
-    """
-    before, after = identities(committed), identities(built)
-    keys = [*before, *(key for key in after if key not in before)]
-    return [
-        f"{key}: {before.get(key)} -> {after.get(key)}"
-        for key in keys
-        if before.get(key) != after.get(key)
-    ]
-
-
-def committed_version(name):
-    """The version of a benchmark's manifest as committed in git, at ``HEAD``.
-
-    Args:
-        name (str): The benchmark, as in BUILDERS.
-
-    Returns:
-        str | None: The version, or None when the manifest is not committed
-            yet.
-
-    Raises:
-        RuntimeError: If git cannot be asked: outside a checkout, with git
-            missing, or when git refuses the folder.
-    """
-    git = ["git", "-C", str(MANIFESTS)]
-    try:
-        inside = subprocess.run(
-            [*git, "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-        )
-        shown = subprocess.run(
-            [*git, "show", f"HEAD:./{name}.json"], capture_output=True, text=True
-        )
-    except Exception as error:
-        raise RuntimeError(f"git could not run: {error}") from error
-    if inside.returncode != 0:
-        raise RuntimeError(inside.stderr.strip() or "not a git checkout")
-    if shown.returncode != 0:
-        return None
-    return json.loads(shown.stdout)["version"]
 
 
 def build(names, inputs, update_manifest=False):
@@ -286,41 +202,12 @@ def build(names, inputs, update_manifest=False):
                 mappings,
                 sources,
             )
-            found = differences(committed, built)
-            refusal = None
-            if found and not update_manifest:
-                refusal = "pass --update-manifest to accept this build"
-            elif found:
-                try:
-                    at_head = committed_version(name)
-                except RuntimeError as error:
-                    refusal = (
-                        f"git cannot say whether version {committed['version']} "
-                        f"is committed ({error}); fix that to accept this build"
-                    )
-                else:
-                    if at_head == committed["version"]:
-                        refusal = (
-                            f"version {committed['version']} is committed; raise "
-                            f'"version" in {committed_path} to accept this '
-                            "build as a new version"
-                        )
-            if refusal:
-                print(f"  differs from {committed_path.name}; working files kept:")
-                for line in found:
-                    print(f"    {line}")
-                print(f"  {refusal}")
-                status = 1
-                continue
-            for file in [*built["files"], f"{name}_manifest.json"]:
-                shutil.move(Path(staging) / file, directory / file)
-        for file, entry in built["files"].items():
-            print(f"  {directory / file}: {entry['rows']:,} rows")
-        if found:
-            committed_path.write_text(
-                json.dumps(built, indent=2) + "\n", encoding="utf-8"
+            status |= manifests.settle(
+                committed_path,
+                built,
+                Path(staging),
+                directory,
+                [*built["files"], f"{name}_manifest.json"],
+                update_manifest,
             )
-            print(f"  accepted, and recorded in {committed_path}")
-        else:
-            print(f"  matches {committed_path.name}")
     return status

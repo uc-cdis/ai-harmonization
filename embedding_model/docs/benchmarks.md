@@ -23,8 +23,8 @@ build writes under `DIR`, in place of `embedding_model/inputs/`; see
 
 Every build is checked against the benchmark's committed manifest; see
 [The manifest](#the-manifest). To build a benchmark from updated sources, see
-[Making a new version](#making-a-new-version). An updated source can be a newer
-commit of the TOPMed documentation, or a new GDC dictionary.
+[Making a new version](manifests.md#making-a-new-version). An updated source
+can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 
 ## How a benchmark is laid out
 
@@ -115,53 +115,15 @@ mappings file keeps them together, one row per query.
 
 ### The manifest
 
-`embedding_model/benchmarks/manifests/<benchmark>.json` is committed. It pins
-what the benchmark is built from, such as the TOPMed documentation's commit or
-the GDC ground truth's Zenodo record. It also records the SHA-256 of each file
-built from those inputs. The builder reads its pins from this file. So the
-code says how to build a benchmark, and the manifest says from which inputs.
+Each benchmark has a manifest committed as
+`embedding_model/benchmarks/manifests/<benchmark>.json`. It pins what the
+benchmark is built from, such as the TOPMed documentation's commit or the GDC
+ground truth's Zenodo record. Each build writes its own manifest beside the
+files, as `<benchmark>_manifest.json`, with the date in `built`. An input's
+`role` is `mappings`, `source text` or `targets`.
 
-Each build also writes its own manifest beside the files, as
-`<benchmark>_manifest.json`. Every manifest has the same fields, and a field
-that does not apply is left out:
-
-- `version` and `built`: the benchmark's version and the date it was built;
-- `files`: each file's row count and SHA-256;
-- `sources`: what the benchmark was built from, one entry each, with
-  - `role`: `mappings`, `source text` or `targets`;
-  - `name` and `location`: a URL, DOI or record;
-  - `version`: a release, tag or commit, where the source has one;
-  - `fetched`: the date, for a source that serves only its current state;
-  - `sha256`, `license` and `citation`, where known.
-
-A rebuild compares its manifest with the committed one. A source counts as
-the same when its SHA-256 matches, or its version where it has no checksum.
-If everything matches, the benchmark is the one the manifest describes. If
-not, the build lists each file and source that differs. It then stops, and
-keeps the working files as they were. That is expected when a source was
-updated on purpose. The build is then accepted as a new version, as the next
-section describes.
-
-#### Making a new version
-
-A difference that is meant makes a new version of the benchmark:
-
-1. In the committed manifest, raise the benchmark's `version`. For a new pin,
-   such as another commit of the TOPMed documentation, also edit the source's
-   `version`. A change the builder cannot pin, such as a new GDC dictionary,
-   needs only the benchmark's `version`.
-2. Rebuild with `--update-manifest`, which records the new checksums.
-3. Commit the manifest.
-
-A version committed in git never changes. `--update-manifest` refuses a build
-that differs while the manifest's `version` is still the committed one, so
-raise it first. Until the new version is committed, it can be rebuilt and
-accepted as often as needed. The files a new version builds overwrite the
-existing benchmark files.
-
-The build asks the local git checkout whether a version is committed. If git
-cannot answer, the build does not know whether the version is committed, so it
-refuses a differing build.
+[Manifests](manifests.md) says what a manifest holds, how a build is checked
+against it, and how to make a new version.
 
 ## TOPMed
 
@@ -304,8 +266,8 @@ data release and the SHA-256 of its content, with keys sorted. A build on a
 changed dictionary then shows as a different benchmark. After GDC publishes a
 new dictionary, a build reports the difference and keeps the files it had. To
 build from the new dictionary, raise the benchmark's version; see
-[Making a new version](#making-a-new-version). Version 2's dictionary is
-gdcdictionary release
+[Making a new version](manifests.md#making-a-new-version). Version 2's
+dictionary is gdcdictionary release
 [4.0.3](https://github.com/NCI-GDC/gdcdictionary/releases/tag/4.0.3) (commit
 `bd56b99`). Its schemas, with their `$ref`s resolved as gdcdictionary's own
 loader resolves them, are identical to what the API served (checked

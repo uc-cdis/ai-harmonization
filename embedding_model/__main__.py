@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from embedding_model import benchmarks, scoring
+from embedding_model import benchmarks, scoring, sources
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -53,6 +53,29 @@ def main(argv=None):
         action="store_true",
         help=(
             "accept a build that differs from its committed manifest, under a "
+            "version not yet committed in git"
+        ),
+    )
+
+    source_step = steps.add_parser("sources", help="fetch the training sources")
+    source_actions = source_step.add_subparsers(dest="action", required=True)
+    fetch = source_actions.add_parser(
+        "fetch",
+        parents=[common],
+        help="download a source's release and write its tables",
+    )
+    fetch.add_argument(
+        "--source",
+        nargs="+",
+        choices=list(sources.FETCHERS),
+        default=list(sources.FETCHERS),
+        help="the sources to fetch (default: all of them)",
+    )
+    fetch.add_argument(
+        "--update-manifest",
+        action="store_true",
+        help=(
+            "accept a fetch that differs from its committed manifest, under a "
             "version not yet committed in git"
         ),
     )
@@ -115,6 +138,8 @@ def main(argv=None):
                 + ", ".join(f"--{name}" for name in benchmarks.BUILDERS)
             )
         return benchmarks.build(names, args.inputs, args.update_manifest)
+    if args.step == "sources" and args.action == "fetch":
+        return sources.fetch(args.source, args.inputs, args.update_manifest)
     return 0
 
 

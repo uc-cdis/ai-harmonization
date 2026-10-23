@@ -1,13 +1,12 @@
-"""Tests for embedding_model.benchmarks -- building TOPMed and GDC, and manifests."""
+"""Tests for embedding_model.benchmarks: building TOPMed and GDC, and checking each build."""
 
 import csv
 import io
 import json
-import shutil
-import subprocess
 import tarfile
 import textwrap
 import zipfile
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -755,55 +754,6 @@ class TestReadBenchmark:
             benchmarks.read_benchmark(tmp_path, "abcd")
 
 
-class TestIdentities:
-    def test_files_then_sources_by_sha256_or_version(self):
-        """Files come first; a source is its SHA-256, else its version."""
-        manifest = {
-            "files": {"abcd_mappings.csv": {"rows": 1, "sha256": "aa"}},
-            "sources": [
-                {**PIN, "sha256": "cc", "version": "2"},
-                {"role": "source text", "name": "Abcd release", "version": "v1"},
-            ],
-        }
-        assert benchmarks.identities(manifest) == {
-            "abcd_mappings.csv": {"rows": 1, "sha256": "aa"},
-            "mappings 'Fictional source'": "cc",
-            "source text 'Abcd release'": "v1",
-        }
-
-
-class TestDifferences:
-    MANIFEST = {
-        "version": "1",
-        "built": "2026-01-01",
-        "files": {"abcd_mappings.csv": {"rows": 1, "sha256": "aa"}},
-        "sources": [{**PIN, "sha256": "cc", "fetched": "2026-01-01"}],
-    }
-
-    def test_dates_and_release_labels_do_not_count(self):
-        """A rebuild on another day, from a source with the same SHA-256, matches."""
-        later = {
-            **self.MANIFEST,
-            "built": "2026-02-01",
-            "sources": [
-                {**PIN, "sha256": "cc", "version": "2", "fetched": "2026-02-01"}
-            ],
-        }
-        assert benchmarks.differences(self.MANIFEST, later) == []
-
-    def test_changed_file_and_source_are_named(self):
-        """A file and a source with another SHA-256 are each named."""
-        changed = {
-            **self.MANIFEST,
-            "files": {"abcd_mappings.csv": {"rows": 1, "sha256": "bb"}},
-            "sources": [{**PIN, "sha256": "dd"}],
-        }
-        found = benchmarks.differences(self.MANIFEST, changed)
-        assert len(found) == 2
-        assert found[0].startswith("abcd_mappings.csv")
-        assert "Fictional source" in found[1]
-
-
 class TestBuild:
     @pytest.fixture
     def setup(self, monkeypatch, tmp_path):
@@ -824,7 +774,7 @@ class TestBuild:
             json.dumps({"version": "1", "files": {}, "sources": [PIN]})
         )
         monkeypatch.setattr(benchmarks, "MANIFESTS", manifests)
-        monkeypatch.setattr(benchmarks, "committed_version", lambda name: None)
+        monkeypatch.setattr(benchmarks.manifests, "committed_version", lambda *_: None)
         return built, manifests / "topmed.json", tmp_path / "inputs" / "benchmarks"
 
     def test_a_first_build_needs_accepting(self, setup, tmp_path):
@@ -852,7 +802,7 @@ class TestBuild:
         """A differing build is refused under a committed version, accepted under a new one."""
         built, manifest, working = setup
         benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True)
-        monkeypatch.setattr(benchmarks, "committed_version", lambda name: "1")
+        monkeypatch.setattr(benchmarks.manifests, "committed_version", lambda *_: "1")
         before = (working / "topmed_mappings.csv").read_bytes(), manifest.read_text()
         built["mappings"] = [mapping("AGE", ["a.age_at_exam"])]
         assert (
@@ -870,88 +820,14 @@ class TestBuild:
         """When git cannot say whether the version is committed, a differing build is refused."""
         built, manifest, working = setup
         benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True)
-
-        def no_answer(name):
-            """Fail as committed_version does outside a git checkout."""
-            raise RuntimeError("not a git repository")
-
-        monkeypatch.setattr(benchmarks, "committed_version", no_answer)
+        no_answer = MagicMock(side_effect=RuntimeError("not a git repository"))
+        monkeypatch.setattr(benchmarks.manifests, "committed_version", no_answer)
         before = manifest.read_text()
         built["mappings"] = [mapping("AGE", ["a.age_at_exam"])]
         assert (
             benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True) == 1
         )
         assert manifest.read_text() == before
-
-
-@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
-class TestCommittedVersion:
-    def git(self, folder, *args):
-        """Run git in a folder, as a fictional committer."""
-        subprocess.run(
-            ["git", "-c", "user.name=Abcd", "-c", "user.email=abcd@example.org",
-             "-C", str(folder), *args],
-            check=True, capture_output=True,
-        )  # fmt: skip
-
-    def test_the_version_at_head(self, monkeypatch, tmp_path):
-        """The committed version is read from HEAD, not from the file on disk."""
-        manifests = tmp_path / "manifests"
-        manifests.mkdir()
-        (manifests / "abcd.json").write_text(json.dumps({"version": "1"}))
-        self.git(tmp_path, "init", "-q")
-        self.git(tmp_path, "add", ".")
-        self.git(tmp_path, "commit", "-q", "-m", "abcd")
-        (manifests / "abcd.json").write_text(json.dumps({"version": "2"}))
-        monkeypatch.setattr(benchmarks, "MANIFESTS", manifests)
-        assert benchmarks.committed_version("abcd") == "1"
-        assert benchmarks.committed_version("efgh") is None
-
-    def test_outside_a_checkout_is_an_error(self, monkeypatch, tmp_path):
-        """Without a git checkout to ask, the answer is an error, not 'not committed'."""
-        monkeypatch.setattr(benchmarks, "MANIFESTS", tmp_path)
-        with pytest.raises(RuntimeError):
-            benchmarks.committed_version("abcd")
-
-    def test_git_missing_is_an_error(self, monkeypatch, tmp_path):
-        """When git cannot run at all, the answer is an error."""
-
-        def missing(*args, **kwargs):
-            """Fail as subprocess.run does when git is not installed."""
-            raise FileNotFoundError("git")
-
-        monkeypatch.setattr(benchmarks.subprocess, "run", missing)
-        with pytest.raises(RuntimeError, match="git could not run"):
-            benchmarks.committed_version("abcd")
-
-
-class TestCached:
-    def test_downloads_once_and_leaves_no_partial_file(self, monkeypatch, tmp_path):
-        """The first call fetches and keeps the file; later calls read it back."""
-        calls = []
-        monkeypatch.setattr(download, "fetch", lambda url: calls.append(url) or b"data")
-        path = tmp_path / "sub" / "file.bin"
-        assert download.cached("https://example.org/f", path) == b"data"
-        assert download.cached("https://example.org/f", path) == b"data"
-        assert calls == ["https://example.org/f"]
-        assert list(path.parent.iterdir()) == [path]
-
-    def test_an_html_answer_is_not_kept(self, monkeypatch, tmp_path):
-        """An HTML page served for a spreadsheet raises, and nothing is kept."""
-        monkeypatch.setattr(
-            download, "fetch", lambda url: b"<!DOCTYPE html><html>Checking...</html>"
-        )
-        path = tmp_path / "table.xlsx"
-        with pytest.raises(ValueError, match="HTML page"):
-            download.cached("https://example.org/table.xlsx", path)
-        assert list(tmp_path.iterdir()) == []
-
-    def test_a_listing_page_is_kept(self, monkeypatch, tmp_path):
-        """A folder listing is HTML by nature, so it is kept."""
-        monkeypatch.setattr(download, "fetch", lambda url: b"<html><a href='x'></a>")
-        path = tmp_path / "listing.html"
-        assert download.downloaded("https://example.org/", path) == path
-        assert path.exists()
 
 
 class TestCommandLine:

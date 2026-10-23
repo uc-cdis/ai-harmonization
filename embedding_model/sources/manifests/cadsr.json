@@ -1,0 +1,34 @@
+{
+  "source": "cadsr",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "elements.parquet": {
+      "rows": 79157,
+      "csv_sha256": "b3b459e2e2b049337a80b12f431f97374c7ac9265abf1a7be9f95d15c6c2fefa"
+    },
+    "alternate_names.parquet": {
+      "rows": 131131,
+      "csv_sha256": "d5de9b4618237aff358f18ef1816eb5db3b06cc7b1a5568367b2fa3f2117e706"
+    },
+    "documents.parquet": {
+      "rows": 172075,
+      "csv_sha256": "38f4caa55185296e7890fe78459d8171381fc1a0da0b6be80de05ed551f4052a"
+    },
+    "values.parquet": {
+      "rows": 702888,
+      "csv_sha256": "b2d96ff311e3b1d10133b546bdcefd16cd30b34e314eb9e470a3f2e8a7cfb107"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "caDSR released data elements",
+      "location": "https://cadsr.nci.nih.gov/ftp/caDSR_Downloads/CDE/XML_Archive/releasedCDEsXML-OD.zip.2026-07-01",
+      "version": "2026-07-01",
+      "sha256": "68a99b43cd763b063394b545e1ff02f38051927bf8a50c8d7cb1c388e2d39748",
+      "license": "NCI's text is free of copyright unless otherwise indicated; the Proprietary Measure Permission document marks exceptions (https://www.cancer.gov/policies/copyright-reuse)",
+      "citation": "embedding_model/docs/sources.md#cadsr"
+    }
+  ]
+}

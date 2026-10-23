@@ -160,7 +160,7 @@ its own.
 | benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark models are developed on | `inputs/benchmarks/` |
 | | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
-| training data | `sources fetch [--source <source>]` | downloads the training sources, or one of them | `inputs/sources/` |
+| training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source>]` | turns each source into pairs of texts that mean the same thing | `inputs/pairs/` |
 | | `pairs audit` | checks no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
 | | `corpus build --name <corpus> [--sources <source>,...]` | combines the sources' pairs into a training corpus | `inputs/corpora/<corpus>/` |
@@ -235,7 +235,9 @@ gigabytes.
 inputs/
     benchmarks/                  <benchmark>_mappings.csv, <benchmark>_targets.csv, and the build's <benchmark>_manifest.json
         downloads/<benchmark>/   the published inputs as downloaded, kept for the next build
-    sources/<source>/<date>/     a training source as downloaded, with its manifest
+    sources/
+        <source>/                a training source's tables, as <table>.parquet, and the fetch's manifest.json
+        downloads/<source>/      the source's files as downloaded, kept for the next fetch
     pairs/                       <source>.parquet: each source's pairs of texts
         audit.json               what the leakage audit checked, and its verdict
     corpora/<corpus>/            training and validation pairs; corpus.json records what went in
@@ -266,14 +268,15 @@ and the index, with one row per scoring. Both can be rebuilt from the run
 folders. A run trained on its own has the same ledger and index. It has no
 comparison tables or figures, since those come from comparing a series' runs.
 
-The only files the tools write that are committed are the benchmark
-manifests, under `embedding_model/benchmarks/manifests/`. A manifest holds the
-SHA-256 of every benchmark file, and the version and license of each source.
-So a rebuilt benchmark either matches its manifest or names what does not.
-[docs/benchmarks.md](docs/benchmarks.md#the-manifest) says how a new version is
-accepted. The benchmark files themselves carry third-party text, such as dbGaP
-variable descriptions and the GDC dictionary. So they are built rather than
-redistributed.
+The only files the tools write that are committed are the manifests of the
+benchmarks and the training sources. They are under
+`embedding_model/benchmarks/manifests/` and `embedding_model/sources/manifests/`.
+A manifest holds the SHA-256 of every file built, and the version and license
+of each input. So a rebuilt benchmark or a new fetch either matches its
+manifest or names what does not. [docs/manifests.md](docs/manifests.md) says
+how a new version is accepted. The files themselves carry third-party text,
+such as dbGaP variable descriptions, the GDC dictionary and LOINC's names. So
+they are built rather than redistributed.
 
 ## Running experiments
 

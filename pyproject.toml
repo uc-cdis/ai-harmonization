@@ -21,6 +21,12 @@ dependencies = [
     # Required by embedding_model.benchmarks.gdc (publishers' .xlsx tables,
     # read through pandas.read_excel)
     "openpyxl>=3.1.5",
+    # Required by embedding_model.sources.nhanes (NHANES's variable lists and
+    # codebook pages, read with BeautifulSoup)
+    "beautifulsoup4>=4.12.0",
+    # Required by embedding_model.sources (each source's tables, written and
+    # read as parquet through pandas)
+    "pyarrow>=14.0.0",
     # We want this to work in a Google Colab environment.
     # In such environments, Google's pre-installs a ton of Google
     # Python SDKs which don't always work with the latest version

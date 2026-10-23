@@ -1,0 +1,49 @@
+{
+  "source": "cdisc",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "terms.parquet": {
+      "rows": 48813,
+      "csv_sha256": "9f95dfcbf6ea99b5cdb11ad2203bb0947527cac91206ab06eb3b070c7a585969"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "CDISC SDTM release",
+      "location": "https://evs.nci.nih.gov/ftp1/CDISC/SDTM/Archive/SDTM%20Terminology%202026-09-25.txt",
+      "version": "2026-09-25",
+      "sha256": "9e8117a90e28e5aade3ac2d52fe1b60adfcccc92a8894891f04ad05c7cf1f88d",
+      "license": "free to use, without licensing restrictions (https://www.cancer.gov/research/resources/terminology/cdisc)",
+      "citation": "embedding_model/docs/sources.md#cdisc"
+    },
+    {
+      "role": "release",
+      "name": "CDISC ADaM release",
+      "location": "https://evs.nci.nih.gov/ftp1/CDISC/ADaM/Archive/ADaM%20Terminology%202026-09-25.txt",
+      "version": "2026-09-25",
+      "sha256": "b33af40aecdce15fc943c1faad371497daa4ee144173b4b863d89794f2c7a45d",
+      "license": "free to use, without licensing restrictions (https://www.cancer.gov/research/resources/terminology/cdisc)",
+      "citation": "embedding_model/docs/sources.md#cdisc"
+    },
+    {
+      "role": "release",
+      "name": "CDISC Protocol release",
+      "location": "https://evs.nci.nih.gov/ftp1/CDISC/Protocol/Archive/Protocol%20Terminology%202025-09-26.txt",
+      "version": "2025-09-26",
+      "sha256": "af6aae6cbc5ba82812470b138c463483d635bb8b4f22088adb9153583bf6dbd4",
+      "license": "free to use, without licensing restrictions (https://www.cancer.gov/research/resources/terminology/cdisc)",
+      "citation": "embedding_model/docs/sources.md#cdisc"
+    },
+    {
+      "role": "release",
+      "name": "CDISC Glossary release",
+      "location": "https://evs.nci.nih.gov/ftp1/CDISC/Glossary/Archive/CDISC%20Glossary%202026-09-25.txt",
+      "version": "2026-09-25",
+      "sha256": "6da8b354a57e9d416708688d62ba6e74b07de7e9cd0f6fc00235ffad61d80b45",
+      "license": "free to use, without licensing restrictions (https://www.cancer.gov/research/resources/terminology/cdisc)",
+      "citation": "embedding_model/docs/sources.md#cdisc"
+    }
+  ]
+}

@@ -9,6 +9,26 @@ from langchain_core.documents import Document
 
 from ai_harmonization.utils import TEMP_DIR
 
+# The NIH CDE Repository's one-call export of every data element, as its own
+# search page asks for it.
+SEARCH_EXPORT_URL = "https://cde.nlm.nih.gov/server/de/searchExport"
+SEARCH_EXPORT_QUERY = {
+    "resultPerPage": 99999,
+    "excludeAllOrgs": False,
+    "excludeOrgs": [],
+    "includeRetired": False,
+    "selectedElements": [],
+    "selectedElementsAlt": [],
+    "page": 1,
+    "includeAggregations": True,
+    "selectedAdminStatuses": [],
+    "selectedStatuses": [],
+    "selectedDatatypes": [],
+    "selectedCopyrightStatus": [],
+    "searchToken": "",
+    "nihEndorsed": False,
+}
+
 """
 Examples:
 
@@ -77,28 +97,10 @@ def _get_cdes_and_write_to_file() -> str:
     """
     Bulk export CDEs from NIH server
     """
-    url = "https://cde.nlm.nih.gov/server/de/searchExport"
-    data = {
-        "resultPerPage": 99999,
-        "excludeAllOrgs": False,
-        "excludeOrgs": [],
-        "includeRetired": False,
-        "selectedElements": [],
-        "selectedElementsAlt": [],
-        "page": 1,
-        "includeAggregations": True,
-        "selectedAdminStatuses": [],
-        "selectedStatuses": [],
-        "selectedDatatypes": [],
-        "selectedCopyrightStatus": [],
-        "searchToken": "",
-        "nihEndorsed": False,
-    }
-
     response = requests.post(
-        url,
+        SEARCH_EXPORT_URL,
         headers={"Content-Type": "application/json"},
-        data=json.dumps(data),
+        data=json.dumps(SEARCH_EXPORT_QUERY),
         stream=True,
     )
 

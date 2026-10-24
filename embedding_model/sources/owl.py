@@ -1,9 +1,9 @@
 """Read an ontology's annotations from its OWL file, in RDF/XML.
 
-OWL files written by the OWL API, as NCIt's and the OBO Foundry ontologies'
-are, hold one ``owl:Class`` block per term and one ``owl:Axiom`` block per
-annotated statement. An axiom adds details to one of the class's statements:
-a synonym's type, say, or a definition's source.
+The OWL API writes NCIt's and the OBO Foundry ontologies' files. Such a file
+holds one ``owl:Class`` block per term and one ``owl:Axiom`` block per
+annotated statement. An axiom adds details to one of the class's statements: a
+synonym's type, say, or a definition's source.
 """
 
 import xml.etree.ElementTree as ET
@@ -20,8 +20,8 @@ DEFINED_PARENT = OWL + "intersectionOf"
 def statements(element):
     """An element's annotations, as (property, value) tuples.
 
-    A value is the child's text, or the IRI it points to. The text is kept
-    exactly as written, since an axiom finds the statement it annotates by
+    A value is the child's text, or the IRI that it points to. The text is kept
+    exactly as written, since an axiom finds the statement that it annotates by
     that text. A defined class's parents are kept as ``DEFINED_PARENT``
     statements. Other nested structures are skipped.
 
@@ -56,8 +56,8 @@ def read_owl(stream):
             ``axioms``, keyed by (subject, property, value), each a list of
             the axioms' annotations, every annotation a list of values. One
             statement can carry several axioms, such as a synonym from two
-            sources, and one axiom several values, such as a synonym with two
-            types.
+            sources. One axiom can carry several values, such as a synonym with
+            two types.
     """
     found = {"ontology": [], "classes": {}, "properties": {}, "axioms": {}}
     depth, root = 0, None

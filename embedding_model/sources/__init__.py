@@ -1,18 +1,18 @@
-"""Sources: the terminologies and data dictionaries the training pairs come from.
+"""Sources: the terminologies and data dictionaries that the training pairs come from.
 
 Each source is downloaded from its publisher into
 ``<inputs>/sources/downloads/<source>/`` and kept there, so reading it again
 needs no network. Its tables are written as parquet files under
 ``<inputs>/sources/<source>/``, beside the manifest of the fetch.
 
-A manifest committed under ``manifests/`` pins the release each source is
-read from, as the benchmarks' manifests do, and records the SHA-256 of every
-table's content. A new fetch either matches it or names what differs; see
+A manifest committed under ``manifests/`` pins the release that each source is
+read from, as the benchmarks' manifests do. It also records the SHA-256 of
+every table's content. A new fetch either matches it or names what differs; see
 ``embedding_model.manifests``.
 
-Every item a source has is kept, retired, draft and closed ones too: the next
-step, ``pairs prepare``, decides which become training pairs. Each item
-carries an ``open`` column, set from its source's restriction field.
+Every item of a source is kept, including retired, draft and closed ones. The
+next step, ``pairs prepare``, decides which of them become training pairs. Each
+item carries an ``open`` column, set from its source's restriction field.
 """
 
 import json
@@ -91,12 +91,12 @@ def write_source(directory, name, version, tables, sources):
 def read_source(inputs, name):
     """A fetched source's tables and the manifest of its fetch.
 
-    Each table must have the content SHA-256 its manifest records. A warning
-    is printed when the fetch's version is not the version committed under
-    ``manifests/``.
+    Each table must have the content SHA-256 that its manifest records. A
+    warning is printed when the fetch's version is not the version committed
+    under ``manifests/``.
 
     Args:
-        inputs (Path): The inputs folder the source was fetched into.
+        inputs (Path): The inputs folder that the source was fetched into.
         name (str): The source, as in FETCHERS.
 
     Returns:
@@ -140,7 +140,7 @@ def read_source(inputs, name):
 
 
 def fetch(names, inputs, update_manifest=False):
-    """Fetch sources at the releases their committed manifests pin.
+    """Fetch sources at the releases that their committed manifests pin.
 
     Each fetch is written to a staging folder first, and kept only if it
     matches the committed manifest or ``update_manifest`` accepts it; see

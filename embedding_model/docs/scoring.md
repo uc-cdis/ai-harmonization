@@ -8,8 +8,8 @@ built first; see [The workflow](../README.md#the-workflow).
 
 For each source variable, the model ranks every target of the benchmark: all
 148 on TOPMed, and all 1,217 on GDC. It ranks them by cosine similarity, as the
-harmonization approaches do. The variable's score is
-where its expected target lands: rank 1 if it comes first.
+harmonization approaches do. The variable's score is where its expected target
+lands: rank 1 if it comes first.
 
 For example, for the variable `age`, the model sorts the 1,217 GDC targets
 from most to least similar. If `demographic.age_at_index` comes third, that
@@ -30,8 +30,8 @@ From those ranks:
 sentence-transformers' `InformationRetrievalEvaluator` ranks the targets and
 computes MRR and accuracy@k. It embeds both sides as the harmonization
 approaches' `encode()` does: a model's `query` and `document` prompts are not
-added. A model with a Router module is the one exception, since the evaluator
-routes the two sides apart.
+added. A model with a Router module is an exception: the evaluator routes its
+two sides apart.
 
 Every source variable's rank is kept, in `per_variable.csv`.
 
@@ -42,8 +42,8 @@ python -m embedding_model score --model uc-ctds/StdElement-Mapper --benchmark to
 ```
 
 `--model` is a Hugging Face model id or a model folder on disk. `--format` is
-the shape the source and target texts are written in. The default is the shape
-this pipeline's models are trained on. Models are compared in that one shape,
+the shape that the source and target texts are written in. This pipeline's
+models are trained in the default shape. Models are compared in that one shape,
 so two scores differ only by the model. A released model can also be scored in
 the shape of its own training samples: `name_description` for
 `uc-ctds/bge-large-en-v1.5-bio-mapping`, and `stdelement` for
@@ -52,9 +52,9 @@ the shape of its own training samples: `name_description` for
 `--benchmark` takes one or more benchmarks. `--benchmark topmed gdc` loads the
 model once and scores it on both.
 
-`score` checks each benchmark file against the SHA-256 its manifest records. A
-file that differs stops scoring, and the error gives the command that rebuilds
-it. A build of another version than the one committed under
+`score` checks each benchmark file against the SHA-256 that its manifest
+records. A file that differs stops scoring, and the error gives the command
+that rebuilds it. A build whose version is not the version committed under
 `embedding_model/benchmarks/manifests/` is scored, with a warning.
 
 `--format` takes one of six formats. Four are the formatters of
@@ -84,7 +84,7 @@ pairs do. So a property that several nodes carry alike has the same text in
 each. On GDC version 2, 494 of the 1,217 targets share their text with
 another. Each copy of a wrong target then takes a rank of its own. Identical
 texts tie, up to float noise between encoding batches. sentence-transformers 6
-breaks a tie by target key, and earlier releases in no fixed order.
+breaks a tie by target key. Earlier releases break it in no fixed order.
 
 A source variable's text leaves the node out, in every format. Its node would
 be its dbGaP table, such as `pht005002.v1`, or its GDC paper, such as `Clark`,
@@ -95,7 +95,7 @@ harmonization approaches do write a source's node, as in
 without it.
 
 Every format that shows values keeps the first 12. The two released models'
-shapes are those of the training samples on their model cards.
+shapes follow the training samples on their model cards.
 
 Scoring uses a GPU when there is one, and the CPU otherwise. A large model,
 such as `uc-ctds/StdElement-Mapper`, is much slower on a CPU. `--device cpu`
@@ -114,7 +114,7 @@ scores. `<model>` is:
 
 `metrics.csv` and `config.yaml` record a model on disk by its full path. Two
 model folders with the same name share a scores folder. Scoring the second
-replaces the first one's scores, with a warning.
+replaces the first model's scores, with a warning.
 
 The folder holds:
 
@@ -123,7 +123,7 @@ The folder holds:
   `accuracy@10` and `median_rank`.
 - `per_variable.csv`, one row per source variable: `source_study_id`,
   `source_table_id`, `source_variable_id`, `source_variable_name`,
-  `expected_target`, `rank`, and the target the model ranked first,
+  `expected_target`, `rank`, and the target that the model ranked first,
   `top1_target`, with its cosine similarity, `top1_similarity`.
 - `config.yaml`:
   - every setting;

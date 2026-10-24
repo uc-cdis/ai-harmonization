@@ -31,8 +31,8 @@ NOT_NODES = {"metaschema", "root"}
 # The ground truth names a property, not a node. So a property that several
 # nodes carry is an expected target in each of them, except where a node gives
 # the name another meaning. A project's primary site and disease type describe
-# the project, not a patient. A portion's weight is a sample's, in milligrams,
-# not a patient's.
+# the project, not a patient. A portion's weight is a sample portion's weight
+# in milligrams, not a patient's weight.
 NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"}
 
 # Each paper's dbGaP study and DOI, by its name in GDC-SM. A paper's patients
@@ -42,8 +42,8 @@ NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"
 # GDC API on 2026-10-22. Its /cases endpoint gave each case's project, from the
 # case ids in each paper's table, which GDC calls submitter_id. All of a
 # paper's cases belong to the project given here. Its /projects endpoint gave
-# each project's dbGaP study. The DOIs are Crossref's for each paper's
-# publisher id, with matching titles.
+# each project's dbGaP study. Crossref gave each paper's DOI from its publisher
+# id, and the titles match.
 PAPERS = {
     "Cao": {"study": "phs001287", "doi": "10.1016/j.cell.2021.08.023"},
     "Clark": {"study": "phs001287", "doi": "10.1016/j.cell.2019.10.007"},
@@ -62,12 +62,13 @@ def dictionary_targets(dictionary):
     """One target per data property in the GDC dictionary, as ``node.property``.
 
     The dictionary is read by ``SimpleDataModel.from_gdc_model``, as the
-    harmonization approaches read it, so a target's text is the text they
+    harmonization approaches read it, so a target's text is the text that they
     build. Of its properties, these are not targets: links (``anyOf``), which
-    point to other nodes rather than hold data; the bookkeeping fields each
-    node lists as ``systemProperties`` -- ``id``, ``created_datetime``,
+    point to other nodes rather than hold data; the bookkeeping fields that
+    each node lists as ``systemProperties`` -- ``id``, ``created_datetime``,
     ``state`` -- and every node's ``type``, which holds the node's own name.
-    Nor are the JSON meta-schema and root the API serves beside the nodes.
+    The JSON meta-schema and the root, which the API serves beside the nodes,
+    are not targets either.
 
     Args:
         dictionary (dict): The dictionary as the GDC API serves it: nodes by
@@ -107,9 +108,9 @@ def require_papers(listed, mapped, papers):
     """Stop when a paper lacks its source table or its study and DOI.
 
     Args:
-        listed (Iterable[str]): The papers whose tables GDC-SM's
-            ``papers_info.json`` lists, by name, such as ``Clark``.
-        mapped (Iterable[str]): The papers the ground truth maps.
+        listed (Iterable[str]): The papers with a table in GDC-SM's
+            ``papers_info.json``, by name, such as ``Clark``.
+        mapped (Iterable[str]): The papers that the ground truth maps.
         papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
 
     Raises:
@@ -142,7 +143,7 @@ def paper_source(paper, info, spreadsheet, papers):
         papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
 
     Returns:
-        dict: The source, keyed as the manifest's sources are.
+        dict: The source, keyed like the manifest's other sources.
     """
     return {
         "role": "source text",
@@ -177,11 +178,11 @@ def read_source_table(spreadsheet, sheet, paper):
     """A paper's source table, as GDC-SM's own download script prepares it.
 
     The script (``gdc_download.py`` in the Zenodo record) reads the
-    publisher's sheet, repairs four of the tables and saves each as CSV, and
-    the same steps are taken here: Vasaikar's sheet loses its first row, of
-    type labels (BIN, CON, ...), and its last, of counts; a tab is removed
-    from a McDermott column name; a typo in Clark's ethnicity values is
-    corrected; and Wang's secondhand-smoke answers are recoded to Yes and No.
+    publisher's sheet, repairs four of the tables and saves each as CSV. The
+    same steps are taken here: Vasaikar's sheet loses its first row, of type
+    labels (BIN, CON, ...), and its last, of counts; a tab is removed from a
+    McDermott column name; a typo in Clark's ethnicity values is corrected; and
+    Wang's secondhand-smoke answers are recoded to Yes and No.
 
     Args:
         spreadsheet (bytes): The publisher's ``.xlsx`` file.
@@ -189,8 +190,8 @@ def read_source_table(spreadsheet, sheet, paper):
         paper (str): The paper's name in GDC-SM, such as ``Vasaikar``.
 
     Returns:
-        pd.DataFrame: The table, with the column types its CSV is read back
-            with.
+        pd.DataFrame: The table, with the column types that its CSV is read
+            back with.
     """
     table = pd.read_excel(io.BytesIO(spreadsheet), sheet_name=sheet)
     if paper == "Vasaikar":
@@ -222,12 +223,12 @@ def read_source_table(spreadsheet, sheet, paper):
 
 
 def mapping_rows(truth, tables, targets, papers):
-    """One row per source variable, with every target the experts mapped it to.
+    """One row per source variable, with every target that the experts mapped it to.
 
-    A variable keeps every distinct value its column holds; the prompt
-    formatters cap how many they show. A published mapping whose property the
-    dictionary does not carry is left out and named, since a new dictionary
-    can drop or rename a property.
+    A variable keeps every distinct value that its column holds. The prompt
+    formatters cap how many they show. A published mapping is left out and
+    named when the dictionary does not carry its property, since a new
+    dictionary can drop or rename a property.
 
     Args:
         truth (dict[str, pd.DataFrame]): The ground truth, from
@@ -306,12 +307,12 @@ def mapping_rows(truth, tables, targets, papers):
 
 
 def build(downloads, manifest):
-    """Build the GDC benchmark from the inputs its manifest pins.
+    """Build the GDC benchmark from the inputs that its manifest pins.
 
     The ground truth and the publishers' spreadsheets are kept between builds.
     The dictionary is fetched each time, since the GDC API serves only the
-    current one; the manifest records its SHA-256, so a build on a changed
-    dictionary shows as a different benchmark.
+    current dictionary. The manifest records its SHA-256, so a build on a
+    changed dictionary shows as a different benchmark.
 
     Args:
         downloads (Path): Where downloaded files are kept between builds.
@@ -370,8 +371,8 @@ def build(downloads, manifest):
                 f"commit {status['commit']}"
             ),
             "fetched": date.today().isoformat(),
-            # Of the content, keys sorted, so a reordering by the API is not a
-            # new dictionary.
+            # The SHA-256 is of the content, with keys sorted, so a reordering
+            # by the API is not a new dictionary.
             "sha256": sha256(json.dumps(dictionary, sort_keys=True).encode()),
             "license": "Apache-2.0",
             "citation": "embedding_model/docs/benchmarks.md#gdc",

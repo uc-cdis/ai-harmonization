@@ -213,7 +213,7 @@ def replacements(codes, path):
 
 
 def fetch_source(downloads, manifest):
-    """Fetch the NCIt release the manifest pins, and its replacements.
+    """Fetch the NCIt release that the manifest pins, and its replacements.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.

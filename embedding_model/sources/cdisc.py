@@ -2,8 +2,8 @@
 
 EVS publishes each CDISC terminology package as a tab-separated file, with a
 new release each quarter. Its archive keeps every release under its date.
-Each package is read from the archive, at the release date the manifest pins.
-So a new CDISC release does not change what the fetch reads, until the
+Each package is read from the archive, at the release date that the manifest
+pins. So a new CDISC release does not change what the fetch reads, until the
 manifest pins the new release.
 """
 
@@ -76,7 +76,7 @@ def read_package(data, package):
 
 
 def fetch_source(downloads, manifest):
-    """Fetch every package at the release date the manifest pins.
+    """Fetch every package at the release date that the manifest pins.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.

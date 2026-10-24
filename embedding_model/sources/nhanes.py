@@ -42,8 +42,8 @@ LIST_COLUMNS = {
 # closed, so a new value is reported, and not open until decided.
 OPEN_USE_CONSTRAINTS = {"None", "RDC Only"}
 CLOSED_USE_CONSTRAINTS = set()
-# Text every page of each kind holds. A page without it is not that page, such
-# as a server's own error or bot-check page, though served with success.
+# Text that every page of each kind holds. A page without it is not that page,
+# such as a server's own error or bot-check page, though served with success.
 LIST_MARKER = b"Use Constraints"
 CODEBOOK_MARKER = b'class="vartitle"'
 NOT_FOUND = "not_found.txt"
@@ -59,7 +59,7 @@ CITATION = "embedding_model/docs/sources.md#nhanes"
 
 
 def cycle(begin_year):
-    """The survey cycle a data file belongs to, as its codebook's address uses.
+    """The survey cycle that a data file belongs to, as its codebook's address has it.
 
     Cycles are two years long and start on an odd year, so a file that begins
     in 2000 is in the 1999 cycle.
@@ -158,7 +158,7 @@ def page(url, path, marker):
     Args:
         url (str): The page's address.
         path (Path): Where the page is kept.
-        marker (bytes): Text every page of its kind holds.
+        marker (bytes): Text that every page of its kind holds.
 
     Returns:
         bytes: The page.

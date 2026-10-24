@@ -29,7 +29,7 @@ CITATION = "embedding_model/docs/sources.md#cadsr"
 # An element with this reference document is part of a proprietary measure,
 # whose owner's permission is needed: caDSR's restriction field.
 PROPRIETARY = "Proprietary Measure Permission"
-# The reference document types caDSR is known to use. A new type is
+# The reference document types that caDSR is known to use. A new type is
 # reported, in case it restricts use, as the Proprietary Measure Permission
 # does.
 DOCUMENT_TYPES = {
@@ -235,7 +235,7 @@ def read_snapshot(archive):
 
 
 def fetch_source(downloads, manifest):
-    """Fetch the snapshot the manifest pins.
+    """Fetch the snapshot that the manifest pins.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.

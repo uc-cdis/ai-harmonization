@@ -1,20 +1,21 @@
 """The TOPMed benchmark.
 
 dbGaP study variables mapped by the experts of the TOPMed Data Coordinating
-Center to its harmonized variables. The documentation lists, for each
-harmonized variable, its harmonization units -- a study or a subcohort of one
--- and the dbGaP variables each unit's harmonization function reads: "at least
-one representing the phenotype itself, and at least one for the age at
-measurement", in the documentation's words. It cites each variable by
-accession, release included, so the variable's text comes from the data
-dictionaries of that dbGaP release, which need no controlled access.
+Center to its harmonized variables. For each harmonized variable, the
+documentation lists its harmonization units. A unit is a study or a subcohort
+of one. For each unit, it lists the dbGaP variables that the unit's
+harmonization function reads: "at least one representing the phenotype itself,
+and at least one for the age at measurement", in the documentation's words. It
+cites each variable by accession, release included, so the variable's text
+comes from the data dictionaries of that dbGaP release, which need no
+controlled access.
 
-The targets are the harmonized schema, written ``<node>.<property>``: the node
+The targets are the harmonized schema, written ``<node>.<property>``. The node
 is the dataset whose folder holds the variable's documentation
-(``atherosclerosis``), and the property is the phenotype (``cac_score_1``)
-or, where the variable has one, the age at measurement
-(``age_at_cac_score_1``). A component variable maps to the age when its dbGaP
-description says "age", and to the phenotype otherwise.
+(``atherosclerosis``). The property is the phenotype (``cac_score_1``), or the
+age at measurement (``age_at_cac_score_1``) where the variable has one. A
+component variable maps to the age when its dbGaP description says "age", and
+to the phenotype otherwise.
 """
 
 import io
@@ -45,8 +46,8 @@ def read_documentation(archive):
     Returns:
         list[dict]: One per harmonized variable, sorted by dataset and name:
             its ``dataset``, ``name``, ``type``, ``description``, ``values``,
-            ``has_age`` and ``components`` -- the dbGaP references its units
-            cite, each a tuple (phs, release, pht, table version, phv).
+            ``has_age`` and ``components`` -- the dbGaP references that its
+            units cite, each a tuple (phs, release, pht, table version, phv).
     """
     variables = []
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
@@ -95,8 +96,8 @@ def target_rows(variables):
 
     The age target is described the way the BioData Catalyst data model
     describes the same properties: "age at measurement of <name> (years)".
-    Types are spelled as ``ai_harmonization.dbgap`` spells the sources', so the
-    two sides of a mapping name a type alike.
+    Types are spelled as ``ai_harmonization.dbgap`` spells the sources' types,
+    so the two sides of a mapping name a type alike.
 
     Args:
         variables (list[dict]): From read_documentation.
@@ -136,10 +137,10 @@ def cited_variables(dictionary, report, study, wanted):
     """The cited variables of one dbGaP table, as mapping rows.
 
     The documentation names each component variable only by accession, so its
-    text comes from the table that holds it: the table is read with
-    ``parse_dbgap_table``, as for any study, and only the cited variables are
-    kept, each as a mapping row still without its target. resolve_components
-    calls this once per cited table.
+    text comes from the table that holds it. The table is read with
+    ``parse_dbgap_table``, as any study's table is. Only the cited variables
+    are kept, each as a mapping row still without its target.
+    resolve_components calls this once per cited table.
 
     Args:
         dictionary (Path): The table's ``data_dict.xml``.
@@ -149,8 +150,8 @@ def cited_variables(dictionary, report, study, wanted):
             their version, such as ``phv99999901``.
 
     Returns:
-        dict[str, dict]: Each cited variable the table has, by phv accession,
-            keyed by MAPPING_COLUMNS without ``expected_target``.
+        dict[str, dict]: Each cited variable that the table has, by phv
+            accession, keyed by MAPPING_COLUMNS without ``expected_target``.
     """
     table_id, model = parse_dbgap_table(
         str(dictionary), str(report) if report else None
@@ -173,14 +174,14 @@ def cited_variables(dictionary, report, study, wanted):
 
 
 def resolve_components(references, downloads):
-    """Look up every component variable in the dbGaP release its reference cites.
+    """Look up every component variable in the dbGaP release that its reference cites.
 
-    Only the tables the references name are downloaded, each with its data
+    Only the tables that the references name are downloaded, each with its data
     dictionary and variable report. Two of dbGaP's folder listings are read to
     find them: the study's, for the folder of the release cited (a reference
     gives ``phs999999.v1``, the folder is ``phs999999.v1.p1``), and that
     release's, for the names of its files. A published release never changes,
-    so its listing is downloaded once and kept like any file; the study's
+    so its listing is downloaded once and kept like any file. The study's
     listing gains a folder with each new release, so it is fetched again when
     the release cited is missing from the copy kept.
 
@@ -257,8 +258,8 @@ def resolve_components(references, downloads):
 def mapping_rows(variables, resolved):
     """One row per component variable, with every target it maps to.
 
-    A variable cited by several units -- three cohorts of one study citing the
-    same age at exam, say -- is one row carrying all its targets. Where a
+    A variable that several units cite is one row with all its targets. For
+    example, three cohorts of one study can cite the same age at exam. Where a
     variable is cited from more than one release, the text of the latest
     release cited is used.
 
@@ -298,7 +299,7 @@ def mapping_rows(variables, resolved):
 
 
 def build(downloads, manifest):
-    """Build the TOPMed benchmark from the inputs its manifest pins.
+    """Build the TOPMed benchmark from the inputs that its manifest pins.
 
     Args:
         downloads (Path): Where downloaded files are kept between builds.

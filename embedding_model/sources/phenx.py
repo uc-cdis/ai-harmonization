@@ -3,7 +3,8 @@
 PhenX's database export holds its protocols, their variables and their
 availability, and maps each variable to dbGaP variables of real studies. Its
 address serves only the latest export, so the zip is kept after the first
-fetch. Its release, such as ``Ver 49.0``, must be the one the manifest pins.
+fetch. Its release, such as ``Ver 49.0``, must match the release that the
+manifest pins.
 """
 
 import io
@@ -82,6 +83,10 @@ def insert_rows(statement):
 
 def read_dump(stream, tables):
     """Chosen tables of a MySQL dump, by name.
+
+    sqlite3 cannot run a MySQL dump, even with its quotes changed, and
+    mysql-to-sqlite3 needs a running MySQL server. So the INSERT statements are
+    read here.
 
     Args:
         stream (file): The dump, opened in binary mode.
@@ -251,9 +256,9 @@ def fetch_source(downloads, manifest):
             manifest's sources.
 
     Raises:
-        ValueError: If the export's release is not the one pinned. The
-            address serves only the latest export, so a new release needs a
-            new version of the manifest.
+        ValueError: If the export's release is not the pinned release. The
+            address serves only the latest export, so a new release needs a new
+            version of the manifest.
     """
     pin = pinned(manifest, EXPORT)
     path = downloaded(EXPORT_URL, downloads / "Phenx_DB.zip", check=check_export)

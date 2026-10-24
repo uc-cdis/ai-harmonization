@@ -33,7 +33,7 @@ class TestCached:
         assert list(tmp_path.iterdir()) == []
 
     def test_a_failed_check_keeps_nothing(self, monkeypatch, tmp_path):
-        """A download its check refuses raises, and nothing is kept."""
+        """A download that its check refuses raises, and nothing is kept."""
         monkeypatch.setattr(download, "fetch", lambda url, **request: b"abcd")
         check = MagicMock(side_effect=ValueError("not the file"))
         with pytest.raises(ValueError, match="not the file"):

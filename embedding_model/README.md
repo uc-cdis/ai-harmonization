@@ -29,8 +29,8 @@ command line, from a checkout of this repository.
   like any other sentence-transformers model. It can be evaluated end to end
   with `get_metrics_for_approach`
   (`ai_harmonization/harmonization_benchmark.py`).
-- `jupyter/embedding_model_training.ipynb` fine-tunes a pretrained model,
-  while this trains a small model from scratch. Both produce
+- `jupyter/embedding_model_training.ipynb` fine-tunes a pretrained model, while
+  `embedding_model` trains a small model from scratch. Both produce
   sentence-transformers models.
 
 ## Setup
@@ -40,20 +40,20 @@ uv sync
 uv pip install -e .
 ```
 
-Everything runs on a CPU, model training included. Training is where a GPU
-matters, and it uses one if the machine has one. `--device cpu` keeps it on
-the CPU. The [quick start](#quick-start) examples train on a CPU in a few
-minutes. A model trained on all the sources takes minutes on a GPU or hours on
-a CPU, and a series of experiments trains many models.
+Everything runs on a CPU, model training included. A GPU matters for training,
+and training uses one if the machine has one. `--device cpu` keeps it on the
+CPU. The [quick start](#quick-start) examples train on a CPU in a few minutes.
+A model trained on all the sources takes minutes on a GPU or hours on a CPU,
+and a series of experiments trains many models.
 
 A series' runs are trained in one of two ways:
 
 - `experiment submit` queues each run as its own SLURM job (`sbatch`), with
   one GPU each, so they train in parallel. Use it on a cluster. Pass your
   cluster's settings, such as partition and time limit, through `--slurm`.
-- `experiment submit --local` trains them one after another on the machine
-  the command runs on. It uses that machine's GPU if it has one, and otherwise
-  the CPU. The machine can be a laptop, a workstation, or a cluster node you
+- `experiment submit --local` trains them one after another on the machine that
+  runs the command. It uses that machine's GPU if it has one, and otherwise the
+  CPU. The machine can be a laptop, a workstation, or a cluster node that you
   have been allocated, such as inside `srun --gpus=1 --pty bash`. Do not use a
   shared login node. Use `--local` for small series and quick tests.
 
@@ -124,13 +124,13 @@ vocabulary, and a text's embedding is the average of its tokens' vectors. A
 table has no attention and no layers, so it is small (a few million
 parameters) and fast.
 
-The tokenizer works in three steps, as a Hugging Face
-[`tokenizers`](https://huggingface.co/docs/tokenizers) pipeline does:
+The tokenizer is a Hugging Face
+[`tokenizers`](https://huggingface.co/docs/tokenizers) pipeline with three
+steps:
 
 1. Text is lowercased and stripped of accents.
-2. It is split at whitespace and at every punctuation character, the rule
-   BERT uses (`BertPreTokenizer`). So `SUBJECT_ID` becomes `subject`, `_`,
-   `id`.
+2. It is split at whitespace and at every punctuation character, by BERT's rule
+   (`BertPreTokenizer`). So `SUBJECT_ID` becomes `subject`, `_`, `id`.
 3. Each piece is split into vocabulary tokens by
    [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
 
@@ -153,22 +153,22 @@ batch.
 
 Every step is a subcommand of one command, run from the repository root:
 `python -m embedding_model <step>`. `python -m embedding_model --help` lists
-them. Each step reads what the one before it wrote, so a step can be rerun on
-its own.
+them. Each step reads the files that the step before it wrote, so a step can be
+rerun on its own.
 
 | | step | what it does | writes |
 |---|---|---|---|
-| benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark models are developed on | `inputs/benchmarks/` |
+| benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark that models are developed on | `inputs/benchmarks/` |
 | | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/` |
-| | `pairs audit` | checks no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
+| | `pairs audit` | checks that no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
 | | `corpus build --name <corpus> [--sources <source>,...]` | combines the sources' pairs into a training corpus | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus>` | learns the vocabulary from the corpus | `inputs/tokenizers/` |
 | | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
 | one model | `train --config <config.yaml> --seed <seed>` | trains one model on its own | `outputs/independent_runs/` |
-| a series | `experiment submit <series.yaml> [--local]` | trains every run the series declares -- each arm at each seed: one SLURM job per run, so many train at once, or with `--local` one after another on the machine the command runs on | `outputs/series/<series>/runs/` |
+| a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one SLURM job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
 | | `experiment status <series.yaml>` | says which runs are done, running or missing | -- |
 | | `experiment report <series.yaml>` | builds tables and figures, with each comparison's verdict | `outputs/series/<series>/` |
 | | `experiment pick <series.yaml>` | writes the series' pick record | `outputs/series/<series>/pick.md` |
@@ -224,7 +224,7 @@ trained model as part of an approach.
 
 The steps that prepare data write under `embedding_model/inputs/`. Those
 steps are the benchmarks, sources, pairs, corpora, tokenizers and the token
-cache. Training runs read what they need from there. They write everything
+cache. Training runs read what they need from there. They write everything that
 they produce under `embedding_model/outputs/`: the model, its logs and its
 scores. Both folders are gitignored.
 
@@ -269,15 +269,16 @@ and the index, with one row per scoring. Both can be rebuilt from the run
 folders. A run trained on its own has the same ledger and index. It has no
 comparison tables or figures, since those come from comparing a series' runs.
 
-The only files the tools write that are committed are the manifests of the
-benchmarks and the training sources. They are under
-`embedding_model/benchmarks/manifests/` and `embedding_model/sources/manifests/`.
-A manifest holds the SHA-256 of every file built, and the version and license
-of each input. So a rebuilt benchmark or a new fetch either matches its
-manifest or names what does not. [docs/manifests.md](docs/manifests.md) says
-how a new version is accepted. The files themselves carry third-party text,
-such as dbGaP variable descriptions, the GDC dictionary and LOINC's names. So
-they are built rather than redistributed.
+Of the files that the tools write, only the manifests of the benchmarks and the
+training sources are committed. They are under
+`embedding_model/benchmarks/manifests/` and
+`embedding_model/sources/manifests/`. A manifest holds the SHA-256 of every
+file built, and the version and license of each input. So a rebuilt benchmark
+or a new fetch either matches its manifest or names what does not.
+[docs/manifests.md](docs/manifests.md) says how a new version is accepted. The
+files themselves carry third-party text, such as dbGaP variable descriptions,
+the GDC dictionary and LOINC's names. So they are built rather than
+redistributed.
 
 ## Running experiments
 
@@ -291,7 +292,7 @@ An experiment file, such as
 lists the arms and the comparisons to make between them. Each arm is a change
 from a base configuration, and the comparisons are grouped into families.
 `experiment report` gives each comparison's verdict: which arm the decision
-rule keeps. That arm is the base the next family is declared against.
+rule keeps. The next family is declared against that arm.
 
 `experiment pick` writes the series' pick record once the series is complete.
 The record holds:
@@ -311,8 +312,9 @@ decided. It covers:
 
 ## Tests
 
-The tests live with the rest of the repository's, in `tests/`, as
-`tests/test_embedding_model_*.py`. From the repository root, this runs them:
+The tests live with the repository's other tests, in `tests/`, as
+`tests/test_embedding_model_*.py`. This command runs them from the repository
+root:
 
 ```
 uv run pytest tests/ -k embedding_model

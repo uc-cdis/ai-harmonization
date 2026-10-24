@@ -48,7 +48,7 @@ def served(pages):
     """A stand-in for ``downloaded`` that writes each URL's page, or raises its error."""
 
     def downloaded(url, path, check=None, **request):
-        """Keep the page served for a URL, unless kept already, as a download would."""
+        """Keep the page served for a URL, unless kept already, as a real download does."""
         if path.exists():
             return path
         page = pages[url]
@@ -457,7 +457,7 @@ class TestLoinc:
             loinc.fetch_source(tmp_path, manifest)
 
     def test_a_zip_with_another_md5_is_refused(self, tmp_path):
-        """A zip placed by hand must have the MD5 the manifest pins."""
+        """A zip placed by hand must have the MD5 that the manifest pins."""
         (tmp_path / "Loinc_9.99.zip").write_bytes(loinc_zip())
         manifest = {
             "sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": "abcd"}]
@@ -466,7 +466,7 @@ class TestLoinc:
             loinc.fetch_source(tmp_path, manifest)
 
     def test_a_download_with_another_md5_is_not_kept(self, monkeypatch, tmp_path):
-        """A zip downloaded with another MD5 than LOINC publishes is refused, and not kept."""
+        """A download without LOINC's published MD5 is refused, and not kept."""
         monkeypatch.setenv("LOINC_USERNAME", "abcd")
         monkeypatch.setenv("LOINC_PASSWORD", "efgh")
         monkeypatch.setattr(
@@ -777,7 +777,7 @@ class TestNhanes:
         ]
 
     def test_a_codebook_row_takes_open_from_its_data_file(self):
-        """A codebook row the lists do not name takes its data file's open."""
+        """A codebook row that the lists do not name takes its data file's open."""
         variables = pd.DataFrame(
             {
                 "cycle": ["2017", "2017"],
@@ -1017,7 +1017,7 @@ class TestPhenx:
         assert list(tmp_path.iterdir()) == []
 
     def test_another_release_than_pinned_is_refused(self, tmp_path):
-        """An export of another release than the manifest pins is refused."""
+        """An export of a release that the manifest does not pin is refused."""
         (tmp_path / "Phenx_DB.zip").write_bytes(phenx_zip())
         manifest = {"sources": [{"name": phenx.EXPORT, "version": "Ver 8.0"}]}
         with pytest.raises(ValueError, match="Ver 9.1"):
@@ -1079,7 +1079,7 @@ class TestWriteAndRead:
     def test_another_version_than_committed_is_a_warning(
         self, monkeypatch, capsys, tmp_path
     ):
-        """A fetch of another version than the committed one is read, with a warning."""
+        """A fetch whose version is not the committed version is read, with a warning."""
         folder = tmp_path / "manifests"
         folder.mkdir()
         (folder / "abcd.json").write_text(json.dumps({"version": "2"}))

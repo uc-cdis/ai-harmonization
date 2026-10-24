@@ -4,8 +4,8 @@ Benchmarks and sources each keep a committed manifest per build, under their
 own ``manifests/`` folder. It pins what the build is made from, such as a
 commit, a release or a record, and records the SHA-256 of every file built.
 A new build writes its own manifest, and the two are compared. A build that
-matches is kept. One that differs is kept only when accepted as a new
-version, and a version committed in git never changes.
+matches is kept. A build that differs is kept only when accepted as a new
+version. A version committed in git never changes.
 ``embedding_model/docs/manifests.md`` describes the fields and the rules.
 """
 
@@ -39,7 +39,7 @@ def identities(manifest):
 
 
 def differences(committed, built):
-    """What differs between a committed manifest and a new build's.
+    """What differs between a committed manifest and a new build's manifest.
 
     A source is identified by its SHA-256 where it has one, and otherwise by
     its version, so a file served under a new release label but with the
@@ -97,7 +97,7 @@ def committed_version(folder, name):
 
 
 def warn_if_not_committed(label, version, committed_path, command):
-    """Print a warning when a build's version is not the committed one.
+    """Print a warning when a build's version is not the committed version.
 
     Args:
         label (str): What was built and where, for the message.
@@ -118,12 +118,12 @@ def warn_if_not_committed(label, version, committed_path, command):
 
 
 def settle(committed_path, built, staging, directory, files, update_manifest):
-    """Keep a build that matches its committed manifest, or one accepted.
+    """Keep a build that matches its committed manifest, or an accepted build.
 
-    A build that matches replaces the working files. One that differs does so
-    only when ``update_manifest`` accepts it, under a version not committed in
-    git, and is then recorded as the committed manifest. Otherwise the
-    differences are printed, and the working files are left as they were.
+    A build that matches replaces the working files. A build that differs
+    replaces them only when ``update_manifest`` accepts it, under a version not
+    committed in git. It is then recorded as the committed manifest. Otherwise
+    the differences are printed, and the working files are left as they were.
 
     Args:
         committed_path (Path): The committed manifest.

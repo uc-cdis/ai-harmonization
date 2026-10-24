@@ -12,12 +12,12 @@ Each benchmark and each source has a manifest committed in git:
 - `embedding_model/sources/manifests/<source>.json`.
 
 It pins what the build is made from, such as a commit of the TOPMed
-documentation or a release of NCIt. It records the SHA-256 of each input the
-build reads, such as a downloaded zip. It also records each file the build
-makes, with its row count and SHA-256. The code reads its pins from this
+documentation or a release of NCIt. It records the SHA-256 of each input that
+the build reads, such as a downloaded zip. It also records each file that the
+build makes, with its row count and SHA-256. The code reads its pins from this
 file. So the code says how to build, and the manifest says from which inputs.
 
-Each build also writes its own manifest beside the files it makes.
+Each build also writes its own manifest beside the files that it makes.
 [benchmarks.md](benchmarks.md#the-manifest) and
 [sources.md](sources.md#what-a-fetch-writes) say where.
 
@@ -46,11 +46,11 @@ A new build compares its manifest with the committed one:
   no checksum.
 - Dates, licenses and citations are not compared.
 
-If everything matches, the build is the one the manifest describes, and its
-files replace the working ones. If not, the build lists each file and input
-that differs. It then stops, and keeps the working files as they were. That
-is expected when an input was updated on purpose. The build is then accepted
-as a new version, as the next section describes.
+If everything matches, the build is what the manifest describes. Its files then
+replace the working ones. If not, the build lists each file and input that
+differs. It then stops, and keeps the working files as they were. That is
+expected when an input was updated on purpose. The build is then accepted as a
+new version, as the next section describes.
 
 ## Making a new version
 
@@ -64,10 +64,10 @@ A difference that is meant makes a new version:
    `sources fetch`. It records the new checksums in the committed manifest.
 3. Commit the manifest.
 
-A version committed in git never changes. `--update-manifest` refuses a
-build that differs while `version` is still the committed one, so raise it
-first. Until the new version is committed, it can be built and accepted as
-often as needed. The new files overwrite the working ones.
+A version committed in git never changes. `--update-manifest` refuses a build
+that differs while `version` is still the committed version, so raise it first.
+Until the new version is committed, it can be built and accepted as often as
+needed. The new files overwrite the working ones.
 
 The build asks the local git checkout whether a version is committed. If git
 cannot answer, the build cannot tell, so it refuses a differing build.

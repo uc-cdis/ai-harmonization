@@ -560,7 +560,7 @@ class TestGdcPapers:
             gdc.require_papers(["Abcd", "Efgh"], ["Abcd"], GDC_PAPERS)
 
     def test_a_mapped_paper_without_a_listed_table_raises(self):
-        """A paper the ground truth maps but papers_info does not list is named."""
+        """A paper that the ground truth maps but papers_info does not list is named."""
         with pytest.raises(ValueError, match="no listed table: Efgh"):
             gdc.require_papers(["Abcd"], ["Abcd", "Efgh"], GDC_PAPERS)
 
@@ -581,7 +581,7 @@ class TestGdcPapers:
         }
 
     def test_every_pinned_paper_has_an_entry_cited_by_its_doi(self):
-        """The paper table covers exactly the papers the manifest pins, cited by DOI."""
+        """The paper table covers exactly the papers that the manifest pins, cited by DOI."""
         manifest = json.loads((benchmarks.MANIFESTS / "gdc.json").read_text())
         cited = {
             source["name"].removesuffix(", supplementary table"): source["citation"]
@@ -613,7 +613,7 @@ class TestGdcMappingRows:
         assert row["source_table_id"] == "Abcd"
 
     def test_a_property_two_nodes_carry_is_expected_in_both(self):
-        """A property two nodes carry is an expected target in both. The description is empty."""
+        """A property that two nodes carry is an expected target in both. The description is empty."""
         truth = {"Abcd": ground_truth([("Race", "race")])}
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian", "White", None]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
@@ -737,7 +737,7 @@ class TestReadBenchmark:
     def test_a_version_not_committed_is_a_warning(
         self, written, monkeypatch, capsys, tmp_path
     ):
-        """A build of another version than the committed one is read, with a warning."""
+        """A build whose version is not the committed version is read, with a warning."""
         (tmp_path / "manifests").mkdir()
         (tmp_path / "manifests" / "abcd.json").write_text(json.dumps({"version": "2"}))
         monkeypatch.setattr(benchmarks, "MANIFESTS", tmp_path / "manifests")
@@ -747,7 +747,7 @@ class TestReadBenchmark:
         )
 
     def test_a_changed_file_is_refused(self, written, tmp_path):
-        """A file whose SHA-256 is not the manifest's is named, with the rebuild command."""
+        """A file whose SHA-256 differs from the manifest is named, with the rebuild command."""
         with open(tmp_path / "benchmarks" / "abcd_mappings.csv", "a") as handle:
             handle.write(",,,,,,,\n")
         with pytest.raises(ValueError, match="abcd_mappings.csv: rebuild with"):

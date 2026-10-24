@@ -13,22 +13,22 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 
 | source | what it holds | fetched from | release read |
 |---|---|---|---|
-| [NCIt](#ncit) | biomedical concepts, such as diseases and drugs: their synonyms, definitions and registries' value lists | EVS's OWL release archive | the version the manifest pins, such as `26.09d` |
-| [Ontologies](#ontologies) | diseases (MONDO), symptoms (HP), anatomy (Uberon), traits (OBA), measurements (CMO, MMO) and data use (DUO): terms, synonyms, definitions | each ontology's OWL release | the release date the manifest pins; for CMO and MMO, their current state, kept after the first fetch |
-| [LOINC](#loinc) | lab tests and clinical measurements: their names, question texts and answer lists | LOINC's download API, or a zip placed by hand | the version the manifest pins, such as `2.83` |
-| [CDISC](#cdisc) | the terms clinical trials report their data with: codelists and their terms | EVS's CDISC archive | each package's release date, as the manifest pins it |
-| [NIH CDE](#nih-cde) | data elements, the fields studies collect: names, definitions and values | the repository's one-call export | its current state, kept after the first fetch |
-| [caDSR](#cadsr) | NCI's data elements: names, question texts and values | the daily bulk XML snapshot | the snapshot date the manifest pins |
+| [NCIt](#ncit) | biomedical concepts, such as diseases and drugs: their synonyms, definitions and registries' value lists | EVS's OWL release archive | the version that the manifest pins, such as `26.09d` |
+| [Ontologies](#ontologies) | diseases (MONDO), symptoms (HP), anatomy (Uberon), traits (OBA), measurements (CMO, MMO) and data use (DUO): terms, synonyms, definitions | each ontology's OWL release | the release date that the manifest pins; for CMO and MMO, their current state, kept after the first fetch |
+| [LOINC](#loinc) | lab tests and clinical measurements: their names, question texts and answer lists | LOINC's download API, or a zip placed by hand | the version that the manifest pins, such as `2.83` |
+| [CDISC](#cdisc) | the terms that clinical trials report their data with: codelists and their terms | EVS's CDISC archive | each package's release date, as the manifest pins it |
+| [NIH CDE](#nih-cde) | data elements, the fields that studies collect: names, definitions and values | the repository's one-call export | its current state, kept after the first fetch |
+| [caDSR](#cadsr) | NCI's data elements: names, question texts and values | the daily bulk XML snapshot | the snapshot date that the manifest pins |
 | [NHANES](#nhanes) | a US health survey's variables: their questions and value labels | the variable-list and codebook pages | their current state, kept after the first fetch |
-| [PhenX](#phenx) | standard study measures' variables, and their mappings to dbGaP variables | the database export | the latest export, kept after the first fetch; its release must be the one the manifest pins, such as `Ver 49.0` |
+| [PhenX](#phenx) | standard study measures' variables, and their mappings to dbGaP variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
-Every file read has its SHA-256 recorded in the manifest, and a new fetch is
-compared by it.
+The manifest records the SHA-256 of every file read, and a new fetch is
+compared with it.
 
 ## What a fetch writes
 
 A source's files go under `embedding_model/inputs/sources/`, or under the
-folder `--inputs` names:
+folder that `--inputs` names:
 
 ```
 sources/
@@ -37,26 +37,26 @@ sources/
 ```
 
 A fetch downloads a source's files, then reads them into tables. There is one
-table per kind of record, such as a concept, a name or a value. The tables
-link back to the item they belong to by the source's own id.
+table per kind of record, such as a concept, a name or a value. Each record
+links back to its item by the source's own id.
 
-Every item a source has is kept, retired, draft and closed ones too. The next
-step, `pairs prepare`, decides which of them become training pairs (see
-[pairs.md](pairs.md)). A cell with several values, such as a concept's
-parents, joins them with `|`.
+Every item of a source is kept, including retired, draft and closed ones. The
+next step, `pairs prepare`, decides which of them become training pairs (see
+[pairs.md](pairs.md)). A cell with several values, such as a concept's parents,
+joins them with `|`.
 
 Each source's main table has an `open` column, set from the source's
 restriction field (see [Licenses](#licenses)). It is `true` when the item may
 be used, and `false` when its restriction field restricts it. A table without
-`open` takes it from the item it links to.
+`open` takes it from the item that it links to.
 
 Each source has a manifest committed as
-`embedding_model/sources/manifests/<source>.json`. It pins the release each
+`embedding_model/sources/manifests/<source>.json`. It pins the release that the
 source is read from. Each fetch writes its own manifest beside the tables, as
 `sources/<source>/manifest.json`, with the date in `fetched`. A table's
 checksum, `csv_sha256`, is the SHA-256 of its content written as CSV, not of
-the parquet file. A parquet file's bytes change with the version of the
-library that writes it, even when the data are the same.
+the parquet file. A parquet file's bytes change with the version of the library
+that writes it, even when the data are the same.
 
 An input's `role` is `release` for a file pinned by its version, or `service`
 for an address that serves only its current state. [Manifests](manifests.md)
@@ -87,7 +87,7 @@ pinned release must be raised first.
 ## Licenses
 
 Each source's license was checked. Every source is free to use, under the
-license or terms its section names.
+license or terms that its section names.
 
 Some sources also mark single items as restricted, in a field of their own.
 For example, LOINC marks a code whose content belongs to a third party. The
@@ -95,15 +95,15 @@ fetch reads these restriction fields too. Each source's main table has an
 `open` column: true when the item's restriction field allows its use.
 
 Where the field holds one of a list of values, an item is open only when its
-value is known to allow use. A value the fetch has not seen before means the
-item is not open. The value is printed, so it can be reviewed. For caDSR, the
-field is a document instead. A new kind of document is printed too, but only
-a Proprietary Measure Permission closes an element.
+value is known to allow use. A value that the fetch has not seen before means
+the item is not open. The value is printed, so it can be reviewed. For caDSR,
+the field is a document instead. A new kind of document is printed too, but
+only a Proprietary Measure Permission closes an element.
 
 | source | restriction field | open when |
 |---|---|---|
 | NCIt, ontologies, CDISC | none per item | always: the source's license covers every item |
-| LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
+| LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
 | NIH CDE | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
 | caDSR | a "Proprietary Measure Permission" reference document | the element has none |
 | NHANES | "Use Constraints", per data file | it is "None" or "RDC Only". Both restrict access to the data, not the documentation read here. |
@@ -111,7 +111,7 @@ a Proprietary Measure Permission closes an element.
 
 ## NCIt
 
-The NCI Thesaurus, read from its OWL release in EVS's archive, such as
+The NCI Thesaurus is read from its OWL release in EVS's archive, such as
 `NCI_Thesaurus/archive/26.09d_Release/Thesaurus_26.09d.OWL.zip`.
 
 | table | one row per | columns |
@@ -146,8 +146,8 @@ state.
 
 ## Ontologies
 
-Seven OBO Foundry ontologies. Ontologies reuse each other's terms: HP, for
-example, uses Uberon's terms for body parts. Only each ontology's own terms
+Seven OBO Foundry ontologies are read. Ontologies reuse each other's terms: HP,
+for example, uses Uberon's terms for body parts. Only each ontology's own terms
 are read, so each term is read once, from the ontology it belongs to.
 
 | table | one row per | columns |
@@ -165,7 +165,7 @@ abbreviation.
 
 ### Files and licenses
 
-Each license is the one the file states.
+Each ontology's file states its license.
 
 | ontology | file read | license |
 |---|---|---|
@@ -229,8 +229,8 @@ get it:
 - Download `Loinc_<version>.zip` from [loinc.org](https://loinc.org/downloads/)
   into `inputs/sources/downloads/loinc/`.
 
-Either way, the zip must have the MD5 checksum the manifest pins. A download
-must also have the one LOINC publishes for the release.
+Either way, the zip must have the MD5 checksum that the manifest pins. A
+download must also have the MD5 that LOINC publishes for the release.
 
 | table | one row per | columns |
 |---|---|---|
@@ -265,10 +265,11 @@ not open (see [Licenses](#licenses)).
 
 ## CDISC
 
-CDISC's controlled terminology, as NCI EVS publishes it, in four packages:
+CDISC's controlled terminology is read as NCI EVS publishes it, in four
+packages:
 
-- SDTM, for the data a clinical trial collects;
-- ADaM, for the data its analysis uses;
+- SDTM, for the data that a clinical trial collects;
+- ADaM, for the data that its analysis uses;
 - Protocol, for trial protocols;
 - the Glossary of clinical research terms.
 
@@ -297,8 +298,8 @@ restrictions", on its
 ## NIH CDE
 
 The NIH Common Data Elements Repository serves only its current state. The
-fetch uses the export `ai_harmonization.cde` uses, with retired elements
-included. The export is kept only when its count equals the total the
+fetch uses the export that `ai_harmonization.cde` uses, with retired elements
+included. The export is kept only when its count equals the total that the
 repository's search reports.
 
 The export is one JSON file, with one record per element. An element's lists,

@@ -1,11 +1,11 @@
 """The NIH CDE Repository: data elements with their names, definitions and values.
 
 The repository serves only its current state, through a one-call export of
-every element: the export ``ai_harmonization.cde`` also uses, with retired
+every element: the export that ``ai_harmonization.cde`` also uses, with retired
 elements included. Each element keeps its registration status, such as
-``Retired``. The export is kept, so a later fetch reads the same elements.
-Its count must equal the total the repository's search reports, or the
-export is not kept.
+``Retired``. The export is kept, so a later fetch reads the same elements. Its
+count must equal the total that the repository's search reports, or the export
+is not kept.
 """
 
 import json

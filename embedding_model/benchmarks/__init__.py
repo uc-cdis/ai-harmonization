@@ -4,14 +4,14 @@ Each benchmark is two CSV files under ``<inputs>/benchmarks/``:
 
 - ``<benchmark>_mappings.csv``: one row per source variable, with the keys of
   its expected targets, separated by ``;`` where there are several;
-- ``<benchmark>_targets.csv``: every target property a source is ranked
+- ``<benchmark>_targets.csv``: every target property that a source is ranked
   against, the expected ones and all the others.
 
 The files carry third-party text, so they are built from their published
 inputs rather than redistributed. A manifest committed under ``manifests/``
-pins those inputs -- a commit, a record, a release -- and records the SHA-256
-of every file built from them: a rebuild either matches it or names what
-differs.
+pins those inputs, such as a commit, a record or a release. It also records the
+SHA-256 of every file built from them. So a rebuild either matches it or names
+what differs.
 """
 
 import csv
@@ -105,13 +105,13 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
 def read_benchmark(inputs, name):
     """A built benchmark: its targets, its mappings and its manifest.
 
-    Each file must have the SHA-256 its manifest records. So scores made from
-    the files can name exactly what was scored. Each file is read once, and
-    the bytes checked are the bytes parsed. A warning is printed when the
+    Each file must have the SHA-256 that its manifest records. So scores made
+    from the files can name exactly what was scored. Each file is read once,
+    and the bytes checked are the bytes parsed. A warning is printed when the
     build's version is not the version committed under ``manifests/``.
 
     Args:
-        inputs (Path): The inputs folder the benchmark was built into.
+        inputs (Path): The inputs folder that the benchmark was built into.
         name (str): The benchmark, such as ``topmed``.
 
     Returns:
@@ -164,13 +164,13 @@ def read_benchmark(inputs, name):
 
 
 def build(names, inputs, update_manifest=False):
-    """Build benchmarks from the inputs their committed manifests pin.
+    """Build benchmarks from the inputs that their committed manifests pin.
 
     Each build is written to a staging folder first. If it matches the
     committed manifest, or ``update_manifest`` accepts it, its files replace
-    the working ones; if not, the differences are printed, the working files
-    are left as they were, and the exit status is 1. A version committed in
-    git never changes: a differing build is accepted only under a version not
+    the working ones. If not, the differences are printed, the working files
+    are left as they were, and the exit status is 1. A version committed in git
+    never changes: a differing build is accepted only under a version not
     committed yet, and not at all when git cannot be asked.
 
     Args:

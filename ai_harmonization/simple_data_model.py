@@ -228,12 +228,16 @@ class SimpleDataModel(BaseModel):
         Accepts input as a json string or a parsed dict.
 
         A property's description, type and values come from the property
-        itself where it gives them. Where it gives none, they are taken from
-        where the dictionary keeps them instead: a description shared by many
-        nodes from `common` (or the property's `term`), a type and values from
-        its `oneOf` options, an array's allowed values from `items`; a
-        property with values but no type is an `enum`. Those fallbacks accept
-        any shape without raising, so whether this converter succeeds on a
+        itself where it gives them. Where it gives none, they come from where
+        the dictionary keeps them instead:
+
+        - a description shared by many nodes, from `common` (or the
+          property's `term`);
+        - a type and values, from its `oneOf` options;
+        - an array's allowed values, from `items`.
+
+        A property with values but no type is an `enum`. Those fallbacks accept
+        any shape without raising. So whether this converter succeeds on a
         dictionary depends only on the property's own fields.
         """
         # If input is a string, parse it

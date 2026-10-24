@@ -17,8 +17,8 @@ python -m embedding_model benchmarks build --gdc
 The first build downloads the inputs into
 `embedding_model/inputs/benchmarks/downloads/<benchmark>/`. It takes a few
 minutes, most of it for dbGaP's variable summaries for TOPMed. A rebuild reuses
-the downloads and takes about half a minute. `--inputs DIR` puts everything a
-build writes under `DIR`, in place of `embedding_model/inputs/`; see
+the downloads and takes about half a minute. `--inputs DIR` puts everything
+that a build writes under `DIR`, in place of `embedding_model/inputs/`; see
 [Inputs and outputs](../README.md#inputs-and-outputs).
 
 Every build is checked against the benchmark's committed manifest; see
@@ -31,17 +31,18 @@ can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 Each benchmark is two files under `embedding_model/inputs/benchmarks/`:
 
 - **`<benchmark>_mappings.csv`**: one row per source variable, with its
-  expected targets: the targets the experts mapped it to, any of which counts
-  as correct. Each is one mapping. GDC's experts named a property without its
-  node. So on GDC, each node that carries the property gives a target of its
-  own: see [Which targets a variable maps to](#which-targets-a-variable-maps-to).
+  expected targets: the targets that the experts mapped it to. Any of them
+  counts as correct. Each is one mapping. GDC's experts named a property
+  without its node. So on GDC, each node that carries the property gives a
+  target of its own: see
+  [Which targets a variable maps to](#which-targets-a-variable-maps-to).
 - **`<benchmark>_targets.csv`**: one row per target property. A format turns
-  each row into the text the model reads on the target side.
+  each row into the text that the model reads on the target side.
   [scoring.md](scoring.md#running-score) lists the formats.
 
 [The columns](#the-columns) lists every column of both files. Both files keep
-every value a variable or property has. The formatters cap how many values a
-prompt shows.
+every value that a variable or property has. The formatters cap how many values
+a prompt shows.
 
 **If you load the files in your own code:** one GDC target's values run to
 132,058 characters. That is over the 131,072 that Python's `csv` module reads
@@ -63,11 +64,12 @@ for is left empty.
 | `source_variable_name` | the variable's name in its table | `cac_agatston_score` | `Race` |
 | `source_type` | the variable's type, in the source's own words | `float`; also `integer`, `string` or `string/encoded` | `string`; also `number`, from the table's column |
 | `source_description` | the variable's description | from its data dictionary: "Coronary artery calcification score" | empty: GDC-SM describes no variable |
-| `source_values` | the variable's values, joined by ` \| ` | the value labels its data dictionary declares | the distinct values in the paper's table |
-| `expected_target` | the targets the experts mapped the variable to, joined by `;` | `atherosclerosis.cac_score_1` | `clinical.race;demographic.race` |
+| `source_values` | the variable's values, joined by ` \| ` | the value labels that its data dictionary declares | the distinct values in the paper's table |
+| `expected_target` | the targets that the experts mapped the variable to, joined by `;` | `atherosclerosis.cac_score_1` | `clinical.race;demographic.race` |
 
-The examples are one row of each benchmark. The TOPMed row is the one in
-[Which target a variable maps to](#which-target-a-variable-maps-to).
+The examples are one row of each benchmark.
+[Which target a variable maps to](#which-target-a-variable-maps-to) explains
+the TOPMed row.
 
 `<benchmark>_targets.csv`:
 
@@ -79,8 +81,8 @@ The examples are one row of each benchmark. The TOPMed row is the one in
 | `target_values` | the target's permissible values, joined by ` \| ` | its documented `encoded_values` | the dictionary's permissible values |
 
 A study is written without its version, so that every release of a study
-counts as the same study. A table and a variable keep the version the experts
-cited, because their text comes from that release.
+counts as the same study. A table and a variable keep the version that the
+experts cited, because their text comes from that release.
 
 ### Why the targets are a file of their own
 
@@ -139,7 +141,7 @@ harmonized variables. For each one, it lists the harmonization units, each a
 study or a subcohort of one. For each unit, it lists the dbGaP variables that
 the unit's harmonization function reads.
 
-Each dbGaP variable is cited with the release the experts used. Its name,
+Each dbGaP variable is cited with the release that the experts used. Its name,
 description and values come from that release's data dictionary. dbGaP
 publishes data dictionaries without controlled access. Only the cited tables
 are downloaded.
@@ -162,8 +164,8 @@ column is a target, written `node.property` with the dataset as the node:
 ### Which target a variable maps to
 
 The documentation lists a unit's variables without saying which is the
-phenotype and which the age. Its README says only that there is "at least one
-representing the phenotype itself, and at least one for the age at
+phenotype and which is the age. Its README says only that there is "at least
+one representing the phenotype itself, and at least one for the age at
 measurement". So the builder decides with a rule. A variable maps to the age
 target when both of these hold:
 
@@ -187,8 +189,9 @@ cites two variables of table `pht005002.v1` in dbGaP study `phs000956.v2`
 The rule is deterministic, and about 2% of variables get a debatable label:
 
 - Dates that feed the age map to the phenotype, for example "DATE OF TEST,
-  NUMBER OF DAYS SINCE EXAM 1" and "CT scan date". So do helpers that the
-  function uses, such as a cohort identifier or an attendance flag.
+  NUMBER OF DAYS SINCE EXAM 1" and "CT scan date". Helpers that the function
+  uses map to the phenotype too, such as a cohort identifier or an attendance
+  flag.
 - In the incident and prior event variables, the event, its date and the
   follow-up dates feed both the status and the age at event. They map to the
   phenotype.
@@ -204,8 +207,8 @@ The rule is deterministic, and about 2% of variables get a debatable label:
   the same in every release cited, and only the accession's version differs.
 
 Each variable's type comes from its table's variable report.
-`ai_harmonization.dbgap` reads it as for any study, so the benchmark sees the
-same text the harmonization approaches see.
+`ai_harmonization.dbgap` reads it as it reads any study's, so the benchmark
+sees the same text that the harmonization approaches see.
 
 ### License
 
@@ -228,7 +231,7 @@ Variables from the supplementary tables of ten cancer papers, mapped by
 experts to the GDC data dictionary. As built here, the benchmark has **165
 source variables with 298 expected mappings, and 1,217 targets**.
 
-Built from three published inputs:
+It is built from three published inputs:
 
 - the ground truth of **GDC-SM**, the GDC Schema Matching Benchmark (CC BY
   4.0): 259 mappings from a paper's variable to a GDC property;
@@ -253,26 +256,26 @@ checked through the GDC API on 2026-10-22, by looking up the table's case ids.
 Every data property of the dictionary is a target, as `node.property`, with its
 type, description and values. `SimpleDataModel.from_gdc_model` reads the
 dictionary as the harmonization approaches read it, so a target's text is the
-text they build. These properties are not targets:
+text that they build. These properties are not targets:
 
 - link properties, which point to other nodes rather than hold data;
-- the bookkeeping fields each node lists as `systemProperties`, such as `id`,
-  `created_datetime` and `state`;
+- the bookkeeping fields that each node lists as `systemProperties`, such as
+  `id`, `created_datetime` and `state`;
 - every node's `type`, which holds the node's own name;
 - the JSON meta-schema and the root, which the API serves beside the nodes.
 
 The GDC API serves only the current dictionary. So the manifest records its
 data release and the SHA-256 of its content, with keys sorted. A build on a
 changed dictionary then shows as a different benchmark. After GDC publishes a
-new dictionary, a build reports the difference and keeps the files it had. To
-build from the new dictionary, raise the benchmark's version; see
+new dictionary, a build reports the difference and keeps the files that it had.
+To build from the new dictionary, raise the benchmark's version; see
 [Making a new version](manifests.md#making-a-new-version). Version 2's
 dictionary is gdcdictionary release
 [4.0.3](https://github.com/NCI-GDC/gdcdictionary/releases/tag/4.0.3) (commit
 `bd56b99`). Its schemas, with their `$ref`s resolved as gdcdictionary's own
 loader resolves them, are identical to what the API served (checked
-2026-10-14). The dictionary that version 2 was built from on 2026-10-22 has
-the same SHA-256 as the one checked.
+2026-10-14). The dictionary that version 2 was built from on 2026-10-22 has the
+same SHA-256 as the dictionary checked then.
 
 ### Which targets a variable maps to
 

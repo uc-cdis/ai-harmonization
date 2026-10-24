@@ -18,8 +18,8 @@ TIMEOUT_SECONDS = 180
 # before an answer starts. It is tried up to 5 more times, at once and then
 # after 2, 4, 8 and 16 seconds, or as long as the server's Retry-After asks.
 # A connection lost while the answer arrives is not tried again: nothing is
-# kept, so the next fetch asks again. A POST is retried too, since the
-# services posted to here only read.
+# kept, so the next fetch asks again. A POST is retried too, since the services
+# that receive these POSTs only read data.
 RETRIES = Retry(
     total=5,
     backoff_factor=1,
@@ -72,7 +72,7 @@ def keep(path, data):
 
 @functools.cache
 def session():
-    """The requests session every download shares, retrying as RETRIES says.
+    """The requests session that every download shares, retrying as RETRIES says.
 
     One session is kept, so many requests to one server reuse a connection.
     """

@@ -22,7 +22,7 @@ def pinned(manifest, name):
 
 
 def report_new(values, known, field, outcome):
-    """Print each value of a field that is not among the known ones, with its count.
+    """Print each value of a field that is not among the known values, with its count.
 
     Args:
         values (pd.Series): The field, one value per item.
@@ -46,7 +46,7 @@ def open_where(values, allowed, closed, field):
     Args:
         values (pd.Series): The field, one value per item.
         allowed (set[str]): The values known to be open.
-        closed (set[str]): The values known not to be.
+        closed (set[str]): The values known to be closed.
         field (str): The field's name, for the report.
 
     Returns:

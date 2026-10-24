@@ -111,10 +111,10 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     """Rank every target for each source, and score the ranks.
 
     Targets are ranked by cosine similarity. The evaluator gives the results
-    two ways. What it returns, in memory, is the averages: MRR and accuracy@k
-    over all source variables. Its predictions file, written to a temporary
-    folder, holds each source variable's full ranking. Each source variable's
-    rank and top-1 target are read from that file, and the folder is deleted.
+    two ways. It returns the averages in memory: MRR and accuracy@k over all
+    source variables. Its predictions file, written to a temporary folder,
+    holds each source variable's full ranking. Each source variable's rank and
+    top-1 target are read from that file, and the folder is deleted.
 
     Args:
         model (SentenceTransformer): The model to score.
@@ -133,8 +133,8 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     # evaluator would add the model's "query" and "document" prompts instead.
     # A model with a Router module still has its two sides routed apart.
     #
-    # The approaches rank by cosine similarity, whatever similarity function a
-    # model's config names, so the evaluator does too.
+    # The approaches rank by cosine similarity, even when a model's config
+    # names another similarity function. So the evaluator ranks by cosine too.
     from sentence_transformers.util import cos_sim
 
     prompt = model.prompts.get(model.default_prompt_name, "")
@@ -217,7 +217,7 @@ def model_revision(model):
     """The Hugging Face commit of a model loaded by its id, read from the cache.
 
     Loading a model by id downloads it into the Hugging Face cache, under its
-    commit. The commit is read from there, with no network, in the cache
+    commit. The commit is read from there, with no network, in the cache that
     SentenceTransformer uses: ``SENTENCE_TRANSFORMERS_HOME``, where set.
 
     The id is looked up as given. SentenceTransformer reads an id with no
@@ -229,7 +229,7 @@ def model_revision(model):
 
     Returns:
         str | None: The commit, or None for a model folder on disk or an id
-            the cache does not hold.
+            that the cache does not hold.
     """
     if Path(model).is_dir():
         return None
@@ -260,8 +260,8 @@ def scores_folder(outputs, model, benchmark, text_format):
       ``scores/abcd-model/topmed/compact``.
 
     It tells them apart as SentenceTransformer does: an existing folder is a
-    model on disk, anything else a Hugging Face id. A downloaded Hugging Face
-    model sits in the Hugging Face cache under another name
+    model on disk, and anything else is a Hugging Face id. A downloaded Hugging
+    Face model sits in the Hugging Face cache under another name
     (``models--uc-ctds--StdElement-Mapper``), so its id stays an id.
 
     The format has a folder of its own, so a model scored in two formats keeps
@@ -271,7 +271,7 @@ def scores_folder(outputs, model, benchmark, text_format):
         outputs (Path): The outputs folder.
         model (str): The Hugging Face model id or folder that was scored.
         benchmark (str): The benchmark.
-        text_format (str): The key of FORMATS the texts were written in.
+        text_format (str): The key of FORMATS that the texts were written in.
 
     Returns:
         Path: ``<outputs>/scores/<model>/<benchmark>/<format>``.
@@ -285,13 +285,13 @@ def write_scores(folder, row, mappings, ranked, config):
     """Write one scoring's files: metrics.csv, per_variable.csv and config.yaml.
 
     The old config.yaml is removed first and the new one written last. So a
-    folder with a config.yaml always holds the scores that config describes.
+    folder with a config.yaml always holds the scores that this config
+    describes.
 
     Args:
         folder (Path): The scores folder, from scores_folder.
         row (dict): The metrics row.
-        mappings (pd.DataFrame): The benchmark's mappings, in the order they
-            were ranked.
+        mappings (pd.DataFrame): The benchmark's mappings, in ranking order.
         ranked (dict): Each source variable's rank and top-1 target, by row
             number, from rank_targets.
         config (dict): What config.yaml holds.
@@ -342,10 +342,9 @@ def score(
     Args:
         model (str): A Hugging Face model id or a model folder on disk.
         benchmarks (list[str]): The benchmarks, such as ``["topmed"]``.
-        inputs (Path): The inputs folder the benchmarks were built into.
+        inputs (Path): The inputs folder that the benchmarks were built into.
         outputs (Path): The outputs folder.
-        text_format (str): A key of FORMATS: the shape the texts are written
-            in.
+        text_format (str): A key of FORMATS: the shape of the texts.
         device (str | None): ``cpu`` or ``cuda``. None uses a GPU if there is
             one, and the CPU otherwise.
         batch_size (int): Texts encoded at a time.

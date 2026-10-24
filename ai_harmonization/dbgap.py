@@ -51,11 +51,11 @@ CSV_HEADERS = [
 
 
 def map_dbgap_type(spelling):
-    """Map a dbGaP type name to the type a SimpleDataModel uses.
+    """Map a dbGaP type name to the type that a SimpleDataModel uses.
 
     dbGaP can give several type names separated by commas, such as
-    ``integer, encoded value``; the first one DBGAP_TYPE_MAP knows is used, so
-    that example is an integer.
+    ``integer, encoded value``. The first name that DBGAP_TYPE_MAP knows is
+    used, so that example is an integer.
 
     Args:
         spelling (str | None): The type as dbGaP gives it.
@@ -74,12 +74,12 @@ def resolve_variable_type(calculated, declared, has_codes):
 
     A variable can have two types: one declared in the study's data
     dictionary, and one calculated by dbGaP from the data itself, in the
-    variable report. Declarations are sometimes inaccurate and calculated
-    types more precise, so a specific calculated type -- a number or an
-    enumeration -- is returned. If the calculated type is the generic
-    ``string``, or there is none, the declared type is returned, except that a
-    variable with value codes that is not declared a number is
-    ``string/encoded``. If neither gives a type, ``string``.
+    variable report. Declarations are sometimes inaccurate, and calculated
+    types are more precise. So a specific calculated type, a number or an
+    enumeration, is returned. If the calculated type is the generic ``string``,
+    or there is none, the declared type is returned. A variable with value
+    codes that is not declared a number is ``string/encoded``, though. If
+    neither gives a type, the type is ``string``.
 
     Args:
         calculated (str | None): The calculated type, from the variable report.

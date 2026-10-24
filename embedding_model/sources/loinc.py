@@ -1,10 +1,9 @@
 """LOINC: codes and their names, question texts, answer lists and replacements.
 
-A release is pinned by its version, such as ``2.83``, and by the MD5 the
-manifest records for it. The release zip needs a free
-loinc.org account. With ``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, it is
-downloaded through LOINC's API. Without them, it can be placed by hand in the
-downloads folder.
+A release is pinned by its version, such as ``2.83``, and by the MD5 that the
+manifest records for it. The release zip needs a free loinc.org account. With
+``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, it is downloaded through LOINC's
+API. Without them, it can be placed by hand in the downloads folder.
 
 Only named columns are read. The SNOMED CT codes and names that the answer
 file carries in columns of their own are never read: LOINC's license does not
@@ -100,8 +99,8 @@ def read_release(archive):
     """The named columns of LOINC's tables, from a release zip.
 
     A code, and a form's row, are open when their RESTRICTION_FIELDS are
-    empty. A form's row is also closed when its code carries a notice, or
-    when a row it is nested in is closed: forms nest panels several levels
+    empty. A form's row is also closed when its code carries a notice, or when
+    a row that it is nested in is closed: forms nest panels several levels
     deep. With closed rows left out, a code is open when it sits in an open
     row, or in no form and has no notice of its own.
 
@@ -114,8 +113,8 @@ def read_release(archive):
             ``forms`` have an ``open`` column.
 
     Raises:
-        KeyError: If the zip lacks one of the tables, or a table one of the
-            columns.
+        KeyError: If the zip lacks one of the tables, or a table lacks one of
+            the columns.
     """
     tables = {}
     with zipfile.ZipFile(archive) as bundle:
@@ -143,7 +142,7 @@ def read_release(archive):
 
     @functools.cache
     def closed(row):
-        """Whether a row, or a row it is nested in, is closed."""
+        """Whether a row, or a row that it is nested in, is closed."""
         return own[row] or (parent[row] != row and closed(parent[row]))
 
     forms["open"] = ~forms.ID.map(closed)
@@ -162,8 +161,9 @@ def md5_check(expected):
     """A check, for ``downloaded``, that a zip has every MD5 it should.
 
     Args:
-        expected (dict[str, str | None]): Each MD5 the zip must have, by whose
-            it is, such as ``LOINC 2.83's``. A missing one is not checked.
+        expected (dict[str, str | None]): Each MD5 that the zip must have,
+            keyed by what it belongs to, such as ``LOINC 2.83's``. A missing
+            MD5 is not checked.
 
     Returns:
         Callable[[bytes], None]: The check.
@@ -183,12 +183,12 @@ def md5_check(expected):
 
 
 def fetch_source(downloads, manifest):
-    """Fetch the LOINC release the manifest pins.
+    """Fetch the LOINC release that the manifest pins.
 
     The zip is downloaded through LOINC's API when credentials are set. It
-    is kept only if it has the MD5 the API publishes for the release, and the
-    MD5 the manifest pins, once it pins one. A zip placed by hand must have
-    the pinned MD5 too.
+    is kept only if it has the MD5 that the API publishes for the release, and
+    the MD5 that the manifest pins, once it pins one. A zip placed by hand must
+    have the pinned MD5 too.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
@@ -202,7 +202,7 @@ def fetch_source(downloads, manifest):
     Raises:
         FileNotFoundError: If the zip is neither in the downloads folder nor
             downloadable without credentials.
-        ValueError: If the zip's MD5 is not the release's.
+        ValueError: If the zip's MD5 differs from the release's MD5.
     """
     pin = pinned(manifest, RELEASE)
     version = pin["version"]

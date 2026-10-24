@@ -188,7 +188,7 @@ class TestParseDbgapTable:
         assert types == {"AGE": "integer", "BMI": "float"}
 
     def test_coded_answers_are_encoded_when_the_report_computes_string(self, tmp_path):
-        """Y/N answers the report computes as string are encoded, by codes or by declaration."""
+        """Y/N answers that the report computes as string are encoded, by codes or by declaration."""
         path = tmp_path / "pht999995.v1_data_dict.xml"
         path.write_text(
             '<data_table id="pht999995.v1" study_id="phs999999">'
@@ -226,7 +226,7 @@ class TestMapDbgapType:
         ],
     )
     def test_types(self, declared, expected):
-        """Each spelling maps by its first part the map knows; one it does not know, to None."""
+        """A spelling maps by the first part that the map knows, or else to None."""
         assert map_dbgap_type(declared) == expected
 
 

@@ -22,7 +22,8 @@ def model():
     age, sex and race are each their own direction. gender lies between race
     (0.8) and sex (0.6), so a gender variable sits closer to race than to sex.
     The mistake is on purpose: it lets the tests check a variable whose
-    expected target is not ranked first. GENDER's, demographic.sex, comes third.
+    expected target is not ranked first. GENDER's expected target,
+    demographic.sex, comes third.
     """
     from sentence_transformers import SentenceTransformer
 
@@ -108,7 +109,7 @@ def inputs(tmp_path):
 
 class TestBenchmarkTexts:
     def test_an_expected_target_not_in_the_targets_is_an_error(self, tmp_path):
-        """An expected target the benchmark's targets do not have stops scoring."""
+        """An expected target that the benchmark's targets do not have stops scoring."""
         unknown = [mapping("AGE01", "Age", ["demographic.age", "z.missing"])]
         targets, mappings, _ = benchmarks.read_benchmark(
             built(tmp_path, unknown), "topmed"
@@ -119,7 +120,7 @@ class TestBenchmarkTexts:
 
 class TestRankTargets:
     def test_ranks_and_metrics(self, model, inputs):
-        """A source variable's rank is that of its best placed expected target.
+        """A source variable's rank is the rank of its best placed expected target.
 
         The metrics come from those ranks.
         """
@@ -167,7 +168,7 @@ class TestRankTargets:
         assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
 
     def test_targets_are_ranked_by_cosine(self, model, inputs):
-        """Targets are ranked by cosine, whatever similarity the model's config names."""
+        """Targets are ranked by cosine, even when the model's config names another similarity."""
         model.similarity_fn_name = "dot"
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         metrics, ranked = scoring.rank_targets(
@@ -236,7 +237,7 @@ class TestScore:
         assert "They are replaced by those of" in capsys.readouterr().err
 
     def test_an_empty_config_is_replaced_quietly(self, saved, inputs, capsys, tmp_path):
-        """An empty config.yaml, as an interrupted write leaves, is replaced with no warning."""
+        """An empty config.yaml, left by an interrupted write, is replaced with no warning."""
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
         folder = folder / texts.DEFAULT_FORMAT
         folder.mkdir(parents=True)
@@ -309,13 +310,13 @@ class TestModelRevision:
         assert scoring.model_revision(str(tmp_path)) is None
 
     def test_a_hugging_face_model_gives_its_cached_commit(self, monkeypatch, tmp_path):
-        """A model loaded by id gives the commit its cached copy was downloaded at."""
+        """A model loaded by id gives the commit that its cached copy was downloaded at."""
         self.cached(tmp_path, "abcd-org/abcd-model")
         monkeypatch.setenv("SENTENCE_TRANSFORMERS_HOME", str(tmp_path))
         assert scoring.model_revision("abcd-org/abcd-model") == "abcd1234"
 
     def test_a_model_not_in_the_cache_has_none(self, monkeypatch, tmp_path):
-        """A model the cache does not hold gives None, and scoring goes on."""
+        """A model that the cache does not hold gives None, and scoring goes on."""
         monkeypatch.setenv("SENTENCE_TRANSFORMERS_HOME", str(tmp_path))
         assert scoring.model_revision("abcd-org/abcd-model") is None
 

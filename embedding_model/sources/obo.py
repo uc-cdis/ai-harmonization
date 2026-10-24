@@ -4,12 +4,12 @@ Ontologies reuse each other's terms, so only each ontology's own terms are
 read. The file read for each:
 
 - MONDO, HP, Uberon and OBA: the base release, which leaves out the terms
-  borrowed from other ontologies, at the date the manifest pins;
-- DUO: its main release, at the date the manifest pins;
-- CMO and MMO: their main file. No dated file can be downloaded, so the
-  current one is kept after the first fetch, as a service's is.
+  borrowed from other ontologies, at the date that the manifest pins;
+- DUO: its main release, at the date that the manifest pins;
+- CMO and MMO: their main file. No dated file can be downloaded, so their
+  current file is kept after the first fetch, as for a service.
 
-Each ontology's license is the one its file states.
+Each ontology's file states its license.
 """
 
 import re
@@ -42,7 +42,7 @@ SCOPES = {
     OBO_IN_OWL + f"has{scope.title()}Synonym": scope
     for scope in ("EXACT", "BROAD", "NARROW", "RELATED")
 }
-# The properties an ontology's header can state its license with.
+# The properties that an ontology's header can state its license with.
 LICENSES = ("{http://purl.org/dc/terms/}license", "{" + PURL + "/}terms_license")
 # A class is obsolete when deprecated, or when it is a subclass of this.
 OBSOLETE_CLASS = "http://www.geneontology.org/formats/oboInOwl#ObsoleteClass"
@@ -87,7 +87,7 @@ def read_ontology(stream, ontology):
     such as ``HP:``. A term needs a name, its ``rdfs:label``, such as "Short
     stature", unless it is obsolete. An obsolete term is kept with what
     replaced it, even without a name. A term can have several definitions,
-    and a synonym several types, so all are kept.
+    and a synonym can have several types. All are kept.
 
     Args:
         stream (file): The OWL file, opened in binary mode.
@@ -159,7 +159,7 @@ def read_ontology(stream, ontology):
 
 
 def fetch_source(downloads, manifest):
-    """Fetch every ontology at the release the manifest pins.
+    """Fetch every ontology at the release that the manifest pins.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.

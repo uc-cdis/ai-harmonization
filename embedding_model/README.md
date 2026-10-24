@@ -210,10 +210,8 @@ There are two benchmarks:
   targets. It is held back, and scored once on a series' pick (the series'
   winner).
 
-[docs/benchmarks.md](docs/benchmarks.md) describes each one:
-
-- what it is built from, and how to build it or make a new version;
-- its license, and how to cite it.
+[docs/benchmarks.md](docs/benchmarks.md) describes what each one is built from,
+and how to build it or make a new version.
 
 `get_metrics_for_approach` evaluates a harmonization approach end to end. The
 approach suggests a set of mappings for a source and a target model, and the
@@ -278,7 +276,8 @@ or a new fetch either matches its manifest or names what does not.
 [docs/manifests.md](docs/manifests.md) says how a new version is accepted. The
 files themselves carry third-party text, such as dbGaP variable descriptions,
 the GDC dictionary and LOINC's names. So they are built rather than
-redistributed.
+redistributed. [docs/licenses.md](docs/licenses.md) gives the license and
+reference of each benchmark and source.
 
 ## Running experiments
 

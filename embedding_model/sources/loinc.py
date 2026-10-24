@@ -25,7 +25,7 @@ RELEASE = "LOINC release"
 METADATA = "https://loinc.regenstrief.org/api/v1/Loinc?version={version}"
 DOWNLOAD = "https://loinc.regenstrief.org/api/v1/Loinc/Download?version={version}"
 LICENSE = "LOINC License (https://loinc.org/license/)"
-CITATION = "embedding_model/docs/sources.md#loinc"
+CITATION = "embedding_model/docs/licenses.md#loinc"
 TABLES = {
     "codes": (
         "LoincTable/Loinc.csv",

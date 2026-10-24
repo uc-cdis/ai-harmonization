@@ -52,7 +52,7 @@ OBSOLETE_CLASS = "http://www.geneontology.org/formats/oboInOwl#ObsoleteClass"
 OBSOLETE_PREFIX = re.compile(r"^(obsoleted?\s+)+", re.IGNORECASE)
 VERSION_IRI = OWL + "versionIRI"
 RELEASED = re.compile(r"/releases/(\d{4}-\d{2}-\d{2})/")
-CITATION = "embedding_model/docs/sources.md#ontologies"
+CITATION = "embedding_model/docs/licenses.md#ontologies"
 
 
 def release_name(ontology):

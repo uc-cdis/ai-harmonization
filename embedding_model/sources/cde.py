@@ -25,7 +25,7 @@ LICENSE = (
     "U.S. government works are free to use; others may be copyrighted, as each "
     "element's copyrightStatus says (https://www.nlm.nih.gov/web_policies.html)"
 )
-CITATION = "embedding_model/docs/sources.md#nih-cde"
+CITATION = "embedding_model/docs/licenses.md#nih-cde"
 
 
 def search_total():

@@ -33,7 +33,7 @@
       "fetched": "2026-10-19",
       "sha256": "71df35259222cb41a289e0c8507b5d042aa2f472e8a3946ab4afe447ca8b1661",
       "license": "most protocols are freely available, and some have limited availability, as each protocol's availability says (https://www.phenxtoolkit.org/help/faq)",
-      "citation": "embedding_model/docs/sources.md#phenx"
+      "citation": "embedding_model/docs/licenses.md#phenx"
     }
   ]
 }

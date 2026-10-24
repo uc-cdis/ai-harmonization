@@ -25,7 +25,7 @@ LICENSE = (
     "Measure Permission document marks exceptions "
     "(https://www.cancer.gov/policies/copyright-reuse)"
 )
-CITATION = "embedding_model/docs/sources.md#cadsr"
+CITATION = "embedding_model/docs/licenses.md#cadsr"
 # An element with this reference document is part of a proprietary measure,
 # whose owner's permission is needed: caDSR's restriction field.
 PROPRIETARY = "Proprietary Measure Permission"

@@ -32,7 +32,7 @@
       "version": "26.09d",
       "sha256": "a6b0897dc68ac9c9312e5d09db1c3d7caf1c6572452942e89cc4506c70f1877e",
       "license": "CC BY 4.0 (https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)",
-      "citation": "embedding_model/docs/sources.md#ncit"
+      "citation": "embedding_model/docs/licenses.md#ncit"
     },
     {
       "role": "service",
@@ -41,7 +41,7 @@
       "fetched": "2026-10-22",
       "sha256": "546d3077d8ed9024c69a077f1215b6ecdea92445b0b86f09a78587fac42d489b",
       "license": "CC BY 4.0 (https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)",
-      "citation": "embedding_model/docs/sources.md#ncit"
+      "citation": "embedding_model/docs/licenses.md#ncit"
     }
   ]
 }

@@ -29,7 +29,7 @@ HISTORY_BATCH = 100
 LICENSE = (
     "CC BY 4.0 (https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)"
 )
-CITATION = "embedding_model/docs/sources.md#ncit"
+CITATION = "embedding_model/docs/licenses.md#ncit"
 NCIT = "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#"
 # NCIt's own annotation properties, by their codes in the OWL file.
 PREFERRED_NAME = "P108"

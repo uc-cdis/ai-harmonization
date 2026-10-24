@@ -19,7 +19,7 @@
       "location": "https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes",
       "version": "14960eb088d9057f3fcd04c65f609a31e0d981a1",
       "license": "none stated",
-      "citation": "embedding_model/docs/benchmarks.md#topmed"
+      "citation": "embedding_model/docs/licenses.md#topmed"
     },
     {
       "role": "source text",

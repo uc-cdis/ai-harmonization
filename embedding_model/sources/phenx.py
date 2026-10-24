@@ -23,7 +23,7 @@ LICENSE = (
     "most protocols are freely available, and some have limited availability, "
     "as each protocol's availability says (https://www.phenxtoolkit.org/help/faq)"
 )
-CITATION = "embedding_model/docs/sources.md#phenx"
+CITATION = "embedding_model/docs/licenses.md#phenx"
 TABLES = {
     "variables",
     "protocols",

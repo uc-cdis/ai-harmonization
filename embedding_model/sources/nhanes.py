@@ -55,7 +55,7 @@ CODEBOOK_FIELDS = {
     "Hard Edits:": "hard_edits",
 }
 LICENSE = "public domain (https://www.cdc.gov/other/agencymaterials.html)"
-CITATION = "embedding_model/docs/sources.md#nhanes"
+CITATION = "embedding_model/docs/licenses.md#nhanes"
 
 
 def cycle(begin_year):

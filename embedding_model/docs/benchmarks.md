@@ -210,20 +210,7 @@ Each variable's type comes from its table's variable report.
 `ai_harmonization.dbgap` reads it as it reads any study's, so the benchmark
 sees the same text that the harmonization approaches see.
 
-### License
-
-The documentation repository states no license.
-
-### Reference
-
-> Stilp, A. M., Emery, L. S., Broome, J. G., Buth, E. J., Khan, A. T.,
-> Laurie, C. A., Wang, F. F., Wong, Q., Chen, D., D'Augustine, C. M.,
-> Heard-Costa, N. L., Hohensee, C. R., Johnson, W. C., Juarez, L. D., Liu, J.,
-> Mutalik, K. M., Raffield, L. M., Wiggins, K. L., de Vries, P. S., et al.
-> (2021). A System for Phenotype Harmonization in the National Heart, Lung,
-> and Blood Institute Trans-Omics for Precision Medicine (TOPMed) Program.
-> *American Journal of Epidemiology*, *190*(10), 1977–1992.
-> https://doi.org/10.1093/aje/kwab115
+[licenses.md](licenses.md#topmed) gives its license and reference.
 
 ## GDC
 
@@ -233,13 +220,13 @@ source variables with 298 expected mappings, and 1,217 targets**.
 
 It is built from three published inputs:
 
-- the ground truth of **GDC-SM**, the GDC Schema Matching Benchmark (CC BY
-  4.0): 259 mappings from a paper's variable to a GDC property;
+- the ground truth of **GDC-SM**, the GDC Schema Matching Benchmark: 259
+  mappings from a paper's variable to a GDC property;
 - the ten papers' **supplementary tables**, downloaded from their
   publishers, for each variable's type and values. They are prepared as
   GDC-SM's own download script prepares them (`gdc_download.py` in the Zenodo
   record). GDC-SM describes no variable, so the description is empty.
-- the live **GDC submission dictionary** (Apache-2.0), for the targets.
+- the live **GDC submission dictionary**, for the targets.
 
 Each variable's study is the dbGaP study of its paper's cohort:
 
@@ -296,28 +283,4 @@ The GDC benchmark built by
 (`harmonization_benchmark_real_GDC_v0.0.1`) maps each property to one node
 only, so its scores and these are not comparable.
 
-### Licenses
-
-The ground truth is CC BY 4.0, and the GDC dictionary is Apache-2.0. Seven of
-the ten papers are published under CC BY-NC-ND, a Creative Commons
-NoDerivatives license. It allows sharing a file as published, but not a
-modified version of it. A benchmark table is a modified version: it is repaired
-and joined to the expert mappings. So GDC-SM distributes only the ground truth,
-with instructions for rebuilding the tables from the publishers' originals.
-Likewise, this repository distributes no benchmark files: the builder downloads
-the originals and makes the tables on your machine.
-
-### References
-
-> Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
-> Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
-> (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
-
-> Liu, Y., Pena, E. H. M., Santos, A., Wu, E., & Freire, J. (2025). Magneto:
-> Combining Small and Large Language Models for Schema Matching. *Proceedings
-> of the VLDB Endowment*, *18*(8), 2681–2694.
-> https://doi.org/10.14778/3742728.3742757
-
-Magneto's code: [VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher).
-Each paper's table, with its SHA-256, and its article's DOI are listed in
-`embedding_model/benchmarks/manifests/gdc.json`.
+[licenses.md](licenses.md#gdc) gives its license and reference.

@@ -38,7 +38,7 @@ LICENSE = (
     "free to use, without licensing restrictions "
     "(https://www.cancer.gov/research/resources/terminology/cdisc)"
 )
-CITATION = "embedding_model/docs/sources.md#cdisc"
+CITATION = "embedding_model/docs/licenses.md#cdisc"
 
 
 def release_name(package):

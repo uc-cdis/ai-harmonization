@@ -375,7 +375,7 @@ def build(downloads, manifest):
             # by the API is not a new dictionary.
             "sha256": sha256(json.dumps(dictionary, sort_keys=True).encode()),
             "license": "Apache-2.0",
-            "citation": "embedding_model/docs/benchmarks.md#gdc",
+            "citation": "embedding_model/docs/licenses.md#gdc",
         },
     ]
     return targets, mappings, sources

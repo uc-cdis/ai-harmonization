@@ -28,7 +28,7 @@
       "version": "2026-07-01",
       "sha256": "68a99b43cd763b063394b545e1ff02f38051927bf8a50c8d7cb1c388e2d39748",
       "license": "NCI's text is free of copyright unless otherwise indicated; the Proprietary Measure Permission document marks exceptions (https://www.cancer.gov/policies/copyright-reuse)",
-      "citation": "embedding_model/docs/sources.md#cadsr"
+      "citation": "embedding_model/docs/licenses.md#cadsr"
     }
   ]
 }

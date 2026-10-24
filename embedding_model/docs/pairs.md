@@ -88,7 +88,7 @@ the fields that each source uses for them.
 
 An item is used only when its source's restriction field allows it. The
 source's tables mark this in their `open` column (see
-[Licenses](sources.md#licenses)).
+[Restricted items](licenses.md#restricted-items)).
 
 ### The canonical
 

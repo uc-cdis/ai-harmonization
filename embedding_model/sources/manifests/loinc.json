@@ -33,7 +33,7 @@
       "md5": "057ddf203164705d5a4c3604257060a4",
       "sha256": "077a0718e87d8309ffe3a673f75b836a8e783dc36a646413ef97c71c12eab27e",
       "license": "LOINC License (https://loinc.org/license/)",
-      "citation": "embedding_model/docs/sources.md#loinc"
+      "citation": "embedding_model/docs/licenses.md#loinc"
     }
   ]
 }

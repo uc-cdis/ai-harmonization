@@ -36,7 +36,7 @@
       "fetched": "2026-10-22",
       "sha256": "2b17a28e31976856d8c3c9d58ec0593d9b6361b48951f1c91b6c7e08b20b1b0c",
       "license": "U.S. government works are free to use; others may be copyrighted, as each element's copyrightStatus says (https://www.nlm.nih.gov/web_policies.html)",
-      "citation": "embedding_model/docs/sources.md#nih-cde"
+      "citation": "embedding_model/docs/licenses.md#nih-cde"
     }
   ]
 }

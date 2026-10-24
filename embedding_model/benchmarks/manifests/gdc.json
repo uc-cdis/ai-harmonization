@@ -19,7 +19,7 @@
       "location": "https://doi.org/10.5281/zenodo.14963588",
       "version": "14963588",
       "license": "CC BY 4.0",
-      "citation": "embedding_model/docs/benchmarks.md#gdc",
+      "citation": "embedding_model/docs/licenses.md#gdc",
       "sha256": "cf5461feed28f4cdc263d68ddd910b25ebd16bf32be3aa0c7c00629abacc4a4a"
     },
     {
@@ -100,7 +100,7 @@
       "fetched": "2026-10-22",
       "sha256": "ad0e70170564ad07396ab5f6d1b135eb44c25edafd38c86cf08da121c9470a6f",
       "license": "Apache-2.0",
-      "citation": "embedding_model/docs/benchmarks.md#gdc"
+      "citation": "embedding_model/docs/licenses.md#gdc"
     }
   ]
 }

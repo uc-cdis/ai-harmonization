@@ -1,8 +1,10 @@
-"""Tests for SimpleDataModel.from_linkml_yaml() in ai_harmonization.simple_data_model."""
+"""Tests for SimpleDataModel.from_linkml_yaml() and from_gdc_model() in ai_harmonization.simple_data_model."""
 
+import json
 import textwrap
 
 import pytest
+from pydantic import ValidationError
 
 from ai_harmonization.simple_data_model import (
     DEFAULT_PROPERTY_DESCRIPTION,
@@ -295,3 +297,140 @@ class TestPermissibleValueForms:
         )
         model = SimpleDataModel.from_linkml_yaml(schema)
         assert model.nodes[0].properties[0].values is None
+
+
+class TestFromGdcModel:
+    DICTIONARY = {
+        "_definitions": {"ignored": {"type": "string"}},
+        "demographic": {
+            "description": "Demographic data.",
+            "properties": {
+                "race": {
+                    "type": ["string", "null"],
+                    "description": "Self-reported race.",
+                    "enum": ["asian", "white"],
+                },
+                "age_at_index": {
+                    "description": "Age at index.",
+                    "oneOf": [{"type": "integer"}, {"type": "null"}],
+                },
+                "vital_status": {
+                    "description": "Alive or dead.",
+                    "oneOf": [{"enum": ["Alive", "Dead"]}, {"type": "null"}],
+                },
+                "state": {"common": {"description": "The record's state."}},
+                "sites": {"type": "array", "items": {"enum": ["Lung", "Liver"]}},
+                "cases": {"anyOf": [{"items": {}}]},
+            },
+        },
+    }
+
+    def properties(self):
+        """The demographic node's properties, by name."""
+        model = SimpleDataModel.from_gdc_model(self.DICTIONARY)
+        (node,) = model.nodes
+        return {p.name: p for p in node.properties}
+
+    def test_every_property_is_kept_in_order(self):
+        """Every property is a Property, links included, in the dictionary's order."""
+        assert list(self.properties()) == [
+            "race",
+            "age_at_index",
+            "vital_status",
+            "state",
+            "sites",
+            "cases",
+        ]
+
+    def test_fields_the_property_gives_are_used_as_given(self):
+        """A property's own type, description and enum are kept unchanged."""
+        race = self.properties()["race"]
+        assert race.type == ["string", "null"]
+        assert race.description == "Self-reported race."
+        assert race.values == ["asian", "white"]
+
+    def test_missing_fields_come_from_where_the_dictionary_keeps_them(self):
+        """Types and values under oneOf, descriptions under common, arrays' items enums."""
+        props = self.properties()
+        assert props["age_at_index"].type == "integer"
+        assert props["vital_status"].type == "enum"
+        assert props["vital_status"].values == ["Alive", "Dead"]
+        assert props["state"].description == "The record's state."
+        assert props["sites"].values == ["Lung", "Liver"]
+
+    def test_a_link_stays_empty(self):
+        """A link property has no description, type or values of its own."""
+        cases = self.properties()["cases"]
+        assert (cases.description, cases.type, cases.values) == ("", "", None)
+
+    def test_more_fallbacks_and_their_order(self):
+        """A bare enum is an enum; the own description beats common, which beats term."""
+        dictionary = {
+            "case": {
+                "description": "A case.",
+                "properties": {
+                    "gender": {"enum": ["female", "male"]},
+                    "own": {
+                        "description": "Own words.",
+                        "common": {"description": "Shared words."},
+                    },
+                    "shared": {
+                        "common": {"description": "Shared words."},
+                        "term": {"description": "Term words."},
+                    },
+                    "termed": {"term": {"description": "Term words."}},
+                },
+            }
+        }
+        (node,) = SimpleDataModel.from_gdc_model(dictionary).nodes
+        props = {p.name: p for p in node.properties}
+        assert props["gender"].type == "enum"
+        assert props["own"].description == "Own words."
+        assert props["shared"].description == "Shared words."
+        assert props["termed"].description == "Term words."
+
+    def test_one_of_types_and_values_are_not_repeated(self):
+        """Types and values gathered from several oneOf options appear once each."""
+        spec = {
+            "oneOf": [
+                {"type": "string", "enum": ["A", "B"]},
+                {"type": "string", "enum": ["A", "C"]},
+                {"type": "null"},
+            ]
+        }
+        prop = SimpleDataModel.from_gdc_model({"n": {"properties": {"p": spec}}})
+        (prop,) = prop.nodes[0].properties
+        assert (prop.type, prop.values) == ("string", ["A", "B", "C"])
+
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            {"items": True, "type": "array"},
+            {"items": "enum"},
+            {"oneOf": [{"enum": None}, {"type": "null"}]},
+            {"oneOf": True},
+            {"term": "_terms.yaml#/race"},
+            {"common": ["not", "a", "definition"]},
+            {"oneOf": [{"type": ["string", "null"]}, {"type": "integer"}]},
+        ],
+    )
+    def test_unexpected_shapes_do_not_raise(self, spec):
+        """A fallback that finds something other than a definition is ignored, not an error."""
+        SimpleDataModel.from_gdc_model({"n": {"properties": {"p": spec}}})
+
+    def test_a_null_description_is_rejected(self):
+        """A property's own null description fails validation, so the dispatcher tries another parser."""
+        with pytest.raises(ValidationError):
+            SimpleDataModel.from_gdc_model(
+                {"n": {"properties": {"p": {"description": None}}}}
+            )
+
+    def test_the_dispatcher_keeps_this_parse_for_a_gen3_dictionary(self):
+        """get_from_unknown_json_format returns from_gdc_model's nodes and properties."""
+        expected = SimpleDataModel.from_gdc_model(self.DICTIONARY)
+        model = SimpleDataModel.get_from_unknown_json_format(
+            json.dumps(self.DICTIONARY)
+        )
+        assert [(n.name, [p.name for p in n.properties]) for n in model.nodes] == [
+            (n.name, [p.name for p in n.properties]) for n in expected.nodes
+        ]

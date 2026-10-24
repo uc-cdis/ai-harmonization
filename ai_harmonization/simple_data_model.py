@@ -226,6 +226,19 @@ class SimpleDataModel(BaseModel):
         """
         Converts a GDC model to a standard SimpleDataModel
         Accepts input as a json string or a parsed dict.
+
+        A property's description, type and values come from the property
+        itself where it gives them. Where it gives none, they come from where
+        the dictionary keeps them instead:
+
+        - a description shared by many nodes, from `common` (or the
+          property's `term`);
+        - a type and values, from its `oneOf` options;
+        - an array's allowed values, from `items`.
+
+        A property with values but no type is an `enum`. Those fallbacks accept
+        any shape without raising. So whether this converter succeeds on a
+        dictionary depends only on the property's own fields.
         """
         # If input is a string, parse it
         if isinstance(input_json, str):
@@ -244,18 +257,63 @@ class SimpleDataModel(BaseModel):
             properties = []
 
             for prop_name, prop_data in node_data.get("properties", {}).items():
+                one_of = prop_data.get("oneOf")
+                options = [
+                    option
+                    for option in (one_of if isinstance(one_of, list) else [])
+                    if isinstance(option, dict)
+                ]
+
                 # Exctract values
                 values = None
                 if "enum" in prop_data:
                     values = prop_data["enum"]
                 elif "values" in prop_data:
                     values = prop_data["values"]
+                else:
+                    items = prop_data.get("items")
+                    candidates = [items.get("enum")] if isinstance(items, dict) else []
+                    candidates += [option.get("enum") for option in options]
+                    found = []
+                    for listed in candidates:
+                        if isinstance(listed, list):
+                            found += [v for v in listed if v not in found]
+                    values = found or None
+
+                prop_type = prop_data.get("type", "")
+                if prop_type == "":
+                    types = []
+                    for option in options:
+                        declared = option.get("type")
+                        for kind in (
+                            declared if isinstance(declared, list) else [declared]
+                        ):
+                            if (
+                                isinstance(kind, str)
+                                and kind != "null"
+                                and kind not in types
+                            ):
+                                types.append(kind)
+                    if len(types) == 1:
+                        prop_type = types[0]
+                    else:
+                        prop_type = types or ("enum" if values else "")
+
+                description = prop_data.get("description", "")
+                if description == "":
+                    for holder in (prop_data.get("common"), prop_data.get("term")):
+                        if isinstance(holder, dict) and isinstance(
+                            holder.get("description"), str
+                        ):
+                            description = holder["description"]
+                            if description:
+                                break
 
                 # Build a Property object
                 prop = Property(
                     name=prop_name,
-                    description=prop_data.get("description", ""),
-                    type=prop_data.get("type", ""),
+                    description=description,
+                    type=prop_type,
                     values=values,
                 )
                 properties.append(prop)

@@ -43,19 +43,20 @@ VALUE_SEPARATOR = " | "
 MAX_VALUES_IN_PROMPT = 12
 
 
-def format_values(values, limit=MAX_VALUES_IN_PROMPT):
+def format_values(values, limit=MAX_VALUES_IN_PROMPT, separator=VALUE_SEPARATOR):
     """Join a property's permissible values for use in a prompt.
 
     Args:
         values (list | None): Permissible values, or None.
         limit (int): Maximum number to include.
+        separator (str): What joins the values.
 
     Returns:
-        str: The values joined by VALUE_SEPARATOR, or "" when there are none.
+        str: The values joined by the separator, or "" when there are none.
     """
     if not values:
         return ""
-    return VALUE_SEPARATOR.join(str(value) for value in values[:limit])
+    return separator.join(str(value) for value in values[:limit])
 
 
 def values_segment(prop):

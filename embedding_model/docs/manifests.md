@@ -1,0 +1,73 @@
+# Manifests
+
+A manifest says what a build was made from, and what it made. Benchmarks and
+training sources both have them, and they work the same way. Here, "a build"
+means a benchmark build or a source fetch.
+
+## The committed manifest and the build's own
+
+Each benchmark and each source has a manifest committed in git:
+
+- `embedding_model/benchmarks/manifests/<benchmark>.json`;
+- `embedding_model/sources/manifests/<source>.json`.
+
+It pins what the build is made from, such as a commit of the TOPMed
+documentation or a release of NCIt. It records the SHA-256 of each input that
+the build reads, such as a downloaded zip. It also records each file that the
+build makes, with its row count and SHA-256. The code reads its pins from this
+file. So the code says how to build, and the manifest says from which inputs.
+
+Each build also writes its own manifest beside the files that it makes.
+[benchmarks.md](benchmarks.md#the-manifest) and
+[sources.md](sources.md#what-a-fetch-writes) say where.
+
+## Its fields
+
+Every manifest has the same fields. A field that does not apply is left out:
+
+- `version`: the benchmark's or the source's version;
+- `built` or `fetched`: the date of the build;
+- `files`: each file's row count, and its `sha256`. A source's table, kept
+  as parquet, has `csv_sha256` instead: the SHA-256 of the table written as
+  CSV, not of the file (see [sources.md](sources.md#what-a-fetch-writes));
+- `sources`: what the build was made from, one entry each, with
+  - `role`: what the input is for, such as `mappings` or `release`;
+  - `name` and `location`: a URL, DOI or record;
+  - `version`: a release, tag or commit, where the input has one;
+  - `fetched`: the date, for an input that serves only its current state;
+  - `sha256`, `license` and `citation`, where known.
+
+## How a build is checked
+
+A new build compares its manifest with the committed one:
+
+- A file is the same when its row count and SHA-256 match.
+- An input is the same when its SHA-256 matches, or its version where it has
+  no checksum.
+- Dates, licenses and citations are not compared.
+
+If everything matches, the build is what the manifest describes. Its files then
+replace the working ones. If not, the build lists each file and input that
+differs. It then stops, and keeps the working files as they were. That is
+expected when an input was updated on purpose. The build is then accepted as a
+new version, as the next section describes.
+
+## Making a new version
+
+A difference that is meant makes a new version:
+
+1. In the committed manifest, raise `version`. For a new pin, such as another
+   commit of the TOPMed documentation or a new NCIt release, also edit the
+   input's `version`. A change that cannot be pinned, such as a new GDC
+   dictionary, needs only the raised `version`.
+2. Build again with `--update-manifest`, as `benchmarks build` or
+   `sources fetch`. It records the new checksums in the committed manifest.
+3. Commit the manifest.
+
+A version committed in git never changes. `--update-manifest` refuses a build
+that differs while `version` is still the committed version, so raise it first.
+Until the new version is committed, it can be built and accepted as often as
+needed. The new files overwrite the working ones.
+
+The build asks the local git checkout whether a version is committed. If git
+cannot answer, the build cannot tell, so it refuses a differing build.

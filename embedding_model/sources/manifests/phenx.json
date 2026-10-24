@@ -1,0 +1,39 @@
+{
+  "source": "phenx",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "variables.parquet": {
+      "rows": 39409,
+      "csv_sha256": "db7f9c477bf41d4062ba5f896a3725fa2acd36099b6431efcf4fd06a74b85d97"
+    },
+    "protocols.parquet": {
+      "rows": 1220,
+      "csv_sha256": "d6b0bc8fb49e293e19517de750b04c64052be8ee446fff9557e25c6a16ad0d7d"
+    },
+    "mappings.parquet": {
+      "rows": 48143,
+      "csv_sha256": "77812b62e65450cc95fa7e08fa335501ae5f89b7843aa0864fbfffa94f34da98"
+    },
+    "replacements.parquet": {
+      "rows": 162,
+      "csv_sha256": "eb5f7d5a1941aa6850c010f6f1c5d3051fa3d81e5244cbfea4d94c93c2341cdd"
+    },
+    "release.parquet": {
+      "rows": 1,
+      "csv_sha256": "3ae5f750009009341ee29e1825e92a6b801165b0efacfc6e7c70cd88d65d8697"
+    }
+  },
+  "sources": [
+    {
+      "role": "service",
+      "name": "PhenX database export",
+      "location": "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip",
+      "version": "Ver 49.0",
+      "fetched": "2026-10-19",
+      "sha256": "71df35259222cb41a289e0c8507b5d042aa2f472e8a3946ab4afe447ca8b1661",
+      "license": "most protocols are freely available, and some have limited availability, as each protocol's availability says (https://www.phenxtoolkit.org/help/faq)",
+      "citation": "embedding_model/docs/licenses.md#phenx"
+    }
+  ]
+}

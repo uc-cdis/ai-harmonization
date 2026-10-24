@@ -1,0 +1,42 @@
+{
+  "source": "cde",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "elements.parquet": {
+      "rows": 40736,
+      "csv_sha256": "2afb0fec5b9b347e969ec4ca476a9b8bfe6b76049fac4b22b64a675d3a8a1fd4"
+    },
+    "designations.parquet": {
+      "rows": 72278,
+      "csv_sha256": "38f428c9a9ba5b433417ff9452738cb55a3aef0d39058f7a8baf71b353e626c7"
+    },
+    "definitions.parquet": {
+      "rows": 24781,
+      "csv_sha256": "43087c76612f1e5bef830b320902ec9bb348c39317f1a1e7bf1383cf0696728a"
+    },
+    "ids.parquet": {
+      "rows": 59256,
+      "csv_sha256": "5afef3010a9cc3b20004cce5016638f9c313668f52819c1e14718c324e0e69d7"
+    },
+    "values.parquet": {
+      "rows": 132001,
+      "csv_sha256": "d2f6d522c159ce3723b70e953b9caf4356b485befda4e7fe25a15e135c86f1b2"
+    },
+    "properties.parquet": {
+      "rows": 42600,
+      "csv_sha256": "95dd1d652c3e9454de03540c58f718eaa26e1d0c74f02506609ba83aae61e8cd"
+    }
+  },
+  "sources": [
+    {
+      "role": "service",
+      "name": "NIH CDE Repository export",
+      "location": "https://cde.nlm.nih.gov/server/de/searchExport",
+      "fetched": "2026-10-22",
+      "sha256": "2b17a28e31976856d8c3c9d58ec0593d9b6361b48951f1c91b6c7e08b20b1b0c",
+      "license": "U.S. government works are free to use; others may be copyrighted, as each element's copyrightStatus says (https://www.nlm.nih.gov/web_policies.html)",
+      "citation": "embedding_model/docs/licenses.md#nih-cde"
+    }
+  ]
+}

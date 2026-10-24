@@ -37,10 +37,8 @@ version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "accelerate" },
-    { name = "beautifulsoup4" },
     { name = "chromadb" },
     { name = "datasets" },
-    { name = "ftfy" },
     { name = "ipython" },
     { name = "ipywidgets" },
     { name = "itables" },
@@ -50,9 +48,7 @@ dependencies = [
     { name = "langchain-huggingface" },
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "openpyxl" },
     { name = "pandas" },
-    { name = "pyarrow" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -70,14 +66,18 @@ dev = [
     { name = "ipykernel" },
     { name = "nbconvert" },
 ]
+embedding-model = [
+    { name = "beautifulsoup4" },
+    { name = "ftfy" },
+    { name = "openpyxl" },
+    { name = "pyarrow" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "accelerate", specifier = ">=1.11.0" },
-    { name = "beautifulsoup4", specifier = ">=4.12.0" },
     { name = "chromadb", specifier = ">=1.0.0" },
     { name = "datasets", specifier = ">=4.4.1" },
-    { name = "ftfy", specifier = ">=6.3.1" },
     { name = "ipython", specifier = ">=7.34.0" },
     { name = "ipywidgets", specifier = ">=8.1.0" },
     { name = "itables", specifier = ">=2.4.4" },
@@ -87,9 +87,7 @@ requires-dist = [
     { name = "langchain-huggingface", specifier = ">=0.3.1" },
     { name = "matplotlib", specifier = ">=3.10.0" },
     { name = "numpy", specifier = ">=2.0.2" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.2" },
-    { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "requests", specifier = ">=2.32.4" },
@@ -106,6 +104,12 @@ dev = [
     { name = "deptry", specifier = ">=0.23.1" },
     { name = "ipykernel", specifier = ">=6.30.0" },
     { name = "nbconvert", specifier = ">=7.16.6,<8.0.0" },
+]
+embedding-model = [
+    { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "ftfy", specifier = ">=6.3.1" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pyarrow", specifier = ">=14.0.0" },
 ]
 
 [[package]]

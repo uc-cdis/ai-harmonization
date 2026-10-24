@@ -40,6 +40,12 @@ uv sync
 uv pip install -e .
 ```
 
+`uv sync` also installs `embedding_model`'s own dependencies, such as
+BeautifulSoup and pyarrow. They are in the `embedding-model` dependency group
+of `pyproject.toml`, so installing `ai_harmonization` as a package leaves them
+out. With pip 25.1 or later, `pip install --group embedding-model` installs
+them.
+
 Everything runs on a CPU, model training included. A GPU matters for training,
 and training uses one if the machine has one. `--device cpu` keeps it on the
 CPU. The [quick start](#quick-start) examples train on a CPU in a few minutes.

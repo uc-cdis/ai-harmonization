@@ -501,7 +501,9 @@ class TestLoinc:
         data = loinc_zip()
         monkeypatch.setenv("LOINC_USERNAME", "abcd")
         monkeypatch.setenv("LOINC_PASSWORD", "efgh")
-        published = {"downloadMD5Hash": hashlib.md5(data).hexdigest()}
+        published = {
+            "downloadMD5Hash": hashlib.md5(data, usedforsecurity=False).hexdigest()
+        }
         monkeypatch.setattr(
             loinc, "fetch", lambda url, **request: json.dumps(published).encode()
         )
@@ -519,7 +521,7 @@ class TestLoinc:
         """A zip placed by hand with the pinned MD5 is read, and its MD5 recorded."""
         data = loinc_zip()
         (tmp_path / "Loinc_9.99.zip").write_bytes(data)
-        md5 = hashlib.md5(data).hexdigest()
+        md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
         manifest = {"sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": md5}]}
         tables, found = loinc.fetch_source(tmp_path, manifest)
         assert len(tables["codes"]) == 3

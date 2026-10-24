@@ -22,86 +22,13 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from ai_harmonization.formatters import (
-    VALUE_SEPARATOR,
-    format_values,
-    get_node_property_as_name_description,
-    get_node_property_as_name_type_description,
-    get_node_property_as_name_type_description_values,
-    get_node_property_as_name_type_values,
-)
-from ai_harmonization.simple_data_model import Node, Property
+from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
+from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 5, 10)
 METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
 BATCH_SIZE = 128
-
-
-def stdelement(node, prop):
-    """A property in the shape of StdElement-Mapper's NCIt training pairs.
-
-    The model card shows ``name: ... | description: ... | values: a; b``, with
-    no node and no type. This format scores the model in the shape it was
-    trained on.
-
-    It is not in ai_harmonization.formatters: the approaches read a target's
-    node.property back from its text, and this shape has none.
-
-    Args:
-        node (Node): Not part of this shape.
-        prop (Property): The property. The first MAX_VALUES_IN_PROMPT of its
-            values are kept.
-
-    Returns:
-        str: The text.
-    """
-    parts = [f"name: {prop.name}"]
-    if prop.description:
-        parts.append(f"description: {prop.description}")
-    values = format_values(prop.values, separator="; ")
-    if values:
-        parts.append(f"values: {values}")
-    return " | ".join(parts)
-
-
-# Each format is a formatter: (Node, Property) -> text. Four are the formatters
-# of ai_harmonization.formatters, under their own names. The default is the
-# shape this pipeline's models are trained on, and the one models are compared
-# in.
-FORMATS = {
-    "name_description": get_node_property_as_name_description,
-    "name_type_description": get_node_property_as_name_type_description,
-    "name_type_description_values": get_node_property_as_name_type_description_values,
-    "name_type_values": get_node_property_as_name_type_values,
-    "stdelement": stdelement,
-}
-DEFAULT_FORMAT = "name_type_description_values"
-
-
-def property_text(formatter, node, name, type_, description, values):
-    """The text of a target property or a source property/variable, by a formatter.
-
-    A source variable is written without a node: its node would be its dbGaP
-    table or GDC paper, which says nothing about what it means. Its text then
-    starts at its name, without the formatters' leading dot.
-
-    Args:
-        formatter (Callable[[Node, Property], str]): A value of FORMATS.
-        node (str): The node, or "" for a source variable.
-        name (str): The target property's or source property/variable's name.
-        type_ (str): Its type.
-        description (str): Its description.
-        values (list[str] | None): Its values.
-
-    Returns:
-        str: The text.
-    """
-    written = formatter(
-        Node(name=node, description="", links=[], properties=[]),
-        Property(name=name, description=description, type=type_, values=values),
-    )
-    return written if node else written.removeprefix(".")
 
 
 def split_values(cell):
@@ -330,7 +257,7 @@ def scores_folder(outputs, model, benchmark, text_format):
       ``scores/uc-ctds/StdElement-Mapper/topmed/stdelement``;
     - a model folder on disk gives only its own name, whether the path is full
       or relative: ``/home/me/models/abcd-model`` gives
-      ``scores/abcd-model/topmed/name_type_description_values``.
+      ``scores/abcd-model/topmed/compact``.
 
     It tells them apart as SentenceTransformer does: an existing folder is a
     model on disk, anything else a Hugging Face id. A downloaded Hugging Face

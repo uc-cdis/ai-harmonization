@@ -9,12 +9,7 @@ from tokenizers.models import WordLevel
 from tokenizers.normalizers import Lowercase
 from tokenizers.pre_tokenizers import Whitespace
 
-from ai_harmonization.formatters import (
-    MAX_VALUES_IN_PROMPT,
-    get_node_property_as_name_type_description_values,
-)
-from ai_harmonization.simple_data_model import Node, Property
-from embedding_model import benchmarks, scoring
+from embedding_model import benchmarks, scoring, texts
 from embedding_model.__main__ import main
 
 WORDS = ["[UNK]", "age", "sex", "race", "gender"]
@@ -111,48 +106,6 @@ def inputs(tmp_path):
     return built(tmp_path, MAPPINGS)
 
 
-class TestFormats:
-    def test_a_target_is_written_by_the_formatter(self):
-        """A target property's text is what the formatter writes when called directly."""
-        expected = get_node_property_as_name_type_description_values(
-            Node(name="a", description="", links=[], properties=[]),
-            Property(name="age", description="Age", type="integer", values=["1"]),
-        )
-        formatter = scoring.FORMATS[scoring.DEFAULT_FORMAT]
-        written = scoring.property_text(formatter, "a", "age", "integer", "Age", ["1"])
-        assert written == expected
-
-    def test_a_source_has_no_leading_dot(self):
-        """A source variable has no node, so its text starts with its name."""
-        formatter = scoring.FORMATS[scoring.DEFAULT_FORMAT]
-        written = scoring.property_text(
-            formatter, "", "AGE01", "integer", "Age at exam", ["1"]
-        )
-        assert written.startswith("AGE01")
-
-    def test_stdelement_shape(self):
-        """StdElement text joins its parts with pipes, and its first 12 values with ;.
-
-        An empty description is left out.
-        """
-        values = [str(v) for v in range(MAX_VALUES_IN_PROMPT + 3)]
-        written = scoring.property_text(
-            scoring.stdelement, "a", "age", "integer", "Age", values
-        )
-        assert written.startswith("name: age | description: Age | values: 0; 1; ")
-        assert written.count(";") == MAX_VALUES_IN_PROMPT - 1
-        assert (
-            scoring.property_text(scoring.stdelement, "a", "age", "integer", "", None)
-            == "name: age"
-        )
-
-    def test_a_source_keeps_its_own_leading_dot(self):
-        """Only the formatter's dot is dropped, not a dot the name starts with."""
-        formatter = scoring.FORMATS[scoring.DEFAULT_FORMAT]
-        written = scoring.property_text(formatter, "", ".AGE", "integer", "Age", None)
-        assert written.startswith(".AGE ")
-
-
 class TestBenchmarkTexts:
     def test_an_expected_target_not_in_the_targets_is_an_error(self, tmp_path):
         """An expected target the benchmark's targets do not have stops scoring."""
@@ -161,7 +114,7 @@ class TestBenchmarkTexts:
             built(tmp_path, unknown), "topmed"
         )
         with pytest.raises(ValueError, match="z.missing"):
-            scoring.benchmark_texts(targets, mappings, scoring.DEFAULT_FORMAT)
+            scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
 
 
 class TestRankTargets:
@@ -172,7 +125,7 @@ class TestRankTargets:
         """
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         source_texts, target_texts, expected = scoring.benchmark_texts(
-            targets, mappings, scoring.DEFAULT_FORMAT
+            targets, mappings, texts.DEFAULT_FORMAT
         )
         metrics, ranked = scoring.rank_targets(
             model, source_texts, target_texts, expected
@@ -192,33 +145,33 @@ class TestRankTargets:
         model.prompts = {"query": "sex sex sex sex sex ", "document": ""}
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         _, ranked = scoring.rank_targets(
-            model, *scoring.benchmark_texts(targets, mappings, scoring.DEFAULT_FORMAT)
+            model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
         )
         assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
 
     def test_the_default_prompt_goes_on_both_sides(self, model, inputs):
         """A default prompt is added to sources and targets, as model.encode() adds it."""
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
-        sources, texts, expected = scoring.benchmark_texts(
-            targets, mappings, scoring.DEFAULT_FORMAT
+        sources, target_texts, expected = scoring.benchmark_texts(
+            targets, mappings, texts.DEFAULT_FORMAT
         )
         prompt = "sex sex "
         by_hand = scoring.rank_targets(
             model,
             {key: prompt + text for key, text in sources.items()},
-            {key: prompt + text for key, text in texts.items()},
+            {key: prompt + text for key, text in target_texts.items()},
             expected,
         )
         model.prompts = {"abcd": prompt}
         model.default_prompt_name = "abcd"
-        assert scoring.rank_targets(model, sources, texts, expected) == by_hand
+        assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
 
     def test_targets_are_ranked_by_cosine(self, model, inputs):
         """Targets are ranked by cosine, whatever similarity the model's config names."""
         model.similarity_fn_name = "dot"
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         metrics, ranked = scoring.rank_targets(
-            model, *scoring.benchmark_texts(targets, mappings, scoring.DEFAULT_FORMAT)
+            model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
         )
         assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
         assert metrics["mrr"] == round((1 + 1 + 1 / 3) / 3, 4)
@@ -237,7 +190,7 @@ class TestScore:
             saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
         )
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
-        folder = folder / scoring.DEFAULT_FORMAT
+        folder = folder / texts.DEFAULT_FORMAT
         metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
         assert metrics.loc[0, "mrr"] == row["mrr"]
         assert (metrics.loc[0, "n"], metrics.loc[0, "targets"]) == (3, 4)
@@ -248,7 +201,7 @@ class TestScore:
         config = yaml.safe_load((folder / "config.yaml").read_text())
         assert config["benchmark_manifest"]["version"] == "1"
         assert config["benchmark_manifest"]["files"]["topmed_mappings.csv"]["sha256"]
-        assert config["format"] == scoring.DEFAULT_FORMAT
+        assert config["format"] == texts.DEFAULT_FORMAT
         assert config["device"] == "cpu"
         assert set(config["ai_harmonization"]) == {"commit", "uncommitted_changes"}
         assert config["model_revision"] is None
@@ -277,7 +230,7 @@ class TestScore:
             )
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
         config = yaml.safe_load(
-            (folder / scoring.DEFAULT_FORMAT / "config.yaml").read_text()
+            (folder / texts.DEFAULT_FORMAT / "config.yaml").read_text()
         )
         assert config["model"] == str((tmp_path / "b" / "abcd-model").resolve())
         assert "They are replaced by those of" in capsys.readouterr().err
@@ -285,7 +238,7 @@ class TestScore:
     def test_an_empty_config_is_replaced_quietly(self, saved, inputs, capsys, tmp_path):
         """An empty config.yaml, as an interrupted write leaves, is replaced with no warning."""
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
-        folder = folder / scoring.DEFAULT_FORMAT
+        folder = folder / texts.DEFAULT_FORMAT
         folder.mkdir(parents=True)
         (folder / "config.yaml").write_text("")
         scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
@@ -304,7 +257,7 @@ class TestScore:
         ]
         scores = tmp_path / "outputs" / "scores" / "abcd-model"
         for name in ("topmed", "gdc"):
-            assert (scores / name / scoring.DEFAULT_FORMAT / "metrics.csv").exists()
+            assert (scores / name / texts.DEFAULT_FORMAT / "metrics.csv").exists()
 
     def test_a_missing_benchmark_stops_before_any_scoring(
         self, saved, inputs, tmp_path
@@ -338,7 +291,7 @@ class TestScoresFolder:
         """A model scored in two formats keeps both scores."""
         folders = {
             scoring.scores_folder(tmp_path, "abcd-org/abcd-model", "gdc", text_format)
-            for text_format in ("stdelement", scoring.DEFAULT_FORMAT)
+            for text_format in ("stdelement", texts.DEFAULT_FORMAT)
         }
         assert len(folders) == 2
 
@@ -391,7 +344,7 @@ class TestCommandLine:
         assert status == 0
         scores = tmp_path / "outputs" / "scores" / "abcd-model"
         for name in ("topmed", "gdc"):
-            assert (scores / name / scoring.DEFAULT_FORMAT / "metrics.csv").exists()
+            assert (scores / name / texts.DEFAULT_FORMAT / "metrics.csv").exists()
 
     def test_an_unbuilt_benchmark_is_a_clean_error(self, capsys, tmp_path):
         """An unbuilt benchmark exits 1 with the build command, not a traceback."""

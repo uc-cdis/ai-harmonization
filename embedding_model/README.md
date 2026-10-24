@@ -15,15 +15,16 @@ command line, from a checkout of this repository.
 
 ## How it fits with the rest of the repository
 
-- The texts a model trains and is scored on, such as a study variable or a
-  data-model property, are written by `ai_harmonization.formatters`. The
-  harmonization approaches use the same functions. So a model is trained and
-  evaluated on texts laid out as it will see them in use. There are two
-  exceptions, explained in [docs/scoring.md](docs/scoring.md#running-score): a
-  source's node is left out, and one format is a released model's own shape.
-  Training and benchmark texts share their layout, but never a text. The
-  corpus is audited for leakage, so no benchmark text, and no near copy of
-  one, reaches training.
+- A model trains and is scored on texts such as a study variable or a
+  data-model property. They are written in one format, `compact`, defined in
+  `embedding_model/texts.py`. It is the layout of
+  `ai_harmonization.formatters`, which the harmonization approaches use, with
+  one change: a description appears only when there is one. So a model is
+  trained and evaluated on texts laid out almost as it will see them in use.
+  See [docs/scoring.md](docs/scoring.md#running-score) for the differences,
+  and for why a source's node is left out. Training and benchmark texts share
+  their layout, but never a text. The corpus is audited for leakage, so no
+  benchmark text, and no near copy of one, reaches training.
 - A trained model is used through `ai_harmonization`'s embedding approach,
   like any other sentence-transformers model. It can be evaluated end to end
   with `get_metrics_for_approach`
@@ -68,7 +69,7 @@ own:
 - `small_series_example.yaml`: a small series of experiments.
 
 Both use one benchmark, [TOPMed](docs/benchmarks.md#topmed), and one training
-source, [NHANES](docs/sources.md#nhanes). NHANES gives about 21,000 pairs of
+source, [NHANES](docs/sources.md#nhanes). NHANES gives about 29,000 pairs of
 variable names, descriptions and values from CDC's public codebooks. The
 examples use a small vocabulary and a short run, so they finish in minutes.
 They are small examples to see every step work. A model meant for use should
@@ -161,7 +162,7 @@ its own.
 | | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
-| | `pairs prepare [--source <source>]` | turns each source into pairs of texts that mean the same thing | `inputs/pairs/` |
+| | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/` |
 | | `pairs audit` | checks no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
 | | `corpus build --name <corpus> [--sources <source>,...]` | combines the sources' pairs into a training corpus | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus>` | learns the vocabulary from the corpus | `inputs/tokenizers/` |
@@ -238,7 +239,7 @@ inputs/
     sources/
         <source>/                a training source's tables, as <table>.parquet, and the fetch's manifest.json
         downloads/<source>/      the source's files as downloaded, kept for the next fetch
-    pairs/                       <source>.parquet: each source's pairs of texts
+    pairs/                       <source>.parquet: each source's pairs of texts; <source>.json, their report
         audit.json               what the leakage audit checked, and its verdict
     corpora/<corpus>/            training and validation pairs; corpus.json records what went in
     tokenizers/<tokenizer>/      tokenizer.json

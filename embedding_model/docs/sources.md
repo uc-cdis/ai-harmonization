@@ -42,8 +42,8 @@ link back to the item they belong to by the source's own id.
 
 Every item a source has is kept, retired, draft and closed ones too. The next
 step, `pairs prepare`, decides which of them become training pairs (see
-[The workflow](../README.md#the-workflow)). A cell with several values, such
-as a concept's parents, joins them with `|`.
+[pairs.md](pairs.md)). A cell with several values, such as a concept's
+parents, joins them with `|`.
 
 Each source's main table has an `open` column, set from the source's
 restriction field (see [Licenses](#licenses)). It is `true` when the item may

@@ -57,17 +57,25 @@ file that differs stops scoring, and the error gives the command that rebuilds
 it. A build of another version than the one committed under
 `embedding_model/benchmarks/manifests/` is scored, with a warning.
 
-`--format` takes one of five formats. The first four are the formatters of
-`ai_harmonization.formatters`, under their own names. The fifth, `stdelement`,
-is defined in `embedding_model/scoring.py`:
+`--format` takes one of six formats. Four are the formatters of
+`ai_harmonization.formatters`, under their own names. Two, `compact` and
+`stdelement`, are defined in `embedding_model/texts.py`:
 
 | `--format` | the text |
 |---|---|
+| `compact` (default) | `node.name (type): description Values: a \| b`, each part only when present: the shape that this pipeline's models are trained on |
 | `name_description` | `node.name: description`, the shape `uc-ctds/bge-large-en-v1.5-bio-mapping` was trained on |
 | `name_type_description` | `node.name (type): description`, what the harmonization approaches build unless given another formatter |
-| `name_type_description_values` (default) | `node.name (type): description Values: a \| b`, the shape this pipeline's models are trained on |
+| `name_type_description_values` | `node.name (type): description Values: a \| b` |
 | `name_type_values` | `node.name (type): Values: a \| b` |
 | `stdelement` | `name: ... \| description: ... \| values: a; b`, the shape of `uc-ctds/StdElement-Mapper`'s NCIt training pairs |
+
+`compact` writes the description, and the `": "` before it, only when a
+property has one. The formatters treat values the same way. GDC's target
+`publication.doi` has no description and no values, so it reads
+`publication.doi (string)`. A GDC source with values but no description
+reads `race (string) Values: White | Black or African American`. The training
+pairs are written in `compact` too.
 
 In every format but `stdelement`, a target's text includes its node, as in
 `atherosclerosis.cac_score_1 (float): Coronary artery calcification (CAC)
@@ -102,8 +110,7 @@ scores. `<model>` is:
 - for a Hugging Face model, its owner and name:
   `scores/uc-ctds/StdElement-Mapper/topmed/stdelement/`;
 - for a model saved on disk, the name of its folder: `--model
-  path/to/abcd-model` writes to
-  `scores/abcd-model/topmed/name_type_description_values/`.
+  path/to/abcd-model` writes to `scores/abcd-model/topmed/compact/`.
 
 `metrics.csv` and `config.yaml` record a model on disk by its full path. Two
 model folders with the same name share a scores folder. Scoring the second

@@ -62,8 +62,33 @@ def differences(committed, built):
     ]
 
 
+def git(folder, *args):
+    """Run git in a folder, and give back its result, with the output as text.
+
+    Args:
+        folder (Path): Where git runs.
+        *args (str): git's own arguments, such as ``rev-parse``.
+
+    Returns:
+        subprocess.CompletedProcess: The result, with ``stdout`` and ``stderr``
+            as text.
+
+    Raises:
+        RuntimeError: If git cannot run at all, such as when it is missing.
+    """
+    try:
+        return subprocess.run(
+            ["git", *args], cwd=folder, capture_output=True, text=True
+        )
+    except Exception as error:
+        raise RuntimeError(f"git could not run: {error}") from error
+
+
 def committed_version(folder, name):
     """The version of a manifest as committed in git, at ``HEAD``.
+
+    git runs in the folder, and the manifest is looked up in git's own listing
+    of it. So no text from the command line reaches a git command.
 
     Args:
         folder (Path): The ``manifests/`` folder.
@@ -77,20 +102,15 @@ def committed_version(folder, name):
         RuntimeError: If git cannot be asked: outside a checkout, with git
             missing, or when git refuses the folder.
     """
-    git = ["git", "-C", str(folder)]
-    try:
-        inside = subprocess.run(
-            [*git, "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-        )
-        shown = subprocess.run(
-            [*git, "show", f"HEAD:./{name}.json"], capture_output=True, text=True
-        )
-    except Exception as error:
-        raise RuntimeError(f"git could not run: {error}") from error
+    inside = git(folder, "rev-parse", "--is-inside-work-tree")
     if inside.returncode != 0:
         raise RuntimeError(inside.stderr.strip() or "not a git checkout")
+    listed = git(folder, "ls-tree", "--name-only", "HEAD")
+    wanted = f"{name}.json"
+    entry = next((e for e in listed.stdout.splitlines() if e == wanted), None)
+    if listed.returncode != 0 or entry is None:
+        return None
+    shown = git(folder, "show", f"HEAD:./{entry}")
     if shown.returncode != 0:
         return None
     return json.loads(shown.stdout)["version"]

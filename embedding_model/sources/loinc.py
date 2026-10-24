@@ -170,8 +170,12 @@ def md5_check(expected):
     """
 
     def check(data):
-        """Raise unless the data has each expected MD5."""
-        found = hashlib.md5(data).hexdigest()
+        """Raise unless the data has each expected MD5.
+
+        LOINC publishes MD5 checksums, so the check uses MD5. It finds a
+        corrupt or wrong download, and is not used for security.
+        """
+        found = hashlib.md5(data, usedforsecurity=False).hexdigest()
         for whose, md5 in expected.items():
             if md5 and found != md5:
                 raise ValueError(

@@ -68,6 +68,7 @@ dev = [
 ]
 embedding-model = [
     { name = "beautifulsoup4" },
+    { name = "defusedxml" },
     { name = "ftfy" },
     { name = "openpyxl" },
     { name = "pyarrow" },
@@ -107,6 +108,7 @@ dev = [
 ]
 embedding-model = [
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
+    { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "ftfy", specifier = ">=6.3.1" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pyarrow", specifier = ">=14.0.0" },

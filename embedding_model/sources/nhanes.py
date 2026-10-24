@@ -13,6 +13,7 @@ network either.
 """
 
 import hashlib
+import re
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -26,6 +27,9 @@ VARIABLE_LIST = (
 CODEBOOK = (
     "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/{cycle}/DataFiles/{data_file}.htm"
 )
+# A data file's name, such as "DEMO_J". It goes into a file path and an address,
+# so a variable list that names a data file with other characters is refused.
+DATA_FILE = re.compile(r"[A-Za-z0-9_]+")
 COMPONENTS = ["Demographics", "Dietary", "Examination", "Laboratory", "Questionnaire"]
 LIST_COLUMNS = {
     "Variable Name": "name",
@@ -219,7 +223,9 @@ def fetch_source(downloads, manifest):
             ``data_file`` and ``name``; and the manifest's sources.
 
     Raises:
-        ValueError: If a variable list is not the page it should be.
+        ValueError: If a variable list is not the page it should be, or names a
+            data file with characters other than letters, digits and
+            underscores.
         RuntimeError: If a codebook page could not be downloaded for another
             reason than not being found. The pages kept are not downloaded
             again, so a new fetch tries only the rest.
@@ -263,6 +269,9 @@ def fetch_source(downloads, manifest):
             if row.data_file and row.cycle
         }
     )
+    odd = sorted({name for _, name in files if not DATA_FILE.fullmatch(name)})
+    if odd:
+        raise ValueError(f"the variable lists name odd data files: {odd[:5]}")
     listed = downloads / "codebooks" / NOT_FOUND
     known = set(listed.read_text().split()) if listed.exists() else set()
     codebook, values, missing, failed = [], [], [], []

@@ -28,6 +28,9 @@ SEARCH_EXPORT_QUERY = {
     "searchToken": "",
     "nihEndorsed": False,
 }
+# How long a request waits for the server to connect or to send more data, in
+# seconds. It is not a limit on the whole download.
+TIMEOUT_SECONDS = 180
 
 """
 Examples:
@@ -102,6 +105,7 @@ def _get_cdes_and_write_to_file() -> str:
         headers={"Content-Type": "application/json"},
         data=json.dumps(SEARCH_EXPORT_QUERY),
         stream=True,
+        timeout=TIMEOUT_SECONDS,
     )
 
     filename = f"{TEMP_DIR}/SearchExport.json"

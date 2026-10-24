@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 import requests
+from defusedxml import DefusedXmlException
 
 from embedding_model import download, sources
 from embedding_model.__main__ import main
@@ -107,6 +108,15 @@ class TestOwl:
         assert values["{" + NCIT + "}P90"] == ["Abcd "]
         assert values[owl.DEFINED_PARENT] == [NCIT + "C900003"]
         assert values[owl.RDFS + "subClassOf"] == [NCIT + "C900001"]
+
+    def test_an_entity_declaration_is_refused(self):
+        """A file that declares an entity is refused, as an external reference could be."""
+        document = rdf("").replace(
+            b'<?xml version="1.0"?>',
+            b'<?xml version="1.0"?>\n<!DOCTYPE rdf:RDF [<!ENTITY abcd SYSTEM "file:///abcd">]>',
+        )
+        with pytest.raises(DefusedXmlException):
+            owl.read_owl(io.BytesIO(document))
 
     def test_axioms_keep_every_annotation(self):
         """Two axioms on one statement, one with two values, are all kept."""
@@ -835,6 +845,17 @@ class TestNhanes:
             "NHANES variable list, Questionnaire",
             "NHANES codebooks",
         ]
+
+    def test_an_odd_data_file_name_stops_the_fetch(self, pages, monkeypatch, tmp_path):
+        """A data file name with characters other than letters, digits and _ is refused."""
+        listing = pages[nhanes.VARIABLE_LIST.format(component="Questionnaire")]
+        pages[nhanes.VARIABLE_LIST.format(component="Questionnaire")] = listing.replace(
+            b"EFGH_J", b"../EFGH_J"
+        )
+        monkeypatch.setattr(nhanes, "downloaded", served(pages))
+        with pytest.raises(ValueError, match="odd data files"):
+            nhanes.fetch_source(tmp_path, {"sources": []})
+        assert not (tmp_path / "EFGH_J.htm").exists()
 
     def test_a_page_not_found_is_not_asked_for_again(
         self, pages, monkeypatch, capsys, tmp_path

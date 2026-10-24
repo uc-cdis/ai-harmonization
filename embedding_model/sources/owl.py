@@ -3,10 +3,12 @@
 The OWL API writes NCIt's and the OBO Foundry ontologies' files. Such a file
 holds one ``owl:Class`` block per term and one ``owl:Axiom`` block per
 annotated statement. An axiom adds details to one of the class's statements: a
-synonym's type, say, or a definition's source.
+synonym's type, say, or a definition's source. defusedxml parses the files: it
+refuses entity declarations and external references, which none of the files
+read here has.
 """
 
-import xml.etree.ElementTree as ET
+from defusedxml.ElementTree import iterparse
 
 RDF = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
 RDFS = "{http://www.w3.org/2000/01/rdf-schema#}"
@@ -61,7 +63,7 @@ def read_owl(stream):
     """
     found = {"ontology": [], "classes": {}, "properties": {}, "axioms": {}}
     depth, root = 0, None
-    for event, element in ET.iterparse(stream, events=("start", "end")):
+    for event, element in iterparse(stream, events=("start", "end")):
         if event == "start":
             root = element if root is None else root
             depth += 1

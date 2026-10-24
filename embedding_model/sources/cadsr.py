@@ -2,15 +2,16 @@
 
 caDSR publishes a daily snapshot of its data elements, as a zip of XML
 files. A snapshot is pinned by its date. A snapshot can hold an element's
-older versions, and exact copies of a record: only the element's latest
-version is kept, once.
+older versions, and exact copies of a record: only the element's latest version
+is kept, once. defusedxml parses the XML: it refuses entity declarations and
+external references, which a snapshot has none of.
 """
 
 import zipfile
 from decimal import Decimal, InvalidOperation
-import xml.etree.ElementTree as ET
 
 import pandas as pd
+from defusedxml.ElementTree import iterparse
 
 from embedding_model.download import downloaded, file_sha256
 from embedding_model.sources.common import pinned, report_new
@@ -120,7 +121,7 @@ def records(archive):
     with zipfile.ZipFile(archive) as bundle:
         for member in sorted(n for n in bundle.namelist() if n.endswith(".xml")):
             with bundle.open(member) as stream:
-                for _, element in ET.iterparse(stream):
+                for _, element in iterparse(stream):
                     if element.tag != "DataElement":
                         continue
                     key = {

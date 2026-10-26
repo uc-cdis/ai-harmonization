@@ -70,14 +70,15 @@ another folder, they go to `pairs/` in that folder. One row is one pair:
 Each side's fields are kept beside its text, so a later step can compare
 fields rather than formatted texts.
 
-`pairs prepare` also writes a report for each source, `<source>.json`, beside
-its pairs in the same folder. It records:
+`pairs prepare` also writes a manifest for each source,
+`<source>_manifest.json`, beside its pairs in the same folder. It has the
+fields that [manifests.md](manifests.md#its-fields) lists:
 
-- the source's version, and the fetch that the pairs come from;
-- the pairs' SHA-256;
-- their counts by kind, term group and status;
-- the items not open, the duplicates removed, and the texts that point to
-  several canonicals.
+- `files`: the pairs' row count and SHA-256;
+- `sources`: the fetch that the pairs come from, with its version and its
+  tables' checksums;
+- `counts`: the pairs by kind, term group and status, the items not open, the
+  duplicates removed, and the texts that point to several canonicals.
 
 ## The rules every source shares
 
@@ -146,7 +147,7 @@ apart, so a training run can leave them out.
 ### One text, several canonicals
 
 A text can name several items, such as "Other, specify" in caDSR. It is then
-used for each of them. The report counts such texts.
+used for each of them. The manifest counts such texts.
 
 ### Duplicates
 

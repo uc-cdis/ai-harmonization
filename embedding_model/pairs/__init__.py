@@ -1,10 +1,10 @@
 """Pairs: each source's items, made into pairs of texts that mean the same thing.
 
 ``pairs prepare`` reads the tables that ``sources fetch`` wrote. It writes each
-source's pairs to ``<inputs>/pairs/<source>.parquet``, beside a report,
-``<source>.json``. Each source has its own module, which reads the source into
-items. ``common.star`` then makes the pairs the same way for every source. The
-rules are in ``embedding_model/docs/pairs.md``.
+source's pairs to ``<inputs>/pairs/<source>.parquet``, beside their manifest,
+``<source>_manifest.json``. Each source has its own module, which reads the
+source into items. ``common.star`` then makes the pairs the same way for every
+source. The rules are in ``embedding_model/docs/pairs.md``.
 
 A pair keeps both rendered texts, ``anchor`` and ``positive``, and the fields
 that they were rendered from. So a later step can compare fields rather than
@@ -98,27 +98,37 @@ def ambiguous_texts(pairs):
     return int((targets.nunique() > 1).sum())
 
 
-def report(name, pairs, counts, manifest):
-    """What a source's pairs were made from, and what they hold, counted.
+def manifest(name, pairs, counts, fetch):
+    """The manifest of a source's pairs: what they were made from, and what they hold.
+
+    It has the fields of every manifest, and ``counts``. Its one input is the
+    source's fetch, with the fetch's own record of its tables. So pairs made
+    from another fetch can be told apart.
 
     Args:
         name (str): The source, as in READERS.
         pairs (pd.DataFrame): Its pairs.
         counts (dict[str, int]): The counts ``common.star`` returns.
-        manifest (dict): The manifest of the source's fetch.
+        fetch (dict): The manifest of the source's fetch.
 
     Returns:
-        dict: The report. ``source_files`` is the fetch's own record of its
-            tables, so pairs from another fetch can be told apart.
+        dict: The manifest.
     """
     return {
         "source": name,
-        "source_version": manifest["version"],
-        "fetched": manifest["fetched"],
-        "source_files": manifest["files"],
-        "prepared": date.today().isoformat(),
-        "rows": len(pairs),
-        "csv_sha256": pairs_sha256(pairs),
+        "built": date.today().isoformat(),
+        "files": {
+            f"{name}.parquet": {"rows": len(pairs), "csv_sha256": pairs_sha256(pairs)}
+        },
+        "sources": [
+            {
+                "role": "fetch",
+                "name": name,
+                "version": fetch["version"],
+                "fetched": fetch["fetched"],
+                "files": fetch["files"],
+            }
+        ],
         "counts": {
             **counts,
             "ambiguous_texts": ambiguous_texts(pairs),
@@ -130,7 +140,7 @@ def report(name, pairs, counts, manifest):
 
 
 def prepare_one(name, inputs, root):
-    """Make one source's pairs, and write them with their report.
+    """Make one source's pairs, and write them with their manifest.
 
     Args:
         name (str): The source, as in READERS.
@@ -139,17 +149,17 @@ def prepare_one(name, inputs, root):
 
     Returns:
         pd.DataFrame: The pairs, also written as ``<source>.parquet``, beside
-            their report, ``<source>.json``.
+            their manifest, ``<source>_manifest.json``.
     """
-    tables, manifest = read_source(inputs, name)
+    tables, fetch = read_source(inputs, name)
     pairs, counts = common.star(READERS[name].items(tables), name)
-    found = report(name, pairs, counts, manifest)
+    found = manifest(name, pairs, counts, fetch)
     pairs.to_parquet(root / f"{name}.parquet", index=False)
-    (root / f"{name}.json").write_text(
+    (root / f"{name}_manifest.json").write_text(
         json.dumps(found, indent=2) + "\n", encoding="utf-8"
     )
     print(
-        f"  {found['rows']:,} pairs from {counts['items']:,} items; "
+        f"  {len(pairs):,} pairs from {counts['items']:,} items; "
         f"{counts['items_not_open']:,} items not open, "
         f"{counts['duplicates_removed']:,} duplicate pairs removed"
     )

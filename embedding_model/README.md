@@ -243,7 +243,7 @@ inputs/
     sources/
         <source>/                a training source's tables, as <table>.parquet, and the fetch's manifest.json
         downloads/<source>/      the source's files as downloaded, kept for the next fetch
-    pairs/                       <source>.parquet: each source's pairs of texts; <source>.json, their report
+    pairs/                       <source>.parquet: each source's pairs of texts; <source>_manifest.json, their manifest
         audit.json               what the leakage audit checked, and its verdict
     corpora/<corpus>/            training and validation pairs; corpus.json records what went in
     tokenizers/<tokenizer>/      tokenizer.json

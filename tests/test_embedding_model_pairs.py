@@ -1137,10 +1137,10 @@ def fetched_nhanes(inputs, name="nhanes"):
 
 
 class TestPrepare:
-    """``pairs prepare``: each source's file, its report, and combining sources."""
+    """``pairs prepare``: each source's file, its manifest, and combining sources."""
 
-    def test_prepare_writes_the_pairs_and_their_report(self, tmp_path):
-        """The pairs are written with a report that records their checksum and counts."""
+    def test_prepare_writes_the_pairs_and_their_manifest(self, tmp_path):
+        """The pairs are written with a manifest of their fetch, checksum and counts."""
         fetched_nhanes(tmp_path)
         assert (
             main(["pairs", "prepare", "--inputs", str(tmp_path), "--source", "nhanes"])
@@ -1149,11 +1149,23 @@ class TestPrepare:
         found = pd.read_parquet(tmp_path / "pairs" / "nhanes.parquet")
         assert found.anchor.tolist() == ["ABCDXYZ (string)", "Abcd score (string)"]
         assert set(found.source) == {"nhanes"}
-        report = json.loads((tmp_path / "pairs" / "nhanes.json").read_text())
-        assert report["rows"] == 2
-        assert report["csv_sha256"] == pairs.pairs_sha256(found)
-        assert report["counts"]["kind"] == {"name": 2}
-        assert report["source_version"] == "1"
+        written = json.loads((tmp_path / "pairs" / "nhanes_manifest.json").read_text())
+        assert written["files"] == {
+            "nhanes.parquet": {"rows": 2, "csv_sha256": pairs.pairs_sha256(found)}
+        }
+        assert written["counts"]["kind"] == {"name": 2}
+        fetch = json.loads(
+            (tmp_path / "sources" / "nhanes" / "manifest.json").read_text()
+        )
+        assert written["sources"] == [
+            {
+                "role": "fetch",
+                "name": "nhanes",
+                "version": "1",
+                "fetched": fetch["fetched"],
+                "files": fetch["files"],
+            }
+        ]
 
     def test_an_unfetched_source_is_reported(self, tmp_path, capsys):
         """A source that was not fetched is reported, with the command to fetch it."""

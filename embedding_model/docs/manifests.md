@@ -1,8 +1,9 @@
 # Manifests
 
-A manifest says what a build was made from, and what it made. Benchmarks and
-training sources both have them, and they work the same way. Here, "a build"
-means a benchmark build or a source fetch.
+A manifest says what a build was made from, and what it made. Benchmarks,
+training sources and their pairs all have them, and they work the same way.
+Here, "a build" means a benchmark build, a source fetch or the preparation of
+a source's pairs.
 
 ## The committed manifest and the build's own
 
@@ -21,21 +22,29 @@ Each build also writes its own manifest beside the files that it makes.
 [benchmarks.md](benchmarks.md#the-manifest) and
 [sources.md](sources.md#what-a-fetch-writes) say where.
 
+Pairs have no committed manifest. The code makes them from a fetch, and the
+fetch's manifest is committed. The pairs' own manifest records that fetch.
+
 ## Its fields
 
 Every manifest has the same fields. A field that does not apply is left out:
 
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
-- `files`: each file's row count, and its `sha256`. A source's table, kept
-  as parquet, has `csv_sha256` instead: the SHA-256 of the table written as
-  CSV, not of the file (see [sources.md](sources.md#what-a-fetch-writes));
+- `files`: each file's row count, and its `sha256`. A table kept as parquet
+  has `csv_sha256` instead, such as a source's table or a source's pairs. It
+  is the SHA-256 of the table written as CSV, not of the file (see
+  [sources.md](sources.md#what-a-fetch-writes));
 - `sources`: what the build was made from, one entry each, with
   - `role`: what the input is for, such as `mappings` or `release`;
   - `name` and `location`: a URL, DOI or record;
   - `version`: a release, tag or commit, where the input has one;
   - `fetched`: the date, for an input that serves only its current state;
-  - `sha256`, `license` and `citation`, where known.
+  - `files`: for an input with several files, such as a fetch, each file as
+    the input's own manifest records it;
+  - `sha256`, `license` and `citation`, where known;
+- `counts`: what the build counted, such as the pairs by kind. It is never
+  compared.
 
 ## How a build is checked
 

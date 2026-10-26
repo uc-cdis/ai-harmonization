@@ -142,8 +142,7 @@ def prepare_one(name, inputs, root):
             their report, ``<source>.json``.
     """
     tables, manifest = read_source(inputs, name)
-    pairs, counts = common.star(READERS[name].items(tables))
-    pairs.insert(2, "source", name)
+    pairs, counts = common.star(READERS[name].items(tables), name)
     found = report(name, pairs, counts, manifest)
     pairs.to_parquet(root / f"{name}.parquet", index=False)
     (root / f"{name}.json").write_text(

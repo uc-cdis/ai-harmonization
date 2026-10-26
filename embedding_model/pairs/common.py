@@ -36,6 +36,7 @@ NAME_TO_DESCRIPTION = "name_to_description"
 COLUMNS = [
     "anchor",
     "positive",
+    "source",
     "kind",
     "item",
     "term_type",
@@ -526,7 +527,9 @@ def distinct(texts, canonical):
     return list(found.values())
 
 
-def item_pairs(target, names, status, anchor_type, descriptions, to_description):
+def item_pairs(
+    target, names, status, anchor_type, descriptions, to_description, source
+):
     """The pairs of one target: a star around its canonical, once per value list.
 
     Each name gives a ``name`` pair, and a ``name_description`` pair when the
@@ -544,6 +547,7 @@ def item_pairs(target, names, status, anchor_type, descriptions, to_description)
         descriptions (list[str]): Other descriptions, for the source side.
         to_description (bool): Whether the canonical may be paired with the
             description when no name is left.
+        source (str): The source's name, written into each pair.
 
     Returns:
         list[tuple]: The pairs, as rows in COLUMNS' order.
@@ -570,6 +574,7 @@ def item_pairs(target, names, status, anchor_type, descriptions, to_description)
             return (
                 anchors[anchor],
                 positives[positive],
+                source,
                 kind,
                 target.id,
                 term_type,
@@ -674,7 +679,7 @@ def distinct_pairs(pairs):
     return kept.assign(study=merged.fillna(kept.study))
 
 
-def star(items):
+def star(items, source):
     """Every pair of a source's items, with what was left out, counted.
 
     Items whose restriction field does not allow use are left out. A retired
@@ -687,6 +692,7 @@ def star(items):
 
     Args:
         items (Iterable[Item]): The source's items.
+        source (str): The source's name, written into each pair.
 
     Returns:
         tuple[pd.DataFrame, dict[str, int]]: The pairs, in COLUMNS, and the
@@ -711,7 +717,13 @@ def star(items):
                 names = [Text(item.canonical, "canonical"), *names]
             for replacement in found:
                 rows += item_pairs(
-                    replacement, names, item.status, anchor_type, [], False
+                    replacement,
+                    names,
+                    item.status,
+                    anchor_type,
+                    [],
+                    False,
+                    source=source,
                 )
         elif item.canonical:
             names = item.texts
@@ -724,6 +736,7 @@ def star(items):
                 anchor_type,
                 item.descriptions,
                 item.status != RETIRED or key(item.canonical) not in live,
+                source=source,
             )
     pairs = pd.DataFrame(rows, columns=COLUMNS)
     rank = pairs.status.map({CURRENT: 0, DRAFT: 1, RETIRED: 2})

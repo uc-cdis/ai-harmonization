@@ -215,6 +215,13 @@ Each variable's type comes from its table's variable report.
 `ai_harmonization.dbgap` reads it as it reads any study's, so the benchmark
 sees the same text that the harmonization approaches see.
 
+**Newer releases.** The documentation is pinned by its commit. When the
+repository has a newer commit, write it as the documentation's `version`. Then
+make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. Each dbGaP
+release comes from the documentation's citations, so it changes only with the
+documentation.
+
 [licenses.md](licenses.md#topmed) gives its license and reference.
 
 ## GDC
@@ -287,5 +294,12 @@ The GDC benchmark built by
 `jupyter/harmonization_real_benchmark_creation_gdc.ipynb`
 (`harmonization_benchmark_real_GDC_v0.0.1`) maps each property to one node
 only, so its scores and these are not comparable.
+
+**Newer releases.** The ground truth is pinned by its Zenodo record. A new
+version of GDC-SM is a new record: write its number as the ground truth's
+`version`. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. The GDC API
+serves only the current dictionary, and each build reads it. So a new GDC data
+release shows as a build that differs (see [The targets](#the-targets)).
 
 [licenses.md](licenses.md#gdc) gives its license and reference.

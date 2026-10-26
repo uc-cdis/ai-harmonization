@@ -69,21 +69,11 @@ fetched. LOINC, for one, needs a loinc.org account: without its credentials or
 a zip placed by hand, it cannot be fetched (see [LOINC](#loinc)). The command
 then exits with status 1, so a script can tell that a source is missing.
 
-Downloads are kept, so a later fetch reads the same files. Some sources
-serve only their current state. To fetch a newer state of one of them, delete
-its files under `downloads/`:
-
-| source | files to delete |
-|---|---|
-| NIH CDE | `cde/SearchExport.json` |
-| NHANES | the whole `nhanes/` folder |
-| NCIt's replacements service | `ncit/replacements_<version>.json` |
-| CMO and MMO | `obo/cmo.owl` and `obo/mmo.owl` |
-| PhenX | `phenx/Phenx_DB.zip` |
-
-The new fetch then differs, and is accepted as a
-[new version](manifests.md#making-a-new-version). For PhenX, the manifest's
-pinned release must be raised first.
+Downloads are kept, so a later fetch reads the same files. Each source's
+"Newer releases" part below says how to use a newer release. For a source
+that serves only its current state, that means deleting its kept files under
+`downloads/`. The new fetch then differs, and is accepted as a
+[new version](manifests.md#making-a-new-version).
 
 ## Licenses and references
 
@@ -111,6 +101,14 @@ service says what happened to each one, such as a merge, and which concept
 replaced it: that is the `replacements` table.
 
 Reading NCIt takes a few minutes and about 4 GB of memory.
+
+**Newer releases.** EVS publishes a new NCIt release each month. EVS's
+`NCI_Thesaurus/archive/` folder lists every release, such as `26.09d_Release`.
+To use a newer one, write its name as the release's `version` in the committed
+manifest. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. The
+replacements service serves only its current state. The fetch keeps its answer,
+so delete `downloads/ncit/replacements_<version>.json` to ask again.
 
 [licenses.md](licenses.md#ncit) gives its license and reference.
 
@@ -145,6 +143,16 @@ abbreviation.
 | MMO, measurement methods | main file, as for CMO |
 | DUO, data use | main release |
 
+**Newer releases.** Each ontology's undated address, such as
+`http://purl.obolibrary.org/obo/mondo.owl`, serves its newest release. The
+file's header names that release in its version IRI (Internationalized Resource
+Identifier), such as `.../mondo/releases/2026-10-06/mondo.owl`. The first few
+kilobytes of the file hold it. A date newer than the pin means a newer release:
+write it as the release's `version`. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. CMO and MMO
+have no dated releases. The fetch keeps their current files, so delete
+`downloads/obo/cmo.owl` and `downloads/obo/mmo.owl` to fetch the newest ones.
+
 [licenses.md](licenses.md#ontologies) gives its license and reference.
 
 ## LOINC
@@ -177,6 +185,13 @@ Codes of every status are kept: active, trial, discouraged and deprecated.
 The answer file's SNOMED CT codes and names are not read: LOINC's license
 does not cover them.
 
+**Newer releases.** Regenstrief publishes a numbered LOINC release twice a
+year, and loinc.org lists them. To use a newer one, write its number as the
+release's `version`, and delete the release's `md5`: the old checksum belongs
+to the old release. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. The fetch
+records the new release's MD5.
+
 [licenses.md](licenses.md#loinc) gives its license and reference.
 
 ## CDISC
@@ -199,6 +214,13 @@ Protocol package in March 2026, so its last release is older than the others.
 
 A term links to its codelist by `package` and `Codelist Code`. A codelist's
 own row has an empty `Codelist Code`. Every `Code` is an NCIt concept code.
+
+**Newer releases.** EVS publishes each package's terminology several times a
+year. A package's `Archive/` folder on EVS's server, such as
+`CDISC/SDTM/Archive/`, lists every release by date. To use a newer one, write
+its date as the package's release `version`. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. Each package
+has its own date, so a package without a new release keeps its pin.
 
 [licenses.md](licenses.md#cdisc) gives its license and reference.
 
@@ -229,6 +251,12 @@ Some elements carry a copyright notice among their properties, such as
 LOINC's. Whether an element is open depends on its `copyrightStatus` and
 `noRenderAllowed`, not on its properties.
 
+**Newer releases.** The repository serves only its current state, so there is
+no release to pin. The fetch keeps the export in
+`downloads/cde/SearchExport.json`. To read the current state, delete that file
+and fetch again. A fetch that differs from the committed manifest is a new
+version, as [Making a new version](manifests.md#making-a-new-version) says.
+
 [licenses.md](licenses.md#nih-cde) gives its license and reference.
 
 ## caDSR
@@ -250,6 +278,11 @@ The tables link by the element's `public_id` and `version`.
 The snapshot also holds retired and draft elements. They are in `elements`
 too, marked by their `workflow_status`, such as `RETIRED ARCHIVED` or
 `DRAFT NEW`.
+
+**Newer releases.** caDSR publishes snapshots of its released data elements,
+each named by its date, in its download area's `CDE/XML_Archive/` folder. To
+use a newer one, write its date as the snapshot's `version`. Then make a new
+version, as [Making a new version](manifests.md#making-a-new-version) says.
 
 [licenses.md](licenses.md#cadsr) gives its license and reference.
 
@@ -273,6 +306,13 @@ Data Center, have no public codebook page. They are listed in
 `downloads/nhanes/codebooks/not_found.txt`, so a later fetch does not ask for
 them again. If a page fails to download, the fetch stops. Run it again: it
 downloads only the pages still missing.
+
+**Newer releases.** NHANES serves only its current pages: the variable lists
+and each data file's codebook. The fetch keeps every page in
+`downloads/nhanes/`. To read the current pages, delete them and fetch again. A
+data file listed in `codebooks/not_found.txt` is not asked for again until that
+list is deleted too. A fetch that differs from the committed manifest is a new
+version, as [Making a new version](manifests.md#making-a-new-version) says.
 
 [licenses.md](licenses.md#nhanes) gives its license and reference.
 
@@ -300,5 +340,12 @@ variable by `variable_id`. A replacement names two protocol `id`s.
 
 A protocol that PhenX replaced by a newer one is hidden: its `visible` is
 `0`, and `replacements` names the protocol that replaced it.
+
+**Newer releases.** The export's address serves only PhenX's latest release,
+and the export names it, such as `Ver 49.0`. The fetch keeps the export in
+`downloads/phenx/Phenx_DB.zip`. To use a newer release, delete that file, write
+the new release as the export's `version`. Then make a new version, as
+[Making a new version](manifests.md#making-a-new-version) says. A fetch refuses
+an export of another release than the pin.
 
 [licenses.md](licenses.md#phenx) gives its license and reference.

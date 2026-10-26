@@ -6,15 +6,14 @@ built first; see [The workflow](../README.md#the-workflow).
 
 ## How a model is scored
 
-For each source variable, the model ranks every target of the benchmark: all
-148 on TOPMed, and all 1,217 on GDC. It ranks them by cosine similarity, as the
-harmonization approaches do. The variable's score is where its expected target
-lands: rank 1 if it comes first.
+For each source variable, the model ranks every target of the benchmark, by
+cosine similarity, as the harmonization approaches do. The variable's score is
+where its expected target lands: rank 1 if it comes first.
 
-For example, for the variable `age`, the model sorts the 1,217 GDC targets
-from most to least similar. If `demographic.age_at_index` comes third, that
+For example, for a source variable `age`, the model sorts every target from
+most to least similar. If `participant.age_at_visit` comes third, that
 variable's rank is 3. Some variables have more than one expected target, and
-then the best placed of them counts. `age` has four.
+then the best placed of them counts.
 
 ## The metrics
 
@@ -71,27 +70,26 @@ that rebuilds it. A build whose version is not the version committed under
 | `stdelement` | `name: ... \| description: ... \| values: a; b`, the shape of `uc-ctds/StdElement-Mapper`'s NCIt training pairs |
 
 `compact` writes the description, and the `": "` before it, only when a
-property has one. The formatters treat values the same way. GDC's target
-`publication.doi` has no description and no values, so it reads
-`publication.doi (string)`. A GDC source with values but no description
-reads `race (string) Values: White | Black or African American`. The training
+property has one. The formatters treat values the same way. A target
+`visit.visit_id` with no description and no values reads
+`visit.visit_id (string)`. A source with values but no description reads
+`smoking_status (string) Values: Current | Former | Never`. The training
 pairs are written in `compact` too.
 
 In every format but `stdelement`, a target's text includes its node, as in
-`atherosclerosis.cac_score_1 (float): Coronary artery calcification (CAC)
-score ...`. `stdelement` leaves the node out, as StdElement-Mapper's training
-pairs do. So a property that several nodes carry alike has the same text in
-each. On GDC version 2, 494 of the 1,217 targets share their text with
-another. Each copy of a wrong target then takes a rank of its own. Identical
-texts tie, up to float noise between encoding batches. sentence-transformers 6
-breaks a tie by target key. Earlier releases break it in no fixed order.
+`vitals.body_weight (float): Body weight in kilograms`. `stdelement` leaves the
+node out, as StdElement-Mapper's training pairs do. So a property that several
+nodes carry alike has the same text in each. Each copy of a wrong target then
+takes a rank of its own. Identical texts tie, up to float noise between
+encoding batches. sentence-transformers 6 breaks a tie by target key. Earlier
+releases break it in no fixed order.
 
 A source variable's text leaves the node out, in every format. Its node would
-be its dbGaP table, such as `pht005002.v1`, or its GDC paper, such as `Clark`,
+be its dbGaP table, such as `pht999999.v1`, or the paper that it comes from,
 and neither says what the variable means. So the text starts at the variable's
-name: `cac_agatston_score (float): Coronary artery calcification score`. The
-harmonization approaches do write a source's node, as in
-`pht005002.v1.cac_agatston_score (float): ...`. A score measures the variable
+name: `body_weight (float): Body weight in kilograms`. The harmonization
+approaches do write a source's node, as in
+`pht999999.v1.body_weight (float): ...`. A score measures the variable
 without it.
 
 Every format that shows values keeps the first 12. The two released models'

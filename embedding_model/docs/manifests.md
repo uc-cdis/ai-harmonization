@@ -12,11 +12,12 @@ Each benchmark and each source has a manifest committed in git:
 - `embedding_model/benchmarks/manifests/<benchmark>.json`;
 - `embedding_model/sources/manifests/<source>.json`.
 
-It pins what the build is made from, such as a commit of the TOPMed
-documentation or a release of NCIt. It records the SHA-256 of each input that
-the build reads, such as a downloaded zip. It also records each file that the
-build makes, with its row count and SHA-256. The code reads its pins from this
-file. So the code says how to build, and the manifest says from which inputs.
+It pins what the build is made from, such as a commit of a benchmark's
+documentation or a release of a source. It records the SHA-256 of each input
+that the build reads, such as a downloaded zip. It also records each file that
+the build makes, with its row count and SHA-256. The code reads its pins from
+this file. So the code says how to build, and the manifest says from which
+inputs.
 
 Each build also writes its own manifest beside the files that it makes.
 [benchmarks.md](benchmarks.md#the-manifest) and
@@ -70,9 +71,10 @@ new version, as the next section describes.
 A difference that is meant makes a new version:
 
 1. In the committed manifest, raise `version`. For a new pin, such as another
-   commit of the TOPMed documentation or a new NCIt release, also edit the
-   input's `version`. A change that cannot be pinned, such as a new GDC
-   dictionary, needs only the raised `version`.
+   commit of a benchmark's documentation or a source's new release, also edit
+   the input's `version`. A change that cannot be pinned, such as a new
+   dictionary from a server that serves only its current state, needs only the
+   raised `version`.
 2. Build again with `--update-manifest`, as `benchmarks build` or
    `sources fetch`. It records the new checksums in the committed manifest.
 3. Commit the manifest.

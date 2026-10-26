@@ -27,12 +27,12 @@ positive: Saphenous Vein Graft (string): A vessel graft comprised of the sapheno
 
 ## The shape: a star around each item
 
-Each source is read into items: a concept, a term, a code, a data element or
-a variable. An item has one **canonical** text, the name that its source
-prefers, such as NCIt's preferred name or an ontology's label. Every other
-text of the item that means the same thing becomes one anchor. Its positive
-is the canonical, with the item's type, description and values. Each item is
-the centre of a star, and no pair joins two of its other texts.
+Each source is read into items: a concept, a term, a code, a data element or a
+variable. An item has one **canonical** text, the name that its source prefers,
+such as a thesaurus's preferred name or an ontology's label. Every other text
+of the item that means the same thing becomes one anchor. Its positive is the
+canonical, with the item's type, description and values. Each item is the
+centre of a star, and no pair joins two of its other texts.
 
 There are four kinds of pair:
 
@@ -59,7 +59,7 @@ another folder, they go to `pairs/` in that folder. One row is one pair:
 | `source` | the source, such as `ncit` |
 | `kind` | `name`, `name_description`, `description_description` or `name_to_description` |
 | `item` | the source's own id of the item on the positive side |
-| `term_type` | what the anchor's text is: the source's own label, such as NCIt's `SY` or caDSR's `GDC Alt Name`, or else its field, such as `short name`; `canonical` and `description` for a canonical and another description |
+| `term_type` | what the anchor's text is: the source's own label, such as a synonym type or an alternate-name type, or else its field, such as `short name`; `canonical` and `description` for a canonical and another description |
 | `term_group` | `expansion` or `paraphrase`; see [Expansions and paraphrases](#expansions-and-paraphrases) |
 | `status` | `current`, `retired` or `draft`: the status of the item the anchor's text comes from |
 | `study` | the dbGaP studies the anchor's text comes from, joined by `\|`, if any |
@@ -146,7 +146,7 @@ apart, so a training run can leave them out.
 
 ### One text, several canonicals
 
-A text can name several items, such as "Other, specify" in caDSR. It is then
+A text can name several items, such as "Other, specify". It is then
 used for each of them. The manifest counts such texts.
 
 ### Duplicates
@@ -184,7 +184,7 @@ pairs once for each distinct list.
 
 ### Types
 
-A source's own type word is kept, such as the NIH CDE's `Value List`. When a
+A source's own type word is kept, such as `Value List`. When a
 source has none, the type is `string/encoded` for an item with values and
 `string` for one without. `ai_harmonization.dbgap` maps dbGaP's types to
 these same words. An anchor takes its item's type word, or `string` when

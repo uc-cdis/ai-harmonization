@@ -175,9 +175,9 @@ def fetch(names, inputs, update_manifest=False):
 
     Each fetch is written to a staging folder first, and kept only if it
     matches the committed manifest or ``update_manifest`` accepts it; see
-    ``manifests.settle``. A source that cannot be fetched, such as LOINC
-    without its zip or credentials, is reported, and the others are still
-    fetched.
+    ``manifests.settle``. A source that cannot be fetched, such as one whose
+    download needs credentials that are not set, is reported, and the others
+    are still fetched.
 
     Args:
         names (list[str]): Sources to fetch, from FETCHERS.

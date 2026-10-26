@@ -366,7 +366,8 @@ class TestObo:
                 {"name": "EFGH release"},
             ]
         }
-        tables, found = obo.fetch_source(tmp_path, manifest)
+        tables, found, counts = obo.fetch_source(tmp_path, manifest)
+        assert counts == {"terms": {"abcd": 4, "efgh": 2}}
         assert tables["terms"].id.tolist() == [
             "ABCD:0000001",
             "ABCD:0000002",
@@ -523,8 +524,12 @@ class TestLoinc:
         (tmp_path / "Loinc_9.99.zip").write_bytes(data)
         md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
         manifest = {"sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": md5}]}
-        tables, found = loinc.fetch_source(tmp_path, manifest)
+        tables, found, counts = loinc.fetch_source(tmp_path, manifest)
         assert len(tables["codes"]) == 3
+        assert counts == {
+            "codes": 3,
+            "not_open": int((~tables["codes"].open).sum()),
+        }
         assert found[0]["md5"] == md5
 
 
@@ -831,7 +836,8 @@ class TestNhanes:
         """A data file whose codebook page is not found is counted, and the rest is read."""
         pages[nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")] = http_error(404)
         monkeypatch.setattr(nhanes, "downloaded", served(pages))
-        tables, found = nhanes.fetch_source(tmp_path, {"sources": []})
+        tables, found, counts = nhanes.fetch_source(tmp_path, {"sources": []})
+        assert counts["data_files_without_codebook"] == 1
         printed = capsys.readouterr().out
         assert "new value of Use Constraints: 'Abcd Only' on 1 items" in printed
         assert "1 data files without a public codebook" in printed
@@ -870,7 +876,7 @@ class TestNhanes:
             tmp_path / "codebooks" / nhanes.NOT_FOUND
         ).read_text() == "2017/EFGH_J\n"
         monkeypatch.setattr(nhanes, "downloaded", served({}))
-        tables, _ = nhanes.fetch_source(tmp_path, {"sources": []})
+        tables, _, _ = nhanes.fetch_source(tmp_path, {"sources": []})
         assert "1 data files without a public codebook" in capsys.readouterr().out
         assert tables["codebook"].data_file.tolist() == ["ABCD_J"]
 
@@ -1023,7 +1029,8 @@ class TestPhenx:
             phenx, "downloaded", served({phenx.EXPORT_URL: phenx_zip()})
         )
         manifest = {"sources": [{"name": phenx.EXPORT, "version": "Ver 9.1"}]}
-        tables, found = phenx.fetch_source(tmp_path, manifest)
+        tables, found, counts = phenx.fetch_source(tmp_path, manifest)
+        assert counts["variables"] == len(tables["variables"])
         assert (tmp_path / "Phenx_DB.zip").exists()
         assert tables["replacements"].protocol_new_id.tolist() == ["1"]
         assert found[0]["role"] == "service"
@@ -1076,7 +1083,10 @@ class TestWriteAndRead:
         """Tables written as parquet read back, checked by their content's SHA-256."""
         directory = tmp_path / "sources" / "abcd"
         directory.mkdir(parents=True)
-        manifest = sources.write_source(directory, "abcd", "1", {"items": TABLE}, [])
+        manifest = sources.write_source(
+            directory, "abcd", "1", {"items": TABLE}, [], {"items": 3}
+        )
+        assert manifest["counts"] == {"items": 3}
         assert manifest["files"]["items.parquet"]["csv_sha256"] == sources.table_sha256(
             TABLE
         )
@@ -1094,7 +1104,7 @@ class TestWriteAndRead:
         """A table whose content changed since its fetch is refused."""
         directory = tmp_path / "sources" / "abcd"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [])
+        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
         TABLE.head(1).to_parquet(directory / "items.parquet", index=False)
         with pytest.raises(ValueError, match="items.parquet"):
             sources.read_source(tmp_path, "abcd")
@@ -1109,7 +1119,7 @@ class TestWriteAndRead:
         monkeypatch.setattr(sources, "MANIFESTS", folder)
         directory = tmp_path / "sources" / "abcd"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [])
+        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
         sources.read_source(tmp_path, "abcd")
         assert "is version 1, and the committed manifest is version 2" in (
             capsys.readouterr().err
@@ -1127,6 +1137,7 @@ def fictional_source():
     source.fetch_source.side_effect = lambda downloads, manifest: (
         {"items": TABLE},
         manifest["sources"],
+        {},
     )
     return source
 

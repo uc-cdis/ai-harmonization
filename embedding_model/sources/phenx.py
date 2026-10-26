@@ -252,8 +252,8 @@ def fetch_source(downloads, manifest):
             release.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables and the
-            manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
+            manifest's sources, and the counts that the fetch prints.
 
     Raises:
         ValueError: If the export's release is not the pinned release. The
@@ -270,8 +270,12 @@ def fetch_source(downloads, manifest):
             f"{path.name} is PhenX {release}, and the manifest pins {pin['version']}"
         )
     found = tables["variables"]
-    print(f"  {release}: {len(found):,} variables, {found.open.sum():,} open")
-    return tables, [
+    counts = {"variables": len(found), "not_open": int((~found.open).sum())}
+    print(
+        f"  {release}: {counts['variables']:,} variables, "
+        f"{counts['variables'] - counts['not_open']:,} open"
+    )
+    sources = [
         {
             "role": "service",
             "name": EXPORT,
@@ -283,3 +287,4 @@ def fetch_source(downloads, manifest):
             "citation": CITATION,
         }
     ]
+    return tables, sources, counts

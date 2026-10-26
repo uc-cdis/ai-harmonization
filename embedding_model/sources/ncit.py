@@ -221,9 +221,9 @@ def fetch_source(downloads, manifest):
             version.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables, with
-            ``replacements`` added to ``read_ncit``'s, and the manifest's
-            sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, with
+            ``replacements`` added to ``read_ncit``'s, the manifest's sources,
+            and the counts that the fetch prints.
     """
     version = pinned(manifest, RELEASE)["version"]
     url = ARCHIVE.format(version=version)
@@ -241,10 +241,15 @@ def fetch_source(downloads, manifest):
     kept = downloads / f"replacements_{version}.json"
     found = replacements(retired, kept)
     tables["replacements"] = found
-    replaced = found[found.replacement_code != ""].code.nunique()
+    counts = {
+        "concepts": len(concepts),
+        "retired_or_obsolete": len(retired),
+        "replaced": int(found[found.replacement_code != ""].code.nunique()),
+    }
     print(
-        f"  {len(concepts):,} concepts, {len(retired):,} retired or obsolete, "
-        f"{replaced:,} replaced"
+        f"  {counts['concepts']:,} concepts, "
+        f"{counts['retired_or_obsolete']:,} retired or obsolete, "
+        f"{counts['replaced']:,} replaced"
     )
     sources = [
         {
@@ -266,4 +271,4 @@ def fetch_source(downloads, manifest):
             "citation": CITATION,
         },
     ]
-    return tables, sources
+    return tables, sources, counts

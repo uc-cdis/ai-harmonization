@@ -307,8 +307,9 @@ def build(downloads, manifest):
             gives the repository and the commit.
 
     Returns:
-        tuple[list[dict], list[dict], list[dict]]: The targets, the mappings
-            and the manifest's sources.
+        tuple[list[dict], list[dict], list[dict], dict]: The targets, the
+            mappings, the manifest's sources, and the counts that the build
+            prints.
     """
     documentation = next(
         (s for s in manifest["sources"] if s["name"] == DOCUMENTATION), None
@@ -326,13 +327,21 @@ def build(downloads, manifest):
     resolved, dbgap_sources = resolve_components(references, downloads / "dbgap")
     targets = target_rows(variables)
     mappings = mapping_rows(variables, resolved)
-    ages = sum(
-        any(".age_at_" in key for key in row["expected_target"]) for row in mappings
-    )
+    counts = {
+        "harmonized_variables": len(variables),
+        "targets": len(targets),
+        "component_references": len(references),
+        "dbgap_releases": len(dbgap_sources),
+        "source_variables": len(mappings),
+        "mapped_to_an_age": sum(
+            any(".age_at_" in key for key in row["expected_target"]) for row in mappings
+        ),
+    }
     print(
-        f"  {len(variables)} harmonized variables, {len(targets)} targets; "
-        f"{len(references):,} component references in {len(dbgap_sources)} "
-        f"dbGaP releases; {len(mappings):,} source variables, {ages:,} of them "
-        "mapped to an age"
+        f"  {counts['harmonized_variables']} harmonized variables, "
+        f"{counts['targets']} targets; {counts['component_references']:,} "
+        f"component references in {counts['dbgap_releases']} dbGaP releases; "
+        f"{counts['source_variables']:,} source variables, "
+        f"{counts['mapped_to_an_age']:,} of them mapped to an age"
     )
-    return targets, mappings, [documentation, *dbgap_sources]
+    return targets, mappings, [documentation, *dbgap_sources], counts

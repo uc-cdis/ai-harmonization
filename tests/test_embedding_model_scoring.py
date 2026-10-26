@@ -97,7 +97,7 @@ def built(tmp_path, mappings, name="topmed"):
     """
     folder = tmp_path / "inputs" / "benchmarks"
     folder.mkdir(parents=True, exist_ok=True)
-    benchmarks.write_benchmark(folder, name, "1", TARGETS, mappings, [])
+    benchmarks.write_benchmark(folder, name, "1", TARGETS, mappings, [], {})
     return tmp_path / "inputs"
 
 

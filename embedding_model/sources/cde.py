@@ -177,8 +177,8 @@ def fetch_source(downloads, manifest):
             the repository serves only its current state.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables and the
-            manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
+            manifest's sources, and the counts that the fetch prints.
     """
     # Importing ai_harmonization.cde also imports langchain, which takes several
     # seconds. Importing it here, not at the top of this module, means only an
@@ -190,7 +190,8 @@ def fetch_source(downloads, manifest):
     elements = export(path, SEARCH_EXPORT_URL, query)
     tables = read_export(elements)
     found = tables["elements"]
-    print(f"  {len(found):,} elements, {(~found.open).sum():,} not open")
+    counts = {"elements": len(found), "not_open": int((~found.open).sum())}
+    print(f"  {counts['elements']:,} elements, {counts['not_open']:,} not open")
     source = {
         "role": "service",
         "name": EXPORT,
@@ -200,4 +201,4 @@ def fetch_source(downloads, manifest):
         "license": LICENSE,
         "citation": CITATION,
     }
-    return tables, [source]
+    return tables, [source], counts

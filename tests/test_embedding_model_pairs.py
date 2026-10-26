@@ -1133,7 +1133,7 @@ def fetched_nhanes(inputs, name="nhanes"):
             label=["Very"],
         ),
     }
-    sources.write_source(directory, name, "1", tables, [])
+    sources.write_source(directory, name, "1", tables, [], {})
 
 
 class TestPrepare:

@@ -320,8 +320,9 @@ def build(downloads, manifest):
             the Zenodo record.
 
     Returns:
-        tuple[list[dict], list[dict], list[dict]]: The targets, the mappings
-            and the manifest's sources.
+        tuple[list[dict], list[dict], list[dict], dict]: The targets, the
+            mappings, the manifest's sources, and the counts that the build
+            prints.
     """
     ground_truth = next(
         (s for s in manifest["sources"] if s["name"] == GROUND_TRUTH), None
@@ -355,9 +356,14 @@ def build(downloads, manifest):
     dictionary = json.loads(fetch(GDC_DICTIONARY))
     targets = dictionary_targets(dictionary)
     mappings = mapping_rows(truth, tables, targets, PAPERS)
+    counts = {
+        "papers": len(truth),
+        "source_variables": len(mappings),
+        "targets": len(targets),
+    }
     print(
-        f"  {len(truth)} papers, {len(mappings)} source variables, "
-        f"{len(targets):,} targets ({status['data_release']})"
+        f"  {counts['papers']} papers, {counts['source_variables']} source "
+        f"variables, {counts['targets']:,} targets ({status['data_release']})"
     )
     sources = [
         {**ground_truth, "sha256": sha256(archive)},
@@ -378,4 +384,4 @@ def build(downloads, manifest):
             "citation": "embedding_model/docs/licenses.md#gdc",
         },
     ]
-    return targets, mappings, sources
+    return targets, mappings, sources, counts

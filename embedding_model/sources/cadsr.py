@@ -244,16 +244,17 @@ def fetch_source(downloads, manifest):
             date.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables and the
-            manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
+            manifest's sources, and the counts that the fetch prints.
     """
     day = pinned(manifest, SNAPSHOT)["version"]
     url = ARCHIVE.format(date=day)
     path = downloaded(url, downloads / f"releasedCDEsXML-OD.zip.{day}")
     tables = read_snapshot(path)
     found = tables["elements"]
-    print(f"  {len(found):,} elements, {(~found.open).sum():,} proprietary")
-    return tables, [
+    counts = {"elements": len(found), "not_open": int((~found.open).sum())}
+    print(f"  {counts['elements']:,} elements, {counts['not_open']:,} proprietary")
+    sources = [
         {
             "role": "release",
             "name": SNAPSHOT,
@@ -264,3 +265,4 @@ def fetch_source(downloads, manifest):
             "citation": CITATION,
         }
     ]
+    return tables, sources, counts

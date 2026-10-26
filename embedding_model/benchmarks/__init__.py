@@ -48,7 +48,7 @@ MANIFESTS = Path(__file__).resolve().parent / "manifests"
 BUILDERS = {"topmed": topmed, "gdc": gdc}
 
 
-def write_benchmark(directory, name, version, targets, mappings, sources):
+def write_benchmark(directory, name, version, targets, mappings, sources, counts):
     """Write a benchmark's two files and the manifest of this build.
 
     Args:
@@ -61,6 +61,8 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
             written sorted and joined by TARGET_SEPARATOR.
         sources (list[dict]): What the benchmark was built from; see
             ``embedding_model/docs/benchmarks.md`` for the fields.
+        counts (dict): What the build counted, as its benchmark's module prints
+            it.
 
     Returns:
         dict: The manifest, also written as ``<name>_manifest.json`` beside
@@ -95,6 +97,7 @@ def write_benchmark(directory, name, version, targets, mappings, sources):
         "built": date.today().isoformat(),
         "files": files,
         "sources": sources,
+        "counts": counts,
     }
     (directory / f"{name}_manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -190,7 +193,7 @@ def build(names, inputs, update_manifest=False):
         committed_path = MANIFESTS / f"{name}.json"
         committed = json.loads(committed_path.read_text(encoding="utf-8"))
         print(f"{name}:")
-        targets, mappings, sources = BUILDERS[name].build(
+        targets, mappings, sources, counts = BUILDERS[name].build(
             directory / "downloads" / name, committed
         )
         with tempfile.TemporaryDirectory(dir=directory) as staging:
@@ -201,6 +204,7 @@ def build(names, inputs, update_manifest=False):
                 targets,
                 mappings,
                 sources,
+                counts,
             )
             status |= manifests.settle(
                 committed_path,

@@ -84,17 +84,19 @@ def fetch_source(downloads, manifest):
             gives its date.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The table ``terms``, every
-            package's rows together, and the manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The table ``terms``,
+            every package's rows together, the manifest's sources, and the
+            counts that the fetch prints.
     """
-    frames, sources = [], []
+    frames, sources, rows = [], [], {}
     for package, (folder, stem) in PACKAGES.items():
         released = pinned(manifest, release_name(package))["version"]
         name = f"{stem} {released}.txt"
         url = ARCHIVE.format(folder=folder, file=quote(name))
         data = cached(url, downloads / name)
         frame = read_package(data, package)
-        print(f"  {package:<9}{len(frame):>8,} rows")
+        rows[package] = len(frame)
+        print(f"  {package:<9}{rows[package]:>8,} rows")
         frames.append(frame)
         sources.append(
             {
@@ -110,4 +112,4 @@ def fetch_source(downloads, manifest):
     terms = pd.concat(frames, ignore_index=True).sort_values(
         ["package", "Codelist Code", "Code"], ignore_index=True
     )
-    return {"terms": terms}, sources
+    return {"terms": terms}, sources, {"rows_by_package": rows}

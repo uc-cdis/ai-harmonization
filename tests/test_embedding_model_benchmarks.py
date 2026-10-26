@@ -188,7 +188,7 @@ class TestBuilders:
         )
         pin = {"name": topmed.DOCUMENTATION, "role": "mappings and targets",
                "location": "https://github.com/abcd/docs", "version": "abcd1234"}  # fmt: skip
-        targets, mappings, sources = topmed.build(tmp_path, {"sources": [pin]})
+        targets, mappings, sources, counts = topmed.build(tmp_path, {"sources": [pin]})
         assert fetched == [
             (
                 "https://codeload.github.com/abcd/docs/tar.gz/abcd1234",
@@ -197,6 +197,8 @@ class TestBuilders:
         ]
         assert [row["expected_target"] for row in mappings] == [["demographic.sex_1"]]
         assert sources == [pin]
+        assert counts["source_variables"] == len(mappings) == 1
+        assert counts["targets"] == len(targets)
 
     @pytest.mark.parametrize("builder", [topmed, gdc])
     def test_a_missing_pin_is_named(self, builder, tmp_path):
@@ -686,7 +688,13 @@ class TestWriteBenchmark:
     def test_files_and_manifest(self, tmp_path):
         """Both files are written with their columns, and the manifest describes them."""
         manifest = benchmarks.write_benchmark(
-            tmp_path, "abcd", "1", [TARGET], [mapping("AGE", ["a.age"])], [PIN]
+            tmp_path,
+            "abcd",
+            "1",
+            [TARGET],
+            [mapping("AGE", ["a.age"])],
+            [PIN],
+            {"source_variables": 1},
         )
         with open(tmp_path / "abcd_mappings.csv", newline="") as handle:
             assert next(csv.reader(handle)) == benchmarks.MAPPING_COLUMNS
@@ -694,13 +702,14 @@ class TestWriteBenchmark:
         assert manifest["files"]["abcd_targets.csv"]["sha256"] == download.sha256(
             (tmp_path / "abcd_targets.csv").read_bytes()
         )
+        assert manifest["counts"] == {"source_variables": 1}
         assert json.loads((tmp_path / "abcd_manifest.json").read_text()) == manifest
 
     def test_a_string_expected_target_is_refused(self, tmp_path):
         """An expected_target given as a string, not a list, is a TypeError."""
         with pytest.raises(TypeError, match="list of target keys"):
             benchmarks.write_benchmark(
-                tmp_path, "abcd", "1", [TARGET], [mapping("AGE", "a.age")], [PIN]
+                tmp_path, "abcd", "1", [TARGET], [mapping("AGE", "a.age")], [PIN], {}
             )
 
 
@@ -712,7 +721,7 @@ class TestReadBenchmark:
         folder.mkdir()
         mappings = [mapping("RACE", ["b.race", "a.race"])]
         return benchmarks.write_benchmark(
-            folder, "abcd", "1", [TARGET], mappings, [PIN]
+            folder, "abcd", "1", [TARGET], mappings, [PIN], {}
         )
 
     def test_an_unbuilt_benchmark_names_the_build_command(self, tmp_path):
@@ -766,6 +775,7 @@ class TestBuild:
                 [TARGET],
                 built["mappings"],
                 manifest["sources"],
+                {},
             ),
         )
         manifests = tmp_path / "manifests"

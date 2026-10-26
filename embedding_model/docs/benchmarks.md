@@ -122,7 +122,12 @@ Each benchmark has a manifest committed as
 benchmark is built from, such as the TOPMed documentation's commit or the GDC
 ground truth's Zenodo record. Each build writes its own manifest beside the
 files, as `<benchmark>_manifest.json`, with the date in `built`. An input's
-`role` is `mappings`, `source text` or `targets`.
+`role` is `mappings`, `source text` or `targets`. Its `counts` hold what the
+build prints:
+
+- TOPMed: the harmonized variables, targets, component references, dbGaP
+  releases and source variables, and the source variables mapped to an age;
+- GDC: the papers, the source variables and the targets.
 
 [Manifests](manifests.md) says what a manifest holds, how a build is checked
 against it, and how to make a new version.

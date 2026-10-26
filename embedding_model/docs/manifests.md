@@ -43,8 +43,8 @@ Every manifest has the same fields. A field that does not apply is left out:
   - `files`: for an input with several files, such as a fetch, each file as
     the input's own manifest records it;
   - `sha256`, `license` and `citation`, where known;
-- `counts`: what the build counted, such as the pairs by kind. It is never
-  compared.
+- `counts`: what the build counted, such as a benchmark's source variables,
+  a source's items not open, or the pairs by kind.
 
 ## How a build is checked
 
@@ -53,7 +53,7 @@ A new build compares its manifest with the committed one:
 - A file is the same when its row count and SHA-256 match.
 - An input is the same when its SHA-256 matches, or its version where it has
   no checksum.
-- Dates, licenses and citations are not compared.
+- Dates, counts, licenses and citations are not compared.
 
 If everything matches, the build is what the manifest describes. Its files then
 replace the working ones. If not, the build lists each file and input that

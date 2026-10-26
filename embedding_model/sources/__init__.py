@@ -56,7 +56,7 @@ def table_sha256(frame):
     return sha256(frame.to_csv(index=False, lineterminator="\n").encode("utf-8"))
 
 
-def write_source(directory, name, version, tables, sources):
+def write_source(directory, name, version, tables, sources, counts):
     """Write a source's tables as parquet, and the manifest of this fetch.
 
     Args:
@@ -66,6 +66,7 @@ def write_source(directory, name, version, tables, sources):
         tables (dict[str, pd.DataFrame]): The tables, by name.
         sources (list[dict]): What the tables were read from; see
             ``embedding_model/docs/sources.md`` for the fields.
+        counts (dict): What the fetch counted, as its source's module prints it.
 
     Returns:
         dict: The manifest, also written as ``manifest.json``.
@@ -81,6 +82,7 @@ def write_source(directory, name, version, tables, sources):
         "fetched": date.today().isoformat(),
         "files": files,
         "sources": sources,
+        "counts": counts,
     }
     (directory / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
@@ -188,9 +190,13 @@ def fetch_one(name, committed_path, root, update_manifest):
         int: 0 if the fetch matches or was accepted, 1 otherwise.
     """
     committed = json.loads(committed_path.read_text(encoding="utf-8"))
-    tables, sources = FETCHERS[name].fetch_source(root / "downloads" / name, committed)
+    tables, sources, counts = FETCHERS[name].fetch_source(
+        root / "downloads" / name, committed
+    )
     with tempfile.TemporaryDirectory(dir=root) as staging:
-        built = write_source(Path(staging), name, committed["version"], tables, sources)
+        built = write_source(
+            Path(staging), name, committed["version"], tables, sources, counts
+        )
         return manifests.settle(
             committed_path,
             built,

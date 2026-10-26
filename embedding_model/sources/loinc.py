@@ -200,8 +200,8 @@ def fetch_source(downloads, manifest):
             version, and the MD5 once recorded.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables and the
-            manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
+            manifest's sources, and the counts that the fetch prints.
 
     Raises:
         FileNotFoundError: If the zip is neither in the downloads folder nor
@@ -234,7 +234,8 @@ def fetch_source(downloads, manifest):
         raise ValueError(f"{path} has MD5 {md5}, and the manifest pins {pin['md5']}")
     tables = read_release(path)
     codes = tables["codes"]
-    print(f"  {len(codes):,} codes, {(~codes.open).sum():,} not open")
+    counts = {"codes": len(codes), "not_open": int((~codes.open).sum())}
+    print(f"  {counts['codes']:,} codes, {counts['not_open']:,} not open")
     sources = [
         {
             "role": "release",
@@ -247,4 +248,4 @@ def fetch_source(downloads, manifest):
             "citation": CITATION,
         }
     ]
-    return tables, sources
+    return tables, sources, counts

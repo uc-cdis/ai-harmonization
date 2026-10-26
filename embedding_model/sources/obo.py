@@ -168,11 +168,12 @@ def fetch_source(downloads, manifest):
             kept.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables, every
-            ontology's rows together, and the manifest's sources.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, every
+            ontology's rows together, the manifest's sources, and the counts
+            that the fetch prints.
     """
     tables = {"terms": [], "synonyms": [], "definitions": []}
-    sources = []
+    sources, terms = [], {}
     for ontology, (_, dated, undated) in ONTOLOGIES.items():
         pin = pinned(manifest, release_name(ontology))
         if dated:
@@ -185,7 +186,8 @@ def fetch_source(downloads, manifest):
             read, stated = read_ontology(stream, ontology)
         for table, frame in read.items():
             tables[table].append(frame)
-        print(f"  {ontology:<7}{len(read['terms']):>8,} terms")
+        terms[ontology] = len(read["terms"])
+        print(f"  {ontology:<7}{terms[ontology]:>8,} terms")
         if not stated["license"]:
             print(f"  {ontology} states no license")
         sources.append(
@@ -205,9 +207,13 @@ def fetch_source(downloads, manifest):
         "synonyms": ["id", "scope", "name", "synonym_types"],
         "definitions": ["id", "definition"],
     }
-    return {
-        table: pd.concat(frames, ignore_index=True).sort_values(
-            keys[table], ignore_index=True
-        )
-        for table, frames in tables.items()
-    }, sources
+    return (
+        {
+            table: pd.concat(frames, ignore_index=True).sort_values(
+                keys[table], ignore_index=True
+            )
+            for table, frames in tables.items()
+        },
+        sources,
+        {"terms": terms},
+    )

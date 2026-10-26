@@ -53,9 +53,10 @@ restricts it. A table without `open` takes it from the item that it links to.
 Each source has a manifest committed as
 `embedding_model/sources/manifests/<source>.json`. It pins the release that the
 source is read from. Each fetch writes its own manifest beside the tables, as
-`sources/<source>/manifest.json`, with the date in `fetched`. A table's
-checksum, `csv_sha256`, is the SHA-256 of its content written as CSV, not of
-the parquet file. A parquet file's bytes change with the version of the library
+`sources/<source>/manifest.json`, with the date in `fetched`. Its `counts`
+hold what the fetch prints, such as the items read and how many are not open.
+A table's checksum, `csv_sha256`, is the SHA-256 of its content written as
+CSV, not of the parquet file. A parquet file's bytes change with the version of the library
 that writes it, even when the data are the same.
 
 An input's `role` is `release` for a file pinned by its version, or `service`

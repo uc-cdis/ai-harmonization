@@ -220,7 +220,8 @@ def fetch_source(downloads, manifest):
     Returns:
         tuple[dict[str, pd.DataFrame], list[dict]]: The tables ``variables``,
             ``codebook`` and ``values``, which share the key ``cycle``,
-            ``data_file`` and ``name``; and the manifest's sources.
+            ``data_file`` and ``name``; the manifest's sources; and the counts
+            that the fetch prints.
 
     Raises:
         ValueError: If a variable list is not the page it should be, or names a
@@ -305,9 +306,15 @@ def fetch_source(downloads, manifest):
             f"{len(failed):,} codebook pages could not be downloaded, such as "
             f"{failed[0]}. Fetch again to try them."
         )
+    counts = {
+        "variables": len(variables),
+        "data_files": len(files),
+        "data_files_without_codebook": len(missing),
+    }
     print(
-        f"  {len(variables):,} variables in {len(files):,} data files; "
-        f"{len(missing):,} data files without a public codebook"
+        f"  {counts['variables']:,} variables in {counts['data_files']:,} data "
+        f"files; {counts['data_files_without_codebook']:,} data files without a "
+        "public codebook"
     )
     sources.append(
         {
@@ -333,4 +340,4 @@ def fetch_source(downloads, manifest):
             ["cycle", "data_file", "name", "position"], ignore_index=True
         ),
     }
-    return tables, sources
+    return tables, sources, counts

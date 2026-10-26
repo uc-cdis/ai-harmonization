@@ -462,6 +462,20 @@ class TestStar:
         found, _ = common.star(items)
         assert found[found.anchor_name == "AB"].status.tolist() == [CURRENT]
 
+    def test_a_duplicate_keeps_the_studies_of_every_copy(self):
+        """A pair from two items keeps one copy, with the studies of both."""
+        items = [
+            Item(
+                id=f"abcd{number}",
+                canonical="Abcd",
+                texts=[Text("AB", "dbGaP variable name", study=study)],
+            )
+            for number, study in ((1, "phs999998"), (2, "phs999997"))
+        ]
+        found, counts = common.star(items)
+        assert found.study.tolist() == ["phs999997|phs999998"]
+        assert counts["duplicates_removed"] == 1
+
     def test_a_text_equal_to_the_canonical_is_no_description(self):
         """A description that repeats the canonical gives no pair of its own."""
         item = Item(

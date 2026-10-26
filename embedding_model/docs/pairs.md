@@ -151,7 +151,7 @@ used for each of them. The report counts such texts.
 ### Duplicates
 
 Each item is read once, by its source's id. When two pairs have exactly the
-same two texts, only one is kept.
+same two texts, only one is kept. It keeps the studies of every copy.
 
 A later step combines the sources into one corpus. A pair that two sources
 share is then kept only in the earlier source. The

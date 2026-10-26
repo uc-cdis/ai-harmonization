@@ -490,6 +490,24 @@ def replacements(item, by_id):
     return found
 
 
+def joined_studies(studies):
+    """Several study texts joined into one, each study once.
+
+    A study text holds dbGaP studies joined by ``|``. The result holds every
+    study of the texts given, once each and sorted. Empty parts are dropped.
+    For example, ``["phs999902|phs999901", "", "phs999901"]`` gives
+    ``"phs999901|phs999902"``.
+
+    Args:
+        studies (Iterable[str]): Study texts.
+
+    Returns:
+        str: The studies, joined by ``|``.
+    """
+    found = {part for study in studies for part in study.split("|")}
+    return "|".join(sorted(found - {""}))
+
+
 def distinct(texts, canonical):
     """The texts that are names, each once, without texts equal to the canonical.
 
@@ -503,8 +521,7 @@ def distinct(texts, canonical):
         if text_key and text_key != canonical_key and is_name(text.text):
             kept = found.setdefault(text_key, text)
             if text.study and text.study != kept.study:
-                studies = set(kept.study.split("|")) | set(text.study.split("|"))
-                study = "|".join(sorted(studies - {""}))
+                study = joined_studies([kept.study, text.study])
                 found[text_key] = Text(kept.text, kept.term_type, kept.question, study)
     return list(found.values())
 
@@ -614,6 +631,49 @@ def item_pairs(target, names, status, anchor_type, descriptions, to_description)
     return rows
 
 
+def distinct_pairs(pairs):
+    """Each pair once: its first copy, with the studies of every copy.
+
+    Two pairs are copies when their two texts, ``anchor`` and ``positive``,
+    are the same. Only the first copy is kept. The order of ``pairs`` decides
+    which copy comes first, such as a current item's copy before a retired
+    item's. A pair from a benchmark's study must not be used for training. So
+    the copy kept takes the studies of every copy, and the study rule sees
+    them all.
+
+    For example, three copies of ``ABCD_SC`` -> ``Abcd score`` have the
+    studies ``phs999901``, none, and ``phs999902|phs999901``. The first copy
+    is kept, and its study is updated from ``phs999901`` to
+    ``phs999901|phs999902``.
+
+    Args:
+        pairs (pd.DataFrame): Pairs, with ``anchor``, ``positive`` and
+            ``study``, the studies joined by ``|``.
+
+    Returns:
+        pd.DataFrame: The first copy of each pair, in the order given. Each
+            keeps its index, so a caller can tell which rows were dropped.
+    """
+    # One number per pair of texts, the same for all its copies.
+    group = pairs.groupby(["anchor", "positive"], sort=False).ngroup()
+    # Every copy that holds a study. keep=False marks the first copy too.
+    copies_with_study = group.duplicated(keep=False) & (pairs.study != "")
+    # The joined studies of each pair, by its number.
+    studies = (
+        pairs.study[copies_with_study]
+        .groupby(group[copies_with_study])
+        .agg(joined_studies)
+    )
+    # One row per pair: its first copy. The later copies are dropped.
+    kept = pairs[~group.duplicated()]
+    if studies.empty:
+        return kept
+    # Each kept pair takes its pair's joined studies. A pair without copies
+    # gets none there, and keeps its own study.
+    merged = group[kept.index].map(studies)
+    return kept.assign(study=merged.fillna(kept.study))
+
+
 def star(items):
     """Every pair of a source's items, with what was left out, counted.
 
@@ -622,7 +682,8 @@ def star(items):
     replacement's canonical. A retired item without a replacement keeps its own
     canonical. Its texts are used only when no current or draft item has them.
     When two pairs have the same two texts, one is kept: the current item's
-    copy, else the draft item's, else the retired item's.
+    copy, else the draft item's, else the retired item's. It takes the studies
+    of every copy.
 
     Args:
         items (Iterable[Item]): The source's items.
@@ -667,8 +728,7 @@ def star(items):
     pairs = pd.DataFrame(rows, columns=COLUMNS)
     rank = pairs.status.map({CURRENT: 0, DRAFT: 1, RETIRED: 2})
     first = pairs.loc[rank.sort_values(kind="stable").index]
-    kept = first.drop_duplicates(["anchor", "positive"]).sort_index()
-    kept = kept.reset_index(drop=True)
+    kept = distinct_pairs(first).sort_index().reset_index(drop=True)
     counts = {
         "items": len(items),
         "items_not_open": sum(not item.open for item in items),

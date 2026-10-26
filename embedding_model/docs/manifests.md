@@ -1,9 +1,9 @@
 # Manifests
 
 A manifest says what a build was made from, and what it made. Benchmarks,
-training sources and their pairs all have them, and they work the same way.
-Here, "a build" means a benchmark build, a source fetch or the preparation of
-a source's pairs.
+training sources, their pairs and corpora all have them, and they work the
+same way. Here, "a build" means a benchmark build, a source fetch, the
+preparation of a source's pairs, or a corpus build.
 
 ## The committed manifest and the build's own
 
@@ -22,8 +22,10 @@ Each build also writes its own manifest beside the files that it makes.
 [benchmarks.md](benchmarks.md#the-manifest) and
 [sources.md](sources.md#what-a-fetch-writes) say where.
 
-Pairs have no committed manifest. The code makes them from a fetch, and the
-fetch's manifest is committed. The pairs' own manifest records that fetch.
+Pairs and corpora have no committed manifest. The code makes pairs from a
+fetch, and a corpus from pairs and benchmarks. The fetches and the benchmarks
+have committed manifests. The pairs' and the corpus's own manifests record
+their inputs.
 
 ## Its fields
 
@@ -43,8 +45,10 @@ Every manifest has the same fields. A field that does not apply is left out:
   - `files`: for an input with several files, such as a fetch, each file as
     the input's own manifest records it;
   - `sha256`, `license` and `citation`, where known;
+- `settings`: the settings that shaped the build, such as a corpus's
+  validation share;
 - `counts`: what the build counted, such as a benchmark's source variables,
-  a source's items not open, or the pairs by kind.
+  a source's items not open, the pairs by kind, or a corpus's dropped pairs.
 
 ## How a build is checked
 

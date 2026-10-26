@@ -4,7 +4,8 @@
 source's pairs to ``<inputs>/pairs/<source>.parquet``, beside their manifest,
 ``<source>_manifest.json``. Each source has its own module, which reads the
 source into items. ``common.star`` then makes the pairs the same way for every
-source. The rules are in ``embedding_model/docs/pairs.md``.
+source. ``read_pairs`` reads them back, checked against their manifest. The
+rules are in ``embedding_model/docs/pairs.md``.
 
 A pair keeps both rendered texts, ``anchor`` and ``positive``, and the fields
 that they were rendered from. So a later step can compare fields rather than
@@ -137,6 +138,74 @@ def manifest(name, pairs, counts, fetch):
             "status": pairs.status.value_counts().to_dict(),
         },
     }
+
+
+def read_pairs(inputs, name):
+    """A source's pairs and their manifest, checked against each other.
+
+    The manifest records the pairs' file and the fetch that they come from.
+    When that fetch is in the inputs folder, the pairs must come from it.
+
+    Args:
+        inputs (Path): The inputs folder that the pairs were prepared in.
+        name (str): The source, as in READERS.
+
+    Returns:
+        tuple[pd.DataFrame, dict]: The pairs and their manifest.
+
+    Raises:
+        FileNotFoundError: If the source's pairs were not prepared there.
+        ValueError: If the pairs, their manifest or the fetch's manifest cannot
+            be read, the manifest is another source's, the pairs lack a column
+            or differ from their manifest, or they come from another fetch.
+    """
+    folder = Path(inputs) / "pairs"
+    file = f"{name}.parquet"
+    written = folder / f"{name}_manifest.json"
+    fetch = Path(inputs) / "sources" / name / "manifest.json"
+    command = f"python -m embedding_model pairs prepare --source {name}"
+    if not (folder / file).exists() or not written.exists():
+        raise FileNotFoundError(f"{name} has no pairs in {folder}; run: {command}")
+    try:
+        record = json.loads(written.read_text(encoding="utf-8"))
+        source = record["source"]
+        checksum = record["files"][file]["csv_sha256"]
+        fetch_entry = record["sources"][0]
+        fetched = fetch_entry["files"]
+        if "version" not in fetch_entry:
+            raise KeyError("version")
+        pairs = pd.read_parquet(folder / file)
+    except Exception as error:
+        raise ValueError(
+            f"{name}'s pairs or their manifest cannot be read"
+            f" ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    if source != name:
+        raise ValueError(
+            f"{written} is the manifest of {source}'s pairs; run: {command}"
+        )
+    if list(pairs.columns) != common.COLUMNS:
+        raise ValueError(
+            f"{name}'s pairs do not have the columns that pairs prepare writes;"
+            f" run: {command}"
+        )
+    if pairs_sha256(pairs) != checksum:
+        raise ValueError(f"{name}'s pairs differ from their manifest; run: {command}")
+    if not fetch.exists():
+        return pairs, record
+    try:
+        files = json.loads(fetch.read_text(encoding="utf-8"))["files"]
+    except Exception as error:
+        raise ValueError(
+            f"{fetch} cannot be read ({error});"
+            f" run: python -m embedding_model sources fetch --source {name}"
+        ) from error
+    if files != fetched:
+        raise ValueError(
+            f"{name}'s pairs come from another fetch than {fetch.parent};"
+            f" run: {command}"
+        )
+    return pairs, record
 
 
 def prepare_one(name, inputs, root):

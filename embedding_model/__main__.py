@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from embedding_model import benchmarks, pairs, scoring, sources, texts
+from embedding_model import benchmarks, corpus, pairs, scoring, sources, texts
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -95,6 +95,22 @@ def main(argv=None):
         help="the sources to prepare (default: all of them)",
     )
 
+    corpus_step = steps.add_parser("corpus", help="build a training corpus")
+    corpus_actions = corpus_step.add_subparsers(dest="action", required=True)
+    corpus_build = corpus_actions.add_parser(
+        "build",
+        parents=[common],
+        help="combine the sources' pairs, drop what leaks a benchmark, and split",
+    )
+    corpus_build.add_argument("--name", required=True, help="the corpus's name")
+    corpus_build.add_argument(
+        "--source",
+        nargs="+",
+        choices=list(pairs.READERS),
+        default=list(pairs.READERS),
+        help="the sources to combine (default: all of them)",
+    )
+
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
@@ -157,6 +173,8 @@ def main(argv=None):
         return sources.fetch(args.source, args.inputs, args.update_manifest)
     if args.step == "pairs" and args.action == "prepare":
         return pairs.prepare(args.source, args.inputs)
+    if args.step == "corpus" and args.action == "build":
+        return corpus.build(args.name, args.source, args.inputs)
     return 0
 
 

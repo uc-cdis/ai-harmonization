@@ -23,8 +23,9 @@ command line, from a checkout of this repository.
   trained and evaluated on texts laid out almost as it will see them in use.
   See [docs/scoring.md](docs/scoring.md#running-score) for the differences,
   and for why a source's node is left out. Training and benchmark texts share
-  their layout, but never a text. The corpus is audited for leakage, so no
-  benchmark text, and no near copy of one, reaches training.
+  their layout. The corpus build drops the pairs that would teach a benchmark's
+  mappings, such as a benchmark variable paired with its expected target. A
+  word that both share on its own, such as `age`, is kept: it is not leakage.
 - A trained model is used through `ai_harmonization`'s embedding approach,
   like any other sentence-transformers model. It can be evaluated end to end
   with `get_metrics_for_approach`
@@ -87,8 +88,7 @@ be trained on more sources.
 python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
-python -m embedding_model pairs audit                  # against the benchmarks built: here TOPMed alone
-python -m embedding_model corpus build --name example --sources nhanes
+python -m embedding_model corpus build --name example --source nhanes  # checked against the benchmarks built: here TOPMed
 python -m embedding_model tokenizer train --corpus example
 python -m embedding_model train --config embedding_model/examples/independent_run_example.yaml --seed 0
 python -m embedding_model score --run independent_run_example_s0 --benchmark topmed
@@ -109,8 +109,7 @@ decide something needs more seeds, as [docs/process.md](docs/process.md) explain
 python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
-python -m embedding_model pairs audit
-python -m embedding_model corpus build --name example --sources nhanes
+python -m embedding_model corpus build --name example --source nhanes
 python -m embedding_model tokenizer train --corpus example
 
 python -m embedding_model cache build --corpus example
@@ -169,8 +168,7 @@ rerun on its own.
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/` |
-| | `pairs audit` | checks that no pair leaks a text of any benchmark built so far; must pass before a corpus is built | `inputs/pairs/audit.json`: what was checked, against which benchmarks, and the verdict |
-| | `corpus build --name <corpus> [--sources <source>,...]` | combines the sources' pairs into a training corpus | `inputs/corpora/<corpus>/` |
+| | `corpus build --name <corpus> [--source <source> ...]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus>` | learns the vocabulary from the corpus | `inputs/tokenizers/` |
 | | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
 | one model | `train --config <config.yaml> --seed <seed>` | trains one model on its own | `outputs/independent_runs/` |
@@ -189,10 +187,11 @@ run. `--no-token-cache` tokenizes inside each training step instead: the same
 model, more slowly. `cache build` is worth running before a series, so that
 many runs starting at once do not each wait for it.
 
-The audit checks the pairs against every benchmark built so far. Each corpus
-records which benchmarks its pairs were checked against. Scoring on a
-benchmark refuses a model whose corpus was not checked against that benchmark
-for leakage.
+`corpus build` checks the pairs against every benchmark built so far, and drops
+those that would leak one ([docs/corpus.md](docs/corpus.md)). Each corpus
+records which benchmarks its pairs were checked against. Scoring on a benchmark
+refuses a model whose corpus was not checked against that benchmark for
+leakage.
 
 ## Evaluating a model
 
@@ -244,8 +243,7 @@ inputs/
         <source>/                a training source's tables, as <table>.parquet, and the fetch's manifest.json
         downloads/<source>/      the source's files as downloaded, kept for the next fetch
     pairs/                       <source>.parquet: each source's pairs of texts; <source>_manifest.json, their manifest
-        audit.json               what the leakage audit checked, and its verdict
-    corpora/<corpus>/            training and validation pairs; corpus.json records what went in
+    corpora/<corpus>/            pairs.parquet, the kept pairs with their split; dropped.parquet; manifest.json, the corpus's manifest
     tokenizers/<tokenizer>/      tokenizer.json
     token_cache/                 token ids, one folder per corpus and tokenizer
 outputs/

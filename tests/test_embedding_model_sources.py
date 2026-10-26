@@ -1100,6 +1100,22 @@ class TestWriteAndRead:
         monkeypatch.setattr("os.linesep", "\r\n")
         assert sources.table_sha256(TABLE) == before
 
+    def test_a_checksum_written_in_chunks_is_that_of_the_whole_text(self):
+        """The streamed SHA-256 is that of the whole CSV text, dates and accents too."""
+        # This checks that the SHA-256 of 120,000 rows, written piece by piece,
+        # equals the SHA-256 of their whole CSV text. With two columns, pandas
+        # writes 50,000 rows per chunk. It leaves out the time in a chunk where
+        # no value has one. The times fill only the last 10,000 rows, so the
+        # last chunk mixes dates and times. Another chunk size would write some
+        # dates without a time. The "É" of "Éfgh" takes two bytes in UTF-8, so
+        # the bytes are checked too.
+        when = pd.to_datetime(
+            ["2020-01-01"] * 110_000 + ["2020-01-03 10:00"] * 10_000, format="ISO8601"
+        )
+        table = pd.DataFrame({"when": when, "name": ["Abcd", "Éfgh"] * 60_000})
+        text = table.to_csv(index=False, lineterminator="\n").encode("utf-8")
+        assert sources.table_sha256(table) == hashlib.sha256(text).hexdigest()
+
     def test_a_changed_table_is_refused(self, tmp_path):
         """A table whose content changed since its fetch is refused."""
         directory = tmp_path / "sources" / "abcd"

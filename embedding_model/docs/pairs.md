@@ -154,12 +154,11 @@ used for each of them. The manifest counts such texts.
 Each item is read once, by its source's id. When two pairs have exactly the
 same two texts, only one is kept. It keeps the studies of every copy.
 
-A later step combines the sources into one corpus. A pair that two sources
-share is then kept only in the earlier source. The
-[next section](#each-source) lists the sources in this order. NCIt comes
-first, since CDISC publishes its terms as NCIt subsets. `pairs prepare`
-prints how many pairs each source shares with an earlier source in the same
-run.
+`corpus build` combines the sources into one [corpus](corpus.md). A pair that
+two sources share is then kept only in the earlier source.
+[Each source](#each-source) lists the sources in this order. NCIt comes first,
+since CDISC publishes its terms as NCIt subsets. `pairs prepare` prints how
+many pairs each source shares with an earlier source in the same run.
 
 ### Values
 

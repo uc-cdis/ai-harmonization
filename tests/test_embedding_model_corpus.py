@@ -8,6 +8,7 @@ import pytest
 
 from embedding_model import benchmarks, corpus, leakage
 from embedding_model.__main__ import main
+from embedding_model.download import file_sha256
 from embedding_model.pairs import common, pairs_sha256
 
 # A fictional benchmark: two source variables, from two fictional studies.
@@ -245,6 +246,7 @@ def write_pairs(inputs, source, rows):
         "files": {
             f"{source}.parquet": {
                 "rows": len(written),
+                "sha256": file_sha256(folder / f"{source}.parquet"),
                 "csv_sha256": pairs_sha256(written),
             }
         },
@@ -312,10 +314,12 @@ class TestBuild:
         assert written["counts"]["leakage_findings"]["by_benchmark"] == {"abcd": 3}
         assert written["files"]["pairs.parquet"] == {
             "rows": 3,
+            "sha256": file_sha256(folder / "pairs.parquet"),
             "csv_sha256": pairs_sha256(kept),
         }
         assert written["files"]["dropped.parquet"] == {
             "rows": 3,
+            "sha256": file_sha256(folder / "dropped.parquet"),
             "csv_sha256": pairs_sha256(dropped),
         }
         assert [(entry["role"], entry["name"]) for entry in written["sources"]] == [
@@ -407,7 +411,7 @@ class TestBuild:
             .replace("cdisc.parquet", "ncit.parquet")
         )
         assert corpus.build("abcd", ["ncit"], inputs) == 1
-        assert "manifest of cdisc's pairs" in capsys.readouterr().err
+        assert "the manifest of source 'cdisc'" in capsys.readouterr().err
 
     def test_a_benchmark_that_cannot_be_checked_stops_the_build(self, inputs, capsys):
         """A benchmark whose expected target is not among its targets stops the build."""
@@ -436,7 +440,7 @@ class TestBuild:
         (inputs / "pairs" / "ncit_manifest.json").write_text("")
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
-        assert "ncit's pairs or their manifest cannot be read" in error
+        assert "ncit.parquet or its manifest cannot be read" in error
         assert "pairs prepare --source ncit" in error
 
     def test_pairs_without_a_column_are_refused(self, inputs, capsys):
@@ -445,12 +449,10 @@ class TestBuild:
         path = inputs / "pairs" / "ncit.parquet"
         pd.read_parquet(path).drop(columns="study").to_parquet(path, index=False)
         record = json.loads((inputs / "pairs" / "ncit_manifest.json").read_text())
-        record["files"]["ncit.parquet"]["csv_sha256"] = pairs_sha256(
-            pd.read_parquet(path)
-        )
+        record["files"]["ncit.parquet"]["sha256"] = file_sha256(path)
         (inputs / "pairs" / "ncit_manifest.json").write_text(json.dumps(record))
         assert corpus.build("abcd", ["ncit"], inputs) == 1
-        assert "do not have the columns" in capsys.readouterr().err
+        assert "does not have the columns" in capsys.readouterr().err
 
     def test_pairs_are_checked_against_the_fetch_in_the_inputs(self, inputs, capsys):
         """Pairs from the fetch in the inputs are read; pairs from another are not."""
@@ -523,7 +525,14 @@ class TestBuild:
         path = inputs / "pairs" / "ncit.parquet"
         pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
         assert corpus.build("abcd", ["ncit"], inputs) == 1
-        assert "differ from their manifest" in capsys.readouterr().err
+        assert "differs from its manifest" in capsys.readouterr().err
+
+    def test_pairs_are_checked_by_the_bytes_of_their_file(self, inputs, capsys):
+        """The same table written again with other bytes is not the file that was written."""
+        path = inputs / "pairs" / "ncit.parquet"
+        pd.read_parquet(path).to_parquet(path, index=False, compression="gzip")
+        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert "differs from its manifest" in capsys.readouterr().err
 
     def test_a_name_that_is_not_a_folder_name_is_refused(self, inputs, capsys):
         """A corpus name must be a plain folder name."""

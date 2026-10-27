@@ -74,7 +74,8 @@ fields rather than formatted texts.
 `<source>_manifest.json`, beside its pairs in the same folder. It has the
 fields that [manifests.md](manifests.md#its-fields) lists:
 
-- `files`: the pairs' row count and SHA-256;
+- `files`: the pairs' row count, their file's `sha256` and their table's
+  `csv_sha256`;
 - `sources`: the fetch that the pairs come from, with its version and its
   tables' checksums;
 - `counts`: the pairs by kind, term group and status, the items not open, the

@@ -164,8 +164,8 @@ build leaves the last corpus as it was.
     pair holds.
 - **`manifest.json`:** the corpus's manifest, with the fields that
   [manifests.md](manifests.md#its-fields) lists:
-  - `files`: `pairs.parquet` and `dropped.parquet`, each with its row count
-    and SHA-256;
+  - `files`: `pairs.parquet` and `dropped.parquet`, each with its row count,
+    its file's `sha256` and its table's `csv_sha256`;
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
   - `settings`: the near-duplicate words, the validation share and the number

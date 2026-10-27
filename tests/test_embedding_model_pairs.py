@@ -6,6 +6,7 @@ import pandas as pd
 
 from embedding_model import pairs, sources
 from embedding_model.__main__ import main
+from embedding_model.download import file_sha256
 from embedding_model.pairs import (
     cadsr,
     cde,
@@ -1179,7 +1180,11 @@ class TestPrepare:
         assert set(found.source) == {"nhanes"}
         written = json.loads((tmp_path / "pairs" / "nhanes_manifest.json").read_text())
         assert written["files"] == {
-            "nhanes.parquet": {"rows": 2, "csv_sha256": pairs.pairs_sha256(found)}
+            "nhanes.parquet": {
+                "rows": 2,
+                "sha256": file_sha256(tmp_path / "pairs" / "nhanes.parquet"),
+                "csv_sha256": pairs.pairs_sha256(found),
+            }
         }
         assert written["counts"]["kind"] == {"name": 2}
         fetch = json.loads(

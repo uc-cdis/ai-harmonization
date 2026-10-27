@@ -30,6 +30,7 @@ from pathlib import Path
 import pandas as pd
 
 from embedding_model import benchmarks, leakage
+from embedding_model.download import file_sha256
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs
 from embedding_model.pairs.common import distinct_pairs
 
@@ -142,6 +143,7 @@ def manifest(
     copy_sources,
     dropped,
     kept,
+    files_sha256,
     pairs_manifests,
     benchmark_manifests,
     shared_vocabulary,
@@ -159,6 +161,8 @@ def manifest(
         dropped (pd.DataFrame): The dropped pairs, one row per pair and
             benchmark that it leaks.
         kept (pd.DataFrame): The kept pairs, with ``split``.
+        files_sha256 (dict[str, str]): The SHA-256 of each written file, by
+            its name.
         pairs_manifests (list[dict]): The manifest of each source's pairs, as
             ``read_pairs`` returns it.
         benchmark_manifests (dict[str, dict]): Each benchmark's manifest, by
@@ -172,9 +176,14 @@ def manifest(
         "corpus": name,
         "built": date.today().isoformat(),
         "files": {
-            "pairs.parquet": {"rows": len(kept), "csv_sha256": pairs_sha256(kept)},
+            "pairs.parquet": {
+                "rows": len(kept),
+                "sha256": files_sha256["pairs.parquet"],
+                "csv_sha256": pairs_sha256(kept),
+            },
             "dropped.parquet": {
                 "rows": len(dropped),
+                "sha256": files_sha256["dropped.parquet"],
                 "csv_sha256": pairs_sha256(dropped),
             },
         },
@@ -314,18 +323,6 @@ def build(name, sources, inputs):
     )
     kept = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
     kept["split"] = splits(kept)
-    written = manifest(
-        name=name,
-        distinct=distinct,
-        copy_sources=copy_sources,
-        dropped=dropped,
-        kept=kept,
-        pairs_manifests=pairs_manifests,
-        benchmark_manifests={
-            benchmark: record for benchmark, (_, _, record) in benchmark_builds.items()
-        },
-        shared_vocabulary=shared_vocabulary,
-    )
 
     corpora = Path(inputs) / "corpora"
     corpora.mkdir(parents=True, exist_ok=True)
@@ -337,6 +334,23 @@ def build(name, sources, inputs):
         built.mkdir()
         kept.to_parquet(built / "pairs.parquet", index=False)
         dropped.to_parquet(built / "dropped.parquet", index=False)
+        written = manifest(
+            name=name,
+            distinct=distinct,
+            copy_sources=copy_sources,
+            dropped=dropped,
+            kept=kept,
+            files_sha256={
+                file: file_sha256(built / file)
+                for file in ("pairs.parquet", "dropped.parquet")
+            },
+            pairs_manifests=pairs_manifests,
+            benchmark_manifests={
+                benchmark: record
+                for benchmark, (_, _, record) in benchmark_builds.items()
+            },
+            shared_vocabulary=shared_vocabulary,
+        )
         (built / "manifest.json").write_text(
             json.dumps(written, indent=2) + "\n", encoding="utf-8"
         )

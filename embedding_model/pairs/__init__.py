@@ -30,6 +30,7 @@ from embedding_model.pairs import (
     obo,
     phenx,
 )
+from embedding_model.download import file_sha256
 from embedding_model.sources import read_source, table_sha256
 
 # The sources, in order. When a corpus combines them, a pair found in two
@@ -103,7 +104,7 @@ def ambiguous_texts(pairs):
     return int((targets.nunique() > 1).sum())
 
 
-def manifest(name, pairs, counts, fetch):
+def manifest(name, pairs, pairs_file_sha256, counts, fetch):
     """The manifest of a source's pairs: what they were made from, and what they hold.
 
     It has the fields of every manifest, and ``counts``. Its one input is the
@@ -113,6 +114,7 @@ def manifest(name, pairs, counts, fetch):
     Args:
         name (str): The source, as in READERS.
         pairs (pd.DataFrame): Its pairs.
+        pairs_file_sha256 (str): The SHA-256 of the pairs' written file.
         counts (dict[str, int]): The counts ``common.star`` returns.
         fetch (dict): The manifest of the source's fetch.
 
@@ -123,7 +125,11 @@ def manifest(name, pairs, counts, fetch):
         "source": name,
         "built": date.today().isoformat(),
         "files": {
-            f"{name}.parquet": {"rows": len(pairs), "csv_sha256": pairs_sha256(pairs)}
+            f"{name}.parquet": {
+                "rows": len(pairs),
+                "sha256": pairs_file_sha256,
+                "csv_sha256": pairs_sha256(pairs),
+            }
         },
         "sources": [
             {
@@ -142,6 +148,67 @@ def manifest(name, pairs, counts, fetch):
             "status": pairs.status.value_counts().to_dict(),
         },
     }
+
+
+def read_pairs_file(table, manifest, field, name, columns, command):
+    """A table of pairs that a step wrote, and its manifest, checked against each other.
+
+    ``pairs prepare`` and ``corpus build`` each write a table of pairs, and a
+    manifest that names it and records its checksums. Five things are checked,
+    in this order:
+
+    1. the pairs and the manifest exist;
+    2. the manifest can be read;
+    3. the manifest names the build asked for;
+    4. the file's ``sha256`` matches the manifest, so the file is unchanged
+       since its step wrote it;
+    5. the pairs have the columns given.
+
+    ``csv_sha256`` is not checked here: it compares the tables of two builds.
+
+    Args:
+        table (Path): The parquet file of the pairs.
+        manifest (Path): The manifest written with it.
+        field (str): The manifest's field that names what was built, such as
+            ``source`` or ``corpus``.
+        name (str): The name that the field must hold.
+        columns (list[str]): The columns that the pairs must have, in order.
+        command (str): The command that writes the pairs again, for the
+            messages.
+
+    Returns:
+        tuple[pd.DataFrame, dict]: The pairs and their manifest.
+
+    Raises:
+        FileNotFoundError: If the pairs or their manifest were not written.
+        ValueError: If the pairs or the manifest cannot be read, the manifest
+            names another build, or the pairs lack a column or differ from the
+            manifest.
+    """
+    if not table.exists() or not manifest.exists():
+        raise FileNotFoundError(f"{table} was not written; run: {command}")
+    try:
+        record = json.loads(manifest.read_text(encoding="utf-8"))
+        recorded = record[field]
+        checksum = record["files"][table.name]["sha256"]
+        computed = file_sha256(table)
+        pairs = pd.read_parquet(table)
+    except Exception as error:
+        raise ValueError(
+            f"{table} or its manifest cannot be read"
+            f" ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    if recorded != name:
+        raise ValueError(
+            f"{manifest} is the manifest of {field} {recorded!r}; run: {command}"
+        )
+    if computed != checksum:
+        raise ValueError(f"{table} differs from its manifest; run: {command}")
+    if list(pairs.columns) != columns:
+        raise ValueError(
+            f"{table} does not have the columns that its step writes; run: {command}"
+        )
+    return pairs, record
 
 
 def read_pairs(inputs, name):
@@ -164,37 +231,22 @@ def read_pairs(inputs, name):
             or differ from their manifest, or they come from another fetch.
     """
     folder = Path(inputs) / "pairs"
-    file = f"{name}.parquet"
     written = folder / f"{name}_manifest.json"
     fetch = Path(inputs) / "sources" / name / "manifest.json"
     command = f"python -m embedding_model pairs prepare --source {name}"
-    if not (folder / file).exists() or not written.exists():
-        raise FileNotFoundError(f"{name} has no pairs in {folder}; run: {command}")
+    pairs, record = read_pairs_file(
+        folder / f"{name}.parquet", written, "source", name, common.COLUMNS, command
+    )
     try:
-        record = json.loads(written.read_text(encoding="utf-8"))
-        source = record["source"]
-        checksum = record["files"][file]["csv_sha256"]
         fetch_entry = record["sources"][0]
         fetched = fetch_entry["files"]
         if "version" not in fetch_entry:
             raise KeyError("version")
-        pairs = pd.read_parquet(folder / file)
     except Exception as error:
         raise ValueError(
-            f"{name}'s pairs or their manifest cannot be read"
+            f"{written} does not record the fetch of {name}"
             f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
-    if source != name:
-        raise ValueError(
-            f"{written} is the manifest of {source}'s pairs; run: {command}"
-        )
-    if list(pairs.columns) != common.COLUMNS:
-        raise ValueError(
-            f"{name}'s pairs do not have the columns that pairs prepare writes;"
-            f" run: {command}"
-        )
-    if pairs_sha256(pairs) != checksum:
-        raise ValueError(f"{name}'s pairs differ from their manifest; run: {command}")
     if not fetch.exists():
         return pairs, record
     try:
@@ -226,8 +278,9 @@ def prepare_one(name, inputs, root):
     """
     tables, fetch = read_source(inputs, name)
     pairs, counts = common.star(READERS[name].items(tables), name)
-    found = manifest(name, pairs, counts, fetch)
-    pairs.to_parquet(root / f"{name}.parquet", index=False)
+    written = root / f"{name}.parquet"
+    pairs.to_parquet(written, index=False)
+    found = manifest(name, pairs, file_sha256(written), counts, fetch)
     (root / f"{name}_manifest.json").write_text(
         json.dumps(found, indent=2) + "\n", encoding="utf-8"
     )

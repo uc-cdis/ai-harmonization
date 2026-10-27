@@ -35,9 +35,15 @@ Every manifest has the same fields. A field that does not apply is left out:
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
 - `files`: each file's row count, and its `sha256`. A table kept as parquet
-  has `csv_sha256` instead, such as a source's table or a source's pairs. It
-  is the SHA-256 of the table written as CSV, not of the file (see
-  [sources.md](sources.md#what-a-fetch-writes));
+  has `csv_sha256`: the SHA-256 of the table written as CSV (see
+  [sources.md](sources.md#what-a-fetch-writes)). A parquet file's bytes
+  depend on the library that wrote it, so the two checksums have two uses:
+  - `csv_sha256` shows whether two builds hold the same table, on any
+    machine. A source's tables have only `csv_sha256`, since their committed
+    manifests compare builds;
+  - `sha256` shows quickly that a file is unchanged since its step wrote it.
+    A source's pairs and a corpus's tables have both checksums, and a step
+    that reads them back checks `sha256`;
 - `sources`: what the build was made from, one entry each, with
   - `role`: what the input is for, such as `mappings` or `release`;
   - `name` and `location`: a URL, DOI or record;

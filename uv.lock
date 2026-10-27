@@ -72,6 +72,7 @@ embedding-model = [
     { name = "ftfy" },
     { name = "openpyxl" },
     { name = "pyarrow" },
+    { name = "tokenizers" },
 ]
 
 [package.metadata]
@@ -112,6 +113,7 @@ embedding-model = [
     { name = "ftfy", specifier = ">=6.3.1" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pyarrow", specifier = ">=14.0.0" },
+    { name = "tokenizers", specifier = ">=0.23.2" },
 ]
 
 [[package]]

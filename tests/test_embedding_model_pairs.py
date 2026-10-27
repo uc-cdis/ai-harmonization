@@ -132,8 +132,9 @@ class TestClean:
         assert common.clean("Abcd <U+110000>") == "Abcd <U+110000>"
 
     def test_characters_that_hold_no_text_are_removed(self):
-        """Byte order marks, zero-width spaces and soft hyphens go."""
+        """Byte order marks, zero-width spaces, soft hyphens and direction marks go."""
         assert common.clean("\ufeffAB\u200bCD\u00ad") == "ABCD"
+        assert common.clean("\u202aAbcd\u202c efgh\u2066") == "Abcd efgh"
 
     def test_escaped_markup_and_more_tags(self):
         """Escaped tags are removed as tags; headings and table parts are tags too."""

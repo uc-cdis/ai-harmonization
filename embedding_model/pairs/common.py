@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 import ftfy
 import pandas as pd
 from bs4 import BeautifulSoup
+from tokenizers import normalizers
 
 from ai_harmonization.dbgap import DBGAP_TYPE_MAP
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
@@ -146,10 +147,12 @@ LETTER_ITEM = re.compile(r"^[A-Z]\.\s+(?=[A-Z][a-z])")
 # How LOINC and the NIH CDE mark a deprecated name: "Deprecated", even twice
 # or with no space after it.
 DEPRECATED = re.compile(r"^(?:deprecated\s*)+", re.IGNORECASE)
-# Characters that hold no text and that ftfy keeps: control bytes that cp1252
-# does not define, such as a byte left from a broken quote, soft hyphens, and
-# zero-width spaces, joiners and marks.
-INVISIBLE = re.compile(r"[\x80-\x9f\u00ad\u200b-\u200f\u2060-\u2064]")
+# BERT's text cleaning: it removes every control, format and private-use
+# character, such as a byte left from a broken quote, a soft hyphen, a
+# zero-width space or a direction mark.
+BERT_CLEANING = normalizers.BertNormalizer(
+    clean_text=True, handle_chinese_chars=False, strip_accents=False, lowercase=False
+)
 
 
 @dataclass(frozen=True)
@@ -250,9 +253,9 @@ def clean(text):
     ``&gt;`` are unescaped. ftfy then repairs text read with the wrong
     encoding, such as ``Iâ€™m`` to ``I’m``, removes control characters and
     normalises Unicode to NFC. HTML tags are removed, and other text in angle
-    brackets, such as ``<time point>``, is kept. Characters that hold no text
-    are removed, a replacement character becomes a space, and every run of
-    whitespace becomes one space.
+    brackets, such as ``<time point>``, is kept. A replacement character
+    becomes a space. BERT's text cleaning then removes the characters that
+    hold no text, and every run of whitespace becomes one space.
 
     Args:
         text (str | None): The text as the source gives it.
@@ -267,7 +270,7 @@ def clean(text):
     text = ftfy.fix_text(text, FIXES).replace(LOST_IN_MAC_ROMAN, "\ufffd")
     if HTML_TAG.search(text):
         text = without_tags(text)
-    text = INVISIBLE.sub("", text.replace("\ufffd", " "))
+    text = BERT_CLEANING.normalize_str(text.replace("\ufffd", " "))
     return " ".join(text.split())
 
 

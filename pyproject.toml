@@ -88,6 +88,8 @@ embedding-model = [
     # embedding_model.sources (each source's tables, written and read as
     # parquet through pandas)
     "pyarrow>=14.0.0",
+    # embedding_model.pairs.common (BERT's text cleaning)
+    "tokenizers>=0.23.2",
 ]
 
 [tool.uv]

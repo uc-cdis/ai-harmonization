@@ -200,8 +200,10 @@ Every text is cleaned the same way:
   when it was decoded twice;
 - HTML tags are removed. Other text in angle brackets is kept, as in
   "Candida <Debaryomycetaceae> infection";
-- Unicode is normalised, and characters that hold no text, such as
-  zero-width spaces, are removed;
+- Unicode is normalised;
+- characters that hold no text are removed, as BERT's text cleaning removes
+  them: control, format and private-use characters, such as zero-width
+  spaces and direction marks;
 - each run of whitespace becomes one space.
 
 A question text also loses the number that a form gives it, as in "24. What

@@ -138,6 +138,12 @@ class TestLeakage:
         assert findings.benchmark.tolist() == ["abcd", "efgh"]
         assert findings.pair.tolist() == [0, 0]
 
+    def test_accents_and_case_do_not_hide_an_answer_key(self):
+        """A pair whose texts differ from a benchmark's only by accents and case is an answer key."""
+        pairs = pd.DataFrame([pair("Ábcd Scöre", "ABCD INDEX")])
+        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY]
+
     def test_shared_vocabulary_is_reported(self, audited):
         """Benchmark texts in the kept pairs are counted, not dropped."""
         shared = audited[1]["abcd"]
@@ -215,7 +221,7 @@ class TestLeakage:
             leakage.benchmark_texts("abcd", targets, MAPPINGS)
 
     def test_keys_are_those_of_pairs(self):
-        """A key is what pairs.common.key writes, accents and Greek letters kept."""
+        """A key is what pairs.common.key writes: accents go, Greek letters stay."""
         texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", None])
         assert leakage.keys(texts).tolist() == [
             common.key("Abcd_Efgh (ijkl)!"),

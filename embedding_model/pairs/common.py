@@ -153,6 +153,17 @@ DEPRECATED = re.compile(r"^(?:deprecated\s*)+", re.IGNORECASE)
 BERT_CLEANING = normalizers.BertNormalizer(
     clean_text=True, handle_chinese_chars=False, strip_accents=False, lowercase=False
 )
+# How the tokenizer normalises a text: BERT's text cleaning, Unicode's NFD,
+# lower case, and no accents. key() and distinct_pairs() start from it, so
+# two texts that the tokenizer normalises to one text are one text to them.
+TOKENIZER_NORMALIZER = normalizers.Sequence(
+    [
+        BERT_CLEANING,
+        normalizers.NFD(),
+        normalizers.Lowercase(),
+        normalizers.StripAccents(),
+    ]
+)
 
 
 @dataclass(frozen=True)
@@ -297,8 +308,14 @@ def undeprecated(name):
 
 
 def key(text):
-    """A text's key for comparing texts: lower case, punctuation as spaces."""
-    return NOT_ALPHANUMERIC.sub(" ", text.casefold()).strip()
+    """A text's key for comparing texts.
+
+    The text is normalised as the tokenizer normalises it, then case-folded,
+    with punctuation as spaces. So ``Größe`` and ``GROSSE`` have one key, and
+    ``Abcdé_Efgh`` and ``abcde efgh`` too.
+    """
+    normalised = TOKENIZER_NORMALIZER.normalize_str(text).casefold()
+    return NOT_ALPHANUMERIC.sub(" ", normalised).strip()
 
 
 def is_name(text):
@@ -556,11 +573,13 @@ def item_pairs(
         list[tuple]: The pairs, as rows in COLUMNS' order.
     """
     names = distinct(names, target.canonical)
-    skipped = {"", key(target.description), key(target.canonical)}
+    description_key, canonical_key = key(target.description), key(target.canonical)
+    skipped = {"", description_key, canonical_key}
     others = {}
     for text in descriptions:
-        if key(text) not in skipped and is_name(text):
-            others.setdefault(key(text), text)
+        text_key = key(text)
+        if text_key not in skipped and is_name(text):
+            others.setdefault(text_key, text)
     anchors = {}
     rows = []
     for list_name, values in target.lists or [("", [])]:
@@ -624,7 +643,7 @@ def item_pairs(
                         term_group(other),
                     )
                 )
-        differs = key(target.description) != key(target.canonical)
+        differs = description_key != canonical_key
         if not names and to_description and target.description and differs:
             if is_name(target.canonical):
                 rows.append(
@@ -639,15 +658,32 @@ def item_pairs(
     return rows
 
 
+def normalised(texts):
+    """Each text as the tokenizer normalises it, each distinct text once.
+
+    Args:
+        texts (pd.Series): Texts.
+
+    Returns:
+        pd.Series: The normalised texts, with the index of ``texts``.
+    """
+    distinct = texts.unique()
+    return texts.map(
+        dict(zip(distinct, map(TOKENIZER_NORMALIZER.normalize_str, distinct)))
+    )
+
+
 def distinct_pairs(pairs):
     """Each pair once: its first copy, with the studies of every copy.
 
     Two pairs are copies when their two texts, ``anchor`` and ``positive``,
-    are the same. Only the first copy is kept. The order of ``pairs`` decides
-    which copy comes first, such as a current item's copy before a retired
-    item's. A pair from a benchmark's study must not be used for training. So
-    the copy kept takes the studies of every copy, and the study rule sees
-    them all.
+    are the same once the tokenizer normalises them. The model cannot tell
+    such pairs apart. For example, ``BMI`` -> ``Body Mass Index`` and ``bmi``
+    -> ``body mass index`` are copies. Only the first copy is kept, as it is
+    written. The order of ``pairs`` decides which copy comes first, such as a
+    current item's copy before a retired item's. A pair from a benchmark's
+    study must not be used for training. So the copy kept takes the studies of
+    every copy, and the study rule sees them all.
 
     For example, three copies of ``ABCD_SC`` -> ``Abcd score`` have the
     studies ``phs999901``, none, and ``phs999902|phs999901``. The first copy
@@ -663,7 +699,9 @@ def distinct_pairs(pairs):
             keeps its index, so a caller can tell which rows were dropped.
     """
     # One number per pair of texts, the same for all its copies.
-    group = pairs.groupby(["anchor", "positive"], sort=False).ngroup()
+    group = pairs.groupby(
+        [normalised(pairs.anchor), normalised(pairs.positive)], sort=False
+    ).ngroup()
     # Every copy that holds a study. keep=False marks the first copy too.
     copies_with_study = group.duplicated(keep=False) & (pairs.study != "")
     # The joined studies of each pair, by its number.

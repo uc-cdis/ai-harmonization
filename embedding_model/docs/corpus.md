@@ -27,10 +27,12 @@ benchmarks of the build.
 The sources are read in the order that the
 [table in pairs.md](pairs.md#each-source) lists. Each source's pairs must have
 the checksum that their manifest records. When the source's fetch is in the
-inputs folder, the pairs must come from that fetch. A pair whose two texts are
-exactly those of an earlier source's pair is kept once, in the earlier source.
-The pair kept takes the studies of all its copies, so the study rule still sees
-them. NCIt comes first, since CDISC publishes its terms as NCIt subsets.
+inputs folder, the pairs must come from that fetch. A pair that copies an
+earlier source's pair is kept once, in the earlier source. Two pairs are
+copies when the tokenizer normalises their texts to the same two texts.
+[pairs.md](pairs.md#duplicates) shows examples. The pair kept takes the
+studies of all its copies, so the study rule still sees them. NCIt comes
+first, since CDISC publishes its terms as NCIt subsets.
 
 ## Leakage prevention
 
@@ -52,10 +54,18 @@ then differs. The fields compared are:
 | each of its expected targets | its property name, without the node, and its description |
 
 The benchmark texts are cleaned first, as `pairs prepare` cleans the pairs'
-texts. Two texts match when they are equal after lower-casing, with punctuation
-turned into spaces. A side text also matches a benchmark description when one
-contains the other as whole words, and the shorter has at least 10 words. For
-example, a benchmark describes a target with a terminology's definition and one
+texts. Two texts match when they are equal after three changes:
+
+- the tokenizer's normalisation, which removes invisible characters,
+  lowercases and removes accents;
+- case folding, which also makes `ß` and `ss` equal;
+- punctuation turned into spaces.
+
+So two texts always match when the tokenizer normalises them to one text.
+
+A side text also matches a benchmark description when one contains the other
+as whole words, and the shorter has at least 10 words. For example, a
+benchmark describes a target with a terminology's definition and one
 sentence of its own. A pair that holds the same definition then matches that
 description. Every side text is compared, since some pairs keep a description
 in a name field. Values are never compared: a common list, such as

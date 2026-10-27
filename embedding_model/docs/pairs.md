@@ -151,8 +151,16 @@ used for each of them. The manifest counts such texts.
 
 ### Duplicates
 
-Each item is read once, by its source's id. When two pairs have exactly the
-same two texts, only one is kept. It keeps the studies of every copy.
+Each item is read once, by its source's id. Two pairs are copies when the
+[tokenizer](../README.md#how-the-model-works) normalises their texts to the
+same two texts. The model cannot tell copies apart, so only the first copy is
+kept, as it is written. It keeps the studies of every copy. For example:
+
+| one pair | another pair | copies? |
+|---|---|---|
+| `BMI` -> `Body Mass Index (float)` | `bmi` -> `body mass index (float)` | yes: only the case differs |
+| `Treatment-naïve` -> `Treatment Naive Indicator (string)` | `treatment-naive` -> `Treatment Naive Indicator (string)` | yes: only an accent differs |
+| `body_weight` -> `Body Weight (float)` | `body weight` -> `Body Weight (float)` | no: the tokenizer keeps the `_` as a token |
 
 `corpus build` combines the sources into one [corpus](corpus.md). A pair that
 two sources share is then kept only in the earlier source.

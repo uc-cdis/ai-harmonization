@@ -69,6 +69,9 @@ def pairs_sha256(pairs):
 def new_pairs(pairs, seen):
     """Which of a source's pairs no earlier source has, by the hash of their texts.
 
+    The texts are hashed after the tokenizer's normalisation.
+    ``common.distinct_pairs`` compares them the same way.
+
     Args:
         pairs (pd.DataFrame): A source's pairs.
         seen (set[int]): The hashes of the earlier sources' pairs. This
@@ -77,7 +80,8 @@ def new_pairs(pairs, seen):
     Returns:
         pd.Series: True where a pair is the first copy.
     """
-    hashes = [hash(texts) for texts in zip(pairs.anchor, pairs.positive)]
+    texts = zip(common.normalised(pairs.anchor), common.normalised(pairs.positive))
+    hashes = [hash(pair_texts) for pair_texts in texts]
     new = pd.Series([found not in seen for found in hashes], index=pairs.index)
     seen.update(hashes)
     return new.astype(bool)

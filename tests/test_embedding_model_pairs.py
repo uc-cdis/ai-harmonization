@@ -153,6 +153,12 @@ class TestClean:
         assert common.clean(None) == ""
         assert common.clean(float("nan")) == ""
 
+    def test_a_key_is_the_text_as_the_tokenizer_normalises_it(self):
+        """Case, accents and punctuation do not change a key; other letters stay."""
+        assert common.key("Ábcd_Éfgh (IJKL)") == "abcd efgh ijkl"
+        assert common.key("Größe") == common.key("GROSSE") == "grosse"
+        assert common.key("α-Abcd") == "α abcd"
+
 
 class TestNamesAndTypes:
     """What counts as a name, its term group, and the type words."""
@@ -252,6 +258,27 @@ class TestNamesAndTypes:
         )
         found, _ = common.star([item], source="abcd")
         assert found.study.tolist() == ["phs999997|phs999998|phs999999"]
+
+    def test_pairs_that_the_tokenizer_cannot_tell_apart_are_kept_once(self):
+        """Pairs that differ only in case or accents are copies; the first is kept."""
+        found = pd.DataFrame(
+            {
+                "anchor": ["ABCD", "abcd", "abcd_x"],
+                "positive": ["Abcd Éfgh", "abcd efgh", "abcd efgh"],
+                "study": ["phs999902", "phs999901", ""],
+            }
+        )
+        kept = common.distinct_pairs(found)
+        assert kept.anchor.tolist() == ["ABCD", "abcd_x"]
+        assert kept.study.tolist() == ["phs999901|phs999902", ""]
+
+    def test_a_copy_in_an_earlier_source_is_found_once_normalised(self):
+        """A later source's pair is not new when only its case or accents differ."""
+        seen = set()
+        earlier = pd.DataFrame({"anchor": ["Abcd"], "positive": ["Éfgh"]})
+        later = pd.DataFrame({"anchor": ["ABCD", "Ijkl"], "positive": ["efgh", "Mnop"]})
+        assert pairs.new_pairs(earlier, seen).tolist() == [True]
+        assert pairs.new_pairs(later, seen).tolist() == [False, True]
 
 
 class TestStar:

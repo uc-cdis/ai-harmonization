@@ -16,9 +16,13 @@ from dataclasses import dataclass, field
 import ftfy
 import pandas as pd
 from bs4 import BeautifulSoup
-from tokenizers import normalizers
 
 from ai_harmonization.dbgap import DBGAP_TYPE_MAP
+from embedding_model.normalization import (
+    BERT_CLEANING,
+    TOKENIZER_NORMALIZER,
+    normalised,
+)
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 # An item's status, kept in the pairs' status column.
@@ -147,23 +151,6 @@ LETTER_ITEM = re.compile(r"^[A-Z]\.\s+(?=[A-Z][a-z])")
 # How LOINC and the NIH CDE mark a deprecated name: "Deprecated", even twice
 # or with no space after it.
 DEPRECATED = re.compile(r"^(?:deprecated\s*)+", re.IGNORECASE)
-# BERT's text cleaning: it removes every control, format and private-use
-# character, such as a byte left from a broken quote, a soft hyphen, a
-# zero-width space or a direction mark.
-BERT_CLEANING = normalizers.BertNormalizer(
-    clean_text=True, handle_chinese_chars=False, strip_accents=False, lowercase=False
-)
-# How the tokenizer normalises a text: BERT's text cleaning, Unicode's NFD,
-# lower case, and no accents. key() and distinct_pairs() start from it, so
-# two texts that the tokenizer normalises to one text are one text to them.
-TOKENIZER_NORMALIZER = normalizers.Sequence(
-    [
-        BERT_CLEANING,
-        normalizers.NFD(),
-        normalizers.Lowercase(),
-        normalizers.StripAccents(),
-    ]
-)
 
 
 @dataclass(frozen=True)
@@ -314,8 +301,8 @@ def key(text):
     with punctuation as spaces. So ``Größe`` and ``GROSSE`` have one key, and
     ``Abcdé_Efgh`` and ``abcde efgh`` too.
     """
-    normalised = TOKENIZER_NORMALIZER.normalize_str(text).casefold()
-    return NOT_ALPHANUMERIC.sub(" ", normalised).strip()
+    folded = TOKENIZER_NORMALIZER.normalize_str(text).casefold()
+    return NOT_ALPHANUMERIC.sub(" ", folded).strip()
 
 
 def is_name(text):
@@ -656,21 +643,6 @@ def item_pairs(
                     )
                 )
     return rows
-
-
-def normalised(texts):
-    """Each text as the tokenizer normalises it, each distinct text once.
-
-    Args:
-        texts (pd.Series): Texts.
-
-    Returns:
-        pd.Series: The normalised texts, with the index of ``texts``.
-    """
-    distinct = texts.unique()
-    return texts.map(
-        dict(zip(distinct, map(TOKENIZER_NORMALIZER.normalize_str, distinct)))
-    )
 
 
 def distinct_pairs(pairs):

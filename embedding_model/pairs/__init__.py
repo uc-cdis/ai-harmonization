@@ -31,6 +31,7 @@ from embedding_model.pairs import (
     phenx,
 )
 from embedding_model.download import file_sha256
+from embedding_model.normalization import normalised
 from embedding_model.sources import read_source, table_sha256
 
 # The sources, in order. When a corpus combines them, a pair found in two
@@ -81,7 +82,7 @@ def new_pairs(pairs, seen):
     Returns:
         pd.Series: True where a pair is the first copy.
     """
-    texts = zip(common.normalised(pairs.anchor), common.normalised(pairs.positive))
+    texts = zip(normalised(pairs.anchor), normalised(pairs.positive))
     hashes = [hash(pair_texts) for pair_texts in texts]
     new = pd.Series([found not in seen for found in hashes], index=pairs.index)
     seen.update(hashes)

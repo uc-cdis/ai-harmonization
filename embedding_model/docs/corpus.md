@@ -148,8 +148,9 @@ validation pairs is close to 2%.
 ## What a corpus holds
 
 `corpus build` writes to `embedding_model/inputs/corpora/<name>/`, or under the
-folder that `--inputs` names. It writes to a staging folder first, so a failed
-build leaves the previous corpus as it was.
+folder that `--inputs` names. It writes the folder whole, so a failed build
+leaves the previous corpus as it was; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
 
 - **`pairs.parquet`:** the kept pairs, with the columns that
   [pairs.md](pairs.md#what-a-pair-holds) lists, and `split`: `train` or

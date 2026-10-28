@@ -171,8 +171,9 @@ share of words split are the measures of Rust et al. (2021).
 ## What a tokenizer holds
 
 `tokenizer train` writes to `embedding_model/inputs/tokenizers/<name>/`, or
-under the folder that `--inputs` names. It writes to a staging folder first,
-so a failed training leaves the previous tokenizer as it was.
+under the folder that `--inputs` names. It writes the folder whole, so a
+failed training leaves the previous tokenizer as it was; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
 
 ### `tokenizer.json`
 

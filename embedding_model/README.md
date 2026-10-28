@@ -89,7 +89,7 @@ python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
 python -m embedding_model corpus build --name example --source nhanes  # checked against the benchmarks built: here TOPMed
-python -m embedding_model tokenizer train --corpus example
+python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 python -m embedding_model train --config embedding_model/examples/independent_run_example.yaml --seed 0
 python -m embedding_model score --run independent_run_example_s0 --benchmark topmed
 ```
@@ -110,7 +110,7 @@ python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
 python -m embedding_model corpus build --name example --source nhanes
-python -m embedding_model tokenizer train --corpus example
+python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 
 python -m embedding_model cache build --corpus example
 python -m embedding_model experiment submit embedding_model/examples/small_series_example.yaml --local
@@ -124,25 +124,39 @@ to SLURM as its own job, and they train at the same time.
 
 ## How the model works
 
-The model is a static embedding table. It holds one vector per token of a
-vocabulary, and a text's embedding is the average of its tokens' vectors. A
-table has no attention and no layers, so it is small (a few million
-parameters) and fast.
+The model is a static embedding table. The table has one row per token of the
+[tokenizer](docs/tokenizer.md)'s vocabulary. Each row holds a vector: a list
+of numbers. This example shows 3 numbers per row, with made-up ids and
+numbers:
+
+| id | token | vector |
+|---|---|---|
+| 812 | `body` | 0.2, 0.9, 0.1 |
+| 1407 | `weight` | 0.7, 0.1, 0.4 |
+| 2350 | `mass` | 0.6, 0.2, 0.5 |
+
+The table has two sizes:
+
+- the vocabulary size sets the number of rows, one per token;
+- the dimension sets the numbers in each row.
+
+So a table of 16,000 tokens and 384 dimensions holds 16,000 × 384, about 6.1
+million numbers. It has no attention and no layers, so it is small and fast.
+
+A text's embedding is the average of its tokens' vectors. The tokenizer cuts
+`Body Weight` into `body` and `weight`. The model averages their two rows,
+number by number. So the embedding of `Body Weight` is 0.45, 0.5, 0.25.
+
+Two embeddings are compared by cosine similarity. A value near 1 means that
+the two texts are alike. At the start, every row holds random numbers.
+Training sets them, as the paragraphs below describe.
 
 The tokenizer is a Hugging Face
-[`tokenizers`](https://huggingface.co/docs/tokenizers) pipeline with three
-steps:
-
-1. Text is lowercased and stripped of accents.
-2. It is split at whitespace and at every punctuation character, by BERT's rule
-   (`BertPreTokenizer`). So `SUBJECT_ID` becomes `subject`, `_`, `id`.
-3. Each piece is split into vocabulary tokens by
-   [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
-
-BPE learns its vocabulary from the corpus. It starts from characters and keeps
-merging the most frequent adjacent pair. So common words become one token,
-and a rare word splits into known pieces rather than becoming unknown. A token
-never spans two words.
+[`tokenizers`](https://huggingface.co/docs/tokenizers) pipeline. It cleans
+a text, lowercases it and drops its accents, and splits it at whitespace and
+punctuation. Then it cuts each piece into tokens by
+[byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
+[docs/tokenizer.md](docs/tokenizer.md) explains each step, with examples.
 
 The table is trained from scratch with a contrastive loss (in-batch
 negatives). It learns from pairs of texts that mean the same thing, such as:
@@ -169,7 +183,7 @@ rerun on its own.
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/` |
 | | `corpus build --name <corpus> [--source <source> ...]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
-| | `tokenizer train --corpus <corpus>` | learns the vocabulary from the corpus | `inputs/tokenizers/` |
+| | `tokenizer train --corpus <corpus> [--vocab-size <size>] [--min-frequency <n>] [--name <tokenizer>]` | learns the [tokenizer](docs/tokenizer.md)'s vocabulary from the corpus's training pairs | `inputs/tokenizers/<tokenizer>/` |
 | | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
 | one model | `train --config <config.yaml> --seed <seed>` | trains one model on its own | `outputs/independent_runs/` |
 | a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one SLURM job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
@@ -244,7 +258,7 @@ inputs/
         downloads/<source>/      the source's files as downloaded, kept for the next fetch
     pairs/                       <source>.parquet: each source's pairs of texts; <source>_manifest.json, their manifest
     corpora/<corpus>/            pairs.parquet, the kept pairs with their split; dropped.parquet; manifest.json, the corpus's manifest
-    tokenizers/<tokenizer>/      tokenizer.json
+    tokenizers/<tokenizer>/      tokenizer.json; manifest.json, the tokenizer's manifest
     token_cache/                 token ids, one folder per corpus and tokenizer
 outputs/
     independent_runs/

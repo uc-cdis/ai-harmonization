@@ -153,9 +153,9 @@ used for each of them. The manifest counts such texts.
 ### Duplicates
 
 Each item is read once, by its source's id. Two pairs are copies when the
-[tokenizer](../README.md#how-the-model-works) normalises their texts to the
-same two texts. The model cannot tell copies apart, so only the first copy is
-kept, as it is written. It keeps the studies of every copy. For example:
+[tokenizer](tokenizer.md) normalises their texts to the same two texts. The
+model cannot tell copies apart, so only the first copy is kept, as it is
+written. It keeps the studies of every copy. For example:
 
 | one pair | another pair | copies? |
 |---|---|---|

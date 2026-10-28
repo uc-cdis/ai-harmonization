@@ -15,15 +15,13 @@ named, and writes one corpus under ``<inputs>/corpora/<name>/``:
 
 The corpus holds ``pairs.parquet``, the kept pairs with their ``split``,
 ``dropped.parquet``, every dropped pair with its findings, and
-``manifest.json``. It is written to a temporary folder first, and replaces the
+``manifest.json``. It is written to a staging folder first, and replaces the
 last corpus of that name only once it is complete.
 """
 
 import hashlib
 import json
-import re
 import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -31,11 +29,10 @@ import pandas as pd
 
 from embedding_model import benchmarks, leakage
 from embedding_model.download import file_sha256
-from embedding_model.pairs import READERS, pairs_sha256, read_pairs
-from embedding_model.pairs.common import distinct_pairs
+from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
+from embedding_model.folders import FOLDER_NAME, staged
+from embedding_model.pairs.common import COLUMNS, distinct_pairs
 
-# A corpus name becomes a folder name, so it holds only these characters.
-NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 # The share of items held out for validation, and the hash buckets it is cut in.
 VALIDATION_SHARE = 0.02
 BUCKETS = 1000
@@ -43,6 +40,36 @@ BUCKETS = 1000
 CONCEPT_CODES = {"ncit", "cdisc"}
 TRAIN = "train"
 VALIDATION = "validation"
+
+
+def read_corpus(inputs, name):
+    """A corpus's kept pairs and its manifest, checked against each other.
+
+    Args:
+        inputs (Path): The inputs folder that the corpus was built in.
+        name (str): The corpus's name.
+
+    Returns:
+        tuple[pd.DataFrame, dict]: The kept pairs, with ``split``, and the
+            corpus's manifest.
+
+    Raises:
+        FileNotFoundError: If no corpus of that name was built there.
+        ValueError: If the name is not a corpus name, the pairs or the manifest
+            cannot be read, the manifest is another corpus's, or the pairs
+            lack a column or differ from the manifest.
+    """
+    if not FOLDER_NAME.fullmatch(name):
+        raise ValueError(f"{name!r} is not a corpus name")
+    folder = Path(inputs) / "corpora" / name
+    return read_pairs_file(
+        folder / "pairs.parquet",
+        folder / "manifest.json",
+        "corpus",
+        name,
+        [*COLUMNS, "split"],
+        f"python -m embedding_model corpus build --name {name}",
+    )
 
 
 def built_benchmarks(inputs):
@@ -111,29 +138,6 @@ def splits(pairs):
     cut = VALIDATION_SHARE * BUCKETS
     held_out = {group for group in groups.unique() if bucket(group) < cut}
     return groups.isin(held_out).map({True: VALIDATION, False: TRAIN})
-
-
-def replace(built, destination, staging):
-    """Move a complete corpus folder into place, over the last one if any.
-
-    The last corpus is moved aside first, into ``staging`` as ``.previous``: no
-    corpus name starts with a dot. If the move is interrupted, the last
-    corpus is put back.
-
-    Args:
-        built (Path): The new corpus folder.
-        destination (Path): Where the corpus goes.
-        staging (Path): A folder on the same file system, deleted afterwards.
-    """
-    previous = staging / ".previous"
-    try:
-        if destination.exists():
-            destination.rename(previous)
-        built.rename(destination)
-    except BaseException:
-        if previous.exists() and not destination.exists():
-            previous.rename(destination)
-        raise
 
 
 def manifest(
@@ -254,7 +258,7 @@ def build(name, sources, inputs):
         OSError: If the corpus cannot be written or moved into place. The last
             corpus of that name is then kept.
     """
-    if not NAME.fullmatch(name):
+    if not FOLDER_NAME.fullmatch(name):
         print(
             f"{name!r} is not a corpus name: use letters, digits, '.', '_', '-'",
             file=sys.stderr,
@@ -324,14 +328,8 @@ def build(name, sources, inputs):
     kept = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
     kept["split"] = splits(kept)
 
-    corpora = Path(inputs) / "corpora"
-    corpora.mkdir(parents=True, exist_ok=True)
-    destination = corpora / name
-    with tempfile.TemporaryDirectory(
-        dir=corpora, prefix=f".{name}.", ignore_cleanup_errors=True
-    ) as staging:
-        built = Path(staging) / name
-        built.mkdir()
+    destination = Path(inputs) / "corpora" / name
+    with staged(destination) as built:
         kept.to_parquet(built / "pairs.parquet", index=False)
         dropped.to_parquet(built / "dropped.parquet", index=False)
         written = manifest(
@@ -354,7 +352,6 @@ def build(name, sources, inputs):
         (built / "manifest.json").write_text(
             json.dumps(written, indent=2) + "\n", encoding="utf-8"
         )
-        replace(built, destination, Path(staging))
     rows = written["counts"]["rows"]
     counted = written["counts"]["leakage_findings"]["by_finding"]
     print(

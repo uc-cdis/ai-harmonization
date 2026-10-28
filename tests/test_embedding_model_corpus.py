@@ -328,11 +328,13 @@ class TestBuild:
             ("benchmark", "abcd"),
         ]
         assert written["settings"]["validation_share"] == corpus.VALIDATION_SHARE
+        read, record = corpus.read_corpus(inputs, "abcd-corpus")
+        assert read.equals(kept) and record == written
         printed = capsys.readouterr().out
         assert "checked against: abcd v1" in printed
         assert "3 pairs dropped for leakage (findings: answer_key 3)" in printed
 
-    def test_a_rebuild_replaces_the_last_corpus(self, inputs, capsys):
+    def test_a_rebuild_replaces_the_previous_corpus(self, inputs, capsys):
         """A second build of one name replaces the first, and leaves no work folder."""
         assert corpus.build("abcd", ["ncit"], inputs) == 0
         assert corpus.build("abcd", ["cdisc"], inputs) == 0
@@ -361,13 +363,48 @@ class TestBuild:
             ["ncit", "phs999444|phs999555"]
         ]
 
+    def test_a_corpus_is_read_back_checked(self, inputs):
+        """read_corpus refuses a bad name, a missing corpus, and changed pairs."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        with pytest.raises(ValueError, match="not a corpus name"):
+            corpus.read_corpus(inputs, "../abcd")
+        with pytest.raises(FileNotFoundError, match="corpus build --name efgh"):
+            corpus.read_corpus(inputs, "efgh")
+        path = inputs / "corpora" / "abcd-corpus" / "pairs.parquet"
+        pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
+        with pytest.raises(ValueError, match="differs from its manifest"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+
+    def test_a_corpus_manifest_or_columns_that_do_not_fit_are_refused(self, inputs):
+        """An empty manifest, another corpus's, or a missing column names the command."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        folder = inputs / "corpora" / "abcd-corpus"
+        record = (folder / "manifest.json").read_text()
+        (folder / "manifest.json").write_text("")
+        with pytest.raises(ValueError, match="corpus build --name abcd-corpus"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+        (folder / "manifest.json").write_text(
+            record.replace('"corpus": "abcd-corpus"', '"corpus": "efgh"')
+        )
+        with pytest.raises(ValueError, match="the manifest of corpus 'efgh'"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+        pairs = pd.read_parquet(folder / "pairs.parquet").drop(columns="split")
+        pairs.to_parquet(folder / "pairs.parquet", index=False)
+        rewritten = json.loads(record)
+        rewritten["files"]["pairs.parquet"]["sha256"] = file_sha256(
+            folder / "pairs.parquet"
+        )
+        (folder / "manifest.json").write_text(json.dumps(rewritten))
+        with pytest.raises(ValueError, match="columns that its step writes"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+
     def test_a_corpus_named_previous_can_be_rebuilt(self, inputs):
         """The swap's own folder name cannot clash with a corpus's name."""
         assert corpus.build("previous", ["ncit"], inputs) == 0
         assert corpus.build("previous", ["cdisc"], inputs) == 0
 
-    def test_a_failed_swap_puts_the_last_corpus_back(self, inputs, monkeypatch):
-        """When the new corpus cannot move into place, the last one stays."""
+    def test_a_failed_swap_puts_the_previous_corpus_back(self, inputs, monkeypatch):
+        """When the new corpus cannot move into place, the previous one stays."""
         assert corpus.build("abcd", ["ncit"], inputs) == 0
         rename, calls = pathlib.Path.rename, []
 

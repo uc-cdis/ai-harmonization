@@ -4,7 +4,15 @@ import argparse
 import sys
 from pathlib import Path
 
-from embedding_model import benchmarks, corpus, pairs, scoring, sources, texts
+from embedding_model import (
+    benchmarks,
+    corpus,
+    pairs,
+    scoring,
+    sources,
+    texts,
+    tokenizer,
+)
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -111,6 +119,35 @@ def main(argv=None):
         help="the sources to combine (default: all of them)",
     )
 
+    tokenizer_step = steps.add_parser("tokenizer", help="train a tokenizer")
+    tokenizer_actions = tokenizer_step.add_subparsers(dest="action", required=True)
+    tokenizer_train = tokenizer_actions.add_parser(
+        "train",
+        parents=[common],
+        help="learn the vocabulary from a corpus's training pairs",
+    )
+    tokenizer_train.add_argument(
+        "--corpus", required=True, help="the corpus to learn from"
+    )
+    tokenizer_train.add_argument(
+        "--name",
+        help="the tokenizer's name (default: the corpus and the vocabulary size,"
+        " such as example-16k)",
+    )
+    tokenizer_train.add_argument(
+        "--vocab-size",
+        type=int,
+        default=tokenizer.VOCAB_SIZE,
+        help=f"the vocabulary's size (default: {tokenizer.VOCAB_SIZE:,})",
+    )
+    tokenizer_train.add_argument(
+        "--min-frequency",
+        type=int,
+        default=tokenizer.MIN_FREQUENCY,
+        help="how often a merge must occur to become a token"
+        f" (default: {tokenizer.MIN_FREQUENCY})",
+    )
+
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
@@ -175,6 +212,10 @@ def main(argv=None):
         return pairs.prepare(args.source, args.inputs)
     if args.step == "corpus" and args.action == "build":
         return corpus.build(args.name, args.source, args.inputs)
+    if args.step == "tokenizer" and args.action == "train":
+        return tokenizer.train(
+            args.corpus, args.name, args.vocab_size, args.min_frequency, args.inputs
+        )
     return 0
 
 

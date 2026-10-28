@@ -8,8 +8,9 @@ accents. It is used in three places:
    ``BERT_CLEANING``. The rule that keeps each pair once,
    ``pairs.common.distinct_pairs``, and leakage prevention, through
    ``pairs.common.key``, compare texts after the whole normalisation.
-2. Training the tokenizer. ``tokenizer train`` normalises each training text
-   this way before BPE learns the vocabulary from it.
+2. Training the tokenizer. ``tokenizer train`` counts each training text
+   once after this normalisation, and BPE learns the vocabulary from the
+   normalised texts.
 3. Using the trained model. The model keeps the tokenizer with these rules.
    Before it embeds any text, it normalises the text by the same rules.
 

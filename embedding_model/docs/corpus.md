@@ -15,8 +15,7 @@ It works in three steps, in this order:
 3. split the kept pairs into training and validation pairs.
 
 The split sees only the pairs that leakage prevention keeps. The later steps
-train the tokenizer on the training pairs alone, so a dropped text never
-shapes the vocabulary.
+train the tokenizer on the training pairs alone.
 
 `corpus build` prints how many pairs each step keeps and drops, and the
 corpus's manifest records the counts. They depend on the sources and the
@@ -142,7 +141,7 @@ validation pairs is close to 2%.
 
 `corpus build` writes to `embedding_model/inputs/corpora/<name>/`, or under the
 folder that `--inputs` names. It writes to a staging folder first, so a failed
-build leaves the last corpus as it was.
+build leaves the previous corpus as it was.
 
 - **`pairs.parquet`:** the kept pairs, with the columns that
   [pairs.md](pairs.md#what-a-pair-holds) lists, and `split`: `train` or

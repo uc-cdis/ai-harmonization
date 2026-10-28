@@ -88,7 +88,9 @@ embedding-model = [
     # embedding_model.sources (each source's tables, written and read as
     # parquet through pandas)
     "pyarrow>=14.0.0",
-    # embedding_model.pairs.common (BERT's text cleaning)
+    # embedding_model.normalization (BERT's text cleaning and the tokenizer's
+    # normaliser) and embedding_model.tokenizer (the BPE vocabulary, trained
+    # and saved)
     "tokenizers>=0.23.2",
 ]
 

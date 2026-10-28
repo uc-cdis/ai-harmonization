@@ -44,6 +44,15 @@ SCOPES = {
 }
 # The properties that an ontology's header can state its license with.
 LICENSES = ("{http://purl.org/dc/terms/}license", "{" + PURL + "/}terms_license")
+# The licenses that the ontologies' files state, as SPDX license expressions.
+# HP's file states its consortium's own terms.
+LICENSE_IDS = {
+    "http://creativecommons.org/licenses/by/4.0/": "CC-BY-4.0",
+    "https://creativecommons.org/licenses/by/4.0/": "CC-BY-4.0",
+    "http://creativecommons.org/licenses/by/3.0/": "CC-BY-3.0",
+    "http://creativecommons.org/publicdomain/zero/1.0/": "CC0-1.0",
+    "https://hpo.jax.org/app/license": "LicenseRef-HPO",
+}
 # A class is obsolete when deprecated, or when it is a subclass of this.
 OBSOLETE_CLASS = "http://www.geneontology.org/formats/oboInOwl#ObsoleteClass"
 # Ontologies mark an obsolete term by putting "obsolete" before its label, as
@@ -158,6 +167,34 @@ def read_ontology(stream, ontology):
     }, stated
 
 
+def spdx_license(stated, ontology):
+    """The SPDX license expression of the license that an ontology's file states.
+
+    A license that LICENSE_IDS does not know stops the fetch, so its terms are
+    read before the ontology is used under them.
+
+    Args:
+        stated (str): The license that the file's header states, or ``""``.
+        ontology (str): The ontology, for the message.
+
+    Returns:
+        str: The SPDX license expression, or ``NONE`` when the file states no
+            license.
+
+    Raises:
+        ValueError: If LICENSE_IDS does not know the license.
+    """
+    if not stated:
+        return "NONE"
+    if stated not in LICENSE_IDS:
+        raise ValueError(
+            f"the {ontology} file states the license {stated}, which"
+            " LICENSE_IDS does not know; add its SPDX id there, and its terms"
+            " to embedding_model/docs/licenses.md"
+        )
+    return LICENSE_IDS[stated]
+
+
 def fetch_source(downloads, manifest):
     """Fetch every ontology at the release that the manifest pins.
 
@@ -198,7 +235,7 @@ def fetch_source(downloads, manifest):
                 "version": pin["version"] if dated else stated["release"],
                 **({} if dated else {"fetched": modified(path)}),
                 "sha256": file_sha256(path),
-                "license": stated["license"],
+                "license": spdx_license(stated["license"], ontology),
                 "citation": CITATION,
             }
         )

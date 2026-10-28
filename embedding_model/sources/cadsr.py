@@ -21,11 +21,9 @@ ARCHIVE = (
     "https://cadsr.nci.nih.gov/ftp/caDSR_Downloads/CDE/XML_Archive/"
     "releasedCDEsXML-OD.zip.{date}"
 )
-LICENSE = (
-    "NCI's text is free of copyright unless otherwise indicated; the Proprietary "
-    "Measure Permission document marks exceptions "
-    "(https://www.cancer.gov/policies/copyright-reuse)"
-)
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-NCI-Reuse"
 CITATION = "embedding_model/docs/licenses.md#cadsr"
 # An element with this reference document is part of a proprietary measure,
 # whose owner's permission is needed: caDSR's restriction field.

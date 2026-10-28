@@ -3,6 +3,7 @@
 import hashlib
 import io
 import json
+import re
 import zipfile
 from unittest.mock import MagicMock
 
@@ -335,6 +336,23 @@ class TestObo:
             "release": "2026-01-01",
         }
 
+    @pytest.mark.parametrize(
+        "stated, expected",
+        [
+            ("https://creativecommons.org/licenses/by/4.0/", "CC-BY-4.0"),
+            ("https://hpo.jax.org/app/license", "LicenseRef-HPO"),
+            ("", "NONE"),
+        ],
+    )
+    def test_a_stated_license_becomes_its_spdx_expression(self, stated, expected):
+        """A file's license is written as SPDX; a file that states none is NONE."""
+        assert obo.spdx_license(stated, "abcd") == expected
+
+    def test_an_unknown_license_stops_the_fetch(self):
+        """A license that LICENSE_IDS does not know is named, with what to do."""
+        with pytest.raises(ValueError, match="abcd file states the license .*add"):
+            obo.spdx_license("https://abcd.org/license", "abcd")
+
     def test_short_ids(self):
         """IRIs become OBO short ids; a local synonym type keeps only its name."""
         assert obo.short_id(OBO + "HP_0000001") == "HP:0000001"
@@ -387,8 +405,8 @@ class TestObo:
         efgh_use = tables["terms"].set_index("id").loc["EFGH:0000002"]
         assert efgh_use.obsolete and efgh_use.label == "efgh use"
         assert [(s["version"], s["license"]) for s in found] == [
-            ("2026-01-01", "http://creativecommons.org/licenses/by/4.0/"),
-            ("2026-02-02", cc0),
+            ("2026-01-01", "CC-BY-4.0"),
+            ("2026-02-02", "CC0-1.0"),
         ]
         assert "fetched" in found[1] and "fetched" not in found[0]
         assert [s["role"] for s in found] == ["release", "service"]
@@ -1321,6 +1339,23 @@ class TestFetch:
             capsys.readouterr().err
         )
         assert (inputs / "sources" / "efgh" / "items.parquet").exists()
+
+
+# An SPDX license expression of one license: an id from the SPDX list, a
+# LicenseRef- id for other terms, or NONE.
+SPDX_LICENSE = re.compile(r"NONE|LicenseRef-[A-Za-z0-9.-]+|[A-Za-z0-9.+-]+")
+
+
+class TestLicenses:
+    """Every license that a fetch records is an SPDX license expression."""
+
+    @pytest.mark.parametrize("name", sorted(sources.FETCHERS))
+    def test_each_source_license_is_spdx(self, name):
+        """A source's LICENSE is an SPDX id, a LicenseRef- id, or NONE."""
+        module = sources.FETCHERS[name]
+        licenses = getattr(module, "LICENSE_IDS", {}).values() or [module.LICENSE]
+        for license_ in licenses:
+            assert SPDX_LICENSE.fullmatch(license_), license_
 
 
 class TestCommandLine:

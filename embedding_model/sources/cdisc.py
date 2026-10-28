@@ -34,10 +34,9 @@ COLUMNS = [
     "CDISC Definition",
     "NCI Preferred Term",
 ]
-LICENSE = (
-    "free to use, without licensing restrictions "
-    "(https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc)"
-)
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-NCI-CDISC"
 CITATION = "embedding_model/docs/licenses.md#cdisc"
 
 

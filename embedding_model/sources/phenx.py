@@ -19,10 +19,9 @@ from embedding_model.sources.common import open_where, pinned
 EXPORT = "PhenX database export"
 EXPORT_URL = "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip"
 DUMP = "phenx.sql"
-LICENSE = (
-    "most protocols are freely available, and some have limited availability, "
-    "as each protocol's availability says (https://www.phenxtoolkit.org/help/faq)"
-)
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-PhenX"
 CITATION = "embedding_model/docs/licenses.md#phenx"
 TABLES = {
     "variables",

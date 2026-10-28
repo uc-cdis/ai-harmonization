@@ -24,7 +24,9 @@ from embedding_model.sources.common import pinned
 RELEASE = "LOINC release"
 METADATA = "https://loinc.regenstrief.org/api/v1/Loinc?version={version}"
 DOWNLOAD = "https://loinc.regenstrief.org/api/v1/Loinc/Download?version={version}"
-LICENSE = "LOINC License (https://loinc.org/license/)"
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-LOINC"
 CITATION = "embedding_model/docs/licenses.md#loinc"
 TABLES = {
     "codes": (

@@ -21,10 +21,9 @@ SEARCH = "https://cde.nlm.nih.gov/server/de/search"
 # and not open until decided.
 OPEN_COPYRIGHT = {"Public domain, free to use"}
 CLOSED_COPYRIGHT = set()
-LICENSE = (
-    "U.S. government works are free to use; others may be copyrighted, as each "
-    "element's copyrightStatus says (https://www.nlm.nih.gov/web_policies.html)"
-)
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-NLM-Web-Policies"
 CITATION = "embedding_model/docs/licenses.md#nih-cde"
 
 

@@ -1,9 +1,13 @@
 # Licenses and references
 
 The benchmarks and the training sources are built from public data that others
-publish. This page gives the license or terms of each one, and the reference to
-cite. It also says how single restricted items are left out, and what this
-repository shares.
+publish. This page gives the license or terms of each one, and the reference
+to cite. It also gives each license's id in SPDX, the
+[System Package Data Exchange](https://spdx.dev/), as the manifests record it.
+SPDX names each license by a short id from its
+[License List](https://spdx.org/licenses/), such as `CC-BY-4.0`. The page also
+says how single restricted items are left out, and what this repository
+shares.
 
 ## What this repository shares
 
@@ -23,7 +27,13 @@ For the GDC benchmark, building on your machine is required: see [GDC](#gdc).
 **Website:**
 [UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes).
 
-**License:** The documentation repository states no license.
+**License:** The documentation repository states no license. The benchmark
+also reads dbGaP's variable summaries, for its source variables' texts. They
+state no license either, and NCBI's
+[website policies](https://www.ncbi.nlm.nih.gov/home/about/policies/) do not
+cover them.
+
+**SPDX:** `NONE`, for both.
 
 **Reference:**
 
@@ -55,6 +65,10 @@ ground truth, with instructions for rebuilding the tables from the publishers'
 originals. Likewise, this repository distributes no benchmark files: the
 builder downloads the originals and makes the tables on your machine.
 
+**SPDX:** the ground truth is `CC-BY-4.0`, and the dictionary is
+`Apache-2.0`. Each paper's Crossref record gives its license: `CC-BY-4.0` for
+Cao, Clark and Dou, and `CC-BY-NC-ND-4.0` for the other seven.
+
 **References:**
 
 > Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
@@ -82,6 +96,8 @@ license or terms below.
 [Terms of Use](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)
 state.
 
+**SPDX:** `CC-BY-4.0`.
+
 **Reference:**
 
 > Sioutos, N., Coronado, S. d., Haber, M. W., Hartel, F. W., Shaiu, W.-L., &
@@ -99,15 +115,15 @@ shows it. For CMO and MMO, the OBO Foundry pages give [CC0
 1.0](https://creativecommons.org/publicdomain/zero/1.0/), while the files
 state [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
-| ontology | website | license |
-|---|---|---|
-| MONDO, diseases | [mondo](https://obofoundry.org/ontology/mondo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-| HP, phenotypes | [hp](https://obofoundry.org/ontology/hp.html) | [HPO license](https://human-phenotype-ontology.github.io/license.html) |
-| Uberon, anatomy | [uberon](https://obofoundry.org/ontology/uberon.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
-| OBA, biological attributes | [oba](https://obofoundry.org/ontology/oba.html) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| CMO, clinical measurements | [cmo](https://obofoundry.org/ontology/cmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-| MMO, measurement methods | [mmo](https://obofoundry.org/ontology/mmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-| DUO, data use | [duo](https://obofoundry.org/ontology/duo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| ontology | website | license | SPDX |
+|---|---|---|---|
+| MONDO, diseases | [mondo](https://obofoundry.org/ontology/mondo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| HP, phenotypes | [hp](https://obofoundry.org/ontology/hp.html) | [HPO license](https://human-phenotype-ontology.github.io/license.html) | `LicenseRef-HPO` |
+| Uberon, anatomy | [uberon](https://obofoundry.org/ontology/uberon.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | `CC-BY-3.0` |
+| OBA, biological attributes | [oba](https://obofoundry.org/ontology/oba.html) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `CC0-1.0` |
+| CMO, clinical measurements | [cmo](https://obofoundry.org/ontology/cmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| MMO, measurement methods | [mmo](https://obofoundry.org/ontology/mmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| DUO, data use | [duo](https://obofoundry.org/ontology/duo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
 
 The HPO license names no standard license. It asks users to:
 
@@ -170,6 +186,8 @@ longer loads. The license is now at the address in the table.
 attribution. Content that belongs to a third party carries a notice, and is not
 open (see [Restricted items](#restricted-items)).
 
+**SPDX:** `LicenseRef-LOINC`.
+
 **Reference:**
 
 > McDonald, C. J., Huff, S. M., Suico, J. G., Hill, G., Leavelle, D., Aller,
@@ -187,6 +205,8 @@ open (see [Restricted items](#restricted-items)).
 licensing restrictions", on its
 [CDISC terminology page](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc).
 
+**SPDX:** `LicenseRef-NCI-CDISC`.
+
 **Reference:**
 
 > CDISC. (n.d.). *Controlled Terminology*. Retrieved October 22, 2026, from
@@ -202,6 +222,8 @@ without permission in the U.S.". Content contributed by others may be
 copyrighted. Each element's `copyrightStatus` says which: only "Public domain,
 free to use" is open.
 
+**SPDX:** `LicenseRef-NLM-Web-Policies`.
+
 **Reference:**
 
 > National Library of Medicine. (n.d.). *NIH Common Data Elements (CDE)
@@ -216,6 +238,8 @@ National Cancer Institute (NCI) products is free of copyright"
 ([Reuse of NCI Information](https://www.cancer.gov/policies/copyright-reuse)).
 An element of a proprietary measure has a Proprietary Measure Permission
 document, and is not open.
+
+**SPDX:** `LicenseRef-NCI-Reuse`.
 
 **Reference:**
 
@@ -233,6 +257,8 @@ public domain. It "may be freely used or reproduced without obtaining copyright
 permission"
 ([Use of Agency Materials](https://www.cdc.gov/other/agencymaterials.html)).
 
+**SPDX:** `LicenseRef-CDC-Agency-Materials`.
+
 **Reference:**
 
 > Centers for Disease Control and Prevention, National Center for Health
@@ -247,6 +273,8 @@ permission"
 most of its protocols are freely available, and a small share have limited
 availability. Each protocol's `availability` says which: only "Available" is
 open.
+
+**SPDX:** `LicenseRef-PhenX`.
 
 **Reference:**
 

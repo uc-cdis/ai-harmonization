@@ -35,26 +35,67 @@ NOT_NODES = {"metaschema", "root"}
 # in milligrams, not a patient's weight.
 NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"}
 
-# Each paper's dbGaP study and DOI, by its name in GDC-SM. A paper's patients
-# are the cases of one GDC project, and each project is one dbGaP study.
-# CPTAC-2 (breast, colon, ovary) is phs000892. CPTAC-3 (brain, head and neck,
-# kidney, lung, pancreas, uterus) is phs001287. This was checked through the
-# GDC API on 2026-10-22. Its /cases endpoint gave each case's project, from the
-# case ids in each paper's table, which GDC calls submitter_id. All of a
+# Each paper's dbGaP study, DOI and license, by its name in GDC-SM. A paper's
+# patients are the cases of one GDC project, and each project is one dbGaP
+# study. CPTAC-2 (breast, colon, ovary) is phs000892. CPTAC-3 (brain, head and
+# neck, kidney, lung, pancreas, uterus) is phs001287. This was checked through
+# the GDC API on 2026-10-22. Its /cases endpoint gave each case's project, from
+# the case ids in each paper's table, which GDC calls submitter_id. All of a
 # paper's cases belong to the project given here. Its /projects endpoint gave
 # each project's dbGaP study. Crossref gave each paper's DOI from its publisher
-# id, and the titles match.
+# id, and the titles match. Each paper's Crossref record gives its license,
+# written here as an SPDX license expression.
 PAPERS = {
-    "Cao": {"study": "phs001287", "doi": "10.1016/j.cell.2021.08.023"},
-    "Clark": {"study": "phs001287", "doi": "10.1016/j.cell.2019.10.007"},
-    "Dou": {"study": "phs001287", "doi": "10.1016/j.cell.2020.01.026"},
-    "Gillette": {"study": "phs001287", "doi": "10.1016/j.cell.2020.06.013"},
-    "Huang": {"study": "phs001287", "doi": "10.1016/j.ccell.2020.12.007"},
-    "Krug": {"study": "phs000892", "doi": "10.1016/j.cell.2020.10.036"},
-    "McDermott": {"study": "phs000892", "doi": "10.1016/j.xcrm.2020.100004"},
-    "Satpathy": {"study": "phs001287", "doi": "10.1016/j.cell.2021.07.016"},
-    "Vasaikar": {"study": "phs000892", "doi": "10.1016/j.cell.2019.03.030"},
-    "Wang": {"study": "phs001287", "doi": "10.1016/j.ccell.2021.01.006"},
+    "Cao": {
+        "study": "phs001287",
+        "doi": "10.1016/j.cell.2021.08.023",
+        "license": "CC-BY-4.0",
+    },
+    "Clark": {
+        "study": "phs001287",
+        "doi": "10.1016/j.cell.2019.10.007",
+        "license": "CC-BY-4.0",
+    },
+    "Dou": {
+        "study": "phs001287",
+        "doi": "10.1016/j.cell.2020.01.026",
+        "license": "CC-BY-4.0",
+    },
+    "Gillette": {
+        "study": "phs001287",
+        "doi": "10.1016/j.cell.2020.06.013",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "Huang": {
+        "study": "phs001287",
+        "doi": "10.1016/j.ccell.2020.12.007",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "Krug": {
+        "study": "phs000892",
+        "doi": "10.1016/j.cell.2020.10.036",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "McDermott": {
+        "study": "phs000892",
+        "doi": "10.1016/j.xcrm.2020.100004",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "Satpathy": {
+        "study": "phs001287",
+        "doi": "10.1016/j.cell.2021.07.016",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "Vasaikar": {
+        "study": "phs000892",
+        "doi": "10.1016/j.cell.2019.03.030",
+        "license": "CC-BY-NC-ND-4.0",
+    },
+    "Wang": {
+        "study": "phs001287",
+        "doi": "10.1016/j.ccell.2021.01.006",
+        "license": "CC-BY-NC-ND-4.0",
+    },
 }
 
 
@@ -140,7 +181,7 @@ def paper_source(paper, info, spreadsheet, papers):
         paper (str): The paper's name in GDC-SM, such as ``Clark``.
         info (dict): The paper's entry in ``papers_info.json``.
         spreadsheet (bytes): The table's file, as downloaded.
-        papers (dict): Each paper's dbGaP study and DOI, as in PAPERS.
+        papers (dict): Each paper's dbGaP study, DOI and license, as in PAPERS.
 
     Returns:
         dict: The source, keyed like the manifest's other sources.
@@ -150,6 +191,7 @@ def paper_source(paper, info, spreadsheet, papers):
         "name": f"{paper}, supplementary table",
         "location": info["Dataset URL"],
         "sha256": sha256(spreadsheet),
+        "license": papers[paper]["license"],
         "citation": f"https://doi.org/{papers[paper]['doi']}",
     }
 

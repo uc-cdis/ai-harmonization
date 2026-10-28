@@ -250,6 +250,8 @@ def resolve_components(references, downloads):
                 "name": f"dbGaP variable summaries, {folder}",
                 "location": url,
                 "version": folder,
+                "license": "NONE",
+                "citation": "embedding_model/docs/licenses.md#topmed",
             }
         )
     return found, sources

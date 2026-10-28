@@ -58,7 +58,9 @@ CODEBOOK_FIELDS = {
     "Target:": "target",
     "Hard Edits:": "hard_edits",
 }
-LICENSE = "public domain (https://www.cdc.gov/other/agencymaterials.html)"
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "LicenseRef-CDC-Agency-Materials"
 CITATION = "embedding_model/docs/licenses.md#nhanes"
 
 

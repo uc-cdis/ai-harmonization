@@ -96,8 +96,10 @@ def ground_truth(rows):
     )
 
 
-# A fictional paper's dbGaP study and DOI, in the shape of gdc.PAPERS.
-GDC_PAPERS = {"Abcd": {"study": "phs999999", "doi": "10.9999/abcd"}}
+# A fictional paper's dbGaP study, DOI and license, in the shape of gdc.PAPERS.
+GDC_PAPERS = {
+    "Abcd": {"study": "phs999999", "doi": "10.9999/abcd", "license": "CC-BY-4.0"}
+}
 
 
 class TestReadDocumentation:
@@ -567,7 +569,7 @@ class TestGdcPapers:
             gdc.require_papers(["Abcd"], ["Abcd", "Efgh"], GDC_PAPERS)
 
     def test_a_papers_source_is_cited_by_its_doi(self):
-        """A paper's manifest entry points to its file and cites its DOI."""
+        """A paper's manifest entry points to its file, gives its license and cites its DOI."""
         source = gdc.paper_source(
             "Abcd",
             {"Dataset URL": "https://example.org/abcd.xlsx"},
@@ -579,6 +581,7 @@ class TestGdcPapers:
             "name": "Abcd, supplementary table",
             "location": "https://example.org/abcd.xlsx",
             "sha256": download.sha256(b"abcd"),
+            "license": "CC-BY-4.0",
             "citation": "https://doi.org/10.9999/abcd",
         }
 
@@ -593,6 +596,7 @@ class TestGdcPapers:
         assert set(cited) == set(gdc.PAPERS)
         for paper, entry in gdc.PAPERS.items():
             assert cited[paper] == f"https://doi.org/{entry['doi']}"
+            assert entry["license"] in {"CC-BY-4.0", "CC-BY-NC-ND-4.0"}
 
 
 class TestGdcMappingRows:

@@ -49,7 +49,17 @@ Every manifest has these fields. A field that does not apply is left out:
   - `fetched`: the date, for an input that serves only its current state;
   - `files`: for an input with several files, such as a fetch, each file as
     the input's own manifest records it;
-  - `sha256`, `license` and `citation`, where known;
+  - `sha256`, where known;
+  - `license`: the input's license, in the format of SPDX, the
+    [System Package Data Exchange](https://spdx.dev/): an
+    [SPDX license expression](https://spdx.github.io/spdx-spec/v2.3.1/SPDX-license-expressions/).
+    SPDX names each license by a short id from its
+    [License List](https://spdx.org/licenses/), such as `CC-BY-4.0`.
+    Terms that are not on the list have a `LicenseRef-` id, such as
+    `LicenseRef-Abcd-Terms`. An input that states no license is `NONE`.
+    [licenses.md](licenses.md) gives each id's terms;
+  - `citation`: the input's DOI, or its section of
+    [licenses.md](licenses.md);
 - `settings`: the settings that shaped the build, such as a corpus's
   validation share;
 - `counts`: what the build counted, such as a benchmark's source variables,

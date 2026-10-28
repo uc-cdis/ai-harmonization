@@ -26,9 +26,9 @@ REPLACEMENTS = "https://api-evsrest.nci.nih.gov/api/v1/history/ncit/replacements
 # How many concepts one call to the replacements service asks about. The codes go
 # in the call's URL, so a batch keeps the URL short and the calls few.
 HISTORY_BATCH = 100
-LICENSE = (
-    "CC BY 4.0 (https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)"
-)
+# The terms of use, as an SPDX license expression. The terms are in
+# embedding_model/docs/licenses.md, which CITATION points to.
+LICENSE = "CC-BY-4.0"
 CITATION = "embedding_model/docs/licenses.md#ncit"
 NCIT = "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#"
 # NCIt's own annotation properties, by their codes in the OWL file.

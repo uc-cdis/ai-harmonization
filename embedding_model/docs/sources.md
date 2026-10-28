@@ -303,10 +303,11 @@ The three tables link by `cycle`, `data_file` and `name`: a name alone
 repeats across cycles and data files.
 
 The pages are kept. Some data files, such as those restricted to the Research
-Data Center, have no public codebook page. They are listed in
-`downloads/nhanes/codebooks/not_found.txt`, so a later fetch does not ask for
-them again. If a page fails to download, the fetch stops. Run it again: it
-downloads only the pages still missing.
+Data Center, have no public codebook page: the server returns "not found"
+(HTTP 404). They are listed in `downloads/nhanes/codebooks/not_found.txt`, so a
+later fetch does not ask for them again. Any other failure to download a
+page, such as a lost connection, stops the fetch. Run it again: it downloads
+only the pages still missing.
 
 **Newer releases.** NHANES serves only its current pages: the variable lists
 and each data file's codebook. The fetch keeps every page in

@@ -909,6 +909,37 @@ class TestNhanes:
         with pytest.raises(RuntimeError, match="EFGH_J"):
             nhanes.fetch_source(tmp_path, {"sources": []})
 
+    def test_a_failed_page_stops_the_fetch_at_once(self, pages, monkeypatch, tmp_path):
+        """The fetch stops at the first page that fails, and asks for no page after it."""
+        first = nhanes.CODEBOOK.format(cycle=2017, data_file="ABCD_J")
+        later = nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")
+        pages[first] = requests.ConnectionError("connection reset")
+        pages[later] = CODEBOOK
+        asked, serve = [], served(pages)
+
+        def downloaded(url, path, **request):
+            """Serve the page, and note that it was asked for."""
+            asked.append(url)
+            return serve(url, path, **request)
+
+        monkeypatch.setattr(nhanes, "downloaded", downloaded)
+        with pytest.raises(RuntimeError, match="ABCD_J"):
+            nhanes.fetch_source(tmp_path, {"sources": []})
+        assert later not in asked
+
+    def test_pages_not_found_before_a_failure_are_kept(
+        self, pages, monkeypatch, tmp_path
+    ):
+        """A fetch that stops still lists the pages that it found missing."""
+        pages[nhanes.CODEBOOK.format(cycle=2017, data_file="ABCD_J")] = http_error(404)
+        failed = nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")
+        pages[failed] = requests.ConnectionError("connection reset")
+        monkeypatch.setattr(nhanes, "downloaded", served(pages))
+        with pytest.raises(RuntimeError, match="EFGH_J"):
+            nhanes.fetch_source(tmp_path, {"sources": []})
+        listed = tmp_path / "codebooks" / nhanes.NOT_FOUND
+        assert listed.read_text().split() == ["2017/ABCD_J"]
+
 
 DUMP = """CREATE TABLE `protocols` (
   `id` int NOT NULL,

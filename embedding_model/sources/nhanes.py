@@ -204,6 +204,16 @@ def add_open(codebook, variables):
     return found.assign(open=found.open.fillna(False).astype(bool))
 
 
+def keep_not_found(path, data_files):
+    """Keep the list of data files without a public codebook page.
+
+    Args:
+        path (Path): The list, ``codebooks/not_found.txt``.
+        data_files (Iterable[str]): The data files, as ``<cycle>/<data file>``.
+    """
+    keep(path, "".join(f"{data_file}\n" for data_file in sorted(data_files)).encode())
+
+
 def fetch_source(downloads, manifest):
     """Fetch the variable lists and every data file's codebook.
 
@@ -275,7 +285,7 @@ def fetch_source(downloads, manifest):
         raise ValueError(f"the variable lists name odd data files: {odd[:5]}")
     listed = downloads / "codebooks" / NOT_FOUND
     known = set(listed.read_text().split()) if listed.exists() else set()
-    codebook, values, missing, failed = [], [], [], []
+    codebook, values, missing = [], [], []
     digest, read = hashlib.sha256(), []
     for index, (first_year, data_file) in enumerate(files, start=1):
         entry = f"{first_year}/{data_file}"
@@ -289,9 +299,14 @@ def fetch_source(downloads, manifest):
         except Exception as error:
             if not_found(error):
                 missing.append(entry)
-            else:
-                failed.append(f"{url} ({error})")
-            continue
+                continue
+            # The pages not found so far are listed, with those known before,
+            # so the next fetch does not ask for them again.
+            keep_not_found(listed, known | set(missing))
+            raise RuntimeError(
+                f"the codebook page {url} could not be downloaded ({error})."
+                " Fetch again: the pages kept are not asked for again."
+            ) from error
         read.append(path)
         digest.update(f"{entry}:".encode() + hashlib.sha256(text).digest())
         found, labels = read_codebook(text)
@@ -300,12 +315,7 @@ def fetch_source(downloads, manifest):
         values += [{**key, **row} for row in labels]
         if index % 200 == 0:
             print(f"  {index:,} of {len(files):,} codebooks")
-    keep(listed, "".join(f"{entry}\n" for entry in sorted(missing)).encode())
-    if failed:
-        raise RuntimeError(
-            f"{len(failed):,} codebook pages could not be downloaded, such as "
-            f"{failed[0]}. Fetch again to try them."
-        )
+    keep_not_found(listed, missing)
     counts = {
         "variables": len(variables),
         "data_files": len(files),

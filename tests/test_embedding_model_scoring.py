@@ -110,6 +110,8 @@ def inputs(tmp_path):
 
 
 class TestRankTargets:
+    """Ranking each source variable's targets, and the metrics of the ranks."""
+
     def test_ranks_and_metrics(self, model, inputs):
         """A source variable's rank is the rank of its best placed expected target.
 
@@ -158,18 +160,32 @@ class TestRankTargets:
         model.default_prompt_name = "abcd"
         assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
 
-    def test_targets_are_ranked_by_cosine(self, model, inputs):
-        """Targets are ranked by cosine, even when the model's config names another similarity."""
+    def test_targets_are_ranked_by_cosine(self, model):
+        """Targets are ranked by cosine, even when the model's config names another similarity.
+
+        The race target's text has four unknown words. They shorten its vector
+        but keep its direction. So cosine ranks it first, while a dot product
+        would rank the gender target first.
+        """
+        targets = pd.DataFrame(
+            [
+                target("demographic.gender", "Gender"),
+                target("clinical.race", "Race abcd efgh ijkl mnop"),
+            ]
+        )
+        mappings = pd.DataFrame(
+            [{**mapping("RACE", "Race", []), "expected_target": "clinical.race"}]
+        )
         model.similarity_fn_name = "dot"
-        targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
-        metrics, ranked = scoring.rank_targets(
+        _, ranked = scoring.rank_targets(
             model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
         )
-        assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
-        assert metrics["mrr"] == round((1 + 1 + 1 / 3) / 3, 4)
+        assert ranked["0"]["rank"] == 1
 
 
 class TestScore:
+    """Scoring a model on built benchmarks, and the files that it writes."""
+
     @pytest.fixture
     def saved(self, model, tmp_path):
         """The small static model, saved to a folder named abcd-model."""
@@ -279,6 +295,8 @@ class TestScore:
 
 
 class TestScoresFolder:
+    """Where a model's scores are written."""
+
     def test_a_hugging_face_model_keeps_its_owner(self, tmp_path):
         """A Hugging Face model's scores sit under its owner and name."""
         folder = scoring.scores_folder(
@@ -343,6 +361,8 @@ class TestWriteScores:
 
 
 class TestModelRevision:
+    """The Hugging Face commit of the model that was scored."""
+
     def cached(self, folder, repo_id):
         """Put a fictional model in a Hugging Face cache, at commit abcd1234."""
         model = folder / ("models--" + repo_id.replace("/", "--"))
@@ -367,6 +387,8 @@ class TestModelRevision:
 
 
 class TestCommandLine:
+    """The `score` command."""
+
     def test_score_command(self, model, inputs, tmp_path):
         """`score` scores a model folder on two built benchmarks."""
         built(tmp_path, MAPPINGS, name="gdc")

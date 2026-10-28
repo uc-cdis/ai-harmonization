@@ -71,7 +71,9 @@ class TestFetch:
         )
 
     def test_the_session_retries_a_busy_server(self):
-        """A busy server's answer, 429 or 503, is tried again."""
+        """A busy server's answer, 429 or 503, is tried again, after a wait, for a POST too."""
         retries = download.session().get_adapter("https://example.org").max_retries
-        assert retries.total == download.RETRIES.total
+        assert retries.total > 0
+        assert retries.backoff_factor > 0
+        assert retries.allowed_methods is None or "POST" in retries.allowed_methods
         assert {429, 503} <= set(retries.status_forcelist)

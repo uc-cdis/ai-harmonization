@@ -140,6 +140,12 @@ class TestLeakage:
         assert findings.benchmark.tolist() == ["abcd", "efgh"]
         assert findings.pair.tolist() == [0, 0]
 
+    def test_an_answer_key_comes_before_a_benchmark_study(self):
+        """A pair that is an answer key and from a benchmark's study has one finding."""
+        pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index", study="phs999902")])
+        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY]
+
     def test_accents_and_case_do_not_hide_an_answer_key(self):
         """A pair whose texts differ from a benchmark's only by accents and case is an answer key."""
         pairs = pd.DataFrame([pair("Ábcd Scöre", "ABCD INDEX")])
@@ -314,6 +320,12 @@ class TestBuild:
         assert set(kept.source) == {"cdisc"}
         assert [path.name for path in (inputs / "corpora").iterdir()] == ["abcd"]
         assert "0 pairs dropped for leakage\n" in capsys.readouterr().out
+
+    def test_sources_combine_in_their_own_order_whatever_the_order_named(self, inputs):
+        """Sources named in another order still combine in READERS' order."""
+        assert corpus.build("abcd", ["cdisc", "ncit"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd" / "pairs.parquet")
+        assert kept.set_index("anchor_name").source["Wxyz"] == "ncit"
 
     def test_a_copy_gives_its_study_to_the_pair_kept(self, inputs, capsys):
         """A later source's copy with a benchmark study gets the kept pair dropped."""

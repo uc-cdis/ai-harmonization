@@ -120,14 +120,15 @@ class TestTokenizer:
         assert first.to_str() == second.to_str()
 
     def test_the_diagnostics(self):
-        """Whole words give fertility 1, split words and unknown characters show."""
+        """Whole words give fertility 1; a word cut into 4 tokens gives 4; unknown characters show."""
         trained = tokenizer.learn(["abcd abcd", "abcd abcd"], 100, 2)
         whole = tokenizer.diagnostics(trained, ["abcd abcd"])
         assert (whole["fertility"], whole["words_split"]) == (1.0, 0.0)
         assert whole["unknown_rate"] == 0.0
         tokens = trained.get_vocab_size() - len(tokenizer.SPECIAL_TOKENS)
         assert whole["vocabulary_used"] == round(1 / tokens, 4)
-        assert tokenizer.diagnostics(trained, ["dcba"])["words_split"] == 1.0
+        split = tokenizer.diagnostics(trained, ["dcba"])
+        assert (split["fertility"], split["words_split"]) == (4.0, 1.0)
         assert tokenizer.diagnostics(trained, ["wxyz"])["unknown_rate"] == 1.0
 
     def test_the_diagnostics_are_the_same_in_batches(self, monkeypatch):

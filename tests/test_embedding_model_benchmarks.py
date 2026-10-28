@@ -90,7 +90,7 @@ def record(name, description, phs="phs999999"):
 
 
 def ground_truth(rows):
-    """A GDC-SM ground-truth table from (source, target) pairs."""
+    """A GDC-SM ground-truth table from (source, target) mappings."""
     return pd.DataFrame(
         rows, columns=["original_paper_variable_names", "GDC_format_variable_names"]
     )
@@ -103,6 +103,8 @@ GDC_PAPERS = {
 
 
 class TestReadDocumentation:
+    """Reading the harmonized variables from TOPMed's documentation."""
+
     def test_variables_with_their_values_and_components(self):
         """Each harmonized variable is read with its coded values and cited components."""
         archive = documentation_archive(
@@ -149,6 +151,8 @@ class TestReadDocumentation:
 
 
 class TestReadDocumentationErrors:
+    """Errors in TOPMed's documentation, each naming its file."""
+
     def test_a_malformed_reference_names_its_file(self):
         """A component that is not a phs.v.pht.v.phv accession fails with its file named."""
         archive = documentation_archive(
@@ -163,6 +167,8 @@ class TestReadDocumentationErrors:
 
 
 class TestBuilders:
+    """Each builder reads its pins from the committed manifest."""
+
     def test_topmed_reads_its_pin_from_the_manifest(self, monkeypatch, tmp_path):
         """The documentation is fetched at the manifest's commit and kept under it."""
         archive = documentation_archive(
@@ -210,6 +216,8 @@ class TestBuilders:
 
 
 class TestTargetRows:
+    """TOPMed's targets: a phenotype target, and an age target where the variable has an age."""
+
     def test_phenotype_and_age_targets(self):
         """A variable with an age column gives a phenotype target and an age_at_ target."""
         variables = [
@@ -241,6 +249,8 @@ class TestTargetRows:
 
 
 class TestIsAge:
+    """Whether a component variable holds an age."""
+
     @pytest.mark.parametrize(
         "description",
         [
@@ -268,6 +278,8 @@ class TestIsAge:
 
 
 class TestCitedVariables:
+    """The cited variables of a dbGaP table, with their dbGaP text."""
+
     def test_wanted_variables_only(self, tmp_path):
         """Only the wanted variables are returned, with their dbGaP text."""
         dictionary = tmp_path / "phs999999.v1.pht999999.v1.Exam.data_dict.xml"
@@ -282,6 +294,8 @@ class TestCitedVariables:
 
 
 class TestResolveComponents:
+    """Finding each cited component in the dbGaP release that it cites."""
+
     @pytest.fixture
     def served(self, monkeypatch):
         """Serve a fictional dbGaP study with two releases and record what is fetched."""
@@ -349,6 +363,8 @@ class TestResolveComponents:
 
 
 class TestTopmedMappingRows:
+    """TOPMed's mappings: one row per component variable, with every target it maps to."""
+
     def variables(self):
         """Two harmonized variables citing the same age and their own values."""
         cac = ("phs999999", "1", "pht999999", "1", "phv99999903")
@@ -411,6 +427,8 @@ class TestTopmedMappingRows:
 
 
 class TestDictionaryTargets:
+    """GDC's targets: the properties of its dictionary that a variable can map to."""
+
     DICTIONARY = {
         "_definitions": {"properties": {"ignored": {"type": "string"}}},
         "demographic": {
@@ -488,6 +506,8 @@ class TestDictionaryTargets:
 
 
 class TestReadGroundTruth:
+    """Reading the expert mappings from the GDC-SM archive."""
+
     def test_one_table_per_paper(self):
         """Ground-truth CSVs are read by paper; other files in the archive are not."""
         buffer = io.BytesIO()
@@ -510,6 +530,8 @@ def spreadsheet(columns, sheet="Clinical"):
 
 
 class TestReadSourceTable:
+    """Reading a paper's supplementary table, repaired as GDC-SM repairs it."""
+
     def test_mcdermott_column_loses_its_tab(self):
         """McDermott's column name ending in a tab is renamed; other names are kept as published."""
         tabbed = "Age in Months at Time of Tissue Procurement \t"
@@ -554,6 +576,8 @@ class TestReadSourceTable:
 
 
 class TestGdcPapers:
+    """Each paper that GDC-SM lists, maps and pins, and its manifest entry."""
+
     def test_listed_and_mapped_papers_with_entries_pass(self):
         """Papers that are listed, mapped and in the paper table pass the check."""
         gdc.require_papers(["Abcd"], ["Abcd"], GDC_PAPERS)
@@ -600,6 +624,8 @@ class TestGdcPapers:
 
 
 class TestGdcMappingRows:
+    """GDC's mappings: one row per source variable, with each node's expected target."""
+
     TARGETS = [
         {"target_property": key}
         for key in (
@@ -636,7 +662,7 @@ class TestGdcMappingRows:
         assert row["expected_target"] == ["case.primary_site"]
 
     def test_several_published_targets_merge_into_one_row(self):
-        """Two ground-truth pairs for one variable give one row with both targets."""
+        """Two ground-truth mappings for one variable give one row with both targets."""
         truth = {"Abcd": ground_truth([("Site", "primary_site"), ("Site", "race")])}
         tables = {"Abcd": pd.DataFrame({"Site": ["Ovary"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
@@ -697,6 +723,8 @@ PIN = {"role": "mappings", "name": "Fictional source", "version": "1"}
 
 
 class TestWriteBenchmark:
+    """Writing a benchmark's two files and the manifest of its build."""
+
     def test_files_and_manifest(self, tmp_path):
         """Both files are written with their columns, and the manifest describes them."""
         manifest = benchmarks.write_benchmark(
@@ -750,6 +778,8 @@ class TestWriteBenchmark:
 
 
 class TestReadBenchmark:
+    """Reading a built benchmark back, checked against its manifest."""
+
     @pytest.fixture
     def written(self, tmp_path):
         """A benchmark named abcd, written into a temp inputs folder."""
@@ -832,6 +862,8 @@ class TestReadBenchmark:
 
 
 class TestBuild:
+    """`benchmarks build` against the committed manifests."""
+
     @pytest.fixture
     def setup(self, monkeypatch, tmp_path):
         """A fictional builder for 'topmed', with its pins-only manifest in a temp folder."""
@@ -933,6 +965,8 @@ class TestBuild:
 
 
 class TestCommandLine:
+    """The `benchmarks build` command."""
+
     def test_build_needs_a_benchmark(self):
         """`benchmarks build` with no benchmark named is a usage error."""
         with pytest.raises(SystemExit) as raised:

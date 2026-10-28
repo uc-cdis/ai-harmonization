@@ -3,6 +3,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from embedding_model import pairs, sources
 from embedding_model.__main__ import main
@@ -451,6 +452,27 @@ class TestStar:
         )
         assert found.lists == [("", ["Yes"]), ("", ["Low"])]
 
+    def test_a_chain_that_loops_ends(self):
+        """Two retired items that name each other as replacement give no replacement."""
+        items = [
+            Item(id="abcd1", canonical="Old", status=RETIRED, replaced_by=["abcd2"]),
+            Item(id="abcd2", canonical="Older", status=RETIRED, replaced_by=["abcd1"]),
+        ]
+        by_id = {item.id: item for item in items}
+        assert common.replacements(items[0], by_id) == []
+
+    def test_a_text_of_two_canonicals_is_counted(self):
+        """A name that two items give, for two canonicals, is one ambiguous text."""
+        found, _ = common.star(
+            [
+                Item(id="abcd1", canonical="Abcd", texts=[Text("Other", "SY")]),
+                Item(id="abcd2", canonical="Efgh", texts=[Text("other", "SY")]),
+                Item(id="abcd3", canonical="Ijkl", texts=[Text("Mnop", "SY")]),
+            ],
+            source="abcd",
+        )
+        assert pairs.ambiguous_texts(found) == 1
+
     def test_a_chain_passes_through_a_closed_retired_item(self):
         """A closed retired item in the middle of a chain does not stop it."""
         items = [
@@ -637,6 +659,20 @@ class TestNcit:
             replacement_name=["Abcd"],
         ),
     }
+
+    @pytest.mark.parametrize(
+        "statuses, expected",
+        [
+            ("Obsolete_Concept", RETIRED),
+            ("Provisional_Concept|Retired_Concept", RETIRED),
+            ("Concept_Pending_Approval", DRAFT),
+            ("Header_Concept", CURRENT),
+            ("", CURRENT),
+        ],
+    )
+    def test_a_concepts_status(self, statuses, expected):
+        """Retired comes before draft when a concept has several statuses."""
+        assert ncit.status_of(statuses) == expected
 
     def test_concepts(self):
         """Same-meaning synonyms; the NCI definition first, sources off; lists once, sorted."""
@@ -1223,6 +1259,13 @@ class TestPrepare:
         """A source that was not fetched is reported, with the command to fetch it."""
         assert pairs.prepare(["nhanes"], tmp_path) == 1
         assert "sources fetch --source nhanes" in capsys.readouterr().err
+
+    def test_a_source_that_fails_does_not_stop_the_others(self, tmp_path, capsys):
+        """A source that cannot be read is reported, and the next one is still prepared."""
+        fetched_nhanes(tmp_path)
+        assert pairs.prepare(["ncit", "nhanes"], tmp_path) == 1
+        assert "ncit not prepared" in capsys.readouterr().err
+        assert (tmp_path / "pairs" / "nhanes" / "pairs.parquet").exists()
 
     def test_a_run_counts_pairs_an_earlier_source_has(
         self, tmp_path, monkeypatch, capsys

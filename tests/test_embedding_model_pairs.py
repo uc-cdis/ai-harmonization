@@ -1168,6 +1168,22 @@ def fetched_nhanes(inputs, name="nhanes"):
 class TestPrepare:
     """``pairs prepare``: each source's file, its manifest, and combining sources."""
 
+    def test_a_failed_prepare_keeps_the_previous_pairs(self, tmp_path, monkeypatch):
+        """A run that fails while it writes leaves the previous pairs as they were."""
+        fetched_nhanes(tmp_path)
+        assert pairs.prepare(["nhanes"], tmp_path) == 0
+        folder = tmp_path / "pairs" / "nhanes"
+        before = {path.name: path.read_bytes() for path in folder.iterdir()}
+
+        def failing(*arguments):
+            """A manifest that cannot be made, as on a full disk."""
+            raise OSError("no space left on device")
+
+        monkeypatch.setattr(pairs, "manifest", failing)
+        assert pairs.prepare(["nhanes"], tmp_path) == 1
+        assert {path.name: path.read_bytes() for path in folder.iterdir()} == before
+        assert [path.name for path in folder.parent.iterdir()] == ["nhanes"]
+
     def test_prepare_writes_the_pairs_and_their_manifest(self, tmp_path, capsys):
         """The pairs are written with a manifest of their fetch, checksum and counts."""
         fetched_nhanes(tmp_path)
@@ -1175,15 +1191,17 @@ class TestPrepare:
             main(["pairs", "prepare", "--inputs", str(tmp_path), "--source", "nhanes"])
             == 0
         )
-        assert f"-> {tmp_path / 'pairs' / 'nhanes.parquet'}" in capsys.readouterr().out
-        found = pd.read_parquet(tmp_path / "pairs" / "nhanes.parquet")
+        assert f"-> {tmp_path / 'pairs' / 'nhanes'}" in capsys.readouterr().out
+        found = pd.read_parquet(tmp_path / "pairs" / "nhanes" / "pairs.parquet")
         assert found.anchor.tolist() == ["ABCDXYZ (string)", "Abcd score (string)"]
         assert set(found.source) == {"nhanes"}
-        written = json.loads((tmp_path / "pairs" / "nhanes_manifest.json").read_text())
+        written = json.loads(
+            (tmp_path / "pairs" / "nhanes" / "manifest.json").read_text()
+        )
         assert written["files"] == {
-            "nhanes.parquet": {
+            "pairs.parquet": {
                 "rows": 2,
-                "sha256": file_sha256(tmp_path / "pairs" / "nhanes.parquet"),
+                "sha256": file_sha256(tmp_path / "pairs" / "nhanes" / "pairs.parquet"),
                 "csv_sha256": pairs.pairs_sha256(found),
             }
         }

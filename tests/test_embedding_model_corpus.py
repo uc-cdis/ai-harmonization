@@ -10,6 +10,7 @@ from embedding_model import benchmarks, corpus, leakage
 from embedding_model.__main__ import main
 from embedding_model.download import file_sha256
 from embedding_model.pairs import common, pairs_sha256
+from embedding_model.pairs import manifest as pairs_manifest
 
 # A fictional benchmark: two source variables, from two fictional studies.
 MAPPINGS = pd.DataFrame(
@@ -235,33 +236,16 @@ class TestLeakage:
 
 def write_pairs(inputs, source, rows):
     """Write a fictional source's pairs and their manifest, as ``pairs prepare`` would."""
-    folder = inputs / "pairs"
+    folder = inputs / "pairs" / source
     folder.mkdir(parents=True, exist_ok=True)
     frame = pd.DataFrame(rows).assign(source=source)
-    frame.to_parquet(folder / f"{source}.parquet", index=False)
-    written = pd.read_parquet(folder / f"{source}.parquet")
-    record = {
-        "source": source,
-        "built": "2026-01-01",
-        "files": {
-            f"{source}.parquet": {
-                "rows": len(written),
-                "sha256": file_sha256(folder / f"{source}.parquet"),
-                "csv_sha256": pairs_sha256(written),
-            }
-        },
-        "sources": [
-            {
-                "role": "fetch",
-                "name": source,
-                "version": "1",
-                "fetched": "2026-01-01",
-                "files": {},
-            }
-        ],
-        "counts": {},
-    }
-    (folder / f"{source}_manifest.json").write_text(json.dumps(record))
+    frame.to_parquet(folder / "pairs.parquet", index=False)
+    written = pd.read_parquet(folder / "pairs.parquet")
+    fetch = {"version": "1", "fetched": "2026-01-01", "files": {}}
+    record = pairs_manifest(
+        source, written, file_sha256(folder / "pairs.parquet"), {}, fetch
+    )
+    (folder / "manifest.json").write_text(json.dumps(record))
 
 
 @pytest.fixture
@@ -424,7 +408,7 @@ class TestBuild:
 
     def test_a_manifest_without_a_field_names_the_command(self, inputs, capsys):
         """A pairs manifest that lacks a field asks for pairs prepare again."""
-        path = inputs / "pairs" / "ncit_manifest.json"
+        path = inputs / "pairs" / "ncit" / "manifest.json"
         record = json.loads(path.read_text())
         del record["files"]
         path.write_text(json.dumps(record))
@@ -442,8 +426,8 @@ class TestBuild:
     def test_another_sources_manifest_is_refused(self, inputs, capsys):
         """A pairs manifest that names another source is not read as this one's."""
         manifests = inputs / "pairs"
-        (manifests / "ncit_manifest.json").write_text(
-            (manifests / "cdisc_manifest.json").read_text()
+        (manifests / "ncit" / "manifest.json").write_text(
+            (manifests / "cdisc" / "manifest.json").read_text()
         )
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "the manifest of source 'cdisc'" in capsys.readouterr().err
@@ -486,28 +470,28 @@ class TestBuild:
 
     def test_pairs_that_cannot_be_read_name_the_source(self, inputs, capsys):
         """A broken pairs file names its source and the command that remakes it."""
-        (inputs / "pairs" / "ncit_manifest.json").write_text("")
+        (inputs / "pairs" / "ncit" / "manifest.json").write_text("")
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
-        assert "ncit_manifest.json cannot be read" in error
+        assert "ncit/manifest.json cannot be read" in error
         assert "pairs prepare --source ncit" in error
 
     def test_a_missing_pairs_manifest_is_named(self, inputs, capsys):
         """Pairs without their manifest name the manifest, not the pairs."""
-        (inputs / "pairs" / "ncit_manifest.json").unlink()
+        (inputs / "pairs" / "ncit" / "manifest.json").unlink()
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
-        assert "ncit_manifest.json is missing" in error
+        assert "ncit/manifest.json is missing" in error
         assert "pairs prepare --source ncit" in error
 
     def test_pairs_without_a_column_are_refused(self, inputs, capsys):
         """Pairs whose columns are not those of pairs prepare are not read."""
         write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd")])
-        path = inputs / "pairs" / "ncit.parquet"
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
         pd.read_parquet(path).drop(columns="study").to_parquet(path, index=False)
-        record = json.loads((inputs / "pairs" / "ncit_manifest.json").read_text())
-        record["files"]["ncit.parquet"]["sha256"] = file_sha256(path)
-        (inputs / "pairs" / "ncit_manifest.json").write_text(json.dumps(record))
+        record = json.loads((inputs / "pairs" / "ncit" / "manifest.json").read_text())
+        record["files"]["pairs.parquet"]["sha256"] = file_sha256(path)
+        (inputs / "pairs" / "ncit" / "manifest.json").write_text(json.dumps(record))
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "does not have the columns" in capsys.readouterr().err
 
@@ -579,14 +563,14 @@ class TestBuild:
 
     def test_pairs_changed_since_their_manifest_are_refused(self, inputs, capsys):
         """Pairs whose content differs from their manifest's checksum are not read."""
-        path = inputs / "pairs" / "ncit.parquet"
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
         pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "differs from its manifest" in capsys.readouterr().err
 
     def test_pairs_are_checked_by_the_bytes_of_their_file(self, inputs, capsys):
         """The same table written again with other bytes is not the file that was written."""
-        path = inputs / "pairs" / "ncit.parquet"
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
         pd.read_parquet(path).to_parquet(path, index=False, compression="gzip")
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "differs from its manifest" in capsys.readouterr().err

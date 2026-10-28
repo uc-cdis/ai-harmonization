@@ -181,7 +181,7 @@ rerun on its own.
 | | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
-| | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/` |
+| | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/<source>/` |
 | | `corpus build --name <corpus> [--source <source> ...]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus> [--vocab-size <size>] [--min-frequency <n>] [--name <tokenizer>]` | learns the [tokenizer](docs/tokenizer.md)'s vocabulary from the corpus's training pairs | `inputs/tokenizers/<tokenizer>/` |
 | | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
@@ -249,11 +249,11 @@ scores. Both folders are gitignored.
 That is useful for a full corpus's token cache, which can run to tens of
 gigabytes.
 
-A benchmark, a source's tables, a corpus and a tokenizer are each written
-whole. For example, `corpus build --name abcd` first writes the new corpus
-into a hidden staging folder, `corpora/.abcd.x1y2/`, next to `corpora/abcd/`.
-Only when the new corpus is complete does it replace `corpora/abcd/`. So a run
-that fails leaves the previous corpus as it was.
+A benchmark, a source's tables, a source's pairs, a corpus and a tokenizer are
+each written whole. For example, `corpus build --name abcd` first writes the
+new corpus into a hidden staging folder, `corpora/.abcd.x1y2/`, next to
+`corpora/abcd/`. Only when the new corpus is complete does it replace
+`corpora/abcd/`. So a run that fails leaves the previous corpus as it was.
 
 A run that is killed, such as by a time limit, cannot delete its staging
 folder. The next run of `corpus build --name abcd` then prints a warning with
@@ -267,7 +267,7 @@ inputs/
     sources/
         <source>/                a training source's tables, as <table>.parquet, and the fetch's manifest.json
         downloads/<source>/      the source's files as downloaded, kept for the next fetch
-    pairs/                       <source>.parquet: each source's pairs of texts; <source>_manifest.json, their manifest
+    pairs/<source>/              pairs.parquet: a source's pairs of texts; manifest.json, their manifest
     corpora/<corpus>/            pairs.parquet, the kept pairs with their split; dropped.parquet; manifest.json, the corpus's manifest
     tokenizers/<tokenizer>/      tokenizer.json; manifest.json, the tokenizer's manifest
     token_cache/                 token ids, one folder per corpus and tokenizer

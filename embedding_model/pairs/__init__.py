@@ -1,8 +1,9 @@
 """Pairs: each source's items, made into pairs of texts that mean the same thing.
 
 ``pairs prepare`` reads the tables that ``sources fetch`` wrote. It writes each
-source's pairs to ``<inputs>/pairs/<source>.parquet``, beside their manifest,
-``<source>_manifest.json``. Each source has its own module, which reads the
+source's pairs to ``<inputs>/pairs/<source>/pairs.parquet``, beside their
+manifest, ``manifest.json``. The folder is written whole, through
+``folders.staged``. Each source has its own module, which reads the
 source into items. ``common.star`` then makes the pairs the same way for every
 source. ``read_pairs`` reads them back, checked against their manifest. The
 rules are in ``embedding_model/docs/pairs.md``.
@@ -32,6 +33,7 @@ from embedding_model.pairs import (
 )
 from embedding_model import manifests
 from embedding_model.download import file_sha256
+from embedding_model.folders import staged
 from embedding_model.normalization import normalised
 from embedding_model.sources import read_source, table_sha256
 
@@ -127,7 +129,7 @@ def manifest(name, pairs, pairs_file_sha256, counts, fetch):
         "source": name,
         "built": date.today().isoformat(),
         "files": {
-            f"{name}.parquet": {
+            "pairs.parquet": {
                 "rows": len(pairs),
                 "sha256": pairs_file_sha256,
                 "csv_sha256": pairs_sha256(pairs),
@@ -232,12 +234,12 @@ def read_pairs(inputs, name):
             be read, the manifest is another source's, the pairs lack a column
             or differ from their manifest, or they come from another fetch.
     """
-    folder = Path(inputs) / "pairs"
-    written = folder / f"{name}_manifest.json"
-    fetch = Path(inputs) / "sources" / name / "manifest.json"
+    folder = Path(inputs) / "pairs" / name
+    manifest_path = folder / "manifest.json"
+    fetch_path = Path(inputs) / "sources" / name / "manifest.json"
     command = f"python -m embedding_model pairs prepare --source {name}"
     pairs, record = read_pairs_file(
-        folder / f"{name}.parquet", written, "source", name, common.COLUMNS, command
+        folder / "pairs.parquet", manifest_path, "source", name, common.COLUMNS, command
     )
     try:
         fetch_entry = record["sources"][0]
@@ -246,42 +248,46 @@ def read_pairs(inputs, name):
             raise KeyError("version")
     except Exception as error:
         raise ValueError(
-            f"{written} does not record the fetch of {name}"
+            f"{manifest_path} does not record the fetch of {name}"
             f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
-    if not fetch.exists():
+    if not fetch_path.exists():
         return pairs, record
     fetch_command = f"python -m embedding_model sources fetch --source {name}"
-    if manifests.read(fetch, fetch_command, "source", name).get("files") != fetched:
+    fetch_manifest = manifests.read(fetch_path, fetch_command, "source", name)
+    if fetch_manifest.get("files") != fetched:
         raise ValueError(
-            f"{name}'s pairs come from another fetch than {fetch.parent};"
+            f"{name}'s pairs come from another fetch than {fetch_path.parent};"
             f" run: {command}"
         )
     return pairs, record
 
 
-def prepare_one(name, inputs, root):
-    """Make one source's pairs, and write them with their manifest.
+def prepare_one(name, inputs):
+    """Make one source's pairs, and write them whole with their manifest.
 
     Args:
         name (str): The source, as in READERS.
         inputs (Path): The inputs folder that the source was fetched into.
-        root (Path): The folder for the pairs.
 
     Returns:
-        pd.DataFrame: The pairs, also written as ``<source>.parquet``, beside
-            their manifest, ``<source>_manifest.json``.
+        pd.DataFrame: The pairs, also written as
+            ``pairs/<source>/pairs.parquet``, beside their manifest,
+            ``manifest.json``.
     """
-    tables, fetch = read_source(inputs, name)
+    tables, fetch_manifest = read_source(inputs, name)
     pairs, counts = common.star(READERS[name].items(tables), name)
-    written = root / f"{name}.parquet"
-    pairs.to_parquet(written, index=False)
-    found = manifest(name, pairs, file_sha256(written), counts, fetch)
-    manifests.write(root / f"{name}_manifest.json", found)
+    destination = Path(inputs) / "pairs" / name
+    with staged(destination) as built:
+        pairs.to_parquet(built / "pairs.parquet", index=False)
+        pairs_manifest = manifest(
+            name, pairs, file_sha256(built / "pairs.parquet"), counts, fetch_manifest
+        )
+        manifests.write(built / "manifest.json", pairs_manifest)
     print(
         f"  {len(pairs):,} pairs from {counts['items']:,} items; "
         f"{counts['items_not_open']:,} items not open, "
-        f"{counts['duplicates_removed']:,} duplicate pairs removed -> {written}"
+        f"{counts['duplicates_removed']:,} duplicate pairs removed -> {destination}"
     )
     return pairs
 
@@ -296,19 +302,17 @@ def prepare(names, inputs):
     Args:
         names (list[str]): Sources to prepare, from READERS.
         inputs (Path): The inputs folder that the sources were fetched into.
-            The pairs go to its ``pairs/`` folder.
+            Each source's pairs go to its ``pairs/<source>/`` folder.
 
     Returns:
         int: 0 if every source was prepared, 1 otherwise.
     """
-    root = Path(inputs) / "pairs"
-    root.mkdir(parents=True, exist_ok=True)
     status = 0
     seen, shared = set(), {}
     for name in [name for name in READERS if name in names]:
         print(f"{name}:")
         try:
-            pairs = prepare_one(name, inputs, root)
+            pairs = prepare_one(name, inputs)
         except Exception as error:
             print(
                 f"  {name} not prepared: {type(error).__name__}: {error}",

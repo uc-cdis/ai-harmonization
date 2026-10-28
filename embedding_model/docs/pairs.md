@@ -49,8 +49,10 @@ pair and a `name_description` pair.
 ## What a pair holds
 
 `pairs prepare` writes each source's pairs to
-`embedding_model/inputs/pairs/<source>.parquet`. When `--inputs` names
-another folder, they go to `pairs/` in that folder. One row is one pair:
+`embedding_model/inputs/pairs/<source>/pairs.parquet`. When `--inputs` names
+another folder, they go to `pairs/<source>/` in that folder. The folder is
+written whole; see [Inputs and outputs](../README.md#inputs-and-outputs). One
+row is one pair:
 
 | column | what it holds |
 |---|---|
@@ -70,9 +72,9 @@ another folder, they go to `pairs/` in that folder. One row is one pair:
 Each side's fields are kept beside its text, so a later step can compare
 fields rather than formatted texts.
 
-`pairs prepare` also writes a manifest for each source,
-`<source>_manifest.json`, beside its pairs in the same folder. It has the
-fields that [manifests.md](manifests.md#its-fields) lists:
+`pairs prepare` also writes a manifest for each source, `manifest.json`,
+beside its pairs in the same folder. It has the fields that
+[manifests.md](manifests.md#its-fields) lists:
 
 - `files`: the pairs' row count, their file's `sha256` and their table's
   `csv_sha256`;

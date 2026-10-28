@@ -32,10 +32,10 @@ from embedding_model.pairs import (
     phenx,
 )
 from embedding_model import manifests
-from embedding_model.download import file_sha256
 from embedding_model.folders import staged
+from embedding_model.manifests import file_sha256, table_sha256
 from embedding_model.normalization import normalised
-from embedding_model.sources import read_source, table_sha256
+from embedding_model.sources import read_source
 
 # The sources, in order. When a corpus combines them, a pair found in two
 # sources is kept in the first. CDISC is published as NCIt subsets, so NCIt

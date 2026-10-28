@@ -19,7 +19,8 @@ import pandas as pd
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
-from embedding_model.download import cached, fetch, sha256
+from embedding_model.download import cached, fetch
+from embedding_model.manifests import sha256
 
 # The manifest source that pins the ground truth, by its Zenodo record.
 GROUND_TRUTH = "GDC-SM ground truth"

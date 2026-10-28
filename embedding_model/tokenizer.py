@@ -36,8 +36,8 @@ from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 
 from embedding_model import manifests
 from embedding_model.corpus import TRAIN, read_corpus
-from embedding_model.download import file_sha256
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
+from embedding_model.manifests import file_sha256
 from embedding_model.normalization import TOKENIZER_NORMALIZER, normalised
 
 # The special tokens of every tokenizer here, in id order. A static model uses

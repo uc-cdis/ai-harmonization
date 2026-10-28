@@ -18,8 +18,9 @@ import re
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from embedding_model.download import downloaded, keep, modified, sha256
+from embedding_model.download import downloaded, keep, modified
 from embedding_model.sources.common import open_where
+from embedding_model.manifests import sha256
 
 VARIABLE_LIST = (
     "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component={component}"

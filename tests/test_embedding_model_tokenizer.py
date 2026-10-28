@@ -9,7 +9,7 @@ from tokenizers import Tokenizer
 
 from embedding_model import corpus, tokenizer
 from embedding_model.__main__ import main
-from embedding_model.download import file_sha256, sha256
+from embedding_model.manifests import file_sha256, sha256
 from embedding_model.pairs import pairs_sha256
 from embedding_model.pairs.common import COLUMNS
 

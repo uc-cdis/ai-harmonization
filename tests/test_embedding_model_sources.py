@@ -12,7 +12,7 @@ import pytest
 import requests
 from defusedxml import DefusedXmlException
 
-from embedding_model import download, sources
+from embedding_model import download, manifests, sources
 from embedding_model.__main__ import main
 from embedding_model.sources import (
     cadsr,
@@ -1142,10 +1142,10 @@ class TestWriteAndRead:
             directory, "abcd", "1", {"items": TABLE}, [], {"items": 3}
         )
         assert manifest["counts"] == {"items": 3}
-        assert manifest["files"]["items.parquet"]["csv_sha256"] == sources.table_sha256(
-            TABLE
-        )
-        assert manifest["files"]["items.parquet"]["sha256"] == download.file_sha256(
+        assert manifest["files"]["items.parquet"][
+            "csv_sha256"
+        ] == manifests.table_sha256(TABLE)
+        assert manifest["files"]["items.parquet"]["sha256"] == manifests.file_sha256(
             directory / "items.parquet"
         )
         tables, read = sources.read_source(tmp_path, "abcd")
@@ -1154,9 +1154,9 @@ class TestWriteAndRead:
 
     def test_a_table_checksum_does_not_depend_on_the_system(self, monkeypatch):
         """A table's checksum is the same where lines end with \\r\\n, as on Windows."""
-        before = sources.table_sha256(TABLE)
+        before = manifests.table_sha256(TABLE)
         monkeypatch.setattr("os.linesep", "\r\n")
-        assert sources.table_sha256(TABLE) == before
+        assert manifests.table_sha256(TABLE) == before
 
     def test_a_checksum_written_in_chunks_is_that_of_the_whole_text(self):
         """The streamed SHA-256 is that of the whole CSV text, dates and accents too."""
@@ -1172,7 +1172,7 @@ class TestWriteAndRead:
         )
         table = pd.DataFrame({"when": when, "name": ["Abcd", "Éfgh"] * 60_000})
         text = table.to_csv(index=False, lineterminator="\n").encode("utf-8")
-        assert sources.table_sha256(table) == hashlib.sha256(text).hexdigest()
+        assert manifests.table_sha256(table) == hashlib.sha256(text).hexdigest()
 
     def test_a_changed_table_is_refused(self, tmp_path):
         """A table whose content changed since its fetch is refused."""

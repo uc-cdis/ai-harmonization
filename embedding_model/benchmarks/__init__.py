@@ -27,7 +27,7 @@ import pandas as pd
 
 from embedding_model import manifests
 from embedding_model.benchmarks import gdc, topmed
-from embedding_model.download import sha256
+from embedding_model.manifests import sha256
 
 MAPPING_COLUMNS = [
     "source_study_id",

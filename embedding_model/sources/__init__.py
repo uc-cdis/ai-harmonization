@@ -15,7 +15,6 @@ next step, ``pairs prepare``, decides which of them become training pairs. Each
 item carries an ``open`` column, set from its source's restriction field.
 """
 
-import hashlib
 import json
 import sys
 from datetime import date
@@ -24,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 from embedding_model import manifests
-from embedding_model.download import file_sha256
+from embedding_model.manifests import file_sha256, table_sha256
 from embedding_model.sources import cadsr, cde, cdisc, loinc, ncit, nhanes, obo, phenx
 
 MANIFESTS = Path(__file__).resolve().parent / "manifests"
@@ -38,51 +37,6 @@ FETCHERS = {
     "nhanes": nhanes,
     "phenx": phenx,
 }
-
-
-class Digest:
-    """A file-like object that adds the text written to it to a SHA-256.
-
-    pandas streams a CSV only into a file-like object, and a hashlib hash is not
-    one: it takes bytes through ``update``, not text through ``write``. With
-    this object, ``table_sha256`` hashes a table as pandas writes it, piece by
-    piece. So a table of millions of rows, such as a corpus's pairs, is hashed
-    without its whole CSV text in memory.
-    """
-
-    def __init__(self):
-        """Start an empty SHA-256."""
-        self.hash = hashlib.sha256()
-
-    def write(self, text):
-        """Add text to the hash, as UTF-8, and give back its length."""
-        self.hash.update(text.encode("utf-8"))
-        return len(text)
-
-    def __iter__(self):
-        """Nothing to read: pandas takes only an iterable as a file."""
-        return iter(())
-
-
-def table_sha256(frame):
-    """The SHA-256 of a table's content, written as CSV without its index.
-
-    The content is hashed rather than the parquet file, whose bytes depend on
-    the library that wrote it. Lines end with ``\\n`` on every system, so the
-    checksum is the same on Windows. pandas writes the CSV to the hash piece by
-    piece, through ``Digest``, so the whole text is never held in memory. pandas
-    uses the same pieces for a whole text, so the checksum is that of the whole
-    text.
-
-    Args:
-        frame (pd.DataFrame): The table.
-
-    Returns:
-        str: The SHA-256, as hex.
-    """
-    digest = Digest()
-    frame.to_csv(digest, index=False, lineterminator="\n")
-    return digest.hash.hexdigest()
 
 
 def write_source(directory, name, version, tables, sources, counts):

@@ -1,7 +1,6 @@
 """Downloads from public data providers, with a local copy kept."""
 
 import functools
-import hashlib
 from datetime import date
 from pathlib import Path
 
@@ -31,22 +30,6 @@ RETRIES = Retry(
 # as an HTML page, under one of HTML_SUFFIXES.
 HTML_START = (b"<!doctype html", b"<html")
 HTML_SUFFIXES = (".html", ".htm")
-
-
-def sha256(data):
-    """The SHA-256 of some bytes, as hex."""
-    return hashlib.sha256(data).hexdigest()
-
-
-def file_digest(path, algorithm):
-    """A file's checksum by one of hashlib's algorithms, as hex, read in chunks."""
-    with open(path, "rb") as stream:
-        return hashlib.file_digest(stream, algorithm).hexdigest()
-
-
-def file_sha256(path):
-    """The SHA-256 of a file, as hex, read in chunks rather than whole."""
-    return file_digest(path, "sha256")
 
 
 def modified(path):

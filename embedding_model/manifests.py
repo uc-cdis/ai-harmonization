@@ -7,13 +7,117 @@ A new build writes its own manifest, and the two are compared. A build that
 matches is kept. A build that differs is kept only when accepted as a new
 version. A version committed in git never changes.
 ``embedding_model/docs/manifests.md`` describes the fields and the rules.
+
+The module also computes the checksums that a manifest records:
+
+- a file's ``sha256``, by ``file_sha256`` for a file on disk, or by ``sha256``
+  for bytes in memory. Both give the same value for the same bytes;
+- a table's ``csv_sha256``, by ``table_sha256``, from the table's content.
 """
 
+import hashlib
 import json
 import subprocess
 import sys
 
 from embedding_model.folders import staged
+
+
+def sha256(data):
+    """The SHA-256 of bytes that are in memory already, as hex.
+
+    It gives the same value as ``file_sha256`` of a file with these bytes. Use
+    it when the code holds the bytes anyway, such as a download just received.
+    For a file on disk, use ``file_sha256``, which never holds the file whole.
+
+    Args:
+        data (bytes): The bytes.
+
+    Returns:
+        str: The SHA-256, as hex.
+    """
+    return hashlib.sha256(data).hexdigest()
+
+
+def file_digest(path, algorithm):
+    """A file's checksum by one of hashlib's algorithms, as hex, read in chunks.
+
+    The file is read piece by piece, so even a large file is never in memory
+    whole. ``file_sha256`` uses it for SHA-256. LOINC's fetch uses it for MD5,
+    the checksum that LOINC publishes for each release.
+
+    Args:
+        path (Path): The file.
+        algorithm (str): A hashlib algorithm, such as ``sha256`` or ``md5``.
+
+    Returns:
+        str: The checksum, as hex.
+    """
+    with open(path, "rb") as stream:
+        return hashlib.file_digest(stream, algorithm).hexdigest()
+
+
+def file_sha256(path):
+    """The SHA-256 of a file's bytes, as hex, read in chunks.
+
+    It gives the same value as ``sha256`` of the file's bytes, but it never
+    holds the whole file in memory. So it suits a large file, such as a
+    release zip or a corpus's pairs. A manifest records it as a file's
+    ``sha256``.
+
+    Args:
+        path (Path): The file.
+
+    Returns:
+        str: The SHA-256, as hex.
+    """
+    return file_digest(path, "sha256")
+
+
+class Digest:
+    """A file-like object that adds the text written to it to a SHA-256.
+
+    pandas streams a CSV only into a file-like object, and a hashlib hash is not
+    one: it takes bytes through ``update``, not text through ``write``. With
+    this object, ``table_sha256`` hashes a table as pandas writes it, piece by
+    piece. So a table of millions of rows, such as a corpus's pairs, is hashed
+    without its whole CSV text in memory.
+    """
+
+    def __init__(self):
+        """Start an empty SHA-256."""
+        self.hash = hashlib.sha256()
+
+    def write(self, text):
+        """Add text to the hash, as UTF-8, and give back its length."""
+        self.hash.update(text.encode("utf-8"))
+        return len(text)
+
+    def __iter__(self):
+        """Nothing to read: pandas takes only an iterable as a file."""
+        return iter(())
+
+
+def table_sha256(frame):
+    """The SHA-256 of a table's content, written as CSV without its index.
+
+    A manifest records it as a table's ``csv_sha256``. The content is hashed
+    rather than the parquet file, whose bytes depend on the library that wrote
+    it. Lines end with ``\\n`` on every system, so the
+    checksum is the same on Windows. pandas writes the CSV to the hash piece by
+    piece, through ``Digest``, so the whole text is never held in memory. pandas
+    uses the same pieces for a whole text, so the checksum is that of the whole
+    text.
+
+    Args:
+        frame (pd.DataFrame): The table.
+
+    Returns:
+        str: The SHA-256, as hex.
+    """
+    digest = Digest()
+    frame.to_csv(digest, index=False, lineterminator="\n")
+    return digest.hash.hexdigest()
 
 
 def file_identity(file_entry):

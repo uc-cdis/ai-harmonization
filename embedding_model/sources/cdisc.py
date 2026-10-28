@@ -13,8 +13,8 @@ from urllib.parse import quote
 
 import pandas as pd
 
-from embedding_model.download import cached, sha256
-from embedding_model.manifests import pinned
+from embedding_model.download import cached
+from embedding_model.manifests import pinned, sha256
 
 ARCHIVE = "https://evs.nci.nih.gov/ftp1/CDISC/{folder}/Archive/{file}"
 # Each package's folder and its file's name, before the release date.

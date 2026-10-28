@@ -18,8 +18,8 @@ import zipfile
 
 import pandas as pd
 
-from embedding_model.download import downloaded, fetch, file_digest, file_sha256
-from embedding_model.manifests import pinned
+from embedding_model.download import downloaded, fetch
+from embedding_model.manifests import file_digest, file_sha256, pinned
 
 RELEASE = "LOINC release"
 METADATA = "https://loinc.regenstrief.org/api/v1/Loinc?version={version}"

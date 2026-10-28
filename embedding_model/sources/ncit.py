@@ -12,8 +12,8 @@ import zipfile
 
 import pandas as pd
 
-from embedding_model.download import downloaded, fetch, file_sha256, keep, modified
-from embedding_model.manifests import pinned
+from embedding_model.download import downloaded, fetch, keep, modified
+from embedding_model.manifests import file_sha256, pinned
 from embedding_model.sources.owl import DEFINED_PARENT, RDFS, grouped, read_owl
 
 RELEASE = "NCIt OWL release"

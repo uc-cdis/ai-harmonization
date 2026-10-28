@@ -28,9 +28,9 @@ from pathlib import Path
 import pandas as pd
 
 from embedding_model import benchmarks, leakage, manifests
-from embedding_model.download import file_sha256
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
+from embedding_model.manifests import file_sha256
 from embedding_model.pairs.common import COLUMNS, distinct_pairs
 
 # The share of items held out for validation, and the hash buckets it is cut in.

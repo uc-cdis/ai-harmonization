@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 from ai_harmonization.formatters import MAX_VALUES_IN_PROMPT, VALUE_SEPARATOR
-from embedding_model import benchmarks, download
+from embedding_model import benchmarks, manifests
 from embedding_model.__main__ import main
 from embedding_model.benchmarks import gdc, topmed
 
@@ -580,7 +580,7 @@ class TestGdcPapers:
             "role": "source text",
             "name": "Abcd, supplementary table",
             "location": "https://example.org/abcd.xlsx",
-            "sha256": download.sha256(b"abcd"),
+            "sha256": manifests.sha256(b"abcd"),
             "license": "CC-BY-4.0",
             "citation": "https://doi.org/10.9999/abcd",
         }
@@ -711,7 +711,7 @@ class TestWriteBenchmark:
         with open(tmp_path / "abcd_mappings.csv", newline="") as handle:
             assert next(csv.reader(handle)) == benchmarks.MAPPING_COLUMNS
         assert manifest["files"]["abcd_mappings.csv"]["rows"] == 1
-        assert manifest["files"]["abcd_targets.csv"]["sha256"] == download.sha256(
+        assert manifest["files"]["abcd_targets.csv"]["sha256"] == manifests.sha256(
             (tmp_path / "abcd_targets.csv").read_bytes()
         )
         assert manifest["counts"] == {"source_variables": 1}
@@ -821,7 +821,7 @@ class TestReadBenchmark:
         path = tmp_path / "benchmarks" / "abcd" / "abcd_targets.csv"
         path.write_text("target_property,target_type\nabcd.efgh,string\n")
         record = {**written}
-        record["files"]["abcd_targets.csv"]["sha256"] = download.sha256(
+        record["files"]["abcd_targets.csv"]["sha256"] = manifests.sha256(
             path.read_bytes()
         )
         (tmp_path / "benchmarks" / "abcd" / "manifest.json").write_text(

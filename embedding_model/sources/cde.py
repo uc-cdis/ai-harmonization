@@ -12,8 +12,9 @@ import json
 
 import pandas as pd
 
-from embedding_model.download import downloaded, fetch, file_sha256, modified
+from embedding_model.download import downloaded, fetch, modified
 from embedding_model.sources.common import open_where
+from embedding_model.manifests import file_sha256
 
 EXPORT = "NIH CDE Repository export"
 SEARCH = "https://cde.nlm.nih.gov/server/de/search"

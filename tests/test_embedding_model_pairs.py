@@ -6,7 +6,7 @@ import pandas as pd
 
 from embedding_model import pairs, sources
 from embedding_model.__main__ import main
-from embedding_model.download import file_sha256
+from embedding_model.manifests import file_sha256
 from embedding_model.pairs import (
     cadsr,
     cde,

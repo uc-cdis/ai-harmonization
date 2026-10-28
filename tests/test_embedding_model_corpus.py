@@ -8,7 +8,7 @@ import pytest
 
 from embedding_model import benchmarks, corpus, leakage
 from embedding_model.__main__ import main
-from embedding_model.download import file_sha256
+from embedding_model.manifests import file_sha256
 from embedding_model.pairs import common, pairs_sha256
 from embedding_model.pairs import manifest as pairs_manifest
 

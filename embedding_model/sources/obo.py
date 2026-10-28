@@ -17,7 +17,7 @@ import re
 import pandas as pd
 
 from embedding_model.download import downloaded, file_sha256, modified
-from embedding_model.sources.common import pinned
+from embedding_model.manifests import pinned
 from embedding_model.sources.owl import OWL, RDFS, grouped, iri_of, read_owl
 
 PURL = "http://purl.obolibrary.org/obo"

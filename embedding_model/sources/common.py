@@ -1,24 +1,8 @@
-"""What the source readers share: a pin from the manifest, and a restriction field."""
+"""What the source readers share: a field's new values, and whether an item is open.
 
-
-def pinned(manifest, name):
-    """One of a source's inputs, as the committed manifest pins it.
-
-    Args:
-        manifest (dict): The source's committed manifest.
-        name (str): The input's name in the manifest's ``sources``.
-
-    Returns:
-        dict: The manifest's entry for the input: its version, SHA-256 or
-            both.
-
-    Raises:
-        KeyError: If the manifest has no input of that name.
-    """
-    for source in manifest.get("sources", []):
-        if source.get("name") == name:
-            return source
-    raise KeyError(f"the manifest has no source named {name!r}")
+``report_new`` prints the values of a field that a reader does not know yet.
+``open_where`` says which items a restriction field allows to be used.
+"""
 
 
 def report_new(values, known, field, outcome):

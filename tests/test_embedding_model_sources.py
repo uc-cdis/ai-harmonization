@@ -1117,11 +1117,6 @@ class TestPhenx:
 class TestCommon:
     """The helpers every source uses."""
 
-    def test_pinned_names_a_missing_input(self):
-        """A manifest without the named input raises, naming it."""
-        with pytest.raises(KeyError, match="Abcd release"):
-            common.pinned({"sources": []}, "Abcd release")
-
     def test_a_new_value_is_closed_and_reported(self, capsys):
         """A value in neither list is not open, and is printed with its count."""
         found = common.open_where(

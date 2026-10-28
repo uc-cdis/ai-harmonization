@@ -92,6 +92,20 @@ class TestDifferences:
         assert manifests.differences(committed, built) == []
 
 
+class TestPinned:
+    """An input as a committed manifest pins it."""
+
+    def test_the_named_input(self):
+        """The input of that name is returned, with its version."""
+        manifest = {"sources": [PIN, {"name": "Abcd release", "version": "2"}]}
+        assert manifests.pinned(manifest, "Abcd release")["version"] == "2"
+
+    def test_a_missing_input_is_named(self):
+        """A manifest without the named input raises, naming it."""
+        with pytest.raises(KeyError, match="Abcd release"):
+            manifests.pinned({"sources": []}, "Abcd release")
+
+
 class TestRead:
     """Reading a manifest that a step wrote, with the command that writes it again."""
 

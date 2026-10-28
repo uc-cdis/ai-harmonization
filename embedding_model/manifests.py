@@ -137,6 +137,26 @@ def committed_version(folder, name):
     return json.loads(shown.stdout)["version"]
 
 
+def pinned(manifest, name):
+    """One of a build's inputs, as its committed manifest pins it.
+
+    Args:
+        manifest (dict): The committed manifest of a benchmark or a source.
+        name (str): The input's name in the manifest's ``sources``.
+
+    Returns:
+        dict: The manifest's entry for the input: its version, SHA-256 or
+            both.
+
+    Raises:
+        KeyError: If the manifest has no input of that name.
+    """
+    for source in manifest.get("sources", []):
+        if source.get("name") == name:
+            return source
+    raise KeyError(f"the manifest has no source named {name!r}")
+
+
 def write(path, manifest):
     """Write a manifest as JSON, in the one format that every manifest has.
 

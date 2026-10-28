@@ -14,7 +14,8 @@ import zipfile
 import pandas as pd
 
 from embedding_model.download import downloaded, file_sha256, modified
-from embedding_model.sources.common import open_where, pinned
+from embedding_model.manifests import pinned
+from embedding_model.sources.common import open_where
 
 EXPORT = "PhenX database export"
 EXPORT_URL = "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip"

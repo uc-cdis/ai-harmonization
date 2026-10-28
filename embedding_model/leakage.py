@@ -54,7 +54,7 @@ from collections import defaultdict
 import pandas as pd
 
 from embedding_model.benchmarks import TARGET_SEPARATOR
-from embedding_model.pairs.common import clean, key
+from embedding_model.pairs.common import STUDY_SEPARATOR, clean, key
 
 # The words that the shorter of two texts needs, for one containing the other
 # to count as a match.
@@ -159,16 +159,6 @@ def benchmark_texts(name, targets, mappings):
         .reset_index(names="row")[["row", "source_variable_name", "target"]]
         .rename(columns={"source_variable_name": "variable"})
     )
-    missing = sorted(set(expected.target) - set(targets.target_property))
-    if missing:
-        raise ValueError(
-            f"{name}'s expected targets are not among its targets: {missing}"
-        )
-    repeated = sorted(
-        targets.target_property[targets.target_property.duplicated()].unique()
-    )
-    if repeated:
-        raise ValueError(f"{name}'s targets list a property twice: {repeated}")
     target_texts = expected.merge(every_target, on="target")
     return (
         source_texts[source_texts.key != ""].assign(benchmark=name),
@@ -363,7 +353,7 @@ def study_matches(pairs, studies):
         pd.DataFrame: ``pair``, ``benchmark`` and ``study_id``, the study that
             the pair and the benchmark share, one row per pair and benchmark.
     """
-    named = pairs.study[pairs.study != ""].str.split("|").explode()
+    named = pairs.study[pairs.study != ""].str.split(STUDY_SEPARATOR).explode()
     matched = (
         pd.DataFrame({"pair": named.index, "study_id": named.to_numpy()})
         .merge(studies, on="study_id")

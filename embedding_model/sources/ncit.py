@@ -13,7 +13,7 @@ import zipfile
 import pandas as pd
 
 from embedding_model.download import downloaded, fetch, file_sha256, keep, modified
-from embedding_model.sources.common import pinned
+from embedding_model.manifests import pinned
 from embedding_model.sources.owl import DEFINED_PARENT, RDFS, grouped, read_owl
 
 RELEASE = "NCIt OWL release"
@@ -45,7 +45,7 @@ DEFINITION_SOURCE = "P378"
 CONCEPT_STATUS = "P310"
 SEMANTIC_TYPE = "P106"
 IN_SUBSET = "A8"
-RETIRED = {"Retired_Concept", "Obsolete_Concept"}
+RETIRED_STATUSES = {"Retired_Concept", "Obsolete_Concept"}
 
 
 def tag(code):
@@ -240,7 +240,7 @@ def fetch_source(downloads, manifest):
     concepts = tables["concepts"]
     retired = concepts[
         concepts.status.str.split("|").map(
-            lambda statuses: bool(RETIRED & set(statuses))
+            lambda statuses: bool(RETIRED_STATUSES & set(statuses))
         )
     ].code.tolist()
     kept = downloads / f"replacements_{version}.json"

@@ -18,6 +18,7 @@ import pandas as pd
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
+from embedding_model import manifests
 from embedding_model.download import cached, fetch, sha256
 
 # The manifest source that pins the ground truth, by its Zenodo record.
@@ -366,11 +367,7 @@ def build(downloads, manifest):
             mappings, the manifest's sources, and the counts that the build
             prints.
     """
-    ground_truth = next(
-        (s for s in manifest["sources"] if s["name"] == GROUND_TRUTH), None
-    )
-    if ground_truth is None:
-        raise KeyError(f"the manifest has no source named {GROUND_TRUTH!r}")
+    ground_truth = manifests.pinned(manifest, GROUND_TRUTH)
     record = ground_truth["version"]
     archive = cached(
         ZENODO_FILE.format(record=record, name="gdc-sm-data.zip"),

@@ -37,6 +37,9 @@ NAME = "name"
 NAME_DESCRIPTION = "name_description"
 DESCRIPTION_DESCRIPTION = "description_description"
 NAME_TO_DESCRIPTION = "name_to_description"
+# What joins a pair's dbGaP studies in its study column, as in
+# "phs999901|phs999902".
+STUDY_SEPARATOR = "|"
 # The columns of a source's pairs, in order. docs/pairs.md describes each one.
 COLUMNS = [
     "anchor",
@@ -501,7 +504,7 @@ def replacements(item, by_id):
 def joined_studies(studies):
     """Several study texts joined into one, each study once.
 
-    A study text holds dbGaP studies joined by ``|``. The result holds every
+    A study text holds dbGaP studies joined by STUDY_SEPARATOR. The result holds every
     study of the texts given, once each and sorted. Empty parts are dropped.
     For example, ``["phs999902|phs999901", "", "phs999901"]`` gives
     ``"phs999901|phs999902"``.
@@ -510,10 +513,10 @@ def joined_studies(studies):
         studies (Iterable[str]): Study texts.
 
     Returns:
-        str: The studies, joined by ``|``.
+        str: The studies, joined by STUDY_SEPARATOR.
     """
-    found = {part for study in studies for part in study.split("|")}
-    return "|".join(sorted(found - {""}))
+    found = {part for study in studies for part in study.split(STUDY_SEPARATOR)}
+    return STUDY_SEPARATOR.join(sorted(found - {""}))
 
 
 def distinct(texts, canonical):

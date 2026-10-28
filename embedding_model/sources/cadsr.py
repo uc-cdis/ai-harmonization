@@ -14,7 +14,8 @@ import pandas as pd
 from defusedxml.ElementTree import iterparse
 
 from embedding_model.download import downloaded, file_sha256
-from embedding_model.sources.common import pinned, report_new
+from embedding_model.manifests import pinned
+from embedding_model.sources.common import report_new
 
 SNAPSHOT = "caDSR released data elements"
 ARCHIVE = (

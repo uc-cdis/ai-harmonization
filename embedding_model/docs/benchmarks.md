@@ -47,6 +47,14 @@ with two files and the manifest of its build:
 every value that a variable or property has. The formatters cap how many values
 a prompt shows.
 
+A build checks the two files against each other before it writes them:
+
+- `<benchmark>_targets.csv` lists each property once, in one row;
+- each expected target in `<benchmark>_mappings.csv` is a property of
+  `<benchmark>_targets.csv`.
+
+A benchmark that fails either check is not written.
+
 **If you load the files in your own code:** one GDC target's values run to
 132,058 characters. That is over the 131,072 that Python's `csv` module reads
 by default. `pandas.read_csv` reads the files as they are. `csv` needs

@@ -55,9 +55,6 @@ def benchmark_texts(targets, mappings, text_format):
           key;
         - expected: each source variable's expected ``node.property`` keys, by
           its row number.
-
-    Raises:
-        ValueError: If an expected target is not among the benchmark's targets.
     """
     formatter = FORMATS[text_format]
     target_texts = {}
@@ -71,7 +68,7 @@ def benchmark_texts(targets, mappings, text_format):
             row.target_description,
             split_values(row.target_values),
         )
-    source_texts, expected, unknown = {}, {}, []
+    source_texts, expected = {}, {}
     for number, row in enumerate(mappings.itertuples()):
         source_texts[str(number)] = property_text(
             formatter,
@@ -82,12 +79,6 @@ def benchmark_texts(targets, mappings, text_format):
             split_values(row.source_values),
         )
         expected[str(number)] = set(row.expected_target.split(TARGET_SEPARATOR))
-        unknown += sorted(expected[str(number)] - target_texts.keys())
-    if unknown:
-        raise ValueError(
-            f"{len(unknown)} expected targets are not in the benchmark's targets: "
-            + ", ".join(unknown[:5])
-        )
     return source_texts, target_texts, expected
 
 

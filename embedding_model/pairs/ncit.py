@@ -23,6 +23,7 @@ from collections import defaultdict
 
 from embedding_model.pairs.common import CURRENT, DRAFT, RETIRED, Item, Text, clean
 from embedding_model.sources.common import report_new
+from embedding_model.sources.ncit import RETIRED_STATUSES
 
 # Synonyms (SY), preferred terms (PT), antiquated terms (AQ, AQS), display
 # names (DN), abbreviations (AB), brand names (BR, FB) and country codes (CA2,
@@ -44,7 +45,6 @@ SAME_MEANING = {
 # Grammar forms (AD), headers (HD), chemical structures (SN) and drug study
 # codes (CN).
 NOT_SAME_MEANING = {"AD", "HD", "SN", "CN"}
-RETIRED_STATUSES = {"Retired_Concept", "Obsolete_Concept"}
 DRAFT_STATUSES = {"Provisional_Concept", "Concept_Pending_Approval"}
 CURRENT_STATUSES = {"", "Header_Concept"}
 # A source at the end of a definition, as in "(NCI)" or "(NCI04)".

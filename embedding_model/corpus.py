@@ -313,14 +313,10 @@ def build(name, sources, inputs):
     del frames, pairs
     print(f"  {len(copy_sources):,} pairs already in an earlier source, kept once")
 
-    try:
-        findings, shared_vocabulary = leakage.audit(
-            distinct,
-            {benchmark: tables[:2] for benchmark, tables in benchmark_builds.items()},
-        )
-    except ValueError as error:
-        print(f"leakage prevention cannot run: {error}", file=sys.stderr)
-        return 1
+    findings, shared_vocabulary = leakage.audit(
+        distinct,
+        {benchmark: tables[:2] for benchmark, tables in benchmark_builds.items()},
+    )
     detail = findings.drop(columns="pair").rename(
         columns={
             column: f"benchmark_{column}"

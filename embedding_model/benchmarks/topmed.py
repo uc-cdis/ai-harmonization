@@ -25,6 +25,7 @@ import tarfile
 
 from ai_harmonization.dbgap import map_dbgap_type, parse_dbgap_table
 from ai_harmonization.formatters import VALUE_SEPARATOR
+from embedding_model import manifests
 from embedding_model.download import cached, downloaded
 
 # The manifest source that pins the documentation, by its commit.
@@ -313,11 +314,7 @@ def build(downloads, manifest):
             mappings, the manifest's sources, and the counts that the build
             prints.
     """
-    documentation = next(
-        (s for s in manifest["sources"] if s["name"] == DOCUMENTATION), None
-    )
-    if documentation is None:
-        raise KeyError(f"the manifest has no source named {DOCUMENTATION!r}")
+    documentation = manifests.pinned(manifest, DOCUMENTATION)
     repository = documentation["location"].removeprefix("https://github.com/")
     commit = documentation["version"]
     archive = cached(

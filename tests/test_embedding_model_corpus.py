@@ -210,18 +210,6 @@ class TestLeakage:
         assert "abcd efgh score" in set(sources.key)
         assert "abcd index" in set(expected.key)
 
-    def test_an_expected_target_missing_from_the_targets_is_an_error(self):
-        """A mapping to a target that the targets file lacks cannot be checked."""
-        mappings = MAPPINGS.assign(expected_target=["node9.wxyz", "node4.ijkl_other"])
-        with pytest.raises(ValueError, match="node9.wxyz"):
-            leakage.benchmark_texts("abcd", TARGETS, mappings)
-
-    def test_a_target_listed_twice_is_an_error(self):
-        """A targets file that lists one property twice cannot be checked."""
-        targets = pd.concat([TARGETS, TARGETS.iloc[:1]], ignore_index=True)
-        with pytest.raises(ValueError, match="node1.abcd_index"):
-            leakage.benchmark_texts("abcd", targets, MAPPINGS)
-
     def test_keys_are_those_of_pairs(self):
         """A key is what pairs.common.key writes: accents go, Greek letters stay."""
         texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", None])
@@ -431,28 +419,6 @@ class TestBuild:
         )
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "the manifest of source 'cdisc'" in capsys.readouterr().err
-
-    def test_a_benchmark_that_cannot_be_checked_stops_the_build(self, inputs, capsys):
-        """A benchmark whose expected target is not among its targets stops the build."""
-        targets = TARGETS[TARGETS.target_property == "node1.abcd_index"]
-        mappings = [
-            {**row, "expected_target": row["expected_target"].split(";")}
-            for row in MAPPINGS.to_dict("records")
-        ]
-        benchmarks.write_benchmark(
-            inputs / "benchmarks" / "abcd",
-            "abcd",
-            "1",
-            targets.to_dict("records"),
-            mappings,
-            [],
-            {},
-        )
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
-        error = capsys.readouterr().err
-        assert "leakage prevention cannot run" in error
-        assert "node2.efgh_value" in error
-        assert not (inputs / "corpora" / "abcd").exists()
 
     def test_sources_without_pairs_build_no_corpus(self, inputs, capsys):
         """Sources that hold no pairs are reported, and no corpus is written."""

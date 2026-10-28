@@ -109,17 +109,6 @@ def inputs(tmp_path):
     return built(tmp_path, MAPPINGS)
 
 
-class TestBenchmarkTexts:
-    def test_an_expected_target_not_in_the_targets_is_an_error(self, tmp_path):
-        """An expected target that the benchmark's targets do not have stops scoring."""
-        unknown = [mapping("AGE01", "Age", ["demographic.age", "z.missing"])]
-        targets, mappings, _ = benchmarks.read_benchmark(
-            built(tmp_path, unknown), "topmed"
-        )
-        with pytest.raises(ValueError, match="z.missing"):
-            scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
-
-
 class TestRankTargets:
     def test_ranks_and_metrics(self, model, inputs):
         """A source variable's rank is the rank of its best placed expected target.

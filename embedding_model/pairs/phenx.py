@@ -14,7 +14,7 @@ related do not mean the same thing, so they are not used.
 import re
 from collections import defaultdict
 
-from embedding_model.pairs.common import Item, Text, clean, is_name
+from embedding_model.pairs.common import Item, Text, clean, is_name, joined_studies
 
 COMPARABLE = "comparable"
 # A code in a value list: a number or a range, as in "9 = Refused", "None = 0"
@@ -106,7 +106,7 @@ def study_texts(mappings):
             found.add(row.gap_study_accession)
     return {
         variable: [
-            Text(text, term_type, study="|".join(sorted(found)))
+            Text(text, term_type, study=joined_studies(found))
             for (text, term_type), found in texts.items()
         ]
         for variable, texts in studies.items()

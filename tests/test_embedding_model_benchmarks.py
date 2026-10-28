@@ -685,6 +685,14 @@ def mapping(name, targets):
 
 
 TARGET = dict.fromkeys(benchmarks.TARGET_COLUMNS, "")
+
+
+def targets_of(mappings):
+    """One target row for each expected target of the mappings, so they agree."""
+    keys = sorted({key for row in mappings for key in row["expected_target"]})
+    return [{**TARGET, "target_property": key} for key in keys]
+
+
 PIN = {"role": "mappings", "name": "Fictional source", "version": "1"}
 
 
@@ -695,7 +703,7 @@ class TestWriteBenchmark:
             tmp_path,
             "abcd",
             "1",
-            [TARGET],
+            targets_of([mapping("AGE", ["a.age"])]),
             [mapping("AGE", ["a.age"])],
             [PIN],
             {"source_variables": 1},
@@ -708,6 +716,30 @@ class TestWriteBenchmark:
         )
         assert manifest["counts"] == {"source_variables": 1}
         assert json.loads((tmp_path / "manifest.json").read_text()) == manifest
+
+    def test_a_target_listed_twice_is_refused(self, tmp_path):
+        """A targets file that lists one property twice is not written."""
+        targets = targets_of([mapping("AGE", ["a.age"])]) * 2
+        with pytest.raises(ValueError, match="list a property twice: \\['a.age'\\]"):
+            benchmarks.write_benchmark(
+                tmp_path, "abcd", "1", targets, [mapping("AGE", ["a.age"])], [PIN], {}
+            )
+        assert list(tmp_path.iterdir()) == []
+
+    def test_an_expected_target_not_among_the_targets_is_refused(self, tmp_path):
+        """A mapping to a target that the targets lack is not written."""
+        mappings = [mapping("AGE", ["a.age", "z.missing"])]
+        with pytest.raises(ValueError, match="z.missing"):
+            benchmarks.write_benchmark(
+                tmp_path,
+                "abcd",
+                "1",
+                targets_of([mapping("AGE", ["a.age"])]),
+                mappings,
+                [PIN],
+                {},
+            )
+        assert list(tmp_path.iterdir()) == []
 
     def test_a_string_expected_target_is_refused(self, tmp_path):
         """An expected_target given as a string, not a list, is a TypeError."""
@@ -725,7 +757,7 @@ class TestReadBenchmark:
         folder.mkdir(parents=True)
         mappings = [mapping("RACE", ["b.race", "a.race"])]
         return benchmarks.write_benchmark(
-            folder, "abcd", "1", [TARGET], mappings, [PIN], {}
+            folder, "abcd", "1", targets_of(mappings), mappings, [PIN], {}
         )
 
     def test_an_unbuilt_benchmark_names_the_build_command(self, tmp_path):
@@ -736,7 +768,7 @@ class TestReadBenchmark:
     def test_reads_what_was_written(self, written, tmp_path):
         """The files read back as strings, with several expected targets sorted and joined by ;."""
         targets, mappings, manifest = benchmarks.read_benchmark(tmp_path, "abcd")
-        assert len(targets) == 1
+        assert len(targets) == 2
         assert mappings.loc[0, "expected_target"] == "a.race;b.race"
         assert mappings.loc[0, "source_values"] == ""
         assert manifest == written
@@ -808,7 +840,7 @@ class TestBuild:
             topmed,
             "build",
             lambda downloads, manifest: (
-                [TARGET],
+                targets_of(built["mappings"]),
                 built["mappings"],
                 manifest["sources"],
                 {},

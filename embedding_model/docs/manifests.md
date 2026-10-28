@@ -38,16 +38,10 @@ Every manifest has these fields. A field that does not apply is left out:
   kind of build that it is;
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
-- `files`: each file's row count, and its `sha256`. A table kept as parquet
-  has `csv_sha256`: the SHA-256 of the table written as CSV (see
-  [sources.md](sources.md#what-a-fetch-writes)). A parquet file's bytes
-  depend on the library that wrote it, so the two checksums have two uses:
-  - `csv_sha256` shows whether two builds hold the same table, on any
-    machine. A source's tables have only `csv_sha256`, since their committed
-    manifests compare builds;
-  - `sha256` shows quickly that a file is unchanged since its step wrote it.
-    A source's pairs and a corpus's tables have both checksums, and a step
-    that reads them back checks `sha256`;
+- `files`: each file's row count, and its `sha256`, the SHA-256 of the
+  file's bytes. A table kept as parquet also has `csv_sha256`, the SHA-256 of
+  the table written as CSV. [Two checksums](#two-checksums) says what each
+  one is for;
 - `sources`: what the build was made from, one entry each, with
   - `role`: what the input is for, such as `mappings` or `release`;
   - `name` and `location`: a URL, DOI or record;
@@ -62,11 +56,27 @@ Every manifest has these fields. A field that does not apply is left out:
   a source's items not open, the pairs by kind, or a corpus's dropped pairs.
   Counts are never compared, so a build with other counts still matches.
 
+## Two checksums
+
+A checksum answers one of two questions:
+
+- **Do two builds hold the same data?** A new build is compared with its
+  committed manifest, on any machine and with any library version. A table
+  kept as parquet is compared by its row count and its `csv_sha256`. The
+  bytes of a parquet file depend on the library that wrote it, so its
+  `sha256` is recorded but not compared. Any other file is compared by its
+  row count and its `sha256`.
+- **Is a file unchanged since its step wrote it?** The step that reads the
+  file checks its `sha256`.
+  [How a step checks its inputs](#how-a-step-checks-its-inputs) lists the
+  checks.
+
 ## How a build is checked
 
 A new build compares its manifest with the committed one:
 
-- A file is the same when its row count and SHA-256 match.
+- A file is the same when its row count and its checksum match, as the first
+  question above says.
 - An input is the same when its SHA-256 matches, or its version where it has
   no checksum.
 - Dates, counts, licenses and citations are not compared.
@@ -86,7 +96,7 @@ that:
 
 - the manifest and the files exist, and the manifest can be read;
 - the manifest names the input asked for, such as the source `ncit`;
-- each file has the checksum that the manifest records;
+- each file has the `sha256` that the manifest records;
 - the pairs, a corpus's pairs and a benchmark's files have the columns that
   their step writes.
 

@@ -55,9 +55,9 @@ Each source has a manifest committed as
 source is read from. Each fetch writes its own manifest beside the tables, as
 `sources/<source>/manifest.json`, with the date in `fetched`. Its `counts`
 hold what the fetch prints, such as the items read and how many are not open.
-A table's checksum, `csv_sha256`, is the SHA-256 of its content written as
-CSV, not of the parquet file. A parquet file's bytes change with the version of the library
-that writes it, even when the data are the same.
+Each table has two checksums: `sha256`, of its file, and `csv_sha256`, of
+its content written as CSV. [Two checksums](manifests.md#two-checksums) says
+what each one is for.
 
 An input's `role` is `release` for a file pinned by its version, or `service`
 for an address that serves only its current state. [Manifests](manifests.md)

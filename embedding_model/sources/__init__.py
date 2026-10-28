@@ -25,6 +25,7 @@ from pathlib import Path
 import pandas as pd
 
 from embedding_model import manifests
+from embedding_model.download import file_sha256
 from embedding_model.sources import cadsr, cde, cdisc, loinc, ncit, nhanes, obo, phenx
 
 MANIFESTS = Path(__file__).resolve().parent / "manifests"
@@ -104,7 +105,11 @@ def write_source(directory, name, version, tables, sources, counts):
     for table, frame in tables.items():
         path = directory / f"{table}.parquet"
         frame.to_parquet(path, index=False)
-        files[path.name] = {"rows": len(frame), "csv_sha256": table_sha256(frame)}
+        files[path.name] = {
+            "rows": len(frame),
+            "sha256": file_sha256(path),
+            "csv_sha256": table_sha256(frame),
+        }
     manifest = {
         "source": name,
         "version": version,
@@ -122,9 +127,9 @@ def write_source(directory, name, version, tables, sources, counts):
 def read_source(inputs, name):
     """A fetched source's tables and the manifest of its fetch.
 
-    Each table must have the content SHA-256 that its manifest records. A
-    warning is printed when the fetch's version is not the version committed
-    under ``manifests/``.
+    Each table's file must have the ``sha256`` that its manifest records, so
+    it is unchanged since its fetch wrote it. A warning is printed when the
+    fetch's version is not the version committed under ``manifests/``.
 
     Args:
         inputs (Path): The inputs folder that the source was fetched into.
@@ -146,9 +151,7 @@ def read_source(inputs, name):
     manifest = manifests.read(manifest_path, command, "source", name)
     try:
         version = manifest["version"]
-        checksums = {
-            file: entry["csv_sha256"] for file, entry in manifest["files"].items()
-        }
+        checksums = {file: entry["sha256"] for file, entry in manifest["files"].items()}
     except Exception as error:
         raise ValueError(
             f"{manifest_path} does not record the fetch's version and tables"
@@ -162,6 +165,8 @@ def read_source(inputs, name):
         path = directory / file
         if not path.exists():
             raise FileNotFoundError(f"{path} is missing; run: {command}")
+        if file_sha256(path) != checksum:
+            raise ValueError(f"{path} differs from its manifest; run: {command}")
         try:
             frame = pd.read_parquet(path)
         except Exception as error:
@@ -169,8 +174,6 @@ def read_source(inputs, name):
                 f"{path} cannot be read ({type(error).__name__}: {error});"
                 f" run: {command}"
             ) from error
-        if table_sha256(frame) != checksum:
-            raise ValueError(f"{path} differs from its manifest; run: {command}")
         tables[file.removesuffix(".parquet")] = frame
     return tables, manifest
 

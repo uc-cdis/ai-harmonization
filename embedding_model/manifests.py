@@ -16,11 +16,29 @@ import sys
 from pathlib import Path
 
 
+def file_identity(file_entry):
+    """What a file is compared by, from its entry in a manifest's ``files``.
+
+    A parquet table has ``csv_sha256``, the SHA-256 of its content, and is
+    compared by it and its rows. Its file's bytes depend on the library that
+    wrote it, so the same table can have another ``sha256`` on another machine.
+    Any other file is compared by its rows and its ``sha256``.
+
+    Args:
+        file_entry (dict): The file's entry in ``files``.
+
+    Returns:
+        dict: Its rows, and the one checksum that it is compared by.
+    """
+    key = "csv_sha256" if "csv_sha256" in file_entry else "sha256"
+    return {"rows": file_entry.get("rows"), key: file_entry.get(key)}
+
+
 def identities(manifest):
     """What a build is compared by: its files, then its sources.
 
-    A file is identified by its rows and SHA-256, and a source by its SHA-256,
-    or by its version where it has none.
+    A file is identified as ``file_identity`` says, and a source by its
+    SHA-256, or by its version where it has none.
 
     Args:
         manifest (dict): A manifest.
@@ -29,7 +47,10 @@ def identities(manifest):
         dict: One entry per file, by name, and per source, by role and name.
     """
     return {
-        **manifest["files"],
+        **{
+            file: file_identity(file_entry)
+            for file, file_entry in manifest["files"].items()
+        },
         **{
             f"{source['role']} {source['name']!r}": source.get("sha256")
             or source.get("version")

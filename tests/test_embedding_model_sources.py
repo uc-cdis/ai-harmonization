@@ -1090,6 +1090,9 @@ class TestWriteAndRead:
         assert manifest["files"]["items.parquet"]["csv_sha256"] == sources.table_sha256(
             TABLE
         )
+        assert manifest["files"]["items.parquet"]["sha256"] == download.file_sha256(
+            directory / "items.parquet"
+        )
         tables, read = sources.read_source(tmp_path, "abcd")
         pd.testing.assert_frame_equal(tables["items"], TABLE)
         assert read == manifest
@@ -1123,6 +1126,15 @@ class TestWriteAndRead:
         sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
         TABLE.head(1).to_parquet(directory / "items.parquet", index=False)
         with pytest.raises(ValueError, match="items.parquet"):
+            sources.read_source(tmp_path, "abcd")
+
+    def test_a_rewritten_table_file_is_refused(self, tmp_path):
+        """A table written again, with the same content but other bytes, is refused."""
+        directory = tmp_path / "sources" / "abcd"
+        directory.mkdir(parents=True)
+        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        TABLE.to_parquet(directory / "items.parquet", index=False, compression="gzip")
+        with pytest.raises(ValueError, match="items.parquet differs from its manifest"):
             sources.read_source(tmp_path, "abcd")
 
     def test_another_version_than_committed_is_a_warning(

@@ -231,7 +231,11 @@ def fetch_source(downloads, manifest):
         downloaded(DOWNLOAD.format(version=version), path, auth=auth, check=check)
     md5 = file_digest(path, "md5")
     if pin.get("md5") and md5 != pin["md5"]:
-        raise ValueError(f"{path} has MD5 {md5}, and the manifest pins {pin['md5']}")
+        raise ValueError(
+            f"{path} has MD5 {md5}, but the manifest pins {pin['md5']}. Delete"
+            " it to download the pinned release again. To use this release,"
+            " follow 'Newer releases' in embedding_model/docs/sources.md#loinc"
+        )
     tables = read_release(path)
     codes = tables["codes"]
     counts = {"codes": len(codes), "not_open": int((~codes.open).sum())}

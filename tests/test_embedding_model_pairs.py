@@ -1168,13 +1168,14 @@ def fetched_nhanes(inputs, name="nhanes"):
 class TestPrepare:
     """``pairs prepare``: each source's file, its manifest, and combining sources."""
 
-    def test_prepare_writes_the_pairs_and_their_manifest(self, tmp_path):
+    def test_prepare_writes_the_pairs_and_their_manifest(self, tmp_path, capsys):
         """The pairs are written with a manifest of their fetch, checksum and counts."""
         fetched_nhanes(tmp_path)
         assert (
             main(["pairs", "prepare", "--inputs", str(tmp_path), "--source", "nhanes"])
             == 0
         )
+        assert f"-> {tmp_path / 'pairs' / 'nhanes.parquet'}" in capsys.readouterr().out
         found = pd.read_parquet(tmp_path / "pairs" / "nhanes.parquet")
         assert found.anchor.tolist() == ["ABCDXYZ (string)", "Abcd score (string)"]
         assert set(found.source) == {"nhanes"}

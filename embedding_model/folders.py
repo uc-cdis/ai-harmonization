@@ -13,6 +13,10 @@ from pathlib import Path
 # A name becomes a folder's name, so it holds only these characters. It never
 # starts with a dot, which ``staged`` and ``replace`` rely on.
 FOLDER_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# FOLDER_NAME in words, for the messages that refuse a name.
+FOLDER_NAME_RULE = (
+    "letters, digits, '.', '_' and '-', starting with a letter or a digit"
+)
 
 
 def replace(built, destination, staging):

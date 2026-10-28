@@ -31,7 +31,7 @@ import pandas as pd
 from embedding_model import benchmarks, leakage
 from embedding_model.download import file_sha256
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
-from embedding_model.folders import FOLDER_NAME, staged
+from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.pairs.common import COLUMNS, distinct_pairs
 
 # The share of items held out for validation, and the hash buckets it is cut in.
@@ -61,7 +61,7 @@ def read_corpus(inputs, name):
             lack a column or differ from the manifest.
     """
     if not FOLDER_NAME.fullmatch(name):
-        raise ValueError(f"{name!r} is not a corpus name")
+        raise ValueError(f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}")
     folder = Path(inputs) / "corpora" / name
     return read_pairs_file(
         folder / "pairs.parquet",
@@ -262,7 +262,7 @@ def build(name, sources, inputs):
     """
     if not FOLDER_NAME.fullmatch(name):
         print(
-            f"{name!r} is not a corpus name: use letters, digits, '.', '_', '-'",
+            f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}",
             file=sys.stderr,
         )
         return 1

@@ -229,8 +229,13 @@ def fetch_source(downloads, manifest):
     url = ARCHIVE.format(version=version)
     path = downloaded(url, downloads / f"Thesaurus_{version}.OWL.zip")
     with zipfile.ZipFile(path) as bundle:
-        member = next(n for n in bundle.namelist() if n.lower().endswith(".owl"))
-        with bundle.open(member) as stream:
+        members = [n for n in bundle.namelist() if n.lower().endswith(".owl")]
+        if not members:
+            raise ValueError(
+                f"{path} holds no .owl file; delete it, then run:"
+                " python -m embedding_model sources fetch --source ncit"
+            )
+        with bundle.open(members[0]) as stream:
             tables = read_ncit(stream)
     concepts = tables["concepts"]
     retired = concepts[

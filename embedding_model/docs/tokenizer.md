@@ -121,8 +121,8 @@ The default is 16,000 tokens. A small corpus, such as the README's example,
 uses 8,000. To choose between sizes, train a model on each and compare their
 scores on a benchmark.
 
-A small corpus can give fewer tokens than asked for, so the manifest records
-the size that was reached.
+A small corpus can give fewer tokens than asked for. `tokenizer train` then
+prints a note, and the manifest records the size that was reached.
 
 ## Special tokens
 

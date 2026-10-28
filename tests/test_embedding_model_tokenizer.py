@@ -220,14 +220,23 @@ class TestTrain:
         """A vocabulary of no more than the special tokens, or a frequency of 0."""
         assert tokenizer.train("abcd", None, 5, 2, inputs) == 1
         assert tokenizer.train("abcd", None, 100, 0, inputs) == 1
-        assert "the vocabulary size must be above 5" in capsys.readouterr().err
+        error = capsys.readouterr().err
+        assert "--vocab-size must be above 5" in error
+        assert "--min-frequency must be at least 1" in error
+
+    def test_fewer_tokens_than_asked_for_are_noted(self, inputs, capsys):
+        """A small corpus that cannot fill the vocabulary says so."""
+        assert tokenizer.train("abcd", None, 10_000, 2, inputs) == 0
+        assert "fewer than the 10,000 asked for" in capsys.readouterr().out
 
     def test_a_name_that_is_not_a_folder_name_is_refused(self, inputs, capsys):
         """A tokenizer's and a corpus's names must be plain folder names."""
         assert tokenizer.train("abcd", "../abcd", 100, 2, inputs) == 1
         assert "not a tokenizer name" in capsys.readouterr().err
         assert tokenizer.train("../abcd", None, 100, 2, inputs) == 1
-        assert "'../abcd' is not a corpus name" in capsys.readouterr().err
+        assert "'../abcd' is not a corpus name: use letters, digits" in (
+            capsys.readouterr().err
+        )
         assert tokenizer.train("abcd", "", 100, 2, inputs) == 1
         assert "'' is not a tokenizer name" in capsys.readouterr().err
 

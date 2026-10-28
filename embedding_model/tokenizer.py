@@ -37,7 +37,7 @@ from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 
 from embedding_model.corpus import TRAIN, read_corpus
 from embedding_model.download import file_sha256
-from embedding_model.folders import FOLDER_NAME, staged
+from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.normalization import TOKENIZER_NORMALIZER, normalised
 
 # The special tokens of every tokenizer here, in id order. A static model uses
@@ -248,20 +248,26 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
             plain Exception when it cannot write.
     """
     if not FOLDER_NAME.fullmatch(corpus):
-        print(f"{corpus!r} is not a corpus name", file=sys.stderr)
-        return 1
-    if vocab_size <= len(SPECIAL_TOKENS) or min_frequency < 1:
         print(
-            f"the vocabulary size must be above {len(SPECIAL_TOKENS)}, and the"
-            " minimum frequency at least 1",
+            f"{corpus!r} is not a corpus name: use {FOLDER_NAME_RULE}",
             file=sys.stderr,
         )
+        return 1
+    if vocab_size <= len(SPECIAL_TOKENS):
+        print(
+            f"--vocab-size must be above {len(SPECIAL_TOKENS)}, the number of"
+            " special tokens",
+            file=sys.stderr,
+        )
+        return 1
+    if min_frequency < 1:
+        print("--min-frequency must be at least 1", file=sys.stderr)
         return 1
     if name is None:
         name = default_name(corpus, vocab_size)
     if not FOLDER_NAME.fullmatch(name):
         print(
-            f"{name!r} is not a tokenizer name: use letters, digits, '.', '_', '-'",
+            f"{name!r} is not a tokenizer name: use {FOLDER_NAME_RULE}",
             file=sys.stderr,
         )
         return 1
@@ -275,7 +281,11 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
     # memory while the tokenizer trains.
     del pairs
     if not texts:
-        print(f"corpus {corpus!r} has no training pairs", file=sys.stderr)
+        print(
+            f"corpus {corpus!r} has no training pairs, so no tokenizer can be"
+            " trained on it",
+            file=sys.stderr,
+        )
         return 1
     print(f"  corpus {corpus}: {len(texts):,} distinct training texts")
     tokenizer = learn(texts, vocab_size, min_frequency)
@@ -295,6 +305,12 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
         )
         (built / "manifest.json").write_text(
             json.dumps(written, indent=2) + "\n", encoding="utf-8"
+        )
+    if tokenizer.get_vocab_size() < vocab_size:
+        print(
+            f"  note: {tokenizer.get_vocab_size():,} tokens, fewer than the"
+            f" {vocab_size:,} asked for: too few merges occur at least"
+            f" {min_frequency} times in the training texts"
         )
     print(
         f"  {tokenizer.get_vocab_size():,} tokens -> {destination}\n"

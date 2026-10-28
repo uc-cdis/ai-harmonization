@@ -283,7 +283,7 @@ def prepare_one(name, inputs, root):
     print(
         f"  {len(pairs):,} pairs from {counts['items']:,} items; "
         f"{counts['items_not_open']:,} items not open, "
-        f"{counts['duplicates_removed']:,} duplicate pairs removed"
+        f"{counts['duplicates_removed']:,} duplicate pairs removed -> {written}"
     )
     return pairs
 

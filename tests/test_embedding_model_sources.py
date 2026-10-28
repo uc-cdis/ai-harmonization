@@ -231,6 +231,14 @@ class TestNcit:
             == "Retired_Concept"
         )
 
+    def test_a_kept_zip_without_its_owl_file_names_the_fix(self, tmp_path):
+        """A kept release zip that holds no .owl file is named, with what to do."""
+        with zipfile.ZipFile(tmp_path / "Thesaurus_99.01d.OWL.zip", "w") as bundle:
+            bundle.writestr("readme.txt", "abcd")
+        manifest = {"sources": [{"name": ncit.RELEASE, "version": "99.01d"}]}
+        with pytest.raises(ValueError, match="holds no .owl file; delete it"):
+            ncit.fetch_source(tmp_path, manifest)
+
     def test_replacements_are_asked_once_and_kept(self, monkeypatch, tmp_path):
         """The replacements service is asked in batches, and its answers are read back later."""
         entry = {
@@ -473,7 +481,7 @@ class TestLoinc:
         manifest = {
             "sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": "abcd"}]
         }
-        with pytest.raises(ValueError, match="MD5"):
+        with pytest.raises(ValueError, match="pins abcd. Delete it to download"):
             loinc.fetch_source(tmp_path, manifest)
 
     def test_a_download_with_another_md5_is_not_kept(self, monkeypatch, tmp_path):
@@ -1042,7 +1050,7 @@ class TestPhenx:
             phenx, "downloaded", served({phenx.EXPORT_URL: b"not a zip"})
         )
         manifest = {"sources": [{"name": phenx.EXPORT}]}
-        with pytest.raises(ValueError, match="not a zip"):
+        with pytest.raises(ValueError, match="cannot be read as a zip"):
             phenx.fetch_source(tmp_path, manifest)
         assert list(tmp_path.iterdir()) == []
 
@@ -1050,8 +1058,11 @@ class TestPhenx:
         """An export of a release that the manifest does not pin is refused."""
         (tmp_path / "Phenx_DB.zip").write_bytes(phenx_zip())
         manifest = {"sources": [{"name": phenx.EXPORT, "version": "Ver 8.0"}]}
-        with pytest.raises(ValueError, match="Ver 9.1"):
+        with pytest.raises(
+            ValueError, match="is PhenX Ver 9.1, but the manifest pins Ver 8.0"
+        ) as raised:
             phenx.fetch_source(tmp_path, manifest)
+        assert "follow 'Newer releases'" in str(raised.value)
 
 
 class TestCommon:

@@ -237,8 +237,11 @@ def check_export(data):
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as bundle:
             names = bundle.namelist()
-    except zipfile.BadZipFile as error:
-        raise ValueError("the PhenX export is not a zip; nothing was kept") from error
+    except Exception as error:
+        raise ValueError(
+            f"the PhenX export cannot be read as a zip ({type(error).__name__}:"
+            f" {error}); nothing was kept"
+        ) from error
     if DUMP not in names:
         raise ValueError(f"the PhenX export holds no {DUMP}; nothing was kept")
 
@@ -267,7 +270,9 @@ def fetch_source(downloads, manifest):
     release = tables["release"].name.iloc[0]
     if pin.get("version") and release != pin["version"]:
         raise ValueError(
-            f"{path.name} is PhenX {release}, and the manifest pins {pin['version']}"
+            f"{path.name} is PhenX {release}, but the manifest pins"
+            f" {pin['version']}. To use {release}, follow 'Newer releases' in"
+            " embedding_model/docs/sources.md#phenx"
         )
     found = tables["variables"]
     counts = {"variables": len(found), "not_open": int((~found.open).sum())}

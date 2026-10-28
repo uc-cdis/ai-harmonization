@@ -135,37 +135,42 @@ def read_source(inputs, name):
             fetch's manifest.
 
     Raises:
-        FileNotFoundError: If the source has not been fetched there.
-        ValueError: If a table differs from its manifest, or the manifest
-            cannot be read.
+        FileNotFoundError: If the source, or one of its tables, has not been
+            fetched there.
+        ValueError: If the manifest cannot be read or names another source,
+            or a table cannot be read or differs from its manifest.
     """
     directory = Path(inputs) / "sources" / name
     manifest_path = directory / "manifest.json"
-    command = f"`python -m embedding_model sources fetch --source {name}`"
-    if not manifest_path.exists():
-        raise FileNotFoundError(
-            f"{manifest_path} is missing: fetch it first with {command}"
-        )
+    command = f"python -m embedding_model sources fetch --source {name}"
+    manifest = manifests.read(manifest_path, command, "source", name)
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except ValueError as error:
+        version = manifest["version"]
+        checksums = {
+            file: entry["csv_sha256"] for file, entry in manifest["files"].items()
+        }
+    except Exception as error:
         raise ValueError(
-            f"{manifest_path} cannot be read ({error}): fetch again with {command}"
+            f"{manifest_path} does not record the fetch's version and tables"
+            f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
     manifests.warn_if_not_committed(
-        f"{name} in {directory}",
-        manifest["version"],
-        MANIFESTS / f"{name}.json",
-        command,
+        f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
     )
     tables = {}
-    for file, entry in manifest["files"].items():
-        frame = pd.read_parquet(directory / file)
-        if table_sha256(frame) != entry["csv_sha256"]:
+    for file, checksum in checksums.items():
+        path = directory / file
+        if not path.exists():
+            raise FileNotFoundError(f"{path} is missing; run: {command}")
+        try:
+            frame = pd.read_parquet(path)
+        except Exception as error:
             raise ValueError(
-                f"{manifest_path.name} records another SHA-256 for {file}: fetch "
-                f"again with {command}"
-            )
+                f"{path} cannot be read ({type(error).__name__}: {error});"
+                f" run: {command}"
+            ) from error
+        if table_sha256(frame) != checksum:
+            raise ValueError(f"{path} differs from its manifest; run: {command}")
         tables[file.removesuffix(".parquet")] = frame
     return tables, manifest
 

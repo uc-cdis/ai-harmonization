@@ -1146,6 +1146,38 @@ class TestWriteAndRead:
         with pytest.raises(FileNotFoundError, match="sources fetch --source abcd"):
             sources.read_source(tmp_path, "abcd")
 
+    def test_a_missing_table_names_the_command(self, tmp_path):
+        """A table that the manifest lists but that is gone is named, with the fetch."""
+        directory = tmp_path / "sources" / "abcd"
+        directory.mkdir(parents=True)
+        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        (directory / "items.parquet").unlink()
+        with pytest.raises(
+            FileNotFoundError, match="items.parquet is missing; run: .*--source abcd"
+        ):
+            sources.read_source(tmp_path, "abcd")
+
+    def test_another_sources_manifest_is_refused(self, tmp_path):
+        """A manifest that names another source is not read as this one's."""
+        directory = tmp_path / "sources" / "abcd"
+        directory.mkdir(parents=True)
+        written = sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        (directory / "manifest.json").write_text(
+            json.dumps({**written, "source": "efgh"})
+        )
+        with pytest.raises(ValueError, match="manifest of source 'efgh'"):
+            sources.read_source(tmp_path, "abcd")
+
+    def test_a_manifest_without_its_files_names_the_command(self, tmp_path):
+        """A manifest that records no files is an error with the fetch command."""
+        directory = tmp_path / "sources" / "abcd"
+        directory.mkdir(parents=True)
+        written = sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        del written["files"]
+        (directory / "manifest.json").write_text(json.dumps(written))
+        with pytest.raises(ValueError, match="KeyError.*run: .*--source abcd"):
+            sources.read_source(tmp_path, "abcd")
+
 
 def fictional_source():
     """A fictional source of one table, read from the manifest's own pins."""

@@ -116,6 +116,46 @@ def committed_version(folder, name):
     return json.loads(shown.stdout)["version"]
 
 
+def read(path, command, field, name):
+    """A manifest that a step wrote, checked to be the manifest of ``name``.
+
+    Each step reads its inputs' manifests with this, so every error names
+    the file and the command that writes it again.
+
+    Args:
+        path (Path): The manifest.
+        command (str): The command that writes the manifest again, for the
+            messages.
+        field (str): The field that names what was built, such as ``source``.
+        name (str): The name that the field must hold, such as ``ncit``.
+
+    Returns:
+        dict: The manifest.
+
+    Raises:
+        FileNotFoundError: If there is no manifest at ``path``.
+        ValueError: If it cannot be read, it is not a JSON object, or it is
+            the manifest of another build.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"{path} is missing; run: {command}")
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        raise ValueError(
+            f"{path} cannot be read ({type(error).__name__}: {error});"
+            f" run: {command}"
+        ) from error
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{path} is not a manifest; run: {command}")
+    if manifest.get(field) != name:
+        raise ValueError(
+            f"{path} is the manifest of {field} {manifest.get(field)!r};"
+            f" run: {command}"
+        )
+    return manifest
+
+
 def warn_if_not_committed(label, version, committed_path, command):
     """Print a warning when a build's version is not the committed version.
 
@@ -132,7 +172,7 @@ def warn_if_not_committed(label, version, committed_path, command):
     if committed != version:
         print(
             f"warning: {label} is version {version}, and the committed manifest "
-            f"is version {committed}. Run {command} for version {committed}.",
+            f"is version {committed}; for version {committed}, run: {command}",
             file=sys.stderr,
         )
 

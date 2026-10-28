@@ -759,7 +759,35 @@ class TestReadBenchmark:
         """A file whose SHA-256 differs from the manifest is named, with the rebuild command."""
         with open(tmp_path / "benchmarks" / "abcd_mappings.csv", "a") as handle:
             handle.write(",,,,,,,\n")
-        with pytest.raises(ValueError, match="abcd_mappings.csv: rebuild with"):
+        with pytest.raises(
+            ValueError, match="SHA-256 for abcd_mappings.csv; run: .*build --abcd"
+        ):
+            benchmarks.read_benchmark(tmp_path, "abcd")
+
+    def test_another_benchmarks_manifest_is_refused(self, written, tmp_path):
+        """A manifest that names another benchmark is not read as this one's."""
+        path = tmp_path / "benchmarks" / "abcd_manifest.json"
+        path.write_text(json.dumps({**written, "benchmark": "efgh"}))
+        with pytest.raises(ValueError, match="manifest of benchmark 'efgh'"):
+            benchmarks.read_benchmark(tmp_path, "abcd")
+
+    def test_a_manifest_without_its_files_names_the_rebuild(self, written, tmp_path):
+        """A manifest that records no files is an error with the build command."""
+        path = tmp_path / "benchmarks" / "abcd_manifest.json"
+        path.write_text(json.dumps({**written, "files": {}}))
+        with pytest.raises(ValueError, match="KeyError.*run: .*build --abcd"):
+            benchmarks.read_benchmark(tmp_path, "abcd")
+
+    def test_files_with_other_columns_are_refused(self, written, tmp_path):
+        """Files whose columns are not those of benchmarks build are not read."""
+        path = tmp_path / "benchmarks" / "abcd_targets.csv"
+        path.write_text("target_property,target_type\nabcd.efgh,string\n")
+        record = {**written}
+        record["files"]["abcd_targets.csv"]["sha256"] = download.sha256(
+            path.read_bytes()
+        )
+        (tmp_path / "benchmarks" / "abcd_manifest.json").write_text(json.dumps(record))
+        with pytest.raises(ValueError, match="do not have the columns"):
             benchmarks.read_benchmark(tmp_path, "abcd")
 
 

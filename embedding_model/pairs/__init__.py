@@ -30,6 +30,7 @@ from embedding_model.pairs import (
     obo,
     phenx,
 )
+from embedding_model import manifests
 from embedding_model.download import file_sha256
 from embedding_model.normalization import normalised
 from embedding_model.sources import read_source, table_sha256
@@ -163,7 +164,7 @@ def read_pairs_file(table, manifest, field, name, columns, command):
     3. the manifest names the build asked for;
     4. the file's ``sha256`` matches the manifest, so the file is unchanged
        since its step wrote it;
-    5. the pairs have the columns given.
+    5. the pairs can be read, and have the columns given.
 
     ``csv_sha256`` is not checked here: it compares the tables of two builds.
 
@@ -186,25 +187,25 @@ def read_pairs_file(table, manifest, field, name, columns, command):
             names another build, or the pairs lack a column or differ from the
             manifest.
     """
-    if not table.exists() or not manifest.exists():
+    if not table.exists():
         raise FileNotFoundError(f"{table} was not written; run: {command}")
+    record = manifests.read(manifest, command, field, name)
     try:
-        record = json.loads(manifest.read_text(encoding="utf-8"))
-        recorded = record[field]
         checksum = record["files"][table.name]["sha256"]
-        computed = file_sha256(table)
+    except Exception as error:
+        raise ValueError(
+            f"{manifest} records no SHA-256 for {table.name}"
+            f" ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    if file_sha256(table) != checksum:
+        raise ValueError(f"{table} differs from its manifest; run: {command}")
+    try:
         pairs = pd.read_parquet(table)
     except Exception as error:
         raise ValueError(
-            f"{table} or its manifest cannot be read"
-            f" ({type(error).__name__}: {error}); run: {command}"
+            f"{table} cannot be read ({type(error).__name__}: {error});"
+            f" run: {command}"
         ) from error
-    if recorded != name:
-        raise ValueError(
-            f"{manifest} is the manifest of {field} {recorded!r}; run: {command}"
-        )
-    if computed != checksum:
-        raise ValueError(f"{table} differs from its manifest; run: {command}")
     if list(pairs.columns) != columns:
         raise ValueError(
             f"{table} does not have the columns that its step writes; run: {command}"
@@ -250,14 +251,8 @@ def read_pairs(inputs, name):
         ) from error
     if not fetch.exists():
         return pairs, record
-    try:
-        files = json.loads(fetch.read_text(encoding="utf-8"))["files"]
-    except Exception as error:
-        raise ValueError(
-            f"{fetch} cannot be read ({error});"
-            f" run: python -m embedding_model sources fetch --source {name}"
-        ) from error
-    if files != fetched:
+    fetch_command = f"python -m embedding_model sources fetch --source {name}"
+    if manifests.read(fetch, fetch_command, "source", name).get("files") != fetched:
         raise ValueError(
             f"{name}'s pairs come from another fetch than {fetch.parent};"
             f" run: {command}"

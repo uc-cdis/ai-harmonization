@@ -65,6 +65,43 @@ class TestDifferences:
         assert "Fictional source" in found[1]
 
 
+class TestRead:
+    """Reading a manifest that a step wrote, with the command that writes it again."""
+
+    COMMAND = "python -m embedding_model abcd build"
+
+    def read(self, path):
+        """The manifest at ``path``, read as source abcd's."""
+        return manifests.read(path, self.COMMAND, "source", "abcd")
+
+    def test_a_manifest_reads_back(self, tmp_path):
+        """A JSON object that names its build reads back as it was written."""
+        path = tmp_path / "manifest.json"
+        path.write_text(json.dumps({"source": "abcd", "files": {}}))
+        assert self.read(path) == {"source": "abcd", "files": {}}
+
+    def test_a_missing_manifest_names_the_command(self, tmp_path):
+        """A manifest never written is named, with the command that writes it."""
+        with pytest.raises(FileNotFoundError, match=f"missing; run: {self.COMMAND}"):
+            self.read(tmp_path / "manifest.json")
+
+    @pytest.mark.parametrize("text", ["", "{", "[1, 2]"])
+    def test_a_manifest_that_is_not_a_json_object_is_refused(self, text, tmp_path):
+        """Text that is not JSON, or JSON that is not an object, is refused."""
+        path = tmp_path / "manifest.json"
+        path.write_text(text)
+        with pytest.raises(ValueError, match=f"manifest.json .*run: {self.COMMAND}"):
+            self.read(path)
+
+    @pytest.mark.parametrize("manifest", [{"source": "efgh"}, {"corpus": "abcd"}])
+    def test_another_builds_manifest_is_refused(self, manifest, tmp_path):
+        """A manifest of another source, or of another kind of build, is refused."""
+        path = tmp_path / "manifest.json"
+        path.write_text(json.dumps(manifest))
+        with pytest.raises(ValueError, match="is the manifest of source"):
+            self.read(path)
+
+
 class TestSettle:
     """Keeping or refusing a build against its committed manifest."""
 

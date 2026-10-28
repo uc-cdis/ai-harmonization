@@ -124,45 +124,46 @@ def read_benchmark(inputs, name):
 
     Raises:
         FileNotFoundError: If the benchmark has not been built there.
-        ValueError: If a file differs from its manifest, or the manifest
-            cannot be read.
+        ValueError: If the manifest cannot be read or names another
+            benchmark, a file differs from its manifest, or the files do not
+            have the columns that ``benchmarks build`` writes.
     """
     directory = Path(inputs) / "benchmarks"
     paths = [directory / f"{name}_{kind}.csv" for kind in ("targets", "mappings")]
     manifest_path = directory / f"{name}_manifest.json"
-    command = f"`python -m embedding_model benchmarks build --{name}`"
-    missing = [path for path in [*paths, manifest_path] if not path.exists()]
-    if missing:
-        raise FileNotFoundError(
-            f"{missing[0]} is missing: build the benchmark first with {command}"
-        )
+    command = f"python -m embedding_model benchmarks build --{name}"
+    for path in paths:
+        if not path.exists():
+            raise FileNotFoundError(f"{path} is missing; run: {command}")
+    manifest = manifests.read(manifest_path, command, "benchmark", name)
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except ValueError as error:
+        version = manifest["version"]
+        recorded = {path.name: manifest["files"][path.name]["sha256"] for path in paths}
+    except Exception as error:
         raise ValueError(
-            f"{manifest_path} cannot be read ({error}): rebuild with {command}"
+            f"{manifest_path} does not record the benchmark's version and files"
+            f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
     manifests.warn_if_not_committed(
-        f"{name} in {directory}",
-        manifest["version"],
-        MANIFESTS / f"{name}.json",
-        command,
+        f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
     )
     data = {path: path.read_bytes() for path in paths}
-    changed = [
-        path.name
-        for path in paths
-        if sha256(data[path]) != manifest["files"].get(path.name, {}).get("sha256")
-    ]
+    changed = [path.name for path in paths if sha256(data[path]) != recorded[path.name]]
     if changed:
         raise ValueError(
-            f"{manifest_path.name} records another SHA-256 for "
-            f"{', '.join(changed)}: rebuild with {command}"
+            f"{manifest_path.name} records another SHA-256 for"
+            f" {', '.join(changed)}; run: {command}"
         )
     targets, mappings = (
         pd.read_csv(io.BytesIO(data[path]), dtype=str, keep_default_na=False)
         for path in paths
     )
+    columns = (list(targets.columns), list(mappings.columns))
+    if columns != (TARGET_COLUMNS, MAPPING_COLUMNS):
+        raise ValueError(
+            f"{directory}'s {name} files do not have the columns that"
+            f" `benchmarks build` writes; run: {command}"
+        )
     return targets, mappings, manifest
 
 

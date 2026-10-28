@@ -443,9 +443,7 @@ class TestBuild:
         """A pairs manifest that names another source is not read as this one's."""
         manifests = inputs / "pairs"
         (manifests / "ncit_manifest.json").write_text(
-            (manifests / "cdisc_manifest.json")
-            .read_text()
-            .replace("cdisc.parquet", "ncit.parquet")
+            (manifests / "cdisc_manifest.json").read_text()
         )
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "the manifest of source 'cdisc'" in capsys.readouterr().err
@@ -477,7 +475,15 @@ class TestBuild:
         (inputs / "pairs" / "ncit_manifest.json").write_text("")
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
-        assert "ncit.parquet or its manifest cannot be read" in error
+        assert "ncit_manifest.json cannot be read" in error
+        assert "pairs prepare --source ncit" in error
+
+    def test_a_missing_pairs_manifest_is_named(self, inputs, capsys):
+        """Pairs without their manifest name the manifest, not the pairs."""
+        (inputs / "pairs" / "ncit_manifest.json").unlink()
+        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "ncit_manifest.json is missing" in error
         assert "pairs prepare --source ncit" in error
 
     def test_pairs_without_a_column_are_refused(self, inputs, capsys):
@@ -495,10 +501,10 @@ class TestBuild:
         """Pairs from the fetch in the inputs are read; pairs from another are not."""
         fetch = inputs / "sources" / "ncit" / "manifest.json"
         fetch.parent.mkdir(parents=True)
-        fetch.write_text(json.dumps({"files": {}}))
+        fetch.write_text(json.dumps({"source": "ncit", "files": {}}))
         assert corpus.build("abcd", ["ncit"], inputs) == 0
         files = {"abcd.parquet": {"rows": 1, "csv_sha256": "abcd"}}
-        fetch.write_text(json.dumps({"files": files}))
+        fetch.write_text(json.dumps({"source": "ncit", "files": files}))
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "come from another fetch" in capsys.readouterr().err
 

@@ -75,7 +75,24 @@ If everything matches, the build is what the manifest describes. Its files then
 replace the working ones. If not, the build lists each file and input that
 differs. It then stops, and keeps the working files as they were. That is
 expected when an input was updated on purpose. The build is then accepted as a
-new version, as the next section describes.
+new version, as [Making a new version](#making-a-new-version) describes.
+
+## How a step checks its inputs
+
+A step reads each of its inputs with that input's own manifest. For example,
+`corpus build` reads each source's pairs with the pairs' manifest, and each
+benchmark with the benchmark's manifest. For each input, the step checks
+that:
+
+- the manifest and the files exist, and the manifest can be read;
+- the manifest names the input asked for, such as the source `ncit`;
+- each file has the checksum that the manifest records;
+- the pairs, a corpus's pairs and a benchmark's files have the columns that
+  their step writes.
+
+If a check fails, the step stops. Its message names the file and the
+command that writes it again, such as `run: python -m embedding_model
+sources fetch --source ncit`.
 
 ## Making a new version
 

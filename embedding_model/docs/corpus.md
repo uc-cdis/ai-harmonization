@@ -83,8 +83,9 @@ then differs. The fields compared are:
 | a benchmark's source variable | its name and its description |
 | each of its expected targets | its property name, without the node, and its description |
 
-The benchmark texts are cleaned first, as `pairs prepare` cleans the pairs'
-texts. Two texts match when they are equal after three changes:
+The benchmark texts are cleaned first with `pairs.common.clean`, the
+cleaning that `pairs prepare` gives every text: markup is removed, and
+characters and spaces are normalised. Two texts match when they are equal after three changes:
 
 - the tokenizer's normalisation, which removes invisible characters,
   lowercases and removes accents;
@@ -123,10 +124,11 @@ counts the text as shared vocabulary.
 
 ## The split
 
-Validation holds 2% of the groups. A group is an item with all its pairs.
-NCIt and CDISC share NCIt's concept codes, so a concept's pairs from both
-sources form one group. All pairs of a group go to the same side, so no
-validation pair has a text that training saw from the same item.
+Validation holds about 2% of the groups. A group is an item with all its
+pairs. NCIt and CDISC share NCIt's concept codes, so a concept's pairs from
+both sources form one group. All pairs of a group go to the same side. A pair
+that two sources share is kept once, in the earlier source's item, so it goes
+to that item's side.
 
 A hash of the group decides its side, with no random draw and no seed. The
 hash puts each group into one of 1,000 buckets, and the groups in buckets 0 to

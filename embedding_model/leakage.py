@@ -13,10 +13,10 @@ differs. The fields compared are:
   variable and of each expected target. A target's name is its property name,
   without its node.
 
-The benchmark texts are cleaned first, as ``pairs prepare`` cleaned the pairs'
-texts. Two texts match when their keys are equal, as ``pairs.common.key``
-writes them: normalised as the tokenizer normalises them, case-folded, with
-punctuation as spaces. A side text also matches a benchmark description when
+The benchmark texts are cleaned first with ``pairs.common.clean``, the
+cleaning that ``pairs prepare`` gives every text. Two texts match when their
+keys are equal, as ``pairs.common.key`` writes them: normalised as the
+tokenizer normalises them, case-folded, with punctuation as spaces. A side text also matches a benchmark description when
 one contains the other, and the shorter has at least NEAR_DUPLICATE_WORDS
 words. A pair can hold a description in a name field, such as a
 ``name_to_description`` pair's positive, so every side text is compared,

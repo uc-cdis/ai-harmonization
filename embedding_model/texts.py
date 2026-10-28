@@ -20,8 +20,8 @@ from ai_harmonization.simple_data_model import Node, Property
 def stdelement(node, prop):
     """A property in the shape of StdElement-Mapper's NCIt training pairs.
 
-    The model card shows ``name: ... | description: ... | values: a; b``, with
-    no node and no type. This format scores the model in the shape of its
+    Its model card shows ``name: ... | description: ... | values: a; b``, with
+    no node and no type. The model is private, so its card needs access too. This format scores the model in the shape of its
     training pairs.
 
     It is not in ai_harmonization.formatters: the approaches read a target's
@@ -88,8 +88,9 @@ def property_text(formatter, node, name, type_, description, values):
     """The text of a target property or a source property/variable, by a formatter.
 
     A source variable is written without a node: its node would be its dbGaP
-    table or GDC paper, which says nothing about what it means. Its text then
-    starts at its name, without the formatters' leading dot.
+    table or the paper that it comes from, which says nothing about what it
+    means. Its text then starts at its name, without the formatters' leading
+    dot.
 
     Args:
         formatter (Callable[[Node, Property], str]): A value of FORMATS.

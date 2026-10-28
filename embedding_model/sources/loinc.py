@@ -113,8 +113,8 @@ def read_release(archive):
             ``forms`` have an ``open`` column.
 
     Raises:
-        KeyError: If the zip lacks one of the tables, or a table lacks one of
-            the columns.
+        KeyError: If the zip lacks one of the tables.
+        ValueError: If a table lacks one of the columns.
     """
     tables = {}
     with zipfile.ZipFile(archive) as bundle:

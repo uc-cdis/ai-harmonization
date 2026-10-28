@@ -6,9 +6,9 @@ display names (DN), abbreviations (AB), brand names (BR, FB) and country codes,
 such as ``USA`` (CA2, CA3, CS). Number codes (CNU) are not names, so they give
 no pairs.
 
-The description is the concept's first NCI definition. When there is none, it
-is the first definition from another source. The other definitions are paired
-with it. NCIt can end a definition with its source, such as "(NCI)", and this
+The description is the concept's first definition. A ``DEFINITION`` comes
+before an ``ALT_DEFINITION``, and NCI's definition before another source's.
+The other definitions are paired with it. NCIt can end a definition with its source, such as "(NCI)", and this
 source is removed.
 
 A concept with value lists gives its pairs once for each distinct list. NCIt

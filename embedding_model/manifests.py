@@ -43,8 +43,8 @@ def differences(committed, built):
 
     A source is identified by its SHA-256 where it has one, and otherwise by
     its version, so a file served under a new release label but with the
-    same content is the same source. Dates, citations and licenses are not
-    compared.
+    same content is the same source. Dates, counts, citations and licenses
+    are not compared.
 
     Args:
         committed (dict): The manifest under ``manifests/``.

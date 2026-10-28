@@ -31,7 +31,7 @@ It cuts a text into tokens in three steps:
 
 | step | what it does | example |
 |---|---|---|
-| 1. normalize | removes control and format characters, as BERT does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
+| 1. normalize | removes control, format and private-use characters, as BERT does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
 | 2. split | splits at whitespace and at every punctuation character, as BERT does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
 | 3. cut into tokens | cuts each piece into vocabulary tokens, by byte-pair encoding (BPE) | `heartrate` -> `heart`, `rate`, if `heartrate` is not a token itself |
 
@@ -49,10 +49,16 @@ training texts were. The section
 
 ### Step 1: normalize
 
-The tokenizer first removes control and format characters. They hold no
-text, and nobody can see them. For example, a description copied from a PDF
-can read `body\u200bweight`, where `\u200b` is a zero-width space. On the
-screen it looks like `bodyweight`.
+The tokenizer first removes control, format and private-use characters.
+They hold no text, and nobody can see them:
+
+- a control character, such as `\x92`, a byte left from a broken quote;
+- a format character, such as `\u200b`, a zero-width space;
+- a private-use character, such as `\ue000`, which a font can use for its
+  own icon.
+
+For example, a description copied from a PDF can read `body\u200bweight`.
+On the screen it looks like `bodyweight`.
 
 | text | tokens without this step | tokens with it |
 |---|---|---|
@@ -144,13 +150,23 @@ holds three words.
 
 | measure | what it says | a bad value |
 |---|---|---|
-| fertility | tokens per word | well above 2: many words are cut into pieces, so the vocabulary does not fit the texts |
+| fertility | tokens per word | high: many words are cut into pieces, so the vocabulary does not fit the texts |
 | words split | the share of words cut into two or more tokens | a large share, for the same reason |
 | unknown rate | the share of tokens that are `[UNK]` | above 0: the training texts have characters that the vocabulary lacks, which is a sign of a broken tokenizer |
-| vocabulary used | the share of the vocabulary's tokens that the training texts use | well below 1: many tokens never occur, so their vectors keep their random start |
+| vocabulary used | the share of the vocabulary's tokens, the special tokens left out, that the training texts use | well below 1: many tokens never occur, so their vectors keep their random start |
 
 The diagnostics show whether the tokenizer works. A broken tokenizer shows
-at once, for example as unknown tokens or a high fertility.
+at once, for example as unknown tokens or a high fertility. Fertility and the
+share of words split are the measures of Rust et al. (2021).
+
+**Reference:**
+
+> Rust, P., Pfeiffer, J., Vulić, I., Ruder, S., & Gurevych, I. (2021). How
+> Good is Your Tokenizer? On the Monolingual Performance of Multilingual
+> Language Models. *Proceedings of the 59th Annual Meeting of the Association
+> for Computational Linguistics and the 11th International Joint Conference on
+> Natural Language Processing (Volume 1: Long Papers)*, 3118–3135.
+> https://doi.org/10.18653/v1/2021.acl-long.243
 
 ## What a tokenizer holds
 

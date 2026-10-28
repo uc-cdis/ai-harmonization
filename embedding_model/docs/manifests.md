@@ -14,11 +14,12 @@ Each benchmark and each source has a manifest committed in git:
 - `embedding_model/sources/manifests/<source>.json`.
 
 It pins what the build is made from, such as a commit of a benchmark's
-documentation or a release of a source. It records the SHA-256 of each input
-that the build reads, such as a downloaded zip. It also records each file that
-the build makes, with its row count and SHA-256. The code reads its pins from
-this file. So the code says how to build, and the manifest says from which
-inputs.
+documentation or a release of a source. It records each input that the build
+reads, by its version, its SHA-256 or both. A version can be a commit or a
+release, and a SHA-256 is that of a downloaded file, such as a zip. It also
+records each file that the build makes, with its row count and SHA-256. The
+code reads its pins from this file. So the code says how to build, and the
+manifest says from which inputs.
 
 Each build also writes its own manifest beside the files that it makes.
 [benchmarks.md](benchmarks.md#the-manifest) and
@@ -31,8 +32,10 @@ builds' own manifests record their inputs.
 
 ## Its fields
 
-Every manifest has the same fields. A field that does not apply is left out:
+Every manifest has these fields. A field that does not apply is left out:
 
+- `benchmark`, `source`, `corpus` or `tokenizer`: the build's name, under the
+  kind of build that it is;
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
 - `files`: each file's row count, and its `sha256`. A table kept as parquet
@@ -57,6 +60,7 @@ Every manifest has the same fields. A field that does not apply is left out:
   validation share;
 - `counts`: what the build counted, such as a benchmark's source variables,
   a source's items not open, the pairs by kind, or a corpus's dropped pairs.
+  Counts are never compared, so a build with other counts still matches.
 
 ## How a build is checked
 

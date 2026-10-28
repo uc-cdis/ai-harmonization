@@ -100,7 +100,8 @@ Retired and obsolete concepts are kept, with their status. EVS's replacements
 service says what happened to each one, such as a merge, and which concept
 replaced it: that is the `replacements` table.
 
-Reading NCIt takes a few minutes and about 4 GB of memory.
+Reading NCIt takes a few minutes, and about 4 GB of memory for release
+26.09d.
 
 **Newer releases.** EVS publishes a new NCIt release each month. EVS's
 `NCI_Thesaurus/archive/` folder lists every release, such as `26.09d_Release`.
@@ -235,8 +236,8 @@ The export is one JSON file, with one record per element. An element's lists,
 such as its names and values, become tables of their own, linked to it by
 `tiny_id`.
 
-Its elements are current, Qualified or Standard, or retired. Their
-`registration_status` says which.
+An element's `registration_status` says whether it is current, such as
+`Qualified` or `Standard`, or `Retired`.
 
 | table | one row per | columns |
 |---|---|---|
@@ -343,8 +344,8 @@ A protocol that PhenX replaced by a newer one is hidden: its `visible` is
 
 **Newer releases.** The export's address serves only PhenX's latest release,
 and the export names it, such as `Ver 49.0`. The fetch keeps the export in
-`downloads/phenx/Phenx_DB.zip`. To use a newer release, delete that file, write
-the new release as the export's `version`. Then make a new version, as
+`downloads/phenx/Phenx_DB.zip`. To use a newer release, delete that file, and
+write the new release as the export's `version`. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. A fetch refuses
 an export of another release than the pin.
 

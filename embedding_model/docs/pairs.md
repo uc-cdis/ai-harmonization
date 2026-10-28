@@ -78,8 +78,11 @@ fields that [manifests.md](manifests.md#its-fields) lists:
   `csv_sha256`;
 - `sources`: the fetch that the pairs come from, with its version and its
   tables' checksums;
-- `counts`: the pairs by kind, term group and status, the items not open, the
-  duplicates removed, and the texts that point to several canonicals.
+- `counts`:
+  - the items, and the items not open;
+  - the pairs by kind, term group and status;
+  - the duplicates removed;
+  - the texts that point to several canonicals.
 
 ## The rules every source shares
 
@@ -107,7 +110,8 @@ lists the texts that it uses.
 
 An anchor must be a name: it has two letters in a row. So ids and bare
 numbers, such as `2223612v3.0:2178533v1.0` or `535`, are not anchors. A text
-that equals the canonical is skipped, ignoring case and punctuation. An item
+that equals the canonical is skipped, ignoring case, accents and
+punctuation. An item
 uses each of its texts once, even when its source lists a text twice.
 
 ### Expansions and paraphrases
@@ -161,7 +165,7 @@ written. It keeps the studies of every copy. For example:
 |---|---|---|
 | `BMI` -> `Body Mass Index (float)` | `bmi` -> `body mass index (float)` | yes: only the case differs |
 | `Treatment-naïve` -> `Treatment Naive Indicator (string)` | `treatment-naive` -> `Treatment Naive Indicator (string)` | yes: only an accent differs |
-| `body_weight` -> `Body Weight (float)` | `body weight` -> `Body Weight (float)` | no: the tokenizer keeps the `_` as a token |
+| `body_wt` -> `Body Weight (float)` | `body wt` -> `Body Weight (float)` | no: the tokenizer keeps the `_` as a token |
 
 `corpus build` combines the sources into one [corpus](corpus.md). A pair that
 two sources share is then kept only in the earlier source.
@@ -227,7 +231,8 @@ it is removed from a description.
 Each source's section below has the same parts: the items, the canonical,
 the anchors, the description, the values and the status. A field, such as
 `preferred_name`, is a column of a table that `sources fetch` writes.
-[sources.md](sources.md) lists each source's tables.
+[sources.md](sources.md) lists each source's tables. A status that a section
+does not name is read as current, and `pairs prepare` prints it.
 
 | source | canonical (the positive's name) | anchors | description | values | retired items replaced by |
 |---|---|---|---|---|---|
@@ -364,8 +369,10 @@ the anchors, the description, the values and the status. A field, such as
 - **Values:** each value's `meaning`, or its `value` when it has no meaning.
   Codes are removed as [Values](#values) says. The type is the element's
   `datatype`, such as `CHARACTER`.
-- **Status:** from `workflow_status`. The statuses that start with `RETIRED`
-  are retired, and those that start with `DRAFT` are drafts.
+- **Status:** from `workflow_status`. `RETIRED ARCHIVED`, `RETIRED PHASED
+  OUT`, `RETIRED WITHDRAWN` and `RETIRED DELETED` are retired, and `DRAFT
+  NEW` and `DRAFT MOD` are drafts. `RELEASED` and `RELEASED-NON-CMPLNT` are
+  current.
 
 ### NHANES
 

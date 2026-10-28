@@ -297,7 +297,7 @@ only, so its scores and these are not comparable.
 
 **Newer releases.** The ground truth is pinned by its Zenodo record. A new
 version of GDC-SM is a new record: write its number as the ground truth's
-`version`. Then make a new version, as
+`version`, and its DOI as its `location`. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. The GDC API
 serves only the current dictionary, and each build reads it. So a new GDC data
 release shows as a build that differs (see [The targets](#the-targets)).

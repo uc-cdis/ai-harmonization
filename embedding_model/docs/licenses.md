@@ -43,14 +43,17 @@ the [GDC Data Dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/), and
 Magneto's code,
 [VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher).
 
-**License:** The ground truth is CC BY 4.0, and the GDC dictionary is
-Apache-2.0. Seven of the ten papers are published under CC BY-NC-ND, a Creative
-Commons NoDerivatives license. It allows sharing a file as published, but not a
-modified version of it. A benchmark table is a modified version: it is repaired
-and joined to the expert mappings. So GDC-SM distributes only the ground truth,
-with instructions for rebuilding the tables from the publishers' originals.
-Likewise, this repository distributes no benchmark files: the builder downloads
-the originals and makes the tables on your machine.
+**License:** The ground truth is [CC BY
+4.0](https://creativecommons.org/licenses/by/4.0/), and the GDC dictionary is
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0). Seven of the ten
+papers are published under [CC BY-NC-ND
+4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/), a Creative Commons
+NoDerivatives license. It allows sharing a file as published, but not a
+modified version of it. A benchmark table is a modified version: it is
+repaired and joined to the expert mappings. So GDC-SM distributes only the
+ground truth, with instructions for rebuilding the tables from the publishers'
+originals. Likewise, this repository distributes no benchmark files: the
+builder downloads the originals and makes the tables on your machine.
 
 **References:**
 
@@ -75,7 +78,7 @@ license or terms below.
 
 **Website:** [evs.nci.nih.gov](https://evs.nci.nih.gov/).
 
-**License:** NCIt is released under CC BY 4.0, as EVS's
+**License:** NCIt is released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), as EVS's
 [Terms of Use](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)
 state.
 
@@ -91,17 +94,31 @@ state.
 **Website:** [OBO Foundry](https://obofoundry.org/), which lists all seven. The
 table links each one's page there.
 
-**License:** Each ontology's file states its license.
+**License:** Each ontology's file states its license, and the table below
+shows it. For CMO and MMO, the OBO Foundry pages give [CC0
+1.0](https://creativecommons.org/publicdomain/zero/1.0/), while the files
+state [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 | ontology | website | license |
 |---|---|---|
-| MONDO, diseases | [mondo](https://obofoundry.org/ontology/mondo.html) | CC BY 4.0 |
-| HP, phenotypes | [hp](https://obofoundry.org/ontology/hp.html) | [HPO license](https://hpo.jax.org/app/license) |
-| Uberon, anatomy | [uberon](https://obofoundry.org/ontology/uberon.html) | CC BY 3.0 |
-| OBA, biological attributes | [oba](https://obofoundry.org/ontology/oba.html) | CC0 1.0 |
-| CMO, clinical measurements | [cmo](https://obofoundry.org/ontology/cmo.html) | CC BY 4.0 |
-| MMO, measurement methods | [mmo](https://obofoundry.org/ontology/mmo.html) | CC BY 4.0 |
-| DUO, data use | [duo](https://obofoundry.org/ontology/duo.html) | CC BY 4.0 |
+| MONDO, diseases | [mondo](https://obofoundry.org/ontology/mondo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| HP, phenotypes | [hp](https://obofoundry.org/ontology/hp.html) | [HPO license](https://human-phenotype-ontology.github.io/license.html) |
+| Uberon, anatomy | [uberon](https://obofoundry.org/ontology/uberon.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| OBA, biological attributes | [oba](https://obofoundry.org/ontology/oba.html) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| CMO, clinical measurements | [cmo](https://obofoundry.org/ontology/cmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| MMO, measurement methods | [mmo](https://obofoundry.org/ontology/mmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| DUO, data use | [duo](https://obofoundry.org/ontology/duo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+
+The HPO license names no standard license. It asks users to:
+
+- acknowledge and cite the HPO Consortium;
+- show the date or version of each HPO file that they display;
+- leave the files and their logical relationships unaltered;
+- say in a service or product: "This service/product is using the Human
+  Phenotype Ontology (_version information_)."
+
+The HP file's header names `https://hpo.jax.org/app/license`, which no
+longer loads. The license is now at the address in the table.
 
 **References:**
 
@@ -168,7 +185,7 @@ open (see [Restricted items](#restricted-items)).
 
 **License:** NCI states that CDISC Terminology can be used "for free, without
 licensing restrictions", on its
-[CDISC terminology page](https://www.cancer.gov/research/resources/terminology/cdisc).
+[CDISC terminology page](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc).
 
 **Reference:**
 
@@ -181,9 +198,9 @@ licensing restrictions", on its
 
 **License:** NLM's [web policies](https://www.nlm.nih.gov/web_policies.html)
 state that U.S. government works on its sites "may be freely used or reproduced
-without permission". Content contributed by others may be copyrighted. Each
-element's `copyrightStatus` says which: only "Public domain, free to use" is
-open.
+without permission in the U.S.". Content contributed by others may be
+copyrighted. Each element's `copyrightStatus` says which: only "Public domain,
+free to use" is open.
 
 **Reference:**
 
@@ -261,5 +278,5 @@ only a Proprietary Measure Permission closes an element.
 | LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
 | NIH CDE | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
 | caDSR | a "Proprietary Measure Permission" reference document | the element has none |
-| NHANES | "Use Constraints", per data file | it is "None" or "RDC Only". Both restrict access to the data, not the documentation read here. |
+| NHANES | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
 | PhenX | the protocol's availability | it is "Available" |

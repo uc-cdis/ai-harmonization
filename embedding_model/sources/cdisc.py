@@ -36,7 +36,7 @@ COLUMNS = [
 ]
 LICENSE = (
     "free to use, without licensing restrictions "
-    "(https://www.cancer.gov/research/resources/terminology/cdisc)"
+    "(https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc)"
 )
 CITATION = "embedding_model/docs/licenses.md#cdisc"
 

@@ -22,7 +22,8 @@ from tokenizers import normalizers
 
 # BERT's text cleaning: it removes every control, format and private-use
 # character, such as a byte left from a broken quote, a soft hyphen, a
-# zero-width space or a direction mark.
+# zero-width space or a direction mark. It turns every whitespace character,
+# such as a tab, a line break or a no-break space, into a plain space.
 BERT_CLEANING = normalizers.BertNormalizer(
     clean_text=True, handle_chinese_chars=False, strip_accents=False, lowercase=False
 )

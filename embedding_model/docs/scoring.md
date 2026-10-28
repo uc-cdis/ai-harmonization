@@ -37,7 +37,7 @@ Every source variable's rank is kept, in `per_variable.csv`.
 ## Running `score`
 
 ```
-python -m embedding_model score --model uc-ctds/StdElement-Mapper --benchmark topmed --format stdelement
+python -m embedding_model score --model uc-ctds/bge-large-en-v1.5-bio-mapping --benchmark topmed --format name_description
 ```
 
 `--model` is a Hugging Face model id or a model folder on disk. `--format` is
@@ -46,7 +46,8 @@ models are trained in the default shape. Models are compared in that one shape,
 so two scores differ only by the model. A released model can also be scored in
 the shape of its own training samples: `name_description` for
 `uc-ctds/bge-large-en-v1.5-bio-mapping`, and `stdelement` for
-`uc-ctds/StdElement-Mapper`.
+`uc-ctds/StdElement-Mapper`. `uc-ctds/StdElement-Mapper` is private: scoring
+it needs a Hugging Face login with access to it.
 
 `--benchmark` takes one or more benchmarks. `--benchmark topmed gdc` loads the
 model once and scores it on both.

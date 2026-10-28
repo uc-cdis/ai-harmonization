@@ -3,9 +3,10 @@
 ``corpus build`` reads the pairs that ``pairs prepare`` wrote, for the sources
 named, and writes one corpus under ``<inputs>/corpora/<name>/``:
 
-1. The sources are combined in READERS' order. A pair whose two texts are
-   exactly those of an earlier source's pair is kept once, in the earlier
-   source, with the studies of every copy.
+1. The sources are combined in READERS' order. A pair whose two texts
+   normalise to the same two texts as an earlier source's pair is kept once,
+   in the earlier source, with the studies of every copy. The texts are
+   normalised as ``normalization.TOKENIZER_NORMALIZER`` normalises them.
 2. Leakage prevention drops the pairs that would leak a benchmark built under
    ``<inputs>/benchmarks/`` (see ``embedding_model.leakage``).
 3. The kept pairs are split into training and validation pairs. All pairs of
@@ -96,9 +97,10 @@ def built_benchmarks(inputs):
 def combine(frames):
     """The sources' pairs, each pair once, with the studies of every copy.
 
-    A pair whose two texts are those of an earlier pair is dropped. The pair
-    kept takes the studies of all its copies, so the study rule still sees a
-    later copy's study.
+    A pair whose two texts normalise to the same two texts as an earlier
+    pair's is dropped, as ``pairs.common.distinct_pairs`` compares them. The
+    pair kept takes the studies of all its copies, so the study rule still
+    sees a later copy's study.
 
     Args:
         frames (list[pd.DataFrame]): The sources' pairs, in READERS' order.
@@ -302,8 +304,7 @@ def build(name, sources, inputs):
         print(f"  {source:<7}{len(pairs):>10,} pairs")
     distinct, copy_sources = combine(frames)
     # The sources' own frames, and the last one read, are not needed past this
-    # point. Freeing them lowers the peak memory, from 6.5 to 5.4 GB on the
-    # eight sources.
+    # point. Freeing them lowers the peak memory.
     del frames, pairs
     print(f"  {len(copy_sources):,} pairs already in an earlier source, kept once")
 

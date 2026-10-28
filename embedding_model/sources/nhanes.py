@@ -218,7 +218,7 @@ def fetch_source(downloads, manifest):
             NHANES serves only its current pages.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict]]: The tables ``variables``,
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables ``variables``,
             ``codebook`` and ``values``, which share the key ``cycle``,
             ``data_file`` and ``name``; the manifest's sources; and the counts
             that the fetch prints.

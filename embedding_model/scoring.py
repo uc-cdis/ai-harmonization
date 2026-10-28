@@ -176,7 +176,7 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
             }
 
     # The evaluator names each metric after its score function, as in
-    # ``cosine_mrr@148``.
+    # ``cosine_mrr@<number of targets>``.
     metrics = {
         "mrr": round(float(scores[f"cosine_mrr@{len(target_texts)}"]), 4),
         **{

@@ -5,14 +5,17 @@
   "files": {
     "terms.parquet": {
       "rows": 103612,
+      "sha256": "3fa77883fb7e17af5b271a84f37dde1553e2b797dbf159c722fb4307e78186ec",
       "csv_sha256": "f3b10bc5cfca65f35a8d5e2862b4e214ccb89553d3e4aec410017afa67c5857e"
     },
     "synonyms.parquet": {
       "rows": 225173,
+      "sha256": "d5f5f345fa934236f8e7e5b58d422e02b1211aa0c3956bfb18fe4e8ad5fed206",
       "csv_sha256": "aeda24a98725868d5f17fa00a45b321a769043c57144a124d7fd5b06fe00cab2"
     },
     "definitions.parquet": {
       "rows": 80204,
+      "sha256": "edd6b4ecff5e9ba162169a95b42427d45e090e17c775777d9dac3cbb503b269c",
       "csv_sha256": "5741f006cf4f0c789e6fa9de37c40aa56d5112a2f64d6a8e72abe25b113ad734"
     }
   },
@@ -23,7 +26,7 @@
       "location": "http://purl.obolibrary.org/obo/mondo/releases/2026-10-06/mondo-base.owl",
       "version": "2026-10-06",
       "sha256": "dc62a6809cce0954f3a59a9c4b6e1a644bd56b411d8d2538b6eaa79d1ebf4f30",
-      "license": "http://creativecommons.org/licenses/by/4.0/",
+      "license": "CC-BY-4.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -32,7 +35,7 @@
       "location": "http://purl.obolibrary.org/obo/hp/releases/2026-09-01/hp-base.owl",
       "version": "2026-09-01",
       "sha256": "42c7e775d590837d838701d264740c79c8f343fd67ef0f5a68d6569965445558",
-      "license": "https://hpo.jax.org/app/license",
+      "license": "LicenseRef-HPO",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -41,7 +44,7 @@
       "location": "http://purl.obolibrary.org/obo/uberon/releases/2026-10-01/uberon-base.owl",
       "version": "2026-10-01",
       "sha256": "e69b77112e073da633d60b20aeec48dfc70eca98d7500707bbb3b43bcef2971c",
-      "license": "http://creativecommons.org/licenses/by/3.0/",
+      "license": "CC-BY-3.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -50,7 +53,7 @@
       "location": "http://purl.obolibrary.org/obo/oba/releases/2026-10-10/oba-base.owl",
       "version": "2026-10-10",
       "sha256": "3c69ad2dbf9154f7eb546cae0196ec71869dac06711b585181b3a17091b34715",
-      "license": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "license": "CC0-1.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -60,7 +63,7 @@
       "version": "2026-10-10",
       "fetched": "2026-10-19",
       "sha256": "18e2399c5f8cee66b0589ab7b7caa30120f6851f0a839851edbe33b843630541",
-      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "license": "CC-BY-4.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -70,7 +73,7 @@
       "version": "2026-10-10",
       "fetched": "2026-10-19",
       "sha256": "b5e26e3769989a64d9c536fb7306ee33e0f8df291b70ca28980fbc19c26f2d2e",
-      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "license": "CC-BY-4.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     },
     {
@@ -79,8 +82,19 @@
       "location": "http://purl.obolibrary.org/obo/duo/releases/2021-02-23/duo.owl",
       "version": "2021-02-23",
       "sha256": "6a34ce09ae07b1e37c6756e049c12129fd1104e7d9e6e2f8cee84d2ab374c45b",
-      "license": "http://creativecommons.org/licenses/by/4.0/",
+      "license": "CC-BY-4.0",
       "citation": "embedding_model/docs/licenses.md#ontologies"
     }
-  ]
+  ],
+  "counts": {
+    "terms": {
+      "mondo": 36129,
+      "hp": 20482,
+      "uberon": 16432,
+      "oba": 25462,
+      "cmo": 4199,
+      "mmo": 869,
+      "duo": 39
+    }
+  }
 }

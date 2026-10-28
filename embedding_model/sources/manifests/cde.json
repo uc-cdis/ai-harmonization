@@ -5,26 +5,32 @@
   "files": {
     "elements.parquet": {
       "rows": 40736,
+      "sha256": "f8d6331cd06dbccaa21c4e72e747f4f65dcf4dbc4bf491735e954fa104dbf38d",
       "csv_sha256": "2afb0fec5b9b347e969ec4ca476a9b8bfe6b76049fac4b22b64a675d3a8a1fd4"
     },
     "designations.parquet": {
       "rows": 72278,
+      "sha256": "7c285aaa386937ab3d696b03a55234102a2c6842de8993e93f53ec3007180184",
       "csv_sha256": "38f428c9a9ba5b433417ff9452738cb55a3aef0d39058f7a8baf71b353e626c7"
     },
     "definitions.parquet": {
       "rows": 24781,
+      "sha256": "1a5a4db522dc2f6522e6ad8ff759c5ac820280c67d8b1d4d6a9b1d8441b6e7c9",
       "csv_sha256": "43087c76612f1e5bef830b320902ec9bb348c39317f1a1e7bf1383cf0696728a"
     },
     "ids.parquet": {
       "rows": 59256,
+      "sha256": "3a257f7e0bbe23dde6ed8509f25bd2a0c19e1ccccc39871983621fc302280046",
       "csv_sha256": "5afef3010a9cc3b20004cce5016638f9c313668f52819c1e14718c324e0e69d7"
     },
     "values.parquet": {
       "rows": 132001,
+      "sha256": "81cd315c370ed083516bf669a89e811f85cde7d59da7d743e1057b3031a56de2",
       "csv_sha256": "d2f6d522c159ce3723b70e953b9caf4356b485befda4e7fe25a15e135c86f1b2"
     },
     "properties.parquet": {
       "rows": 42600,
+      "sha256": "1dfea0045e0c0a1ffe634e086eb46818f597792b84770616f51876699fa49720",
       "csv_sha256": "95dd1d652c3e9454de03540c58f718eaa26e1d0c74f02506609ba83aae61e8cd"
     }
   },
@@ -35,8 +41,12 @@
       "location": "https://cde.nlm.nih.gov/server/de/searchExport",
       "fetched": "2026-10-22",
       "sha256": "2b17a28e31976856d8c3c9d58ec0593d9b6361b48951f1c91b6c7e08b20b1b0c",
-      "license": "U.S. government works are free to use; others may be copyrighted, as each element's copyrightStatus says (https://www.nlm.nih.gov/web_policies.html)",
+      "license": "LicenseRef-NLM-Web-Policies",
       "citation": "embedding_model/docs/licenses.md#nih-cde"
     }
-  ]
+  ],
+  "counts": {
+    "elements": 40736,
+    "not_open": 326
+  }
 }

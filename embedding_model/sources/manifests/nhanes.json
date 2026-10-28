@@ -5,14 +5,17 @@
   "files": {
     "variables.parquet": {
       "rows": 60008,
+      "sha256": "55f4e11671956553c0ddc953de869ae11ae325f3df29eb1e48e7993ed5ca27bc",
       "csv_sha256": "1371034781e70377f2dd0e47b0abe6e8eb1457b12e47b9cfc01c6c169deb76ac"
     },
     "codebook.parquet": {
       "rows": 58787,
+      "sha256": "dd4df0ac392e222823f952e8696935b932c1de00b527d0e8a623095aaea86cfe",
       "csv_sha256": "b6bfe32c60a0df6d19ee01ffdd5615c4fb6d8ad4659da2743593f4f063f98395"
     },
     "values.parquet": {
       "rows": 200753,
+      "sha256": "43fd1d63f451e922732915d22169c8596fb1ba45c3ee316a2bc735131af0173b",
       "csv_sha256": "9f23f491f45a7d193bce8f756298855e3fbc0207c055d526632340f8e8777986"
     }
   },
@@ -23,7 +26,7 @@
       "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics",
       "fetched": "2026-10-22",
       "sha256": "34a761948d19a7344c9f9aeb6453ae8e4240782c9b80742ac539e6d3450e3bd5",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     },
     {
@@ -32,7 +35,7 @@
       "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Dietary",
       "fetched": "2026-10-22",
       "sha256": "6ea340ed4a36799e832059a9a87975f897e977b285f482e34a71d254fcbe23a2",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     },
     {
@@ -41,7 +44,7 @@
       "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Examination",
       "fetched": "2026-10-22",
       "sha256": "a8fef73b46b832446d511206dfbb462cd20ac461f23d738208b0084a004eded3",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     },
     {
@@ -50,7 +53,7 @@
       "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Laboratory",
       "fetched": "2026-10-22",
       "sha256": "de37592fe58bb4809b5b66331359188c135eb53a96ea391b5ccdb88121463a14",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     },
     {
@@ -59,7 +62,7 @@
       "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Questionnaire",
       "fetched": "2026-10-22",
       "sha256": "8833d8416f3c640495d7d5a60f5884968d378007d241944686736e60539bde61",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     },
     {
@@ -68,8 +71,13 @@
       "location": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/{cycle}/DataFiles/{data_file}.htm",
       "fetched": "2026-10-22",
       "sha256": "390ab488c0cd892c4173f8525b5714ca81328a74421d877ca863a10ada7e815b",
-      "license": "public domain (https://www.cdc.gov/other/agencymaterials.html)",
+      "license": "LicenseRef-CDC-Agency-Materials",
       "citation": "embedding_model/docs/licenses.md#nhanes"
     }
-  ]
+  ],
+  "counts": {
+    "variables": 60008,
+    "data_files": 1852,
+    "data_files_without_codebook": 48
+  }
 }

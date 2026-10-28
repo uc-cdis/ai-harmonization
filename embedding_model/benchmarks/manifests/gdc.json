@@ -27,6 +27,7 @@
       "name": "Cao, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867421009971-mmc1.xlsx",
       "sha256": "ceb984e2c29cf197bfff3514e3d4267be69d8b8402afdb4c53739daaf453d9d7",
+      "license": "CC-BY-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2021.08.023"
     },
     {
@@ -34,6 +35,7 @@
       "name": "Clark, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867419311237-mmc1.xlsx",
       "sha256": "3174a83fa98e0416bedaf28e4f7526b8a70f0fe1954da5994dbabe470f6fd078",
+      "license": "CC-BY-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2019.10.007"
     },
     {
@@ -41,6 +43,7 @@
       "name": "Dou, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420301070-mmc1.xlsx",
       "sha256": "cefdda0a26bbf667639f8787f426f046545453cb911252e05f5e3a16dcc9c9d2",
+      "license": "CC-BY-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2020.01.026"
     },
     {
@@ -48,6 +51,7 @@
       "name": "Gillette, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420307443-mmc1.xlsx",
       "sha256": "00ef1caa741c211546d9d2c6c3051fa3febf5a040d1cd5d6fc98955a326af56a",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2020.06.013"
     },
     {
@@ -55,6 +59,7 @@
       "name": "Huang, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S1535610820306553-mmc2.xlsx",
       "sha256": "fccbd91635d2eb9b368ca5da705ef7fea4e6bb61c341120c1b852c372a969086",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.ccell.2020.12.007"
     },
     {
@@ -62,6 +67,7 @@
       "name": "Krug, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867420314008-mmc1.xlsx",
       "sha256": "9c0fb08c65541d8c24a71a8d5737d9a0389135c17d5e2456c3da3806f9029526",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2020.10.036"
     },
     {
@@ -69,6 +75,7 @@
       "name": "McDermott, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S2666379120300045-mmc2.xlsx",
       "sha256": "1dbb62061c3d8e0f86a0c90cbec999ccceed2fdaecbd08ac6f8e52381c256e03",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.xcrm.2020.100004"
     },
     {
@@ -76,6 +83,7 @@
       "name": "Satpathy, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867421008576-mmc1.xlsx",
       "sha256": "8cdff61042eca53c09c42ea9fef2340e22e3eca1d6d7c8eaa96c6e2cca768fde",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2021.07.016"
     },
     {
@@ -83,6 +91,7 @@
       "name": "Vasaikar, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S0092867419302922-mmc1.xlsx",
       "sha256": "dc9c970097d6b4aaf51e0e74ae900fbce2bd0a60b5ccd9a61c037e6e05a91c76",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.cell.2019.03.030"
     },
     {
@@ -90,6 +99,7 @@
       "name": "Wang, supplementary table",
       "location": "https://ars.els-cdn.com/content/image/1-s2.0-S1535610821000507-mmc2.xlsx",
       "sha256": "c1fa2a7c67136dde22700dcbf648f659a3e7630e47b0524b3644731d3617de65",
+      "license": "CC-BY-NC-ND-4.0",
       "citation": "https://doi.org/10.1016/j.ccell.2021.01.006"
     },
     {
@@ -102,5 +112,10 @@
       "license": "Apache-2.0",
       "citation": "embedding_model/docs/licenses.md#gdc"
     }
-  ]
+  ],
+  "counts": {
+    "papers": 10,
+    "source_variables": 165,
+    "targets": 1217
+  }
 }

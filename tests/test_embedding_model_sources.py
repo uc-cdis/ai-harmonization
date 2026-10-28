@@ -1270,6 +1270,43 @@ class TestFetch:
         assert (inputs / "sources" / "abcd" / "items.parquet").exists()
         assert sources.fetch(["abcd"], inputs) == 0
 
+    def test_a_refused_fetch_keeps_the_working_folder(
+        self, folder, monkeypatch, tmp_path
+    ):
+        """A fetch that differs, without --update-manifest, leaves the working folder."""
+        monkeypatch.setitem(sources.FETCHERS, "abcd", fictional_source())
+        inputs = tmp_path / "inputs"
+        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
+        working = inputs / "sources" / "abcd"
+        before = {path.name: path.read_bytes() for path in working.iterdir()}
+        changed = MagicMock()
+        changed.fetch_source.side_effect = lambda downloads, manifest: (
+            {"items": TABLE.head(1)},
+            manifest["sources"],
+            {},
+        )
+        monkeypatch.setitem(sources.FETCHERS, "abcd", changed)
+        assert sources.fetch(["abcd"], inputs) == 1
+        assert {path.name: path.read_bytes() for path in working.iterdir()} == before
+        assert [path.name for path in working.parent.iterdir()] == ["abcd"]
+
+    def test_a_table_that_a_new_version_drops_is_gone(
+        self, folder, monkeypatch, tmp_path
+    ):
+        """The folder is replaced whole, so a table that the new fetch lacks goes."""
+        two = MagicMock()
+        two.fetch_source.side_effect = lambda downloads, manifest: (
+            {"items": TABLE, "extra": TABLE},
+            manifest["sources"],
+            {},
+        )
+        monkeypatch.setitem(sources.FETCHERS, "abcd", two)
+        inputs = tmp_path / "inputs"
+        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
+        monkeypatch.setitem(sources.FETCHERS, "abcd", fictional_source())
+        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
+        assert not (inputs / "sources" / "abcd" / "extra.parquet").exists()
+
     def test_a_failing_source_does_not_stop_the_others(
         self, folder, monkeypatch, capsys, tmp_path
     ):

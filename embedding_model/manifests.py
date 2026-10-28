@@ -10,10 +10,11 @@ version. A version committed in git never changes.
 """
 
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+from embedding_model.folders import staged
 
 
 def file_identity(file_entry):
@@ -198,61 +199,106 @@ def warn_if_not_committed(label, version, committed_path, command):
         )
 
 
-def settle(committed_path, built, staging, directory, files, update_manifest):
-    """Keep a build that matches its committed manifest, or an accepted build.
+class Refused(Exception):
+    """A build that differs from its committed manifest, and is not accepted."""
 
-    A build that matches replaces the working files. A build that differs
-    replaces them only when ``update_manifest`` accepts it, under a version not
-    committed in git. It is then recorded as the committed manifest. Otherwise
-    the differences are printed, and the working files are left as they were.
+
+def decide(committed_path, built, update_manifest, command):
+    """Whether a build may replace the working one; raise Refused if not.
+
+    A build that matches its committed manifest may replace the working one. A
+    build that differs is accepted only with ``update_manifest``, under a
+    version not committed in git. Otherwise the differences are printed, with
+    the steps that accept the build, and Refused is raised. ``write_checked``
+    calls this inside ``folders.staged``, so a refused build is deleted and
+    the working one is kept.
 
     Args:
         committed_path (Path): The committed manifest.
-        built (dict): The new build's manifest; its ``files`` are listed with
-            their row counts.
-        staging (Path): Where the build was written.
-        directory (Path): Where the working files are kept.
-        files (list[str]): The files to move from ``staging`` to
-            ``directory``.
+        built (dict): The new build's manifest.
         update_manifest (bool): Accept a build that differs.
+        command (str): The command that made the build, for the messages.
 
     Returns:
-        int: 0 if the build was kept, 1 if it was refused.
+        list[str]: The differences; empty when the build matches.
+
+    Raises:
+        Refused: If the build differs and is not accepted.
     """
     committed = json.loads(committed_path.read_text(encoding="utf-8"))
-    found = differences(committed, built)
-    refusal = None
-    if found and not update_manifest:
-        refusal = "pass --update-manifest to accept this build"
-    elif found:
-        try:
-            version = committed_version(committed_path.parent, committed_path.stem)
-        except RuntimeError as error:
+    differing = differences(committed, built)
+    if not differing:
+        return differing
+    version = committed["version"]
+    try:
+        head_version = committed_version(committed_path.parent, committed_path.stem)
+    except RuntimeError as error:
+        refusal = (
+            f"git cannot say whether version {version} is committed ({error});"
+            " fix that to accept this build"
+        )
+    else:
+        if head_version == version:
             refusal = (
-                f"git cannot say whether version {committed['version']} "
-                f"is committed ({error}); fix that to accept this build"
+                f'version {version} is committed: raise "version" in'
+                f" {committed_path}, then run: {command} --update-manifest"
+            )
+        elif not update_manifest:
+            refusal = (
+                f"to accept this build as version {version}, run: {command}"
+                " --update-manifest"
             )
         else:
-            if version == committed["version"]:
-                refusal = (
-                    f"version {committed['version']} is committed; raise "
-                    f'"version" in {committed_path} to accept this '
-                    "build as a new version"
-                )
-    if refusal:
-        print(f"  differs from {committed_path.name}; working files kept:")
-        for line in found:
-            print(f"    {line}")
-        print(f"  {refusal}")
-        return 1
-    directory.mkdir(parents=True, exist_ok=True)
-    for file in files:
-        shutil.move(Path(staging) / file, directory / file)
+            return differing
+    print(f"  differs from {committed_path.name}:", file=sys.stderr)
+    for line in differing:
+        print(f"    {line}", file=sys.stderr)
+    print(f"  {refusal}", file=sys.stderr)
+    raise Refused(refusal)
+
+
+def record(committed_path, built, differing, directory):
+    """Report a build that is in place, and record it if it was accepted.
+
+    Args:
+        committed_path (Path): The committed manifest.
+        built (dict): The build's manifest.
+        differing (list[str]): The differences that ``decide`` returned.
+        directory (Path): Where the build now is.
+    """
     for file, entry in built["files"].items():
         print(f"  {directory / file}: {entry['rows']:,} rows")
-    if found:
+    if differing:
         committed_path.write_text(json.dumps(built, indent=2) + "\n", encoding="utf-8")
         print(f"  accepted, and recorded in {committed_path}")
     else:
         print(f"  matches {committed_path.name}")
+
+
+def write_checked(destination, write, committed_path, update_manifest, command):
+    """Write a build whole, and keep it only if its committed manifest allows.
+
+    The build is written through ``folders.staged``. ``decide`` then says
+    whether it may replace the working folder, while the build is still in
+    the staging folder. A refused build is deleted, and the working folder is
+    kept. A kept build is recorded only once it is in place.
+
+    Args:
+        destination (Path): The build's folder, such as ``sources/<source>/``.
+        write (Callable[[Path], dict]): Writes the build into the folder that
+            it is given, and returns the build's manifest.
+        committed_path (Path): The committed manifest.
+        update_manifest (bool): Accept a build that differs.
+        command (str): The command that made the build, for the messages.
+
+    Returns:
+        int: 0 if the build matches or was accepted, 1 if it was refused.
+    """
+    try:
+        with staged(destination) as folder:
+            built = write(folder)
+            differing = decide(committed_path, built, update_manifest, command)
+    except Refused:
+        return 1
+    record(committed_path, built, differing, destination)
     return 0

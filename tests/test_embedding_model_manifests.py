@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from embedding_model import manifests
+from embedding_model import folders, manifests
 
 PIN = {"role": "mappings", "name": "Fictional source", "version": "1"}
 
@@ -129,66 +129,137 @@ class TestRead:
             self.read(path)
 
 
-class TestSettle:
-    """Keeping or refusing a build against its committed manifest."""
+class TestDecide:
+    """Whether a build may replace the working one, against its committed manifest."""
+
+    COMMAND = "python -m embedding_model abcd build"
+    BUILT = {
+        "version": "1",
+        "files": {"abcd.csv": {"rows": 1, "sha256": "aa"}},
+        "sources": [PIN],
+    }
 
     @pytest.fixture
-    def setup(self, tmp_path):
-        """A pins-only committed manifest, and a build of one file in staging."""
-        committed = tmp_path / "abcd.json"
-        committed.write_text(
-            json.dumps({"version": "1", "files": {}, "sources": [PIN]})
-        )
-        staging = tmp_path / "staging"
-        staging.mkdir()
-        (staging / "abcd.csv").write_text("a\n1\n")
-        built = {
-            "version": "1",
-            "files": {"abcd.csv": {"rows": 1, "sha256": "aa"}},
-            "sources": [PIN],
-        }
-        return committed, built, staging, tmp_path / "working"
+    def committed(self, tmp_path):
+        """A pins-only committed manifest, version 1, that every build differs from."""
+        path = tmp_path / "abcd.json"
+        path.write_text(json.dumps({"version": "1", "files": {}, "sources": [PIN]}))
+        return path
 
-    def test_a_differing_build_is_refused_without_update(self, setup, monkeypatch):
-        """Without --update-manifest, a differing build is not kept."""
-        committed, built, staging, working = setup
+    def test_a_matching_build_may_be_kept(self, tmp_path):
+        """A build that matches its committed manifest is kept, with no difference."""
+        path = tmp_path / "abcd.json"
+        path.write_text(json.dumps(self.BUILT))
+        assert manifests.decide(path, self.BUILT, False, self.COMMAND) == []
+
+    def test_a_differing_build_needs_update_manifest(
+        self, committed, monkeypatch, capsys
+    ):
+        """Without --update-manifest, a differing build is refused, with the command."""
         monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
-        status = manifests.settle(
-            committed, built, staging, working, ["abcd.csv"], False
-        )
-        assert status == 1
-        assert not (working / "abcd.csv").exists()
+        with pytest.raises(manifests.Refused):
+            manifests.decide(committed, self.BUILT, False, self.COMMAND)
+        error = capsys.readouterr().err
+        assert "abcd.csv" in error
+        assert f"run: {self.COMMAND} --update-manifest" in error
 
-    def test_an_accepted_build_is_kept_and_recorded(self, setup, monkeypatch):
-        """Accepted under an uncommitted version, the build moves and is recorded."""
-        committed, built, staging, working = setup
+    def test_a_build_under_an_uncommitted_version_is_accepted(
+        self, committed, monkeypatch
+    ):
+        """With --update-manifest and a version not committed, the build is accepted."""
         monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
-        status = manifests.settle(
-            committed, built, staging, working, ["abcd.csv"], True
-        )
-        assert status == 0
-        assert (working / "abcd.csv").exists()
-        assert json.loads(committed.read_text())["files"] == built["files"]
+        found = manifests.decide(committed, self.BUILT, True, self.COMMAND)
+        assert found and found[0].startswith("abcd.csv")
 
-    def test_a_committed_version_is_not_redefined(self, setup, monkeypatch):
-        """A differing build under the version git has committed is refused."""
-        committed, built, staging, working = setup
+    @pytest.mark.parametrize("update_manifest", [False, True])
+    def test_a_committed_version_gives_both_steps(
+        self, update_manifest, committed, monkeypatch, capsys
+    ):
+        """Under a version that git has committed, the refusal says to raise it first."""
         monkeypatch.setattr(manifests, "committed_version", lambda *_: "1")
-        status = manifests.settle(
-            committed, built, staging, working, ["abcd.csv"], True
-        )
-        assert status == 1
-        assert json.loads(committed.read_text())["files"] == {}
+        with pytest.raises(manifests.Refused):
+            manifests.decide(committed, self.BUILT, update_manifest, self.COMMAND)
+        error = capsys.readouterr().err
+        assert f'raise "version" in {committed}' in error
+        assert f"then run: {self.COMMAND} --update-manifest" in error
 
-    def test_no_answer_from_git_refuses(self, setup, monkeypatch):
+    def test_no_answer_from_git_refuses(self, committed, monkeypatch):
         """When git cannot say whether the version is committed, the build is refused."""
-        committed, built, staging, working = setup
         no_answer = MagicMock(side_effect=RuntimeError("not a git repository"))
         monkeypatch.setattr(manifests, "committed_version", no_answer)
-        status = manifests.settle(
-            committed, built, staging, working, ["abcd.csv"], True
+        with pytest.raises(manifests.Refused, match="git cannot say"):
+            manifests.decide(committed, self.BUILT, True, self.COMMAND)
+
+
+class TestRecord:
+    """Reporting a build that is in place, and recording an accepted one."""
+
+    def test_an_accepted_build_is_recorded(self, tmp_path, capsys):
+        """A build with differences is written as the committed manifest."""
+        committed = tmp_path / "abcd.json"
+        built = {**TestDecide.BUILT, "counts": {"rows": 1}}
+        manifests.record(committed, built, ["abcd.csv: ..."], tmp_path / "abcd")
+        assert json.loads(committed.read_text()) == built
+        assert "accepted, and recorded in" in capsys.readouterr().out
+
+    def test_a_matching_build_leaves_the_committed_manifest(self, tmp_path, capsys):
+        """A build that matches is reported, and the committed manifest is not written."""
+        committed = tmp_path / "abcd.json"
+        committed.write_text("{}")
+        manifests.record(committed, TestDecide.BUILT, [], tmp_path / "abcd")
+        assert committed.read_text() == "{}"
+        assert "matches abcd.json" in capsys.readouterr().out
+
+
+class TestWriteChecked:
+    """Writing a build whole, kept only if its committed manifest allows."""
+
+    @pytest.fixture
+    def committed(self, tmp_path, monkeypatch):
+        """A pins-only committed manifest, under a version that git has not committed."""
+        path = tmp_path / "abcd.json"
+        path.write_text(json.dumps({"version": "1", "files": {}, "sources": [PIN]}))
+        monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
+        return path
+
+    @staticmethod
+    def write(folder):
+        """Write one file of the build, and return the build's manifest."""
+        (folder / "abcd.csv").write_text("a\n1\n")
+        return TestDecide.BUILT
+
+    def test_a_refused_build_leaves_nothing(self, committed, tmp_path):
+        """Without --update-manifest, a differing build is deleted, and exits 1."""
+        status = manifests.write_checked(
+            tmp_path / "abcd", self.write, committed, False, "abcd build"
         )
         assert status == 1
+        assert not (tmp_path / "abcd").exists()
+
+    def test_an_accepted_build_is_in_place_and_recorded(self, committed, tmp_path):
+        """An accepted build replaces the folder, and is written as the committed manifest."""
+        status = manifests.write_checked(
+            tmp_path / "abcd", self.write, committed, True, "abcd build"
+        )
+        assert status == 0
+        assert (tmp_path / "abcd" / "abcd.csv").exists()
+        assert json.loads(committed.read_text())["files"] == TestDecide.BUILT["files"]
+
+    def test_a_build_that_cannot_move_into_place_is_not_recorded(
+        self, committed, tmp_path, monkeypatch
+    ):
+        """A failed swap leaves the committed manifest as it was."""
+
+        def failing(*arguments):
+            """A swap that fails, as on a full disk."""
+            raise OSError("no space left on device")
+
+        monkeypatch.setattr(folders, "replace", failing)
+        with pytest.raises(OSError):
+            manifests.write_checked(
+                tmp_path / "abcd", self.write, committed, True, "abcd build"
+            )
+        assert json.loads(committed.read_text())["files"] == {}
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")

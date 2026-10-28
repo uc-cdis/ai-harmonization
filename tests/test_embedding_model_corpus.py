@@ -273,9 +273,9 @@ def inputs(tmp_path, monkeypatch):
         {**row, "expected_target": row["expected_target"].split(";")}
         for row in MAPPINGS.to_dict("records")
     ]
-    (tmp_path / "benchmarks").mkdir()
+    (tmp_path / "benchmarks" / "abcd").mkdir(parents=True)
     benchmarks.write_benchmark(
-        tmp_path / "benchmarks", "abcd", "1", targets, mappings, [], {}
+        tmp_path / "benchmarks" / "abcd", "abcd", "1", targets, mappings, [], {}
     )
     duplicate = pair("Wxyz", "Wxyz Abcd")
     write_pairs(tmp_path, "ncit", PLANTED[:3] + [duplicate, pair("Stuv", "Stuv Abcd")])
@@ -456,7 +456,7 @@ class TestBuild:
             for row in MAPPINGS.to_dict("records")
         ]
         benchmarks.write_benchmark(
-            inputs / "benchmarks",
+            inputs / "benchmarks" / "abcd",
             "abcd",
             "1",
             targets.to_dict("records"),
@@ -563,7 +563,7 @@ class TestBuild:
 
     def test_a_benchmark_with_a_file_missing_stops_the_build(self, inputs, capsys):
         """A built benchmark that cannot be read is an error, not skipped."""
-        (inputs / "benchmarks" / "abcd_targets.csv").unlink()
+        (inputs / "benchmarks" / "abcd" / "abcd_targets.csv").unlink()
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "a benchmark cannot be read" in capsys.readouterr().err
 

@@ -81,9 +81,10 @@ A new build compares its manifest with the committed one:
   no checksum.
 - Dates, counts, licenses and citations are not compared.
 
-If everything matches, the build is what the manifest describes. Its files then
-replace the working ones. If not, the build lists each file and input that
-differs. It then stops, and keeps the working files as they were. That is
+If everything matches, the build is what the manifest describes. Its folder
+then replaces the working one. If not, the build lists each file and input
+that differs, and the steps that accept it. It then stops, and keeps the
+working folder as it was. That is
 expected when an input was updated on purpose. The build is then accepted as a
 new version, as [Making a new version](#making-a-new-version) describes.
 
@@ -120,7 +121,7 @@ A difference that is meant makes a new version:
 A version committed in git never changes. `--update-manifest` refuses a build
 that differs while `version` is still the committed version, so raise it first.
 Until the new version is committed, it can be built and accepted as often as
-needed. The new files overwrite the working ones.
+needed. The new folder replaces the working one.
 
 The build asks the local git checkout whether a version is committed. If git
 cannot answer, the build cannot tell, so it refuses a differing build.

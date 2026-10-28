@@ -30,7 +30,8 @@ can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 
 ## How a benchmark is laid out
 
-Each benchmark is two files under `embedding_model/inputs/benchmarks/`:
+Each benchmark is a folder, `embedding_model/inputs/benchmarks/<benchmark>/`,
+with two files and the manifest of its build:
 
 - **`<benchmark>_mappings.csv`**: one row per source variable, with its
   expected targets: the targets that the experts mapped it to. Any of them
@@ -123,7 +124,7 @@ Each benchmark has a manifest committed as
 `embedding_model/benchmarks/manifests/<benchmark>.json`. It pins what the
 benchmark is built from, such as the TOPMed documentation's commit or the GDC
 ground truth's Zenodo record. Each build writes its own manifest beside the
-files, as `<benchmark>_manifest.json`, with the date in `built`. An input's
+files, as `manifest.json`, with the date in `built`. An input's
 `role` is `mappings`, `source text` or `targets`. Its `counts` hold what the
 build prints:
 

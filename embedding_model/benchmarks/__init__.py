@@ -1,6 +1,7 @@
 """Benchmarks: expert mappings from study variables to data-model properties.
 
-Each benchmark is two CSV files under ``<inputs>/benchmarks/``:
+Each benchmark is two CSV files under ``<inputs>/benchmarks/<benchmark>/``,
+beside the manifest of its build:
 
 - ``<benchmark>_mappings.csv``: one row per source variable, with the keys of
   its expected targets, separated by ``;`` where there are several;
@@ -18,7 +19,6 @@ import csv
 import io
 import json
 import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -66,8 +66,8 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
             it.
 
     Returns:
-        dict: The manifest, also written as ``<name>_manifest.json`` beside
-            the files.
+        dict: The manifest, also written as ``manifest.json`` beside the
+            files.
 
     Raises:
         TypeError: If a mapping's ``expected_target`` is a string, not a list.
@@ -100,7 +100,7 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
         "sources": sources,
         "counts": counts,
     }
-    (directory / f"{name}_manifest.json").write_text(
+    (directory / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )
     return manifest
@@ -129,9 +129,9 @@ def read_benchmark(inputs, name):
             benchmark, a file differs from its manifest, or the files do not
             have the columns that ``benchmarks build`` writes.
     """
-    directory = Path(inputs) / "benchmarks"
+    directory = Path(inputs) / "benchmarks" / name
     paths = [directory / f"{name}_{kind}.csv" for kind in ("targets", "mappings")]
-    manifest_path = directory / f"{name}_manifest.json"
+    manifest_path = directory / "manifest.json"
     command = f"python -m embedding_model benchmarks build --{name}"
     for path in paths:
         if not path.exists():
@@ -162,7 +162,7 @@ def read_benchmark(inputs, name):
     columns = (list(targets.columns), list(mappings.columns))
     if columns != (TARGET_COLUMNS, MAPPING_COLUMNS):
         raise ValueError(
-            f"{directory}'s {name} files do not have the columns that"
+            f"the files in {directory} do not have the columns that"
             f" `benchmarks build` writes; run: {command}"
         )
     return targets, mappings, manifest
@@ -172,9 +172,9 @@ def build(names, inputs, update_manifest=False):
     """Build benchmarks from the inputs that their committed manifests pin.
 
     Each build is written to a staging folder first. If it matches the
-    committed manifest, or ``update_manifest`` accepts it, its files replace
-    the working ones. If not, the differences are printed, the working files
-    are left as they were, and the exit status is 1. A version committed in git
+    committed manifest, or ``update_manifest`` accepts it, its folder replaces
+    the working one. If not, the differences are printed, the working folder
+    is left as it was, and the exit status is 1. A version committed in git
     never changes: a differing build is accepted only under a version not
     committed yet, and not at all when git cannot be asked. A benchmark that
     cannot be built, such as one whose download fails, is reported, and the
@@ -207,7 +207,10 @@ def build(names, inputs, update_manifest=False):
 
 
 def build_one(name, directory, update_manifest):
-    """Build one benchmark, write it to a staging folder, and settle it.
+    """Build one benchmark, and swap its folder in if the build may be kept.
+
+    ``manifests.write_checked`` writes the files, and keeps them only if the
+    committed manifest allows.
 
     Args:
         name (str): The benchmark, from BUILDERS.
@@ -222,21 +225,12 @@ def build_one(name, directory, update_manifest):
     targets, mappings, sources, counts = BUILDERS[name].build(
         directory / "downloads" / name, committed
     )
-    with tempfile.TemporaryDirectory(dir=directory) as staging:
-        built = write_benchmark(
-            Path(staging),
-            name,
-            committed["version"],
-            targets,
-            mappings,
-            sources,
-            counts,
-        )
-        return manifests.settle(
-            committed_path,
-            built,
-            Path(staging),
-            directory,
-            [*built["files"], f"{name}_manifest.json"],
-            update_manifest,
-        )
+    return manifests.write_checked(
+        directory / name,
+        lambda folder: write_benchmark(
+            folder, name, committed["version"], targets, mappings, sources, counts
+        ),
+        committed_path,
+        update_manifest,
+        f"python -m embedding_model benchmarks build --{name}",
+    )

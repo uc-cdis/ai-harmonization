@@ -18,7 +18,6 @@ item carries an ``open`` column, set from its source's restriction field.
 import hashlib
 import json
 import sys
-import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -183,7 +182,7 @@ def fetch(names, inputs, update_manifest=False):
 
     Each fetch is written to a staging folder first, and kept only if it
     matches the committed manifest or ``update_manifest`` accepts it; see
-    ``manifests.settle``. A source that cannot be fetched, such as one whose
+    ``manifests.decide``. A source that cannot be fetched, such as one whose
     download needs credentials that are not set, is reported, and the others
     are still fetched.
 
@@ -215,7 +214,10 @@ def fetch(names, inputs, update_manifest=False):
 
 
 def fetch_one(name, committed_path, root, update_manifest):
-    """Fetch one source, write it to a staging folder, and settle it.
+    """Fetch one source, and swap its folder in if the fetch may be kept.
+
+    ``manifests.write_checked`` writes the tables, and keeps them only if the
+    committed manifest allows.
 
     Args:
         name (str): The source, from FETCHERS.
@@ -230,15 +232,12 @@ def fetch_one(name, committed_path, root, update_manifest):
     tables, sources, counts = FETCHERS[name].fetch_source(
         root / "downloads" / name, committed
     )
-    with tempfile.TemporaryDirectory(dir=root) as staging:
-        built = write_source(
-            Path(staging), name, committed["version"], tables, sources, counts
-        )
-        return manifests.settle(
-            committed_path,
-            built,
-            Path(staging),
-            root / name,
-            [*built["files"], "manifest.json"],
-            update_manifest,
-        )
+    return manifests.write_checked(
+        root / name,
+        lambda folder: write_source(
+            folder, name, committed["version"], tables, sources, counts
+        ),
+        committed_path,
+        update_manifest,
+        f"python -m embedding_model sources fetch --source {name}",
+    )

@@ -90,7 +90,7 @@ def built_benchmarks(inputs):
     return {
         name: benchmarks.read_benchmark(inputs, name)
         for name in benchmarks.BUILDERS
-        if (folder / f"{name}_manifest.json").exists()
+        if (folder / name / "manifest.json").exists()
     }
 
 

@@ -703,7 +703,7 @@ class TestWriteBenchmark:
             (tmp_path / "abcd_targets.csv").read_bytes()
         )
         assert manifest["counts"] == {"source_variables": 1}
-        assert json.loads((tmp_path / "abcd_manifest.json").read_text()) == manifest
+        assert json.loads((tmp_path / "manifest.json").read_text()) == manifest
 
     def test_a_string_expected_target_is_refused(self, tmp_path):
         """An expected_target given as a string, not a list, is a TypeError."""
@@ -717,8 +717,8 @@ class TestReadBenchmark:
     @pytest.fixture
     def written(self, tmp_path):
         """A benchmark named abcd, written into a temp inputs folder."""
-        folder = tmp_path / "benchmarks"
-        folder.mkdir()
+        folder = tmp_path / "benchmarks" / "abcd"
+        folder.mkdir(parents=True)
         mappings = [mapping("RACE", ["b.race", "a.race"])]
         return benchmarks.write_benchmark(
             folder, "abcd", "1", [TARGET], mappings, [PIN], {}
@@ -739,8 +739,8 @@ class TestReadBenchmark:
 
     def test_a_corrupt_manifest_names_the_rebuild(self, written, tmp_path):
         """A manifest that is not JSON is named, with the rebuild command."""
-        (tmp_path / "benchmarks" / "abcd_manifest.json").write_text("")
-        with pytest.raises(ValueError, match="abcd_manifest.json cannot be read"):
+        (tmp_path / "benchmarks" / "abcd" / "manifest.json").write_text("")
+        with pytest.raises(ValueError, match="abcd/manifest.json cannot be read"):
             benchmarks.read_benchmark(tmp_path, "abcd")
 
     def test_a_version_not_committed_is_a_warning(
@@ -757,7 +757,9 @@ class TestReadBenchmark:
 
     def test_a_changed_file_is_refused(self, written, tmp_path):
         """A file whose SHA-256 differs from the manifest is named, with the rebuild command."""
-        with open(tmp_path / "benchmarks" / "abcd_mappings.csv", "a") as handle:
+        with open(
+            tmp_path / "benchmarks" / "abcd" / "abcd_mappings.csv", "a"
+        ) as handle:
             handle.write(",,,,,,,\n")
         with pytest.raises(
             ValueError, match="SHA-256 for abcd_mappings.csv; run: .*build --abcd"
@@ -766,27 +768,29 @@ class TestReadBenchmark:
 
     def test_another_benchmarks_manifest_is_refused(self, written, tmp_path):
         """A manifest that names another benchmark is not read as this one's."""
-        path = tmp_path / "benchmarks" / "abcd_manifest.json"
+        path = tmp_path / "benchmarks" / "abcd" / "manifest.json"
         path.write_text(json.dumps({**written, "benchmark": "efgh"}))
         with pytest.raises(ValueError, match="manifest of benchmark 'efgh'"):
             benchmarks.read_benchmark(tmp_path, "abcd")
 
     def test_a_manifest_without_its_files_names_the_rebuild(self, written, tmp_path):
         """A manifest that records no files is an error with the build command."""
-        path = tmp_path / "benchmarks" / "abcd_manifest.json"
+        path = tmp_path / "benchmarks" / "abcd" / "manifest.json"
         path.write_text(json.dumps({**written, "files": {}}))
         with pytest.raises(ValueError, match="KeyError.*run: .*build --abcd"):
             benchmarks.read_benchmark(tmp_path, "abcd")
 
     def test_files_with_other_columns_are_refused(self, written, tmp_path):
         """Files whose columns are not those of benchmarks build are not read."""
-        path = tmp_path / "benchmarks" / "abcd_targets.csv"
+        path = tmp_path / "benchmarks" / "abcd" / "abcd_targets.csv"
         path.write_text("target_property,target_type\nabcd.efgh,string\n")
         record = {**written}
         record["files"]["abcd_targets.csv"]["sha256"] = download.sha256(
             path.read_bytes()
         )
-        (tmp_path / "benchmarks" / "abcd_manifest.json").write_text(json.dumps(record))
+        (tmp_path / "benchmarks" / "abcd" / "manifest.json").write_text(
+            json.dumps(record)
+        )
         with pytest.raises(ValueError, match="do not have the columns"):
             benchmarks.read_benchmark(tmp_path, "abcd")
 
@@ -813,7 +817,11 @@ class TestBuild:
         )
         monkeypatch.setattr(benchmarks, "MANIFESTS", manifests)
         monkeypatch.setattr(benchmarks.manifests, "committed_version", lambda *_: None)
-        return built, manifests / "topmed.json", tmp_path / "inputs" / "benchmarks"
+        return (
+            built,
+            manifests / "topmed.json",
+            tmp_path / "inputs" / "benchmarks" / "topmed",
+        )
 
     def test_a_first_build_needs_accepting(self, setup, tmp_path):
         """Against a pins-only manifest, a build differs until accepted."""

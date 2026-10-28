@@ -95,7 +95,7 @@ def built(tmp_path, mappings, name="topmed"):
     Returns:
         Path: The inputs folder it was built into.
     """
-    folder = tmp_path / "inputs" / "benchmarks"
+    folder = tmp_path / "inputs" / "benchmarks" / name
     folder.mkdir(parents=True, exist_ok=True)
     benchmarks.write_benchmark(folder, name, "1", TARGETS, mappings, [], {})
     return tmp_path / "inputs"

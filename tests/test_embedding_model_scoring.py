@@ -219,6 +219,19 @@ class TestScore:
             )
         assert capsys.readouterr().err.count("They are replaced by those of") == 1
 
+    def test_a_model_folder_is_loaded_without_asking_hugging_face(
+        self, saved, inputs, monkeypatch, tmp_path
+    ):
+        """Loading a model folder sends no request to Hugging Face for its card."""
+        from sentence_transformers.base import model_card
+
+        asked = []
+        monkeypatch.setattr(
+            model_card, "get_model_info", lambda *args, **kwargs: asked.append(args)
+        )
+        scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
+        assert asked == []
+
     def test_a_relative_model_path_is_recorded_in_full(
         self, model, inputs, monkeypatch, capsys, tmp_path
     ):
@@ -362,6 +375,28 @@ class TestCommandLine:
         )
         assert status == 1
         assert "benchmarks build --gdc" in capsys.readouterr().err
+
+    def test_a_model_that_cannot_be_loaded_is_named(self, inputs, capsys, tmp_path):
+        """A folder that holds no model is named, and score exits 1."""
+        empty = tmp_path / "abcd-model"
+        empty.mkdir()
+        status = main(
+            [
+                "score",
+                "--model",
+                str(empty),
+                "--benchmark",
+                "topmed",
+                "--inputs",
+                str(inputs),
+                "--outputs",
+                str(tmp_path / "outputs"),
+                "--device",
+                "cpu",
+            ]
+        )
+        assert status == 1
+        assert f"the model {empty} cannot be loaded" in capsys.readouterr().err
 
     def test_score_needs_a_known_benchmark(self):
         """An unknown benchmark is a usage error."""

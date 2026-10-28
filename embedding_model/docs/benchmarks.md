@@ -22,7 +22,9 @@ that a build writes under `DIR`, in place of `embedding_model/inputs/`; see
 [Inputs and outputs](../README.md#inputs-and-outputs).
 
 Every build is checked against the benchmark's committed manifest; see
-[The manifest](#the-manifest). To build a benchmark from updated sources, see
+[The manifest](#the-manifest). A benchmark that cannot be built, such as one
+whose download fails, is reported, and the other benchmarks are still built.
+The command then exits with status 1. To build a benchmark from updated sources, see
 [Making a new version](manifests.md#making-a-new-version). An updated source
 can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 

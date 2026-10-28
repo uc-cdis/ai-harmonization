@@ -254,11 +254,11 @@ def build(name, sources, inputs):
 
     Returns:
         int: 0 if the corpus was written, 1 if a name, a source or a benchmark
-            stops the build.
+            stops the build, or no pair is left to write.
 
     Raises:
-        OSError: If the corpus cannot be written or moved into place. The last
-            corpus of that name is then kept.
+        OSError: If the corpus cannot be written or moved into place. The
+            previous corpus of that name is then kept.
     """
     if not FOLDER_NAME.fullmatch(name):
         print(
@@ -303,6 +303,12 @@ def build(name, sources, inputs):
         pairs_manifests.append(pairs_manifest)
         print(f"  {source:<7}{len(pairs):>10,} pairs")
     distinct, copy_sources = combine(frames)
+    if distinct.empty:
+        print(
+            f"no pairs in {', '.join(sources)}, so there is no corpus to build",
+            file=sys.stderr,
+        )
+        return 1
     # The sources' own frames, and the last one read, are not needed past this
     # point. Freeing them lowers the peak memory.
     del frames, pairs
@@ -327,6 +333,13 @@ def build(name, sources, inputs):
         [distinct.loc[findings.pair].reset_index(drop=True), detail], axis=1
     )
     kept = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
+    if kept.empty:
+        print(
+            f"leakage prevention dropped all {len(distinct):,} pairs, so there is"
+            " no corpus to build",
+            file=sys.stderr,
+        )
+        return 1
     kept["split"] = splits(kept)
 
     destination = Path(inputs) / "corpora" / name

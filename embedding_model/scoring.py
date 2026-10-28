@@ -329,8 +329,9 @@ def score(
 
     Every benchmark is read and checked first. So a missing or changed one
     stops scoring before the model is loaded. The model is then loaded once,
-    and scored on each benchmark in turn. A model on disk is recorded by its
-    full path, and a Hugging Face model by its id.
+    and scored on each benchmark in turn. A model on disk is loaded without
+    asking Hugging Face, and recorded by its full path. A Hugging Face model
+    is recorded by its id.
 
     For each benchmark, it writes:
 
@@ -351,6 +352,12 @@ def score(
 
     Returns:
         list[dict]: The metrics rows, one per benchmark.
+
+    Raises:
+        FileNotFoundError: If a benchmark has not been built.
+        ValueError: If a benchmark cannot be read, differs from its manifest
+            or lists an expected target that is not among its targets, or if
+            the model cannot be loaded.
     """
     import sentence_transformers
     from sentence_transformers import SentenceTransformer
@@ -360,7 +367,15 @@ def score(
         name: benchmark_texts(targets, mappings, text_format)
         for name, (targets, mappings, _) in built.items()
     }
-    encoder = SentenceTransformer(model, device=device)
+    try:
+        encoder = SentenceTransformer(
+            model, device=device, local_files_only=Path(model).is_dir()
+        )
+    except Exception as error:
+        raise ValueError(
+            f"the model {model} cannot be loaded ({type(error).__name__}:"
+            f" {error}); give a model folder on disk or a Hugging Face model id"
+        ) from error
     scored = str(Path(model).resolve()) if Path(model).is_dir() else model
     code = code_commit()
     revision = model_revision(model)

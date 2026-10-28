@@ -345,7 +345,7 @@ class TestBuild:
 
     def test_a_copy_gives_its_study_to_the_pair_kept(self, inputs, capsys):
         """A later source's copy with a benchmark study gets the kept pair dropped."""
-        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd")])
+        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd"), pair("Stuv", "Stuv")])
         write_pairs(inputs, "phenx", [pair("Wxyz", "Wxyz Abcd", study="phs999902")])
         assert corpus.build("abcd", ["ncit", "phenx"], inputs) == 0
         dropped = pd.read_parquet(inputs / "corpora" / "abcd" / "dropped.parquet")
@@ -468,6 +468,20 @@ class TestBuild:
         error = capsys.readouterr().err
         assert "leakage prevention cannot run" in error
         assert "node2.efgh_value" in error
+        assert not (inputs / "corpora" / "abcd").exists()
+
+    def test_sources_without_pairs_build_no_corpus(self, inputs, capsys):
+        """Sources that hold no pairs are reported, and no corpus is written."""
+        write_pairs(inputs, "ncit", pd.DataFrame([pair()]).iloc[:0])
+        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert "no pairs in ncit" in capsys.readouterr().err
+        assert not (inputs / "corpora" / "abcd").exists()
+
+    def test_a_corpus_that_would_be_empty_is_not_written(self, inputs, capsys):
+        """When leakage prevention drops every pair, no corpus is written."""
+        write_pairs(inputs, "ncit", PLANTED[:3])
+        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert "dropped all 3 pairs" in capsys.readouterr().err
         assert not (inputs / "corpora" / "abcd").exists()
 
     def test_pairs_that_cannot_be_read_name_the_source(self, inputs, capsys):

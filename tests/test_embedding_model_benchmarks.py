@@ -826,6 +826,26 @@ class TestBuild:
         assert json.loads(manifest.read_text())["files"]
         assert benchmarks.build(["topmed"], tmp_path / "inputs") == 0
 
+    def test_a_failing_benchmark_does_not_stop_the_others(
+        self, setup, monkeypatch, capsys, tmp_path
+    ):
+        """A benchmark whose build fails is reported, and the next one is still built."""
+        _, manifest, working = setup
+
+        def fail(downloads, committed):
+            """A build whose download fails."""
+            raise ConnectionError("abcd.org does not answer")
+
+        monkeypatch.setattr(gdc, "build", fail)
+        (manifest.parent / "gdc.json").write_text(manifest.read_text())
+        status = benchmarks.build(
+            ["gdc", "topmed"], tmp_path / "inputs", update_manifest=True
+        )
+        assert status == 1
+        error = capsys.readouterr().err
+        assert "gdc not built: ConnectionError: abcd.org does not answer" in error
+        assert (working / "topmed_mappings.csv").exists()
+
     def test_a_differing_build_leaves_the_working_files(self, setup, tmp_path):
         """A build that differs exits 1 and leaves the files and manifest as they were."""
         built, manifest, working = setup

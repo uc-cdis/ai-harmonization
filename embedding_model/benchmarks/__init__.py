@@ -17,6 +17,7 @@ what differs.
 import csv
 import io
 import json
+import sys
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -175,7 +176,9 @@ def build(names, inputs, update_manifest=False):
     the working ones. If not, the differences are printed, the working files
     are left as they were, and the exit status is 1. A version committed in git
     never changes: a differing build is accepted only under a version not
-    committed yet, and not at all when git cannot be asked.
+    committed yet, and not at all when git cannot be asked. A benchmark that
+    cannot be built, such as one whose download fails, is reported, and the
+    others are still built.
 
     Args:
         names (list[str]): Benchmarks to build, from BUILDERS.
@@ -191,28 +194,49 @@ def build(names, inputs, update_manifest=False):
     directory.mkdir(parents=True, exist_ok=True)
     status = 0
     for name in names:
-        committed_path = MANIFESTS / f"{name}.json"
-        committed = json.loads(committed_path.read_text(encoding="utf-8"))
         print(f"{name}:")
-        targets, mappings, sources, counts = BUILDERS[name].build(
-            directory / "downloads" / name, committed
-        )
-        with tempfile.TemporaryDirectory(dir=directory) as staging:
-            built = write_benchmark(
-                Path(staging),
-                name,
-                committed["version"],
-                targets,
-                mappings,
-                sources,
-                counts,
+        try:
+            status |= build_one(name, directory, update_manifest)
+        except Exception as error:
+            print(
+                f"  {name} not built: {type(error).__name__}: {error}",
+                file=sys.stderr,
             )
-            status |= manifests.settle(
-                committed_path,
-                built,
-                Path(staging),
-                directory,
-                [*built["files"], f"{name}_manifest.json"],
-                update_manifest,
-            )
+            status = 1
     return status
+
+
+def build_one(name, directory, update_manifest):
+    """Build one benchmark, write it to a staging folder, and settle it.
+
+    Args:
+        name (str): The benchmark, from BUILDERS.
+        directory (Path): The inputs folder's ``benchmarks/``.
+        update_manifest (bool): As in ``build``.
+
+    Returns:
+        int: 0 if the build matches or was accepted, 1 otherwise.
+    """
+    committed_path = MANIFESTS / f"{name}.json"
+    committed = json.loads(committed_path.read_text(encoding="utf-8"))
+    targets, mappings, sources, counts = BUILDERS[name].build(
+        directory / "downloads" / name, committed
+    )
+    with tempfile.TemporaryDirectory(dir=directory) as staging:
+        built = write_benchmark(
+            Path(staging),
+            name,
+            committed["version"],
+            targets,
+            mappings,
+            sources,
+            counts,
+        )
+        return manifests.settle(
+            committed_path,
+            built,
+            Path(staging),
+            directory,
+            [*built["files"], f"{name}_manifest.json"],
+            update_manifest,
+        )

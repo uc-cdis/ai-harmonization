@@ -194,8 +194,8 @@ def main(argv=None):
                 args.device,
                 args.batch_size,
             )
-        except (FileNotFoundError, ValueError) as error:
-            print(f"score: {error}", file=sys.stderr)
+        except Exception as error:
+            print(f"score: {type(error).__name__}: {error}", file=sys.stderr)
             return 1
         return 0
     if args.step == "benchmarks" and args.action == "build":

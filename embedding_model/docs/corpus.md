@@ -21,6 +21,12 @@ train the tokenizer on the training pairs alone.
 corpus's manifest records the counts. They depend on the sources and the
 benchmarks of the build.
 
+The build stops, and writes no corpus, in three cases:
+
+- no benchmark is built, so the pairs cannot be checked for leakage;
+- the sources named hold no pairs;
+- leakage prevention drops every pair.
+
 ## Combining the sources
 
 The sources are read in the order that the

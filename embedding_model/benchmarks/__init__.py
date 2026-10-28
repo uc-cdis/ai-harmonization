@@ -100,9 +100,7 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
         "sources": sources,
         "counts": counts,
     }
-    (directory / "manifest.json").write_text(
-        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-    )
+    manifests.write(directory / "manifest.json", manifest)
     return manifest
 
 

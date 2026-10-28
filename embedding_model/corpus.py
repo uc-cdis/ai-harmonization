@@ -21,14 +21,13 @@ last corpus of that name only once it is complete.
 """
 
 import hashlib
-import json
 import sys
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
-from embedding_model import benchmarks, leakage
+from embedding_model import benchmarks, leakage, manifests
 from embedding_model.download import file_sha256
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
@@ -363,9 +362,7 @@ def build(name, sources, inputs):
             },
             shared_vocabulary=shared_vocabulary,
         )
-        (built / "manifest.json").write_text(
-            json.dumps(written, indent=2) + "\n", encoding="utf-8"
-        )
+        manifests.write(built / "manifest.json", written)
     rows = written["counts"]["rows"]
     counted = written["counts"]["leakage_findings"]["by_finding"]
     print(

@@ -107,6 +107,15 @@ class TestRead:
         path.write_text(json.dumps({"source": "abcd", "files": {}}))
         assert self.read(path) == {"source": "abcd", "files": {}}
 
+    def test_a_written_manifest_reads_back(self, tmp_path):
+        """A manifest is written as indented JSON with a final newline, and reads back."""
+        path = tmp_path / "manifest.json"
+        manifest = {"source": "abcd", "files": {"abcd.parquet": {"rows": 1}}}
+        manifests.write(path, manifest)
+        assert path.read_text().endswith("}\n")
+        assert '\n  "files": {' in path.read_text()
+        assert self.read(path) == manifest
+
     def test_a_missing_manifest_names_the_command(self, tmp_path):
         """A manifest never written is named, with the command that writes it."""
         with pytest.raises(FileNotFoundError, match=f"missing; run: {self.COMMAND}"):

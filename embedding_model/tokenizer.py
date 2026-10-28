@@ -25,7 +25,6 @@ tokenizer is not broken.
 """
 
 import itertools
-import json
 import sys
 from collections import Counter
 from datetime import date
@@ -35,6 +34,7 @@ import pandas as pd
 import tokenizers
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 
+from embedding_model import manifests
 from embedding_model.corpus import TRAIN, read_corpus
 from embedding_model.download import file_sha256
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
@@ -303,9 +303,7 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
             learned_vocab_size=tokenizer.get_vocab_size(),
             measured=measured,
         )
-        (built / "manifest.json").write_text(
-            json.dumps(written, indent=2) + "\n", encoding="utf-8"
-        )
+        manifests.write(built / "manifest.json", written)
     if tokenizer.get_vocab_size() < vocab_size:
         print(
             f"  note: {tokenizer.get_vocab_size():,} tokens, fewer than the"

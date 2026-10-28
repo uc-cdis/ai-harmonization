@@ -12,7 +12,6 @@ version. A version committed in git never changes.
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 from embedding_model.folders import staged
 
@@ -136,6 +135,16 @@ def committed_version(folder, name):
     if shown.returncode != 0:
         return None
     return json.loads(shown.stdout)["version"]
+
+
+def write(path, manifest):
+    """Write a manifest as JSON, in the one format that every manifest has.
+
+    Args:
+        path (Path): Where the manifest goes.
+        manifest (dict): The manifest.
+    """
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
 
 def read(path, command, field, name):
@@ -269,7 +278,7 @@ def record(committed_path, built, differing, directory):
     for file, entry in built["files"].items():
         print(f"  {directory / file}: {entry['rows']:,} rows")
     if differing:
-        committed_path.write_text(json.dumps(built, indent=2) + "\n", encoding="utf-8")
+        write(committed_path, built)
         print(f"  accepted, and recorded in {committed_path}")
     else:
         print(f"  matches {committed_path.name}")

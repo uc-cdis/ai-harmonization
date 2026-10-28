@@ -277,9 +277,7 @@ def prepare_one(name, inputs, root):
     written = root / f"{name}.parquet"
     pairs.to_parquet(written, index=False)
     found = manifest(name, pairs, file_sha256(written), counts, fetch)
-    (root / f"{name}_manifest.json").write_text(
-        json.dumps(found, indent=2) + "\n", encoding="utf-8"
-    )
+    manifests.write(root / f"{name}_manifest.json", found)
     print(
         f"  {len(pairs):,} pairs from {counts['items']:,} items; "
         f"{counts['items_not_open']:,} items not open, "

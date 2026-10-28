@@ -59,7 +59,7 @@ def identities(manifest):
     }
 
 
-def differences(committed, built):
+def differences(committed, built_manifest):
     """What differs between a committed manifest and a new build's manifest.
 
     A source is identified by its SHA-256 where it has one, and otherwise by
@@ -69,12 +69,12 @@ def differences(committed, built):
 
     Args:
         committed (dict): The manifest under ``manifests/``.
-        built (dict): The manifest of the build just made.
+        built_manifest (dict): The manifest of the build just made.
 
     Returns:
         list[str]: One line per difference; empty when the two match.
     """
-    before, after = identities(committed), identities(built)
+    before, after = identities(committed), identities(built_manifest)
     keys = [*before, *(key for key in after if key not in before)]
     return [
         f"{key}: {before.get(key)} -> {after.get(key)}"
@@ -212,7 +212,7 @@ class Refused(Exception):
     """A build that differs from its committed manifest, and is not accepted."""
 
 
-def decide(committed_path, built, update_manifest, command):
+def decide(committed_path, built_manifest, update_manifest, command):
     """Whether a build may replace the working one; raise Refused if not.
 
     A build that matches its committed manifest may replace the working one. A
@@ -224,7 +224,7 @@ def decide(committed_path, built, update_manifest, command):
 
     Args:
         committed_path (Path): The committed manifest.
-        built (dict): The new build's manifest.
+        built_manifest (dict): The new build's manifest.
         update_manifest (bool): Accept a build that differs.
         command (str): The command that made the build, for the messages.
 
@@ -235,7 +235,7 @@ def decide(committed_path, built, update_manifest, command):
         Refused: If the build differs and is not accepted.
     """
     committed = json.loads(committed_path.read_text(encoding="utf-8"))
-    differing = differences(committed, built)
+    differing = differences(committed, built_manifest)
     if not differing:
         return differing
     version = committed["version"]
@@ -266,19 +266,19 @@ def decide(committed_path, built, update_manifest, command):
     raise Refused(refusal)
 
 
-def record(committed_path, built, differing, directory):
+def record(committed_path, built_manifest, differing, directory):
     """Report a build that is in place, and record it if it was accepted.
 
     Args:
         committed_path (Path): The committed manifest.
-        built (dict): The build's manifest.
+        built_manifest (dict): The build's manifest.
         differing (list[str]): The differences that ``decide`` returned.
         directory (Path): Where the build now is.
     """
-    for file, entry in built["files"].items():
+    for file, entry in built_manifest["files"].items():
         print(f"  {directory / file}: {entry['rows']:,} rows")
     if differing:
-        write(committed_path, built)
+        write(committed_path, built_manifest)
         print(f"  accepted, and recorded in {committed_path}")
     else:
         print(f"  matches {committed_path.name}")
@@ -304,10 +304,10 @@ def write_checked(destination, write, committed_path, update_manifest, command):
         int: 0 if the build matches or was accepted, 1 if it was refused.
     """
     try:
-        with staged(destination) as folder:
-            built = write(folder)
-            differing = decide(committed_path, built, update_manifest, command)
+        with staged(destination) as built:
+            built_manifest = write(built)
+            differing = decide(committed_path, built_manifest, update_manifest, command)
     except Refused:
         return 1
-    record(committed_path, built, differing, destination)
+    record(committed_path, built_manifest, differing, destination)
     return 0

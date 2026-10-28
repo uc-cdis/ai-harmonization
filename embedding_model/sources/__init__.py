@@ -232,8 +232,8 @@ def fetch_one(name, committed_path, root, update_manifest):
     )
     return manifests.write_checked(
         root / name,
-        lambda folder: write_source(
-            folder, name, committed["version"], tables, sources, counts
+        lambda built: write_source(
+            built, name, committed["version"], tables, sources, counts
         ),
         committed_path,
         update_manifest,

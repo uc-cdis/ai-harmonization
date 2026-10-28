@@ -225,8 +225,8 @@ def build_one(name, directory, update_manifest):
     )
     return manifests.write_checked(
         directory / name,
-        lambda folder: write_benchmark(
-            folder, name, committed["version"], targets, mappings, sources, counts
+        lambda built: write_benchmark(
+            built, name, committed["version"], targets, mappings, sources, counts
         ),
         committed_path,
         update_manifest,

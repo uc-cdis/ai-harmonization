@@ -345,7 +345,7 @@ def build(name, sources, inputs):
     with staged(destination) as built:
         kept.to_parquet(built / "pairs.parquet", index=False)
         dropped.to_parquet(built / "dropped.parquet", index=False)
-        written = manifest(
+        corpus_manifest = manifest(
             name=name,
             distinct=distinct,
             copy_sources=copy_sources,
@@ -362,9 +362,9 @@ def build(name, sources, inputs):
             },
             shared_vocabulary=shared_vocabulary,
         )
-        manifests.write(built / "manifest.json", written)
-    rows = written["counts"]["rows"]
-    counted = written["counts"]["leakage_findings"]["by_finding"]
+        manifests.write(built / "manifest.json", corpus_manifest)
+    rows = corpus_manifest["counts"]["rows"]
+    counted = corpus_manifest["counts"]["leakage_findings"]["by_finding"]
     print(
         f"  {rows['leakage_removed']:,} pairs dropped for leakage"
         + (

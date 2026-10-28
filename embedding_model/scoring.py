@@ -444,7 +444,7 @@ def score(
         print(
             "  "
             + ", ".join(f"{metric} {metrics[metric]}" for metric in METRIC_COLUMNS)
-            + f"\n  written to {folder}"
+            + f"\n  -> {folder}"
         )
         rows.append(row)
     return rows

@@ -227,8 +227,8 @@ def manifest(
 def train(corpus, name, vocab_size, min_frequency, inputs):
     """Learn a corpus's vocabulary, and write the tokenizer with its manifest.
 
-    The tokenizer is written to a staging folder first, and replaces the last
-    one of that name only once it is complete.
+    The tokenizer is written to a staging folder first, and replaces the
+    previous one of that name only once it is complete.
 
     Args:
         corpus (str): The corpus's name, under ``<inputs>/corpora/``.
@@ -244,7 +244,7 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
 
     Raises:
         Exception: If the tokenizer cannot be written or moved into place. The
-            last tokenizer of that name is then kept. ``tokenizers`` raises a
+            previous tokenizer of that name is then kept. ``tokenizers`` raises a
             plain Exception when it cannot write.
     """
     if not FOLDER_NAME.fullmatch(corpus):
@@ -293,7 +293,7 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
     destination = Path(inputs) / "tokenizers" / name
     with staged(destination) as built:
         tokenizer.save(str(built / "tokenizer.json"))
-        written = manifest(
+        tokenizer_manifest = manifest(
             name=name,
             corpus_manifest=corpus_manifest,
             vocab_size=vocab_size,
@@ -303,7 +303,7 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
             learned_vocab_size=tokenizer.get_vocab_size(),
             measured=measured,
         )
-        manifests.write(built / "manifest.json", written)
+        manifests.write(built / "manifest.json", tokenizer_manifest)
     if tokenizer.get_vocab_size() < vocab_size:
         print(
             f"  note: {tokenizer.get_vocab_size():,} tokens, fewer than the"

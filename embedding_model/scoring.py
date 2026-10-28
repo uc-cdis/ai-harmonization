@@ -24,6 +24,7 @@ import yaml
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
+from embedding_model.folders import staged
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 5, 10)
@@ -284,9 +285,9 @@ def scores_folder(outputs, model, benchmark, text_format):
 def write_scores(folder, row, mappings, ranked, config):
     """Write one scoring's files: metrics.csv, per_variable.csv and config.yaml.
 
-    The old config.yaml is removed first and the new one written last. So a
-    folder with a config.yaml always holds the scores that this config
-    describes.
+    The folder is written whole, through ``folders.staged``. So a scoring that
+    fails while it writes leaves the previous scores as they were, and the
+    files in a folder always come from one scoring.
 
     Args:
         folder (Path): The scores folder, from scores_folder.
@@ -296,9 +297,6 @@ def write_scores(folder, row, mappings, ranked, config):
             number, from rank_targets.
         config (dict): What config.yaml holds.
     """
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "config.yaml").unlink(missing_ok=True)
-    pd.DataFrame([row]).to_csv(folder / "metrics.csv", index=False)
     per_variable = mappings[
         [
             "source_study_id",
@@ -310,10 +308,29 @@ def write_scores(folder, row, mappings, ranked, config):
     ].copy()
     for column in ("rank", "top1_target", "top1_similarity"):
         per_variable[column] = [ranked[str(i)][column] for i in range(len(mappings))]
-    per_variable.to_csv(folder / "per_variable.csv", index=False)
-    (folder / "config.yaml").write_text(
-        yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
-    )
+    with staged(folder) as built:
+        pd.DataFrame([row]).to_csv(built / "metrics.csv", index=False)
+        per_variable.to_csv(built / "per_variable.csv", index=False)
+        (built / "config.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
+        )
+
+
+def scored_model(folder):
+    """The model whose scores a scores folder holds, from its config.yaml.
+
+    Args:
+        folder (Path): The scores folder, from scores_folder.
+
+    Returns:
+        str | None: The model, or None when the folder has no config.yaml
+            that can be read.
+    """
+    try:
+        config = yaml.safe_load((folder / "config.yaml").read_text(encoding="utf-8"))
+        return config.get("model")
+    except Exception:
+        return None
 
 
 def score(
@@ -416,15 +433,13 @@ def score(
             "scored": datetime.now().isoformat(timespec="seconds"),
         }
         folder = scores_folder(outputs, model, name, text_format)
-        if (folder / "config.yaml").exists():
-            text = (folder / "config.yaml").read_text(encoding="utf-8")
-            previous = (yaml.safe_load(text) or {}).get("model")
-            if previous and previous != scored:
-                print(
-                    f"warning: {folder} held the scores of {previous}. They are "
-                    f"replaced by those of {scored}.",
-                    file=sys.stderr,
-                )
+        previous = scored_model(folder)
+        if previous and previous != scored:
+            print(
+                f"warning: {folder} held the scores of {previous}. They are "
+                f"replaced by those of {scored}.",
+                file=sys.stderr,
+            )
         write_scores(folder, row, mappings, ranked, config)
         print(
             "  "

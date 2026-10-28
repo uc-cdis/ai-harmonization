@@ -1,5 +1,7 @@
 """Tests for the embedding model's scoring: texts, ranks, metrics and outputs."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -249,12 +251,15 @@ class TestScore:
         assert config["model"] == str((tmp_path / "b" / "abcd-model").resolve())
         assert "They are replaced by those of" in capsys.readouterr().err
 
-    def test_an_empty_config_is_replaced_quietly(self, saved, inputs, capsys, tmp_path):
-        """An empty config.yaml, left by an interrupted write, is replaced with no warning."""
+    @pytest.mark.parametrize("text", ["", "{", "[1, 2]"])
+    def test_a_config_that_cannot_be_read_is_replaced_quietly(
+        self, text, saved, inputs, capsys, tmp_path
+    ):
+        """A config.yaml that names no model, or is not YAML, is replaced with no warning."""
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
         folder = folder / texts.DEFAULT_FORMAT
         folder.mkdir(parents=True)
-        (folder / "config.yaml").write_text("")
+        (folder / "config.yaml").write_text(text)
         scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
         assert "warning" not in capsys.readouterr().err
         assert yaml.safe_load((folder / "config.yaml").read_text())["model"]
@@ -308,6 +313,44 @@ class TestScoresFolder:
             for text_format in ("stdelement", texts.DEFAULT_FORMAT)
         }
         assert len(folders) == 2
+
+
+class TestWriteScores:
+    """Writing one scoring's files as a whole folder."""
+
+    def test_a_failed_write_keeps_the_previous_scores(self, tmp_path):
+        """A scoring that fails while it writes leaves the previous files, all of them."""
+        folder = tmp_path / "scores" / "abcd-model" / "topmed" / "compact"
+        folder.mkdir(parents=True)
+        (folder / "metrics.csv").write_text("previous")
+        mappings = pd.DataFrame(
+            {
+                column: ["abcd"]
+                for column in (
+                    "source_study_id",
+                    "source_table_id",
+                    "source_variable_id",
+                    "source_variable_name",
+                    "expected_target",
+                )
+            }
+        )
+
+        to_csv = pd.DataFrame.to_csv
+
+        def failing(frame, path, **keywords):
+            """Write metrics.csv, then fail on per_variable.csv, as on a full disk."""
+            if Path(path).name == "per_variable.csv":
+                raise OSError("no space left on device")
+            return to_csv(frame, path, **keywords)
+
+        ranked = {"0": {"rank": 1, "top1_target": "a.b", "top1_similarity": 0.9}}
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(pd.DataFrame, "to_csv", failing)
+            with pytest.raises(OSError):
+                scoring.write_scores(folder, {"mrr": 1.0}, mappings, ranked, {})
+        assert (folder / "metrics.csv").read_text() == "previous"
+        assert [path.name for path in folder.parent.iterdir()] == ["compact"]
 
 
 class TestModelRevision:

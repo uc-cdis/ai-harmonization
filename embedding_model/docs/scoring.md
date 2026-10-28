@@ -115,7 +115,9 @@ scores. `<model>` is:
 model folders with the same name share a scores folder. Scoring the second
 replaces the first model's scores, with a warning.
 
-The folder holds:
+The folder is written whole, so a scoring that fails leaves the previous
+scores as they were; see [Inputs and outputs](../README.md#inputs-and-outputs).
+It holds:
 
 - `metrics.csv`, one row: `model`, `benchmark`, `benchmark_version`, `format`,
   `n` (the variables scored), `targets`, `mrr`, `accuracy@1`, `accuracy@5`,

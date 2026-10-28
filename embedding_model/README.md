@@ -249,11 +249,12 @@ scores. Both folders are gitignored.
 That is useful for a full corpus's token cache, which can run to tens of
 gigabytes.
 
-A benchmark, a source's tables, a source's pairs, a corpus and a tokenizer are
-each written whole. For example, `corpus build --name abcd` first writes the
-new corpus into a hidden staging folder, `corpora/.abcd.x1y2/`, next to
-`corpora/abcd/`. Only when the new corpus is complete does it replace
-`corpora/abcd/`. So a run that fails leaves the previous corpus as it was.
+A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer and a
+model's scores are each written whole. For example, `corpus build --name abcd`
+first writes the new corpus into a hidden staging folder,
+`corpora/.abcd.x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
+complete does it replace `corpora/abcd/`. So a run that fails leaves the
+previous corpus as it was.
 
 A run that is killed, such as by a time limit, cannot delete its staging
 folder. The next run of `corpus build --name abcd` then prints a warning with

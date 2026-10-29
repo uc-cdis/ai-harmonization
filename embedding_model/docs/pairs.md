@@ -260,6 +260,12 @@ Some NCIt and caDSR definitions follow a template with the headings
 "EXAMPLE(S):", "OTHER NAME(S):" and "NOTE(S):". A heading with nothing after
 it is removed from a description.
 
+NCIt, caDSR and NIH CDE add notices about Executive Order 14168 to some
+definitions. One reads: "This content is being reviewed for compliance with
+Executive Order 14168 ...". CDISC copies NCIt's notices. A notice says
+nothing about the concept, so it is removed from a description. A description
+that was only a notice, as some retired NCIt concepts have, is dropped.
+
 ## Each source
 
 Each source's section below has the same parts: the items, the canonical,

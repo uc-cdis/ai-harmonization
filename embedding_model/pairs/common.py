@@ -164,6 +164,24 @@ CURATION = re.compile(
 EMPTY_HEADING = re.compile(
     r"\s*\b(?:EXAMPLE|OTHER NAME|NOTE)\(S\):\s*(?=(?:EXAMPLE|OTHER NAME|NOTE)\(S\):|$)"
 )
+# The notices that publishers add to definitions about Executive Order 14168.
+# They say nothing about the concept: NCIt's, after "IMPORTANT NOTICE:" or in
+# brackets, and the one that it gives as a retired concept's whole
+# definition; caDSR's; and NIH CDE's. CDISC copies NCIt's.
+NOTICE = re.compile(
+    r"\[?(?:IMPORTANT NOTICE: )?The NCI Thesaurus contains biomedical"
+    r" terminologies that NCI does not own or control\. This concept contains"
+    r" gender-related content that does not comply with Executive Order"
+    r" 14168\.\]?"
+    r"|This concept has been retired and marked obsolete to ensure compliance"
+    r" with the Executive Order 14168 which mandates that gender should not be"
+    r" used as a replacement for sex\."
+    r"|This content is being reviewed for compliance with Executive Order 14168"
+    r" which mandates that gender should not be used as a replacement for sex\."
+    r'|NLM disclaimer: Consistent with Executive Order 14168, "gender" should'
+    r' not be used as a replacement for the element "sex" in the NIH CDE'
+    r" repository\."
+)
 # A question's letter item, as in "C. What year?". It is taken only from a text
 # that ends with "?", since "H. Influenzae" names a germ.
 LETTER_ITEM = re.compile(r"^[A-Z]\.\s+(?=[A-Z][a-z])")
@@ -478,9 +496,11 @@ def cleaned(item):
     """An item with every text cleaned, and texts that clean to nothing dropped.
 
     When the description is empty, the first other description takes its
-    place. A description loses the empty headings of the template that some
-    NCIt and caDSR definitions follow, such as ``NOTE(S):``. Value lists that
-    clean to the same values are kept once.
+    place. A description loses the publishers' notices about Executive Order
+    14168, in NOTICE, and then the empty headings of the template that some
+    NCIt and caDSR definitions follow, such as ``NOTE(S):``. A description
+    that was only a notice is dropped. Value lists that clean to the same
+    values are kept once.
     """
     texts = [
         Text(text, found.term_type, found.question, found.study)
@@ -490,7 +510,7 @@ def cleaned(item):
     descriptions = [
         text
         for text in (
-            " ".join(EMPTY_HEADING.sub(" ", clean(found)).split())
+            " ".join(EMPTY_HEADING.sub(" ", NOTICE.sub(" ", clean(found))).split())
             for found in [item.description, *item.descriptions]
         )
         if text

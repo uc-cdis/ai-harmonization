@@ -628,6 +628,36 @@ class TestStar:
             ["An efgh. NOTE(S): Ijkl."],
         )
 
+    def test_publishers_notices_go_from_a_description(self):
+        """A notice about Executive Order 14168 goes, and a notice alone is no description."""
+        item = common.cleaned(
+            Item(
+                id="abcd1",
+                canonical="Abcd",
+                description=(
+                    "This concept has been retired and marked obsolete to ensure"
+                    " compliance with the Executive Order 14168 which mandates that"
+                    " gender should not be used as a replacement for sex."
+                ),
+                descriptions=[
+                    "An abcd. [The NCI Thesaurus contains biomedical terminologies"
+                    " that NCI does not own or control. This concept contains"
+                    " gender-related content that does not comply with Executive"
+                    " Order 14168.]",
+                    "Values M or F This content is being reviewed for compliance"
+                    " with Executive Order 14168 which mandates that gender should"
+                    " not be used as a replacement for sex.",
+                    "An efgh. NLM disclaimer: Consistent with Executive Order 14168,"
+                    ' "gender" should not be used as a replacement for the element'
+                    ' "sex" in the NIH CDE repository. NOTE(S):',
+                ],
+            )
+        )
+        assert (item.description, item.descriptions) == (
+            "An abcd.",
+            ["Values M or F", "An efgh."],
+        )
+
     def test_a_draft_is_used_and_marked(self):
         """A draft item is used like a current item, and it keeps its status."""
         found, _ = common.star(

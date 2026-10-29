@@ -23,7 +23,7 @@
     {
       "role": "release",
       "name": "MONDO release",
-      "location": "http://purl.obolibrary.org/obo/mondo/releases/2026-10-06/mondo-base.owl",
+      "location": "https://purl.obolibrary.org/obo/mondo/releases/2026-10-06/mondo-base.owl",
       "version": "2026-10-06",
       "sha256": "dc62a6809cce0954f3a59a9c4b6e1a644bd56b411d8d2538b6eaa79d1ebf4f30",
       "license": "CC-BY-4.0",
@@ -32,7 +32,7 @@
     {
       "role": "release",
       "name": "HP release",
-      "location": "http://purl.obolibrary.org/obo/hp/releases/2026-09-01/hp-base.owl",
+      "location": "https://purl.obolibrary.org/obo/hp/releases/2026-09-01/hp-base.owl",
       "version": "2026-09-01",
       "sha256": "42c7e775d590837d838701d264740c79c8f343fd67ef0f5a68d6569965445558",
       "license": "LicenseRef-HPO",
@@ -41,7 +41,7 @@
     {
       "role": "release",
       "name": "UBERON release",
-      "location": "http://purl.obolibrary.org/obo/uberon/releases/2026-10-01/uberon-base.owl",
+      "location": "https://purl.obolibrary.org/obo/uberon/releases/2026-10-01/uberon-base.owl",
       "version": "2026-10-01",
       "sha256": "e69b77112e073da633d60b20aeec48dfc70eca98d7500707bbb3b43bcef2971c",
       "license": "CC-BY-3.0",
@@ -50,7 +50,7 @@
     {
       "role": "release",
       "name": "OBA release",
-      "location": "http://purl.obolibrary.org/obo/oba/releases/2026-10-10/oba-base.owl",
+      "location": "https://purl.obolibrary.org/obo/oba/releases/2026-10-10/oba-base.owl",
       "version": "2026-10-10",
       "sha256": "3c69ad2dbf9154f7eb546cae0196ec71869dac06711b585181b3a17091b34715",
       "license": "CC0-1.0",
@@ -59,7 +59,7 @@
     {
       "role": "service",
       "name": "CMO release",
-      "location": "http://purl.obolibrary.org/obo/cmo.owl",
+      "location": "https://purl.obolibrary.org/obo/cmo.owl",
       "version": "2026-10-10",
       "fetched": "2026-10-19",
       "sha256": "18e2399c5f8cee66b0589ab7b7caa30120f6851f0a839851edbe33b843630541",
@@ -69,7 +69,7 @@
     {
       "role": "service",
       "name": "MMO release",
-      "location": "http://purl.obolibrary.org/obo/mmo.owl",
+      "location": "https://purl.obolibrary.org/obo/mmo.owl",
       "version": "2026-10-10",
       "fetched": "2026-10-19",
       "sha256": "b5e26e3769989a64d9c536fb7306ee33e0f8df291b70ca28980fbc19c26f2d2e",
@@ -79,7 +79,7 @@
     {
       "role": "release",
       "name": "DUO release",
-      "location": "http://purl.obolibrary.org/obo/duo/releases/2021-02-23/duo.owl",
+      "location": "https://purl.obolibrary.org/obo/duo/releases/2021-02-23/duo.owl",
       "version": "2021-02-23",
       "sha256": "6a34ce09ae07b1e37c6756e049c12129fd1104e7d9e6e2f8cee84d2ab374c45b",
       "license": "CC-BY-4.0",

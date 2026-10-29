@@ -380,11 +380,11 @@ class TestObo:
                 f'<obo:terms_license rdf:resource="{cc0}"/>'
             ),
         )
-        dated = f"{obo.PURL}/abcd/releases/2026-01-01/abcd-base.owl"
+        dated = f"{obo.DOWNLOAD_BASE}/abcd/releases/2026-01-01/abcd-base.owl"
         monkeypatch.setattr(
             obo,
             "downloaded",
-            served({dated: obo_document(), f"{obo.PURL}/efgh.owl": efgh}),
+            served({dated: obo_document(), f"{obo.DOWNLOAD_BASE}/efgh.owl": efgh}),
         )
         manifest = {
             "sources": [

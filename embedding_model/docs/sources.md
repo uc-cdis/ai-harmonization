@@ -145,7 +145,7 @@ abbreviation.
 | DUO, data use | main release |
 
 **Newer releases.** Each ontology's undated address, such as
-`http://purl.obolibrary.org/obo/mondo.owl`, serves its newest release. The
+`https://purl.obolibrary.org/obo/mondo.owl`, serves its newest release. The
 file's header names that release in its version IRI (Internationalized Resource
 Identifier), such as `.../mondo/releases/2026-10-06/mondo.owl`. The first few
 kilobytes of the file hold it. A date newer than the pin means a newer release:

@@ -20,7 +20,10 @@ from embedding_model.download import downloaded, modified
 from embedding_model.manifests import file_sha256, pinned
 from embedding_model.sources.owl import OWL, RDFS, grouped, iri_of, read_owl
 
+# The namespace of the ontologies' IRIs, which the files write with http.
 PURL = "http://purl.obolibrary.org/obo"
+# The same server, for downloads, over https.
+DOWNLOAD_BASE = "https://purl.obolibrary.org/obo"
 EFO = "http://www.ebi.ac.uk/efo/"
 # Each ontology's name, its file at a dated release (None when it publishes
 # none), and its file without a date.
@@ -214,10 +217,10 @@ def fetch_source(downloads, manifest):
     for ontology, (_, dated, undated) in ONTOLOGIES.items():
         pin = pinned(manifest, release_name(ontology))
         if dated:
-            url = dated.format(purl=PURL, date=pin["version"])
+            url = dated.format(purl=DOWNLOAD_BASE, date=pin["version"])
             path = downloaded(url, downloads / f"{ontology}-{pin['version']}.owl")
         else:
-            url = undated.format(purl=PURL)
+            url = undated.format(purl=DOWNLOAD_BASE)
             path = downloaded(url, downloads / f"{ontology}.owl")
         with open(path, "rb") as stream:
             read, stated = read_ontology(stream, ontology)

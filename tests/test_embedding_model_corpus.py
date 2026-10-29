@@ -517,6 +517,32 @@ class TestBuild:
             corpus.VALIDATION,
         ]
 
+    def test_a_larger_validation_share_keeps_the_smaller_ones_groups(self):
+        """A larger share holds out more groups, and every group of the smaller."""
+        pairs = pd.DataFrame(
+            {"source": "cadsr", "item": [f"abcd{number}" for number in range(2000)]}
+        )
+        small = pairs.item[corpus.splits(pairs, 0.02) == corpus.VALIDATION]
+        large = pairs.item[corpus.splits(pairs, 0.1) == corpus.VALIDATION]
+        assert set(small) < set(large)
+
+    @pytest.mark.parametrize("share", [0, 1, 0.0255, -0.02])
+    def test_a_validation_share_between_buckets_stops_the_build(
+        self, inputs, capsys, share
+    ):
+        """A share that is not a whole number of buckets is refused before any work."""
+        assert corpus.build("abcd", ["ncit"], inputs, share) == 1
+        assert "in steps of 0.001" in capsys.readouterr().err
+        assert not (inputs / "corpora").exists()
+
+    def test_the_manifest_records_the_validation_share(self, inputs):
+        """A corpus built with another share records that share."""
+        assert corpus.build("abcd", ["ncit", "cdisc"], inputs, 0.5) == 0
+        written = json.loads(
+            (inputs / "corpora" / "abcd" / "manifest.json").read_text()
+        )
+        assert written["settings"]["validation_share"] == 0.5
+
     def test_no_benchmark_built_stops_the_build(self, tmp_path, capsys):
         """Without a benchmark, the corpus cannot be checked, so it is not built."""
         assert corpus.build("abcd", ["ncit"], tmp_path) == 1

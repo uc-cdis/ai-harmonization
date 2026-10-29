@@ -118,6 +118,13 @@ def main(argv=None):
         default=list(pairs.READERS),
         help="the sources to combine (default: all of them)",
     )
+    corpus_build.add_argument(
+        "--validation-share",
+        type=float,
+        default=corpus.VALIDATION_SHARE,
+        help="the share of groups held out for validation, in steps of 0.001"
+        f" (default: {corpus.VALIDATION_SHARE})",
+    )
 
     tokenizer_step = steps.add_parser("tokenizer", help="train a tokenizer")
     tokenizer_actions = tokenizer_step.add_subparsers(dest="action", required=True)
@@ -211,7 +218,7 @@ def main(argv=None):
     if args.step == "pairs" and args.action == "prepare":
         return pairs.prepare(args.source, args.inputs)
     if args.step == "corpus" and args.action == "build":
-        return corpus.build(args.name, args.source, args.inputs)
+        return corpus.build(args.name, args.source, args.inputs, args.validation_share)
     if args.step == "tokenizer" and args.action == "train":
         return tokenizer.train(
             args.corpus, args.name, args.vocab_size, args.min_frequency, args.inputs

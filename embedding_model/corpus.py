@@ -33,7 +33,9 @@ from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
 from embedding_model.pairs.common import COLUMNS, distinct_pairs
 
-# The share of items held out for validation, and the hash buckets it is cut in.
+# The share of groups held out for validation by default, and the hash buckets
+# that the share is cut in. So a share is a whole number of buckets: a multiple
+# of 0.001.
 VALIDATION_SHARE = 0.02
 BUCKETS = 1000
 # Sources whose item ids are NCIt concept codes.
@@ -126,17 +128,46 @@ def bucket(key):
     return int(hashlib.blake2b(key.encode(), digest_size=8).hexdigest(), 16) % BUCKETS
 
 
-def splits(pairs):
+def validation_buckets(validation_share):
+    """The number of buckets that a validation share holds.
+
+    Args:
+        validation_share (float): The share of groups held out for
+            validation, such as 0.02.
+
+    Returns:
+        int: The buckets, from 1 to BUCKETS - 1.
+
+    Raises:
+        ValueError: If the share is not a multiple of 1 / BUCKETS between 0
+            and 1, both left out.
+    """
+    held = round(validation_share * BUCKETS)
+    if not 0 < held < BUCKETS or abs(validation_share * BUCKETS - held) > 1e-9:
+        raise ValueError(
+            f"a validation share must be between {1 / BUCKETS} and"
+            f" {1 - 1 / BUCKETS}, in steps of {1 / BUCKETS}: {validation_share}"
+        )
+    return held
+
+
+def splits(pairs, validation_share=VALIDATION_SHARE):
     """Each pair's split, by a hash of its group.
+
+    A group goes to validation when its bucket is below the share's buckets.
+    So a larger share keeps the groups that a smaller share holds out, and
+    adds others.
 
     Args:
         pairs (pd.DataFrame): The pairs, with ``source`` and ``item``.
+        validation_share (float): The share of groups held out for
+            validation, a multiple of 1 / BUCKETS.
 
     Returns:
         pd.Series: TRAIN or VALIDATION, per pair.
     """
     groups = group_keys(pairs)
-    cut = VALIDATION_SHARE * BUCKETS
+    cut = validation_buckets(validation_share)
     held_out = {group for group in groups.unique() if bucket(group) < cut}
     return groups.isin(held_out).map({True: VALIDATION, False: TRAIN})
 
@@ -152,6 +183,7 @@ def manifest(
     pairs_manifests,
     benchmark_manifests,
     shared_vocabulary,
+    validation_share,
 ):
     """The corpus's manifest, for ``manifest.json``.
 
@@ -173,6 +205,7 @@ def manifest(
         benchmark_manifests (dict[str, dict]): Each benchmark's manifest, by
             name, as ``built_benchmarks`` reads it.
         shared_vocabulary (dict): The shared vocabulary, from ``leakage.audit``.
+        validation_share (float): The share of groups held out for validation.
 
     Returns:
         dict: The manifest.
@@ -214,7 +247,7 @@ def manifest(
         ],
         "settings": {
             "near_duplicate_words": leakage.NEAR_DUPLICATE_WORDS,
-            "validation_share": VALIDATION_SHARE,
+            "validation_share": validation_share,
             "buckets": BUCKETS,
         },
         "counts": {
@@ -242,7 +275,7 @@ def manifest(
     }
 
 
-def build(name, sources, inputs):
+def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
     """Combine the sources' pairs, drop what leaks a benchmark, and split.
 
     Args:
@@ -250,10 +283,13 @@ def build(name, sources, inputs):
         sources (list[str]): The sources to combine, from READERS.
         inputs (Path): The inputs folder. The corpus goes to its
             ``corpora/<name>/``.
+        validation_share (float): The share of groups held out for
+            validation, a multiple of 1 / BUCKETS.
 
     Returns:
-        int: 0 if the corpus was written, 1 if a name, a source or a benchmark
-            stops the build, or no pair is left to write.
+        int: 0 if the corpus was written, 1 if a name, a source, the
+            validation share or a benchmark stops the build, or no pair is
+            left to write.
 
     Raises:
         OSError: If the corpus cannot be written or moved into place. The
@@ -271,6 +307,11 @@ def build(name, sources, inputs):
             f"choose sources among {', '.join(READERS)}; unknown: {unknown}",
             file=sys.stderr,
         )
+        return 1
+    try:
+        validation_buckets(validation_share)
+    except ValueError as error:
+        print(f"--validation-share: {error}", file=sys.stderr)
         return 1
     try:
         benchmark_builds = built_benchmarks(inputs)
@@ -335,7 +376,7 @@ def build(name, sources, inputs):
             file=sys.stderr,
         )
         return 1
-    kept["split"] = splits(kept)
+    kept["split"] = splits(kept, validation_share)
 
     destination = Path(inputs) / "corpora" / name
     with staged(destination) as built:
@@ -357,6 +398,7 @@ def build(name, sources, inputs):
                 for benchmark, (_, _, record) in benchmark_builds.items()
             },
             shared_vocabulary=shared_vocabulary,
+            validation_share=validation_share,
         )
         manifests.write(built / "manifest.json", corpus_manifest)
     rows = corpus_manifest["counts"]["rows"]

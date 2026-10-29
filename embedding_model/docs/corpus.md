@@ -130,20 +130,26 @@ counts the text as shared vocabulary.
 
 ## The split
 
-Validation holds about 2% of the groups. A group is an item with all its
-pairs. NCIt and CDISC share NCIt's concept codes, so a concept's pairs from
-both sources form one group. All pairs of a group go to the same side. A pair
+Validation holds 2% of the groups by default. `--validation-share` sets
+another share, in steps of 0.001, such as `--validation-share 0.1`. A small
+corpus can use a larger share, so that validation holds enough pairs.
+
+A group is an item with all its pairs. NCIt and CDISC share NCIt's concept
+codes, so a concept's pairs from both sources form one group. All pairs of a
+group go to the same side. A pair
 that two sources share is kept once, in the earlier source's item, so it goes
 to that item's side.
 
 A hash of the group decides its side, with no random draw and no seed. The
-hash puts each group into one of 1,000 buckets, and the groups in buckets 0 to
-19 go to validation. So the split is the same on every build, and a group keeps
-its side as sources are added. Groups differ in size, so the share of pairs in
-validation is close to 2%, but not exactly 2%.
+hash puts each group into one of 1,000 buckets. The groups in the first
+buckets go to validation: buckets 0 to 19 for a share of 2%. So the split is
+the same on every build, and a group keeps its side as sources are added. A
+larger share adds buckets, so a group in validation at 2% is in validation at
+10% too. Groups differ in size, so the share of pairs in validation is close to
+the share asked for, but not exactly that share.
 
 The split is not stratified. Each source has many groups, so its share of
-validation pairs is close to 2%.
+validation pairs is close to the share asked for.
 
 ## What a corpus holds
 

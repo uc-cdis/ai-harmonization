@@ -100,11 +100,21 @@ class TestClean:
 
     @pytest.mark.parametrize(
         "text",
-        ["x &amp;lt;5", "<b>x</b> &amp;amp;", "Caf\u00c3\u00a9 <U+00A0>", "a&nbsp;b"],
+        [
+            "x &amp;lt;5",
+            "<b>x</b> &amp;amp;",
+            "Caf\u00c3\u00a9 <U+00A0>",
+            "a&nbsp;b",
+            "Caf&lt;U+00E9&gt; noir",
+        ],
     )
     def test_cleaning_a_clean_text_changes_nothing(self, text):
         """A second clean gives the same text as the first."""
         assert common.clean(common.clean(text)) == common.clean(text)
+
+    def test_an_escape_written_with_entities_is_read(self):
+        """An escape whose brackets are entities is read once the entities are."""
+        assert common.clean("Caf&lt;U+00E9&gt; noir") == "Caf\u00e9 noir"
 
     def test_brackets_that_are_not_a_tag_are_kept(self):
         """Text that only starts like a tag, without a tag's attributes, is kept."""

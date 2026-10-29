@@ -238,6 +238,16 @@ The steps run in this order. For example, a description from an HTML page:
 Unescaping turns `&lt;` into `<`, but it removes nothing. Only the tag step
 removes text, and only real HTML tags.
 
+The steps run again until the text stops changing. For example, an escape
+written with entities, `Caf&lt;U+00E9&gt;`, becomes `Caf<U+00E9>` in the first
+run, and `Café` in the second. A third run leaves `Café` as it is, so cleaning
+stops there.
+
+Cleaning keeps accents, since they are part of the text, as in `Café`. Later
+steps use the tokenizer's normalisation, which removes them: to compare texts,
+as for [duplicates](#duplicates), and to cut a text into tokens (see
+[tokenizer.md](tokenizer.md#step-1-normalize)).
+
 A question text also loses the number that a form gives it, as in "24. What
 is your marital status?". Units are kept, such as "(mg/dL)".
 

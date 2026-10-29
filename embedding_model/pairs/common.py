@@ -103,7 +103,7 @@ ESCAPE = re.compile(r"<U\+([0-9A-Fa-f]{4,6})>|\\u([0-9A-Fa-f]{4})")
 # The settings of ftfy's fix_text, which unescapes HTML entities and repairs
 # text read with the wrong encoding. It repeats its fixes until the text stops
 # changing. So a text that a source escaped twice, such as "&amp;lt;5", becomes
-# "<5", and cleaning a clean text changes nothing. unescape_html is True, since
+# "<5". unescape_html is True, since
 # ftfy's default, "auto", leaves the entities of a text that has a "<", such as
 # a tag. uncurl_quotes is off, so quotes stay as the source writes them.
 FIXES = ftfy.TextFixerConfig(unescape_html=True, uncurl_quotes=False, explain=False)
@@ -269,11 +269,15 @@ def clean(text):
     Escapes such as R's ``<U+00A0>`` are read first. ftfy then unescapes
     entities such as ``&gt;``, repairs text read with the wrong encoding, such
     as ``Iâ€™m`` to ``I’m``, removes control characters and normalises Unicode
-    to NFC. It repeats these fixes until the text stops changing, so a clean
-    text cleans to itself. HTML tags are removed, and other text in angle
-    brackets, such as ``<time point>``, is kept. A replacement character
-    becomes a space. BERT's text cleaning then removes the characters that
-    hold no text, and every run of whitespace becomes one space.
+    to NFC. HTML tags are removed, and other text in angle brackets, such as
+    ``<time point>``, is kept. A replacement character becomes a space. BERT's
+    text cleaning then removes the characters that hold no text, and every run
+    of whitespace becomes one space.
+
+    These steps repeat until the text stops changing, as ftfy repeats its own
+    fixes. So a clean text cleans to itself, even when one step leaves work for
+    an earlier one: ``Caf&lt;U+00E9&gt;`` becomes ``Caf<U+00E9>`` in the first
+    pass, and ``Café`` in the second.
 
     Args:
         text (str | None): The text as the source gives it.
@@ -283,6 +287,13 @@ def clean(text):
     """
     if not isinstance(text, str):
         return ""
+    while (cleaner := cleaning_pass(text)) != text:
+        text = cleaner
+    return text
+
+
+def cleaning_pass(text):
+    """A text after one pass of ``clean``'s steps, in their order."""
     text = ESCAPE.sub(escaped, text)
     text = ftfy.fix_text(text, FIXES).replace(LOST_IN_MAC_ROMAN, "\ufffd")
     if HTML_TAG.search(text):

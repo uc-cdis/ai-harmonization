@@ -197,7 +197,7 @@ def ncit_document():
 
 
 class TestNcit:
-    """NCIt's tables, and the replacements service's answers."""
+    """NCIt's tables, and the replacements in its history file."""
 
     def test_concepts_synonyms_definitions_and_values(self):
         """Each FULL_SYN keeps its own axiom, and value lists keep their association."""
@@ -240,24 +240,46 @@ class TestNcit:
         with pytest.raises(ValueError, match="holds no .owl file; delete it"):
             ncit.fetch_source(tmp_path, manifest)
 
-    def test_replacements_are_asked_once_and_kept(self, monkeypatch, tmp_path):
-        """The replacements service is asked in batches, and its answers are read back later."""
-        entry = {
-            "code": "C900004",
-            "action": "merge",
-            "date": "2026-01-01",
-            "replacementCode": "C900002",
-            "replacementName": "Abcd Measurement",
-        }
-        service = MagicMock(return_value=json.dumps([entry]).encode())
-        monkeypatch.setattr(ncit, "fetch", service)
-        monkeypatch.setattr(ncit, "HISTORY_BATCH", 1)
-        path = tmp_path / "replacements.json"
-        frame = ncit.replacements(["C900004", "C900006"], path)
-        assert service.call_count == 2
-        assert frame.replacement_code.tolist() == ["C900002", "C900002"]
-        ncit.replacements(["C900004"], path)
-        assert service.call_count == 2
+    def test_a_merge_names_a_replacement_and_a_retire_its_old_parent(self, tmp_path):
+        """A merge record names the survivor; a retire record names no replacement."""
+        path = history_zip(
+            tmp_path,
+            [
+                "C900004||merge|01-Jan-26|C900002|",
+                "C900002||merge|01-Jan-26|C900002|",
+                "C900004||retire|01-Jan-26|null|",
+                "C900006||retire|02-Jan-26|C900001|",
+                "C900008||create|01-Jan-20|null|",
+            ],
+        )
+        frame = ncit.replacements(
+            ["C900004", "C900006"],
+            ncit.read_history(path),
+            {"C900001": "Abcd", "C900002": "Abcd Measurement"},
+        )
+        assert frame.values.tolist() == [
+            ["C900004", "merge", "2026-01-01", "C900002", "Abcd Measurement"],
+            ["C900004", "retire", "2026-01-01", "", ""],
+            ["C900006", "retire", "2026-01-02", "", ""],
+        ]
+
+    def test_a_history_file_of_another_shape_is_refused(self, tmp_path):
+        """A zip without a history file, or with lines of other fields, is named."""
+        with zipfile.ZipFile(tmp_path / "empty.zip", "w") as bundle:
+            bundle.writestr("readme.md", "abcd")
+        with pytest.raises(ValueError, match="holds no history file; delete it"):
+            ncit.read_history(tmp_path / "empty.zip")
+        path = history_zip(tmp_path, ["C900004|merge|01-Jan-26|C900002"])
+        with pytest.raises(ValueError, match="has 6 fields"):
+            ncit.read_history(path)
+
+
+def history_zip(folder, lines):
+    """A fictional history file of an NCIt release, zipped as EVS publishes it."""
+    path = folder / "subset_cumulative_history_99.01d.zip"
+    with zipfile.ZipFile(path, "w") as bundle:
+        bundle.writestr("subset_cumulative_history_99.01d.txt", "\n".join(lines) + "\n")
+    return path
 
 
 def obo_document():

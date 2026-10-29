@@ -1,31 +1,31 @@
 """NCIt: concepts, names, definitions and value lists, from its OWL release.
 
 A release is pinned by its version, such as ``26.09d``, and read from EVS's
-archive. Every concept is kept, retired ones too, with its status. For each
-retired or obsolete concept, EVS's replacements service says what happened to
-it, such as a merge, and which concept replaced it, if any.
+archive. Every concept is kept, retired ones too, with its status. The
+release's history file, in the same folder, says which concept replaced each
+retired or obsolete concept, if any.
 """
 
-import itertools
-import json
+import csv
 import zipfile
 
 import pandas as pd
 
-from embedding_model.download import downloaded, fetch, keep, modified
+from embedding_model.download import downloaded
 from embedding_model.manifests import file_sha256, pinned
 from embedding_model.sources.owl import DEFINED_PARENT, RDFS, grouped, read_owl
 
 RELEASE = "NCIt OWL release"
-HISTORY = "NCIt history: replacements of retired concepts"
+HISTORY = "NCIt history file"
 ARCHIVE = (
     "https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/{version}_Release/"
     "Thesaurus_{version}.OWL.zip"
 )
-REPLACEMENTS = "https://api-evsrest.nci.nih.gov/api/v1/history/ncit/replacements"
-# How many concepts one call to the replacements service asks about. The codes go
-# in the call's URL, so a batch keeps the URL short and the calls few.
-HISTORY_BATCH = 100
+# The release's history of concepts created, merged, split or retired.
+HISTORY_ARCHIVE = (
+    "https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/{version}_Release/"
+    "subset_cumulative_history_{version}.zip"
+)
 # The terms of use, as an SPDX license expression. The terms are in
 # embedding_model/docs/licenses.md, which CITATION points to.
 LICENSE = "CC-BY-4.0"
@@ -94,15 +94,15 @@ def read_ncit(stream):
             name). Several values of one field are joined by ``|``. Rows are
             sorted, so a table's content does not depend on the file's order.
     """
-    found = read_owl(stream)
+    owl = read_owl(stream)
     concepts = {
         iri[len(NCIT) :]: grouped(annotations)
-        for iri, annotations in found["classes"].items()
+        for iri, annotations in owl["classes"].items()
         if iri.startswith(NCIT)
     }
     name = {code: first(values, PREFERRED_NAME) for code, values in concepts.items()}
     lists = {}
-    for iri, annotations in found["properties"].items():
+    for iri, annotations in owl["properties"].items():
         list_name = first(grouped(annotations), PREFERRED_NAME)
         if iri.startswith(NCIT) and is_value_list(list_name):
             lists[tag(iri[len(NCIT) :])] = list_name
@@ -112,7 +112,7 @@ def read_ncit(stream):
 
         A statement without an axiom then still gives one row.
         """
-        return found["axioms"].get((NCIT + code, NCIT + prop, text)) or [{}]
+        return owl["axioms"].get((NCIT + code, NCIT + prop, text)) or [{}]
 
     rows = {"concepts": [], "synonyms": [], "definitions": [], "values": []}
     for code, values in concepts.items():
@@ -180,40 +180,100 @@ def read_ncit(stream):
         "values": ["code", "association", "value", "value_code"],
     }
     return {
-        table: pd.DataFrame(found_rows).sort_values(keys[table], ignore_index=True)
-        for table, found_rows in rows.items()
+        table: pd.DataFrame(table_rows).sort_values(keys[table], ignore_index=True)
+        for table, table_rows in rows.items()
     }
 
 
-def replacements(codes, path):
-    """What replaced each retired concept, from EVS's replacements service.
+def read_history(path):
+    """The records of a release's history file, one row each.
 
-    The service's answers are kept in one file, so a later fetch reads them
-    back.
+    EVS's ReadMe_history.txt names the fields: the concept's code, the edit's
+    action and date, and a reference code. The file writes them around an
+    empty second field, and ends each line with a separator.
+
+    Args:
+        path (Path): The history file's zip.
+
+    Returns:
+        pd.DataFrame: ``code``, ``action``, ``date`` and ``reference``.
+
+    Raises:
+        ValueError: If the zip holds no history file, or its lines have
+            another number of fields.
+    """
+    with zipfile.ZipFile(path) as bundle:
+        members = [n for n in bundle.namelist() if n.lower().endswith(".txt")]
+        if not members:
+            raise ValueError(
+                f"{path} holds no history file; delete it, then run:"
+                " python -m embedding_model sources fetch --source ncit"
+            )
+        with bundle.open(members[0]) as stream:
+            records = pd.read_csv(
+                stream,
+                sep="|",
+                header=None,
+                dtype=str,
+                keep_default_na=False,
+                quoting=csv.QUOTE_NONE,
+            )
+    if records.shape[1] != 6:
+        raise ValueError(
+            f"{path}: a history record has 6 fields, and these lines have"
+            f" {records.shape[1]}"
+        )
+    records = records[[0, 2, 3, 4]]
+    records.columns = ["code", "action", "date", "reference"]
+    return records
+
+
+def replacements(codes, history, names):
+    """What replaced each retired concept, from the release's history file.
+
+    In a merge, one concept survives and the other retires. Each of the two
+    gets a merge record that names the survivor. So a merge record of a
+    retired concept names its replacement. A retire record names the
+    concept's old parent instead, as EVS's ReadMe_history.txt says, so it
+    names no replacement.
 
     Args:
         codes (list[str]): The retired and obsolete concepts' codes.
-        path (Path): Where the entries are kept, as JSON.
+        history (pd.DataFrame): The history file's records, from
+            ``read_history``.
+        names (dict[str, str]): Each concept's preferred name, by code.
 
     Returns:
-        pd.DataFrame: One row per entry: ``code``, ``action`` (such as
-            ``merge`` or ``retire``), ``date``, and ``replacement_code`` and
-            ``replacement_name`` where the concept has a replacement.
+        pd.DataFrame: One row per merge or retire record of a retired
+            concept: ``code``, ``action``, ``date`` (as ``YYYY-MM-DD``), and
+            ``replacement_code`` and ``replacement_name`` where the record
+            names a replacement.
     """
-    if not path.exists():
-        entries = []
-        for batch in itertools.batched(codes, HISTORY_BATCH):
-            entries += json.loads(fetch(f"{REPLACEMENTS}?list={','.join(batch)}"))
-        keep(path, (json.dumps(entries, indent=1) + "\n").encode("utf-8"))
-    columns = ["code", "action", "date", "replacementCode", "replacementName"]
-    frame = pd.DataFrame(json.loads(path.read_text(encoding="utf-8")))
-    frame = frame.reindex(columns=columns).fillna("").astype(str)
-    frame.columns = ["code", "action", "date", "replacement_code", "replacement_name"]
+    records = history[
+        history.code.isin(set(codes)) & history.action.isin(["merge", "retire"])
+    ]
+    merged = (
+        (records.action == "merge")
+        & ~records.reference.isin(["", "null"])
+        & (records.reference != records.code)
+    )
+    replacement = records.reference.where(merged, "")
+    frame = pd.DataFrame(
+        {
+            "code": records.code,
+            "action": records.action,
+            "date": pd.to_datetime(records.date, format="%d-%b-%y").dt.strftime(
+                "%Y-%m-%d"
+            ),
+            "replacement_code": replacement,
+            "replacement_name": replacement.map(names).fillna(""),
+        }
+    )
     return frame.sort_values(list(frame.columns), ignore_index=True)
 
 
 def fetch_source(downloads, manifest):
-    """Fetch the NCIt release that the manifest pins, and its replacements.
+    """Fetch the NCIt release that the manifest pins, and its history file.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
@@ -243,13 +303,17 @@ def fetch_source(downloads, manifest):
             lambda statuses: bool(RETIRED_STATUSES & set(statuses))
         )
     ].code.tolist()
-    kept = downloads / f"replacements_{version}.json"
-    found = replacements(retired, kept)
-    tables["replacements"] = found
+    history_url = HISTORY_ARCHIVE.format(version=version)
+    history_path = downloaded(
+        history_url, downloads / f"subset_cumulative_history_{version}.zip"
+    )
+    names = dict(zip(concepts.code, concepts.preferred_name))
+    tables["replacements"] = replacements(retired, read_history(history_path), names)
+    replaced = tables["replacements"].replacement_code != ""
     counts = {
         "concepts": len(concepts),
         "retired_or_obsolete": len(retired),
-        "replaced": int(found[found.replacement_code != ""].code.nunique()),
+        "replaced": int(tables["replacements"][replaced].code.nunique()),
     }
     print(
         f"  {counts['concepts']:,} concepts, "
@@ -267,11 +331,11 @@ def fetch_source(downloads, manifest):
             "citation": CITATION,
         },
         {
-            "role": "service",
+            "role": "release",
             "name": HISTORY,
-            "location": REPLACEMENTS,
-            "fetched": modified(kept),
-            "sha256": file_sha256(kept),
+            "location": history_url,
+            "version": version,
+            "sha256": file_sha256(history_path),
             "license": LICENSE,
             "citation": CITATION,
         },

@@ -305,8 +305,8 @@ does not name is read as current, and `pairs prepare` prints it.
   order, so its values are sorted by name.
 - **Status:** from `status`. `Retired_Concept` and `Obsolete_Concept` are
   retired, and `Provisional_Concept` and `Concept_Pending_Approval` are
-  drafts. The `replacements` table, from EVS's history, names a retired
-  concept's replacement.
+  drafts. The `replacements` table names a retired concept's replacement:
+  the concept that a merge record of the history file names.
 
 ### Ontologies
 

@@ -83,7 +83,9 @@ reference. It also lists the fields that mark single items as restricted.
 ## NCIt
 
 The NCI Thesaurus is read from its OWL release in EVS's archive, such as
-`NCI_Thesaurus/archive/26.09d_Release/Thesaurus_26.09d.OWL.zip`.
+`NCI_Thesaurus/archive/26.09d_Release/Thesaurus_26.09d.OWL.zip`. The
+replacements of retired concepts come from the release's history file, in the
+same folder: `subset_cumulative_history_26.09d.zip`.
 
 | table | one row per | columns |
 |---|---|---|
@@ -91,14 +93,16 @@ The NCI Thesaurus is read from its OWL release in EVS's archive, such as
 | `synonyms` | synonym | `code`, `name`, `term_type`, `source`, `source_code`, `subsource` |
 | `definitions` | definition | `code`, `definition`, `kind` (`DEFINITION` or `ALT_DEFINITION`), `source` |
 | `values` | value of a registry's value list | `code`, `association` (such as `Has_GDC_Value`), `value_code`, `value` |
-| `replacements` | record of what happened to a retired concept | `code`, `action` (such as `merge` or `retire`), `date`, `replacement_code`, `replacement_name` |
+| `replacements` | merge or retire record of a retired concept, from the history file | `code`, `action` (`merge` or `retire`), `date`, `replacement_code`, `replacement_name` |
 
 The tables link by the concept's `code`. A value's `value_code`, a
 concept's `parents` and a `replacement_code` are concept codes too.
 
-Retired and obsolete concepts are kept, with their status. EVS's replacements
-service says what happened to each one, such as a merge, and which concept
-replaced it: that is the `replacements` table.
+Retired and obsolete concepts are kept, with their status. The history file
+records what happened to each one. A merge record names the concept that a
+retired concept was merged into: its replacement, in `replacement_code`. A
+retire record names the concept's old parent instead, as EVS's
+[ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt) says, so it gives no replacement.
 
 Reading NCIt takes a few minutes, and about 4 GB of memory for release
 26.09d.
@@ -107,9 +111,8 @@ Reading NCIt takes a few minutes, and about 4 GB of memory for release
 `NCI_Thesaurus/archive/` folder lists every release, such as `26.09d_Release`.
 To use a newer one, write its name as the release's `version` in the committed
 manifest. Then make a new version, as
-[Making a new version](manifests.md#making-a-new-version) says. The
-replacements service serves only its current state. The fetch keeps its answer,
-so delete `downloads/ncit/replacements_<version>.json` to ask again.
+[Making a new version](manifests.md#making-a-new-version) says. The history
+file of the same release is read with it.
 
 [licenses.md](licenses.md#ncit) gives its license and reference.
 

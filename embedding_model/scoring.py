@@ -12,7 +12,6 @@ first k. It is what a reviewer of the top k suggestions sees.
 import json
 import os
 import platform
-import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -23,12 +22,21 @@ import pandas as pd
 import yaml
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
+from embedding_model import manifests
 from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
 from embedding_model.folders import staged
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 5, 10)
 METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
+# The files whose changes can change a score, as git pathspecs from the top of
+# the checkout.
+CODE_PATHS = [
+    ":(top,glob)ai_harmonization/**/*.py",
+    ":(top,glob)embedding_model/**/*.py",
+    ":(top)pyproject.toml",
+    ":(top)uv.lock",
+]
 # sentence-transformers' own default, in encode() and in its
 # InformationRetrievalEvaluator.
 BATCH_SIZE = 32
@@ -182,27 +190,28 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     return metrics, ranked
 
 
-def code_commit():
+def code_commit(folder=Path(__file__).resolve().parent):
     """The ai-harmonization commit of the code that wrote the texts and ranked them.
+
+    Only what can change a score counts as an uncommitted change: CODE_PATHS,
+    the Python files of the two packages and the files that pin the
+    dependencies. A changed doc does not count.
+
+    Args:
+        folder (Path): A folder of the checkout to ask, by default this
+            package's.
 
     Returns:
         dict: ``commit``, the commit at ``HEAD``, and ``uncommitted_changes``,
-            whether ``ai_harmonization/`` or ``embedding_model/`` differ from
-            it. Both are None when git cannot be asked.
+            whether a file of CODE_PATHS differs from it or is new. Both are
+            None when git cannot be asked.
     """
-    git = ["git", "-C", str(Path(__file__).resolve().parent)]
-    paths = ["--", ":/ai_harmonization", ":/embedding_model"]
     try:
-        commit = subprocess.run(
-            [*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
-        ).stdout.strip()
-        status = subprocess.run(
-            [*git, "status", "--porcelain", *paths],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    except Exception:
+        commit = manifests.git(folder, "rev-parse", "HEAD").strip()
+        status = manifests.git(
+            folder, "status", "--porcelain", "--untracked-files=all", "--", *CODE_PATHS
+        )
+    except RuntimeError:
         return {"commit": None, "uncommitted_changes": None}
     return {"commit": commit, "uncommitted_changes": bool(status.strip())}
 

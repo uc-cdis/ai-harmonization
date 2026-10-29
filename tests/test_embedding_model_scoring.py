@@ -1,5 +1,7 @@
 """Tests for the embedding model's scoring: texts, ranks, metrics and outputs."""
 
+import shutil
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -358,6 +360,64 @@ class TestWriteScores:
                 scoring.write_scores(folder, {"mrr": 1.0}, mappings, ranked, {})
         assert (folder / "metrics.csv").read_text() == "previous"
         assert [path.name for path in folder.parent.iterdir()] == ["compact"]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
+class TestCodeCommit:
+    """The commit that scores record, and whether the code had uncommitted changes."""
+
+    def git(self, folder, *args):
+        """Run git in a folder, as a fictional committer."""
+        subprocess.run(
+            ["git", "-c", "user.name=Abcd", "-c", "user.email=abcd@example.org",
+             "-C", str(folder), *args],
+            check=True, capture_output=True,
+        )  # fmt: skip
+
+    @pytest.fixture
+    def checkout(self, tmp_path):
+        """A checkout with a module, a doc and the dependency files, all committed."""
+        (tmp_path / "embedding_model" / "docs").mkdir(parents=True)
+        (tmp_path / "embedding_model" / "abcd.py").write_text("ABCD = 1\n")
+        (tmp_path / "embedding_model" / "docs" / "abcd.md").write_text("# Abcd\n")
+        (tmp_path / "pyproject.toml").write_text("[project]\n")
+        (tmp_path / "uv.lock").write_text("version = 1\n")
+        self.git(tmp_path, "init", "-q")
+        self.git(tmp_path, "add", ".")
+        self.git(tmp_path, "commit", "-q", "-m", "abcd")
+        return tmp_path
+
+    def test_a_changed_doc_is_not_an_uncommitted_change(self, checkout):
+        """Only code and dependency files count; a doc does not."""
+        (checkout / "embedding_model" / "docs" / "abcd.md").write_text("# Efgh\n")
+        found = scoring.code_commit(checkout / "embedding_model")
+        assert len(found["commit"]) == 40
+        assert found["uncommitted_changes"] is False
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            "embedding_model/abcd.py",
+            "embedding_model/new/efgh.py",
+            "pyproject.toml",
+            "uv.lock",
+        ],
+    )
+    def test_code_and_dependency_files_count(self, checkout, changed):
+        """A changed or new Python file, or a changed dependency file, is an uncommitted change."""
+        path = checkout / changed
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("changed\n")
+        found = scoring.code_commit(checkout / "embedding_model")
+        assert found["uncommitted_changes"] is True
+
+    def test_outside_a_checkout_nothing_is_recorded(self, tmp_path, monkeypatch):
+        """Without git to ask, the commit and the flag are None."""
+        monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+        assert scoring.code_commit(tmp_path) == {
+            "commit": None,
+            "uncommitted_changes": None,
+        }
 
 
 class TestModelRevision:

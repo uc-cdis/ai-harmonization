@@ -126,10 +126,14 @@ It holds:
   `source_table_id`, `source_variable_id`, `source_variable_name`,
   `expected_target`, `rank`, and the target that the model ranked first,
   `top1_target`, with its cosine similarity, `top1_similarity`.
-- `config.yaml`:
+- `config.yaml`, what the scores were computed with:
   - every setting;
   - the model's Hugging Face revision, for a model loaded by its id;
-  - the ai-harmonization commit, and whether `ai_harmonization/` or
-    `embedding_model/` had uncommitted changes;
+  - under `ai_harmonization`:
+    - `commit`: the ai-harmonization commit of the code that computed them;
+    - `uncommitted_changes`: true when the code differed from that commit,
+      that is, when a Python file of `ai_harmonization/` or `embedding_model/`
+      was new or changed, or when `pyproject.toml` or `uv.lock` was changed.
+      An uncommitted edit to any other file, such as a doc, leaves it false;
   - the Python and sentence-transformers versions;
   - the benchmark's version and file checksums, from its manifest.

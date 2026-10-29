@@ -29,7 +29,9 @@ from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 5, 10)
 METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
-BATCH_SIZE = 128
+# sentence-transformers' own default, in encode() and in its
+# InformationRetrievalEvaluator.
+BATCH_SIZE = 32
 
 
 def split_values(cell):

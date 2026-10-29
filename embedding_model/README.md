@@ -202,7 +202,7 @@ model, more slowly. `cache build` is worth running before a series, so that
 many runs starting at once do not each wait for it.
 
 `corpus build` checks the pairs against every benchmark built so far, and drops
-those that would leak one ([docs/corpus.md](docs/corpus.md)). Each corpus
+those that would leak one ([docs/leakage.md](docs/leakage.md)). Each corpus
 records which benchmarks its pairs were checked against. Scoring on a benchmark
 refuses a model whose corpus was not checked against that benchmark for
 leakage.

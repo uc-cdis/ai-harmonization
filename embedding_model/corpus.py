@@ -34,7 +34,6 @@ from embedding_model import benchmarks, leakage, manifests
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
-from embedding_model.normalization import normalised
 from embedding_model.pairs.common import COLUMNS, NAME_TO_DESCRIPTION, distinct_pairs
 
 # The share of groups held out for validation by default, and the hash buckets
@@ -139,8 +138,10 @@ def group_keys(pairs):
     """The group of each pair, as the key of the group's first item.
 
     Two items are in one group when they share an item key, as an NCIt
-    concept and its CDISC terms do, or a canonical text, normalised as the
-    tokenizer normalises it. The links carry over, so the groups are the
+    concept and its CDISC terms do, or a canonical text's key, as
+    ``pairs.common.key`` writes it. So two canonicals that differ only in
+    case or punctuation link their items. An empty key links nothing. The
+    links carry over, so the groups are the
     connected components of a graph: each pair links its item to its
     canonical text. A group's key is the first of its items' keys in sorted
     order, so the same pairs always give the same keys.
@@ -152,15 +153,16 @@ def group_keys(pairs):
     Returns:
         pd.Series: The group key of each pair.
     """
-    items = item_keys(pairs).to_numpy()
-    texts = ("text:" + normalised(canonical_texts(pairs))).to_numpy()
+    items = item_keys(pairs)
+    canonical_keys = leakage.keys(canonical_texts(pairs))
+    texts = ("text:" + canonical_keys).where(canonical_keys != "", items)
     nodes = pd.Index(np.concatenate([items, texts])).unique()
     item_nodes, text_nodes = nodes.get_indexer(items), nodes.get_indexer(texts)
     links = coo_matrix(
         (np.ones(len(pairs)), (item_nodes, text_nodes)), shape=(len(nodes),) * 2
     )
     _, component = connected_components(links, directed=False)
-    first_item = pd.Series(items).groupby(component[item_nodes]).min()
+    first_item = items.groupby(component[item_nodes]).min()
     return pd.Series(
         first_item.loc[component[item_nodes]].to_numpy(), index=pairs.index
     )

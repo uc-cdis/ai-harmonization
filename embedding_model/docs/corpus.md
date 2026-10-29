@@ -61,11 +61,14 @@ with all their pairs. Two items are in one group when they share:
 - an NCIt concept code. NCIt's concepts and CDISC's terms are both keyed by
   it, so a CDISC term joins its NCIt concept. The other sources' items have
   keys of their own, which never match across sources;
-- or a canonical text, as the tokenizer
-  [normalises](tokenizer.md#step-1-normalize) it. [Each source](pairs.md#each-source)
-  lists each source's canonical. For example, an NCIt concept's canonical is
-  `Inverted Urothelial Papilloma`, and an ontology term's is
-  `inverted urothelial papilloma`. After the normalisation, they are one text.
+- or a canonical text, compared as
+  [leakage prevention](leakage.md#how-two-texts-match) compares texts: after
+  the tokenizer's normalisation, with case folded and punctuation turned into
+  spaces. [Each source](pairs.md#each-source) lists each source's canonical.
+  For example, an NCIt concept's canonical is `Inverted Urothelial Papilloma`,
+  and an ontology term's is `inverted urothelial-papilloma`. Compared this
+  way, they are one text. A canonical made of punctuation alone links
+  nothing.
 
 The links carry over. For example, item A shares a text with item B, and B
 shares a code with C. Then A, B and C are one group. So the same concept never

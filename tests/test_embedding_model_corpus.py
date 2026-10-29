@@ -568,6 +568,24 @@ class TestBuild:
             "cadsr:abcd2",
         ]
 
+    def test_canonicals_that_differ_in_punctuation_share_a_group(self):
+        """Canonicals are linked by their keys, and an empty key links nothing."""
+        pairs = pd.DataFrame(
+            {
+                "source": ["ncit", "obo", "cde", "cadsr"],
+                "item": ["C1", "MONDO:9999901", "abcd1", "abcd2"],
+                "kind": ["name"] * 4,
+                "anchor_name": ["Wxyz"] * 4,
+                "positive_name": ["Abcd, Efgh", "abcd-efgh", "?", "?"],
+            }
+        )
+        assert corpus.group_keys(pairs).tolist() == [
+            "ncit:C1",
+            "ncit:C1",
+            "cde:abcd1",
+            "cadsr:abcd2",
+        ]
+
     def test_a_larger_validation_share_keeps_the_smaller_ones_groups(self):
         """A larger share holds out more groups, and every group of the smaller."""
         numbers = range(2000)

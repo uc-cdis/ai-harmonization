@@ -246,7 +246,8 @@ def manifest(
             ),
         ],
         "settings": {
-            "overlap_words": leakage.OVERLAP_WORDS,
+            "min_overlap_words": leakage.MIN_OVERLAP_WORDS,
+            "min_name_words": leakage.MIN_NAME_WORDS,
             "validation_share": validation_share,
             "buckets": BUCKETS,
         },

@@ -84,6 +84,7 @@ PLANTED = [
     pair("efgh value", "EFGH LEVEL"),
     pair("abcd score", "Abcd", positive_description=f"{LONG_DESCRIPTION} More."),
     pair("abcd_score", f"{LONG_DESCRIPTION} More.", kind="name_to_description"),
+    pair("Score of Abcd", "Qrst", positive_description=LONG_DESCRIPTION),
     pair("Mnop", "Qrst", study="phs999902|phs999777"),
 ]
 INNOCENT = [
@@ -94,6 +95,7 @@ INNOCENT = [
         "efgh_level", "Cdef", positive_description="Efgh value in node three and more"
     ),
     pair("Ghij", "Klmn", study="phs999555"),
+    pair("Score of Abcd", "Abcd Index"),
 ]
 
 
@@ -110,26 +112,56 @@ class TestLeakage:
         """Every planted leak is dropped, with its finding, and no innocent pair is."""
         findings, _ = audited
         assert findings.pair.tolist() == list(range(len(PLANTED)))
-        assert findings.finding.tolist() == [leakage.ANSWER_KEY] * 6 + [
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY] * 7 + [
             leakage.BENCHMARK_STUDY
         ]
 
     def test_the_fields_that_matched_are_named(self, audited):
         """Each answer key names the two fields that matched, and how."""
         findings, _ = audited
-        assert findings.fields.tolist()[:6] == [
+        assert findings.fields.tolist()[:7] == [
             "anchor name = source name, positive name = target name",
             "anchor name = source name, positive description = target description",
             "anchor name = source description, positive name = target name",
             "positive name = source name, anchor name = target name",
             "anchor name = source name, positive description ~ target description",
             "anchor name = source name, positive name ~ target description",
+            "anchor name >= source name, positive description = target description",
         ]
         assert findings.target_property.tolist()[0] == "node1.abcd_index"
         assert findings.target_description.tolist()[0] == LONG_DESCRIPTION
         assert findings.source_variable_description.tolist()[0] == "Abcd efgh score"
-        assert findings.target_description.tolist()[6] == ""
-        assert findings.study_id.tolist()[6] == "phs999902"
+        assert findings.target_description.tolist()[7] == ""
+        assert findings.study_id.tolist()[7] == "phs999902"
+
+    def test_a_text_that_matches_source_and_target_on_one_side_is_kept(self):
+        """A source name equal to its target's name, on one side only, is shared vocabulary."""
+        mappings = MAPPINGS.assign(source_variable_name=["abcd_index", "efgh_level"])
+        pairs = pd.DataFrame([pair("Abcd Index", "Wxyz")])
+        assert leakage.audit(pairs, {"abcd": (TARGETS, mappings)})[0].empty
+
+    def test_a_one_word_name_matches_only_an_equal_text(self, monkeypatch):
+        """A one-word name is not matched by its words, even beside a description match."""
+        mappings = MAPPINGS.assign(source_variable_name=["Abcd", "efgh_level"])
+        pairs = pd.DataFrame(
+            [pair("Abcd Efgh", "Ijkl", positive_description=LONG_DESCRIPTION)]
+        )
+        assert leakage.audit(pairs, {"abcd": (TARGETS, mappings)})[0].empty
+        monkeypatch.setattr(leakage, "MIN_NAME_WORDS", 1)
+        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, mappings)})
+        assert findings.fields.tolist() == [
+            "anchor name >= source name, positive description = target description"
+        ]
+
+    def test_a_long_name_matches_by_eight_words_in_a_row(self):
+        """The 8-word overlap applies to names too, not only to descriptions."""
+        name = "abcd efgh ijkl mnop qrst uvwx yzab cdef ghij"
+        mappings = MAPPINGS.assign(source_variable_name=[name, "efgh_level"])
+        pairs = pd.DataFrame([pair(name.rsplit(" ", 1)[0], "Abcd Index")])
+        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, mappings)})
+        assert findings.fields.tolist() == [
+            "anchor name ~ source name, positive name = target name"
+        ]
 
     def test_a_pair_that_leaks_two_benchmarks_has_a_finding_for_each(self):
         """One pair can leak two benchmarks, and each one gets its finding."""
@@ -156,8 +188,9 @@ class TestLeakage:
         """Benchmark texts in the kept pairs are counted, not dropped."""
         shared = audited[1]["abcd"]
         assert shared["rows_with_shared_source"] == 2
-        assert shared["rows_with_shared_target"] == 1
+        assert shared["rows_with_shared_target"] == 2
         assert {item["text"] for item in shared["most_common"]} == {
+            "abcd index",
             "abcd score",
             "efgh level",
             "efgh value",
@@ -188,7 +221,7 @@ class TestLeakage:
         )
         benchmark = {"abcd": (TARGETS, MAPPINGS)}
         assert leakage.audit(pairs, benchmark)[0].empty
-        monkeypatch.setattr(leakage, "OVERLAP_WORDS", 5)
+        monkeypatch.setattr(leakage, "MIN_OVERLAP_WORDS", 5)
         findings, _ = leakage.audit(pairs, benchmark)
         assert findings.fields.tolist() == [
             "anchor name = source name, positive description ~ target description"
@@ -297,6 +330,7 @@ class TestBuild:
             ("benchmark", "abcd"),
         ]
         assert written["settings"]["validation_share"] == corpus.VALIDATION_SHARE
+        assert written["settings"]["min_name_words"] == leakage.MIN_NAME_WORDS
         read, record = corpus.read_corpus(inputs, "abcd-corpus")
         assert read.equals(kept) and record == written
         printed = capsys.readouterr().out

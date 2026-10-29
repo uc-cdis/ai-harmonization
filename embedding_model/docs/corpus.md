@@ -76,6 +76,8 @@ Either side can match the source. For example, a benchmark maps the variable
 `body_weight` to `vitals.weight`. The pair `Weight` -> `Body Weight` is then
 an answer key, and it is dropped.
 
+#### The fields compared
+
 Each side of a pair is a text formatted from its fields: a name, a type, a
 description and values. For example, the anchor `ABCD_SC (integer)` is
 formatted from the name `ABCD_SC` and the type `integer`. Leakage prevention
@@ -89,20 +91,55 @@ then differs. The fields compared are:
 | a benchmark's source variable | its name and its description |
 | each of its expected targets | its property name, without the node, and its description |
 
+Every side text is compared, since some pairs keep a description in a name
+field. Values are never compared: a common list, such as
+`Unknown | Not Reported | No | Yes`, matches many targets.
+
+#### How two texts match
+
 The benchmark texts are cleaned first with `pairs.common.clean`, the
 cleaning that `pairs prepare` gives every text: markup is removed, and
-characters and spaces are normalised. Two texts match when they are equal after three changes:
+characters and spaces are normalised. Then both texts go through three
+changes:
 
 - the tokenizer's normalisation, which removes invisible characters,
   lowercases and removes accents;
 - case folding, which also makes `ß` and `ss` equal;
 - punctuation turned into spaces.
 
-So two texts always match when the tokenizer normalises them to one text.
+After these changes, two texts match in one of three ways. Each way has a
+mark:
 
-A side text also matches a benchmark description when the two share 8 words
-in a row, after the same three changes. For example, a benchmark copies a
-terminology's definition, changes a word, and adds a sentence:
+| way | mark | for |
+|---|---|---|
+| equal | `=` | any text |
+| at least 8 words in a row | `~` | any text |
+| a name's words, with a description on the other side | `>=` | a name of two words or more |
+
+The marks show in `dropped.parquet`, the corpus's file of dropped pairs (see
+[What a corpus holds](#what-a-corpus-holds)). There, the column `fields` names
+each pair's two matches, the source's first. Each match reads as follows:
+
+| in `fields` | it reads |
+|---|---|
+| `anchor name = source name` | the anchor's name equals the source variable's name |
+| `positive description ~ target description` | the positive's description shares at least 8 words in a row with the target's description |
+| `anchor name >= source name` | the anchor's name holds every word of the source variable's name |
+
+So `anchor name >= source name, positive description = target description`
+means that the anchor holds the words of the source's name, and the positive
+holds the target's description.
+
+##### Equal
+
+The two texts are the same after the changes. So two texts always match when
+the tokenizer normalises them to one text.
+
+##### At least 8 words in a row
+
+A side text matches a benchmark text when the two share at least 8 words in a
+row. For example, a benchmark copies a terminology's definition,
+changes a word, and adds a sentence:
 
 | text | from |
 |---|---|
@@ -112,9 +149,26 @@ terminology's definition, changes a word, and adds a sentence:
 They share 10 words in a row: `the total number of lymph nodes that were
 examined by`. So the two texts match.
 
-Every side text is compared, since some pairs keep a description in a name
-field. Values are never compared: a common list, such as
-`Unknown | Not Reported | No | Yes`, matches many targets.
+##### A name's words, with a description on the other side
+
+Most names are shorter than 8 words, so a name has one more way to match. Say
+that one side of a pair matches a description of a benchmark row, equal or by
+at least 8 words in a row. The other side then matches a name of that row when it holds every word
+of the name, in any order. The name can be the source's or a target's. For
+example, a benchmark row maps the source variable `Waist.cm` to a target
+described as "The waist circumference of the participant in centimeters.":
+
+| side | text | it matches |
+|---|---|---|
+| anchor | `Waist in cm` | the source name `Waist.cm`, by its words `waist` and `cm` |
+| positive | `Participant Waist Circumference: The waist circumference of the participant in centimeters.` | the target's description, equal |
+
+So the pair is an answer key. Two limits keep general vocabulary:
+
+- a name of one word, such as `age`, matches only an equal text;
+- without a description on the other side, a name's words do not count. So
+  `Waist in cm` -> `Waist` is kept, since `Waist` matches only the target's
+  name.
 
 ### The study rule: `benchmark_study`
 
@@ -181,8 +235,8 @@ leaves the previous corpus as it was; see
     - `benchmark_target_property` and `benchmark_target_description`: the
       expected target that matched;
     - `fields`: the two fields that matched, such as `anchor name = source
-      name, positive name = target name`. A `~` marks a match by 8 words in a
-      row;
+      name, positive name = target name`. [How two texts match](#how-two-texts-match)
+      says how to read it;
   - for the study rule: `benchmark_study_id`, the benchmark's study that the
     pair holds.
 - **`manifest.json`:** the corpus's manifest, with the fields that
@@ -191,8 +245,13 @@ leaves the previous corpus as it was; see
     its file's `sha256` and its table's `csv_sha256`;
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
-  - `settings`: the number of words in a row that make a match, the
-    validation share and the number of buckets;
+  - `settings`:
+    - `min_overlap_words`: the minimum number of words in a row that two
+      texts share to match;
+    - `min_name_words`: the minimum number of words of a name that can match
+      by its words;
+    - `validation_share` and `buckets`: the split's share and its hash
+      buckets;
   - `counts`:
     - `rows`:
       - `combined`: the pairs of all the sources;

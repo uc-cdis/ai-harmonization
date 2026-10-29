@@ -17,10 +17,17 @@ The benchmark texts are cleaned first with ``pairs.common.clean``, the
 cleaning that ``pairs prepare`` gives every text. Two texts match when their
 keys are equal, as ``pairs.common.key`` writes them: normalised as the
 tokenizer normalises them, case-folded, with punctuation as spaces. A side
-text also matches a benchmark description when the two keys share
-OVERLAP_WORDS words in a row. A pair can hold a description in a name field,
-such as a ``name_to_description`` pair's positive, so every side text is
-compared, whatever its field.
+text also matches any benchmark text, a name or a description, when the two
+keys share at least MIN_OVERLAP_WORDS words in a row. A pair can hold a
+description in a name field, such as a ``name_to_description`` pair's
+positive, so every side text is compared, whatever its field.
+
+A name also matches by its words, with a description on the other side. When
+one side of a pair matches a benchmark row's description, the other side also
+matches a name of that row when it holds every word of the name, in any order,
+and the name has MIN_NAME_WORDS words or more. For example, the anchor
+``Waist in cm`` holds the words of the source name ``Waist.cm``. It matches
+that name when the positive holds the target's description.
 
 A finding is a reason to drop a pair, found against one benchmark. There are
 two kinds:
@@ -56,11 +63,17 @@ import pandas as pd
 from embedding_model.benchmarks import TARGET_SEPARATOR
 from embedding_model.pairs.common import STUDY_SEPARATOR, clean, key
 
-# A side text overlaps a benchmark description when the two share this many
+# A side text overlaps a benchmark text when the two share at least this many
 # words in a row. GPT-3's authors check for their test data in their training
 # data the same way (Brown et al., 2020, Appendix C). Their rule gives 8 words
-# for texts as short as the benchmarks' descriptions.
-OVERLAP_WORDS = 8
+# for texts as short as the benchmarks' descriptions. A shorter text, such as
+# most names, matches only an equal text or, with a description on the other
+# side, by its words.
+MIN_OVERLAP_WORDS = 8
+# The minimum number of words of a benchmark name that a side can match by its
+# words. A one-word name, such as "age", matches only an equal text, since a
+# side that holds one shared word is mostly general vocabulary.
+MIN_NAME_WORDS = 2
 # The two findings, as the findings table and the corpus's manifest name them.
 ANSWER_KEY = "answer_key"
 BENCHMARK_STUDY = "benchmark_study"
@@ -207,7 +220,7 @@ def overlaps(texts, references, length):
     Args:
         texts (Iterable[str]): Keys, as ``keys`` writes them.
         references (Iterable[str]): Keys to compare them with.
-        length (int): The words in a run, such as OVERLAP_WORDS.
+        length (int): The words in a run, such as MIN_OVERLAP_WORDS.
 
     Returns:
         set[tuple[str, str]]: (text, reference), for each text and reference
@@ -228,30 +241,76 @@ def overlaps(texts, references, length):
     return matched
 
 
-def matches(sides, texts, overlapping):
-    """The side texts that match benchmark texts, exactly or by an overlap.
+def word_matches(texts, names, min_words):
+    """The texts and names where the text holds every word of the name.
+
+    The words may come in any order. Only names of ``min_words`` words or
+    more are matched. Each text is indexed by its words, and a name looks up
+    the texts that hold its rarest word, then keeps those that hold the rest.
+
+    Args:
+        texts (Iterable[str]): Keys, as ``keys`` writes them.
+        names (Iterable[str]): Benchmark names' keys.
+        min_words (int): The minimum number of words of a name that can
+            match, such as MIN_NAME_WORDS.
+
+    Returns:
+        set[tuple[str, str]]: (text, name), for each text that holds the
+            name's words and is not already the name's equal key.
+    """
+    holding = defaultdict(set)
+    for text in set(texts):
+        for word in set(text.split()):
+            holding[word].add(text)
+    matched = set()
+    for name in set(names):
+        words = sorted(set(name.split()), key=lambda word: len(holding[word]))
+        if len(words) < min_words:
+            continue
+        found = set(holding[words[0]])
+        for word in words[1:]:
+            found &= holding[word]
+        matched.update((text, name) for text in found if text != name)
+    return matched
+
+
+def matches(sides, texts):
+    """Every match of a side text with a benchmark text, in each of the three ways.
+
+    The three ways are an equal key (``=``), at least MIN_OVERLAP_WORDS words
+    in a row (``~``), and a name's words (``>=``), for names of MIN_NAME_WORDS
+    words or more.
 
     Args:
         sides (pd.DataFrame): From ``side_keys``.
-        texts (pd.DataFrame): Benchmark texts, from ``benchmark_texts``.
-        overlapping (pd.DataFrame): The side texts that overlap a benchmark
-            description: ``sides``' columns, and ``reference``, the
-            description's key.
+        texts (pd.DataFrame): Benchmark texts, from ``benchmark_texts``: the
+            source texts and the target texts together.
 
     Returns:
         pd.DataFrame: One row per match: the side's columns, the benchmark
-            text's columns, and ``how``, ``=`` for an equal key or ``~`` for an
-            overlap.
+            text's columns, and ``how``, the way that it matched.
     """
-    exact = sides.merge(texts, on="key").assign(how="=")
-    descriptions = texts[texts.field.str.endswith("description")]
-    linked = (
-        overlapping.drop(columns="key")
-        .merge(descriptions.rename(columns={"key": "reference"}), on="reference")
-        .drop(columns="reference")
-        .assign(how="~")
+    names = texts[texts.field.str.endswith("name")]
+
+    def joined(matched_keys, candidates, how):
+        """The side texts and benchmark texts of (side key, benchmark key) tuples."""
+        matched = pd.DataFrame(sorted(matched_keys), columns=["key", "reference"])
+        return (
+            sides.merge(matched, on="key")
+            .drop(columns="key")
+            .merge(candidates.rename(columns={"key": "reference"}), on="reference")
+            .drop(columns="reference")
+            .assign(how=how)
+        )
+
+    return pd.concat(
+        [
+            sides.merge(texts, on="key").assign(how="="),
+            joined(overlaps(sides.key, texts.key, MIN_OVERLAP_WORDS), texts, "~"),
+            joined(word_matches(sides.key, names.key, MIN_NAME_WORDS), names, ">="),
+        ],
+        ignore_index=True,
     )
-    return pd.concat([exact, linked], ignore_index=True)
 
 
 def answer_keys(sides, source_texts, target_texts):
@@ -269,37 +328,38 @@ def answer_keys(sides, source_texts, target_texts):
             such as ``anchor name = source name, positive description ~ target
             description``.
     """
-    references = pd.concat(
-        [
-            frame.key[frame.field.str.endswith("description")]
-            for frame in (source_texts, target_texts)
-        ]
-    )
-    overlapping = sides.merge(
-        pd.DataFrame(
-            sorted(overlaps(sides.key, references, OVERLAP_WORDS)),
-            columns=["key", "reference"],
-        ),
-        on="key",
-    )
-    on_source = matches(sides, source_texts, overlapping)
-    on_target = matches(sides, target_texts, overlapping)
+    side_matches = matches(sides, pd.concat([source_texts, target_texts]))
+    on_source = side_matches[side_matches.field.str.startswith("source")]
+    on_target = side_matches[side_matches.field.str.startswith("target")]
     both = on_source.merge(
         on_target, on=["pair", "benchmark", "row"], suffixes=("_source", "_target")
     )
+    # The source and the target must match on two sides of the pair. One side
+    # that matches both, as "Race" matches the source "Race" and the target
+    # "race", is shared vocabulary.
     both = both[both.side_source != both.side_target]
+    # A name's words count only when the pair's other side matched a
+    # description of the same row. That needs both sides, so it is checked
+    # here, once they are joined.
+    source_counts = (both.how_source != ">=") | both.field_target.str.endswith(
+        "description"
+    )
+    target_counts = (both.how_target != ">=") | both.field_source.str.endswith(
+        "description"
+    )
+    both = both[source_counts & target_counts]
 
-    def described(end):
+    def as_text(end):
         """One of the two matches as text, such as ``anchor name = source name``."""
         parts = [both[f"{part}_{end}"] for part in ("side_field", "how", "field")]
         return both[f"side_{end}"].str.cat(parts, sep=" ")
 
     both = both.assign(
-        fields=described("source") + ", " + described("target"),
+        fields=as_text("source") + ", " + as_text("target"),
         source_variable_name=both.variable_source,
-        target_property=both.target,
+        target_property=both.target_target,
     )
-    both = both.sort_values(["pair", "benchmark", "row", "target", "fields"])
+    both = both.sort_values(["pair", "benchmark", "row", "target_property", "fields"])
     return both.drop_duplicates(["pair", "benchmark"])[
         [
             "pair",

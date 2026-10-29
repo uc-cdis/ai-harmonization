@@ -34,7 +34,8 @@ The sources are read in the order that the
 the checksum that their manifest records. When the source's fetch is in the
 inputs folder, the pairs must come from that fetch. A pair that copies an
 earlier source's pair is kept once, in the earlier source. Two pairs are
-copies when the tokenizer normalises their texts to the same two texts.
+copies when the tokenizer
+[normalises](tokenizer.md#step-1-normalize) their texts to the same two texts.
 [pairs.md](pairs.md#duplicates) shows examples. The pair kept takes the
 studies of all its copies, so the
 [study rule](leakage.md#the-study-rule-benchmark_study) still sees them. NCIt comes
@@ -54,19 +55,41 @@ Validation holds 2% of the groups by default. `--validation-share` sets
 another share, in steps of 0.001, such as `--validation-share 0.1`. A small
 corpus can use a larger share, so that validation holds enough pairs.
 
-A group is an item with all its pairs. NCIt and CDISC share NCIt's concept
-codes, so a concept's pairs from both sources form one group. All pairs of a
-group go to the same side. A pair
-that two sources share is kept once, in the earlier source's item, so it goes
-to that item's side.
+All pairs of a group go to the same side. A group holds one or more items,
+with all their pairs. Two items are in one group when they share:
+
+- an NCIt concept code. NCIt's concepts and CDISC's terms are both keyed by
+  it, so a CDISC term joins its NCIt concept. The other sources' items have
+  keys of their own, which never match across sources;
+- or a canonical text, as the tokenizer
+  [normalises](tokenizer.md#step-1-normalize) it. [Each source](pairs.md#each-source)
+  lists each source's canonical. For example, an NCIt concept's canonical is
+  `Inverted Urothelial Papilloma`, and an ontology term's is
+  `inverted urothelial papilloma`. After the normalisation, they are one text.
+
+The links carry over. For example, item A shares a text with item B, and B
+shares a code with C. Then A, B and C are one group. So the same concept never
+has pairs on both sides. A pair that two sources share is kept once, in the
+earlier source's item, so it goes to that item's group.
 
 A hash of the group decides its side, with no random draw and no seed. The
-hash puts each group into one of 1,000 buckets. The groups in the first
-buckets go to validation: buckets 0 to 19 for a share of 2%. So the split is
-the same on every build, and a group keeps its side as sources are added. A
-larger share adds buckets, so a group in validation at 2% is in validation at
-10% too. Groups differ in size, so the share of pairs in validation is close to
-the share asked for, but not exactly that share.
+hash reads the group's key: the first key of its items in sorted order, such
+as `cadsr:9999901` or `ncit:C999901`. It puts each group into one of 1,000
+buckets, numbered 0 to 999. The first buckets go to validation, and the rest
+to training:
+
+| share | validation | training |
+|---|---|---|
+| 2%, the default | buckets 0 to 19 | buckets 20 to 999 |
+| 10% | buckets 0 to 99 | buckets 100 to 999 |
+
+So a group in validation at 2% is in validation at 10% too. Groups differ in
+size, so the share of pairs in validation is close to the share asked for, but
+not exactly that share.
+
+A build from the same sources and the same benchmarks gives the same split.
+When a source or a benchmark changes, the groups can change, and so can the
+split.
 
 The split is not stratified. Each source has many groups, so its share of
 validation pairs is close to the share asked for.

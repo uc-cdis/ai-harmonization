@@ -10,9 +10,9 @@ named, and writes one corpus under ``<inputs>/corpora/<name>/``:
 2. Leakage prevention drops the pairs that would leak a benchmark built under
    ``<inputs>/benchmarks/`` (see ``embedding_model.leakage``).
 3. The kept pairs are split into training and validation pairs. All pairs of
-   one group go to the same side: an item, or an NCIt concept in both NCIt and
-   CDISC. A hash of the group decides, so the split is the same on every
-   build, and a group keeps its side as the corpus grows.
+   one group go to the same side: items that share an NCIt concept code or a
+   canonical text, as ``group_keys`` links them. A hash of the group decides,
+   so the same sources and benchmarks always give the same split.
 
 The corpus holds ``pairs.parquet``, the kept pairs with their ``split``,
 ``dropped.parquet``, every dropped pair with its findings, and
@@ -25,13 +25,17 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import connected_components
 
 from embedding_model import benchmarks, leakage, manifests
 from embedding_model.pairs import READERS, pairs_sha256, read_pairs, read_pairs_file
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
-from embedding_model.pairs.common import COLUMNS, distinct_pairs
+from embedding_model.normalization import normalised
+from embedding_model.pairs.common import COLUMNS, NAME_TO_DESCRIPTION, distinct_pairs
 
 # The share of groups held out for validation by default, and the hash buckets
 # that the share is cut in. So a share is a whole number of buckets: a multiple
@@ -115,11 +119,50 @@ def combine(frames):
     return distinct.reset_index(drop=True), combined.source.drop(index=distinct.index)
 
 
-def group_keys(pairs):
-    """The group of each pair: its source and item, or the NCIt concept code."""
+def item_keys(pairs):
+    """The item of each pair: its source and item, or the NCIt concept code."""
     ncit_codes = pairs.source.isin(CONCEPT_CODES)
     return ("ncit:" + pairs["item"]).where(
         ncit_codes, pairs.source + ":" + pairs["item"]
+    )
+
+
+def canonical_texts(pairs):
+    """Each pair's canonical: the positive's name, or the anchor's name for a
+    ``name_to_description`` pair, whose positive is a description alone."""
+    return pairs.positive_name.where(
+        pairs.kind != NAME_TO_DESCRIPTION, pairs.anchor_name
+    )
+
+
+def group_keys(pairs):
+    """The group of each pair, as the key of the group's first item.
+
+    Two items are in one group when they share an item key, as an NCIt
+    concept and its CDISC terms do, or a canonical text, normalised as the
+    tokenizer normalises it. The links carry over, so the groups are the
+    connected components of a graph: each pair links its item to its
+    canonical text. A group's key is the first of its items' keys in sorted
+    order, so the same pairs always give the same keys.
+
+    Args:
+        pairs (pd.DataFrame): The pairs, with ``source``, ``item``, ``kind``,
+            ``anchor_name`` and ``positive_name``.
+
+    Returns:
+        pd.Series: The group key of each pair.
+    """
+    items = item_keys(pairs).to_numpy()
+    texts = ("text:" + normalised(canonical_texts(pairs))).to_numpy()
+    nodes = pd.Index(np.concatenate([items, texts])).unique()
+    item_nodes, text_nodes = nodes.get_indexer(items), nodes.get_indexer(texts)
+    links = coo_matrix(
+        (np.ones(len(pairs)), (item_nodes, text_nodes)), shape=(len(nodes),) * 2
+    )
+    _, component = connected_components(links, directed=False)
+    first_item = pd.Series(items).groupby(component[item_nodes]).min()
+    return pd.Series(
+        first_item.loc[component[item_nodes]].to_numpy(), index=pairs.index
     )
 
 
@@ -159,7 +202,8 @@ def splits(pairs, validation_share=VALIDATION_SHARE):
     adds others.
 
     Args:
-        pairs (pd.DataFrame): The pairs, with ``source`` and ``item``.
+        pairs (pd.DataFrame): The pairs, with the columns that ``group_keys``
+            reads.
         validation_share (float): The share of groups held out for
             validation, a multiple of 1 / BUCKETS.
 

@@ -96,6 +96,10 @@ embedding-model = [
     # the scores' config). Its minimum version is the one that
     # sentence-transformers 5.1.2, the lowest version allowed, requires.
     "huggingface-hub>=0.20.0",
+    # embedding_model.corpus (the split's groups, as the connected components
+    # of a graph of items and canonical texts). Its minimum version is the
+    # first with wheels for Python 3.12, the project's lowest Python.
+    "scipy>=1.11.2",
 ]
 
 [tool.uv]

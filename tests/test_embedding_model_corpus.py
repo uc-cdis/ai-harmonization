@@ -525,6 +525,9 @@ class TestBuild:
             {
                 "source": ["ncit", "cdisc", "cadsr", "ncit", "cdisc"],
                 "item": ["C0", "C0", "C0", "C51", "C51"],
+                "kind": "name",
+                "anchor_name": "Wxyz",
+                "positive_name": ["Abcd", "Abcd", "Efgh", "Ijkl", "Ijkl"],
             }
         )
         assert corpus.group_keys(pairs).tolist() == [
@@ -542,10 +545,40 @@ class TestBuild:
             corpus.VALIDATION,
         ]
 
+    def test_items_with_one_canonical_text_share_a_group(self):
+        """Items linked by a canonical text, directly or through a code, take the first key."""
+        pairs = pd.DataFrame(
+            {
+                "source": ["ncit", "obo", "cdisc", "cde", "cadsr", "nhanes"],
+                "item": ["C1", "MONDO:9999901", "C1", "abcd1", "abcd2", "abcd3"],
+                "kind": ["name"] * 5 + ["name_to_description"],
+                "anchor_name": ["Wxyz"] * 5 + ["Efgh"],
+                "positive_name": [
+                    "Inverted Papilloma",
+                    "inverted papilloma",
+                    "Papilloma, Inverted",
+                    "Papilloma, Inverted",
+                    "Efgh",
+                    "An efgh, as a description alone.",
+                ],
+            }
+        )
+        assert corpus.group_keys(pairs).tolist() == ["cde:abcd1"] * 4 + [
+            "cadsr:abcd2",
+            "cadsr:abcd2",
+        ]
+
     def test_a_larger_validation_share_keeps_the_smaller_ones_groups(self):
         """A larger share holds out more groups, and every group of the smaller."""
+        numbers = range(2000)
         pairs = pd.DataFrame(
-            {"source": "cadsr", "item": [f"abcd{number}" for number in range(2000)]}
+            {
+                "source": "cadsr",
+                "item": [f"abcd{number}" for number in numbers],
+                "kind": "name",
+                "anchor_name": "Wxyz",
+                "positive_name": [f"Abcd {number}" for number in numbers],
+            }
         )
         small = pairs.item[corpus.splits(pairs, 0.02) == corpus.VALIDATION]
         large = pairs.item[corpus.splits(pairs, 0.1) == corpus.VALIDATION]

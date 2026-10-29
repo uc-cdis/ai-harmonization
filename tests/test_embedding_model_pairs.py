@@ -87,12 +87,24 @@ class TestClean:
         for text in ("JOS\u00c9\u2019s", "FIANC\u00c9\u00ae", "\u201cCAF\u00c9\u201d"):
             assert common.clean(text) == text
 
-    def test_entities_are_read_once_and_only_when_whole(self):
-        """Entities are unescaped once, tag or no tag, and only with their semicolon."""
+    def test_an_entity_written_in_capitals_is_read(self):
+        """An entity that an upper-cased text wrote in capitals is still unescaped."""
+        assert common.clean("&EACUTE;COLE") == "ÉCOLE"
+
+    def test_entities_are_read_until_none_is_left_and_only_when_whole(self):
+        """Entities are unescaped, even twice escaped and beside a tag, only with their semicolon."""
         assert common.clean("I&acirc;&#128;&#153;m") == "I\u2019m"
-        assert common.clean("x &amp;lt;5") == "x &lt;5"
-        assert common.clean("<b>x</b> &amp;lt;5") == "x &lt;5"
+        assert common.clean("x &amp;lt;5") == "x <5"
+        assert common.clean("<b>x</b> &amp;lt;5") == "x <5"
         assert common.clean("Yes&not sure") == "Yes&not sure"
+
+    @pytest.mark.parametrize(
+        "text",
+        ["x &amp;lt;5", "<b>x</b> &amp;amp;", "Caf\u00c3\u00a9 <U+00A0>", "a&nbsp;b"],
+    )
+    def test_cleaning_a_clean_text_changes_nothing(self, text):
+        """A second clean gives the same text as the first."""
+        assert common.clean(common.clean(text)) == common.clean(text)
 
     def test_brackets_that_are_not_a_tag_are_kept(self):
         """Text that only starts like a tag, without a tag's attributes, is kept."""
@@ -757,7 +769,7 @@ class TestObo:
         assert (term.description, term.descriptions) == ("An abcd.", ["The abcd."])
 
     def test_an_obsolete_terms_texts_lose_their_marker(self):
-        """An obsolete term's synonyms and definition lose the word "obsolete"."""
+        """An obsolete term's synonyms and definition lose the word "obsolete", even twice."""
         tables = {
             "terms": table(
                 id=["ABCD:1"],
@@ -768,16 +780,16 @@ class TestObo:
                 open=[True],
             ),
             "synonyms": table(
-                id=["ABCD:1"],
-                name=["obsolete efgh"],
-                scope=["EXACT"],
-                synonym_types=[""],
+                id=["ABCD:1", "ABCD:1"],
+                name=["obsolete efgh", "obsolete obsolete ijkl"],
+                scope=["EXACT", "EXACT"],
+                synonym_types=["", ""],
             ),
             "definitions": table(id=["ABCD:1"], definition=["OBSOLETE. An abcd."]),
         }
         (term,) = obo.items(tables)
         assert ([t.text for t in term.texts], term.description) == (
-            ["efgh"],
+            ["efgh", "ijkl"],
             "An abcd.",
         )
 
@@ -932,7 +944,10 @@ class TestCde:
             "definitions": table(
                 tiny_id=["abcd1", "abcd1"],
                 position=[1, 0],
-                definition=["Another abcd.", "An abcd._The efgh."],
+                definition=[
+                    "Another abcd.",
+                    "An abcd._The efgh. Value Domain for java language String datatype.",
+                ],
                 tags=["", ""],
             ),
             "values": table(

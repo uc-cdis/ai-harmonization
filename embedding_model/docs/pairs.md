@@ -209,8 +209,9 @@ there is none.
 
 Every text is cleaned the same way:
 
-- escapes such as R's `<U+00A0>` are read, and entities such as `&gt;` are
-  unescaped;
+- escapes such as R's `<U+00A0>` are read, and HTML entities are unescaped,
+  such as `&gt;` to `>`. An entity that a source escaped twice, as `&amp;gt;`,
+  becomes `>` too;
 - UTF-8 text decoded as cp1252 is repaired, such as `Iâ€™m` to `I’m`, even
   when it was decoded twice;
 - HTML tags are removed. Other text in angle brackets is kept, as in
@@ -220,6 +221,22 @@ Every text is cleaned the same way:
   them: control, format and private-use characters, such as zero-width
   spaces and direction marks;
 - each run of whitespace becomes one space.
+
+The steps run in this order. For example, a description from an HTML page:
+
+```
+<p>Age<U+00A0>(years)</p><p>Enter 0 if the participantâ€™s age is &lt; 1 year</p>
+```
+
+| step | what changes | the text after it |
+|---|---|---|
+| escapes | `<U+00A0>` becomes a no-break space | `<p>Age (years)</p><p>Enter 0 if the participantâ€™s age is &lt; 1 year</p>` |
+| entities and encoding | `&lt;` becomes `<`, and `participantâ€™s` becomes `participant’s` | `<p>Age (years)</p><p>Enter 0 if the participant’s age is < 1 year</p>` |
+| tags | `<p>` and `</p>` go, and each leaves a space. `< 1 year` is not a tag, so it stays | ` Age (years)  Enter 0 if the participant’s age is < 1 year ` |
+| characters and spaces | the no-break space becomes a space, and each run of spaces becomes one | `Age (years) Enter 0 if the participant’s age is < 1 year` |
+
+Unescaping turns `&lt;` into `<`, but it removes nothing. Only the tag step
+removes text, and only real HTML tags.
 
 A question text also loses the number that a form gives it, as in "24. What
 is your marital status?". Units are kept, such as "(mg/dL)".

@@ -25,13 +25,15 @@ from embedding_model.pairs.common import (
     cadsr_definition,
     undeprecated,
     value_labels,
+    without_java,
 )
 from embedding_model.sources.common import report_new
 
 # The NIH CDE Repository also lists some of caDSR's elements, with NCI as their
-# steward. Their definitions are caDSR's, so they go through cadsr_definition(),
-# which removes caDSR's curation marks and turns its concept joins into spaces.
-# Other stewards' definitions get the usual cleaning only.
+# steward. Their definitions are caDSR's, so they are cleaned as caDSR's are:
+# cadsr_definition() removes caDSR's curation marks and turns its concept joins
+# into spaces, and without_java() removes the phrase about a Java type. Other
+# stewards' definitions get the usual cleaning only.
 CADSR_STEWARD = "NCI"
 # The registration statuses that the repository's guides list, and Retired.
 STATUSES = {
@@ -85,7 +87,10 @@ def items(tables):
     )
     definitions = definitions.assign(
         definition=definitions.definition.where(
-            ~copied, definitions.definition.map(cadsr_definition)
+            ~copied,
+            definitions.definition.map(
+                lambda text: without_java(cadsr_definition(text))
+            ),
         )
     )
     described = by_element(definitions, "definition")

@@ -30,6 +30,7 @@ from embedding_model.pairs.common import (
     Text,
     cadsr_definition,
     value_labels,
+    without_java,
 )
 from embedding_model.sources.common import report_new
 
@@ -152,31 +153,6 @@ NAME_TYPES = {
     "VM Alt Name",
     "XML Tag",
 }
-# The Java type that ends the long name of an element of an old software model,
-# as in "Gene Alias Name java.lang.String".
-JAVA_TYPE = re.compile(r"\s*\bjava\.(?:lang|util|sql)\.[A-Za-z]+")
-# The phrase about that Java type in the element's definition: "Generic value
-# domain for a java datatype that ...", "Value Domain for java language String
-# datatype." or "Java Date Type". It often follows the text before it with no
-# full stop, so only the phrase is removed, not its sentence.
-JAVA_VALUE_DOMAIN = re.compile(
-    r"\s*(?:Generic value domain for a (?:primitive )?java\b.*?(?:\.(?=\s|$)|$)"
-    r"|Value Domain for java language \w+ datatype\b\.?"
-    r"|Java (?:\w+ Type|Double Wrapper for primitive type double)\b\.?)",
-    re.IGNORECASE,
-)
-
-
-def without_java(text):
-    """A long name or definition without its Java type and the phrase about it.
-
-    Args:
-        text (str): The long name or definition.
-
-    Returns:
-        str: The text without them.
-    """
-    return JAVA_TYPE.sub("", JAVA_VALUE_DOMAIN.sub("", text))
 
 
 def items(tables):

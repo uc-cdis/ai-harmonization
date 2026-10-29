@@ -33,7 +33,8 @@ def items(tables):
     )
     both = both.fillna({"open_list": True, "open_codebook": True}).fillna("")
     values = tables["values"].sort_values([*KEY, "position"], kind="stable")
-    values = values[~values.label.str.strip().isin(NOT_VALUES)]
+    values = values.assign(label=values.label.map(clean))
+    values = values[~values.label.isin(NOT_VALUES)]
     listed = values.groupby(KEY).label.agg(list).to_dict()
     found = []
     for row in both.itertuples():

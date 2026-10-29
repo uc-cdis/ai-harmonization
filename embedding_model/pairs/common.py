@@ -96,14 +96,17 @@ BLOCK_TAG = re.compile(
 )
 # A character written as an escape: R's "<U+00A0>" or a JSON-style "\u2122".
 # No codec reads R's escapes, and Python's "unicode_escape" codec garbles text
-# that is not ASCII, as "Café" to "CafÃ©".
+# that is not ASCII, as "Café" to "CafÃ©". ftfy's decode_escapes reads "\u2122",
+# but it also turns the "\n" and "\t" of a text such as "C:\new\table" into a
+# line break and a tab.
 ESCAPE = re.compile(r"<U\+([0-9A-Fa-f]{4,6})>|\\u([0-9A-Fa-f]{4})")
-# An entity with its semicolon, as in "&gt;". html.unescape alone also reads
-# one without it, so "Yes&not sure" would become "Yes¬ sure".
-HTML_ENTITY = re.compile(r"&(?:[a-zA-Z][a-zA-Z0-9]*|#\d+|#[xX][0-9a-fA-F]+);")
-# ftfy repairs text read with the wrong encoding. Entities are unescaped before
-# it, in every text, and quotes are kept as the source writes them.
-FIXES = ftfy.TextFixerConfig(unescape_html=False, uncurl_quotes=False, explain=False)
+# The settings of ftfy's fix_text, which unescapes HTML entities and repairs
+# text read with the wrong encoding. It repeats its fixes until the text stops
+# changing. So a text that a source escaped twice, such as "&amp;lt;5", becomes
+# "<5", and cleaning a clean text changes nothing. unescape_html is True, since
+# ftfy's default, "auto", leaves the entities of a text that has a "<", such as
+# a tag. uncurl_quotes is off, so quotes stay as the source writes them.
+FIXES = ftfy.TextFixerConfig(unescape_html=True, uncurl_quotes=False, explain=False)
 # The replacement character's UTF-8 bytes, read as Mac Roman. ftfy leaves them
 # as they are, so they are turned back into the replacement character.
 LOST_IN_MAC_ROMAN = "\u00d4\u00f8\u03a9"
@@ -137,6 +140,19 @@ DASHED_CODE = re.compile(r"^\s*\(?-?\d{1,3}\)?-(?=[A-Za-z])")
 CONCEPT_JOIN = re.compile(
     r"(?:(?<=\.)|(?<=\))(?<!\([Ss]\)))\s*(?:[:_]+|-(?=\s*[A-Z]))\s*"
     r"|(?<=[a-z0-9\]])_(?=[A-Z][a-z ])"
+)
+# The Java type that ends the long name of an element of an old software model,
+# as in "Gene Alias Name java.lang.String".
+JAVA_TYPE = re.compile(r"\s*\bjava\.(?:lang|util|sql)\.[A-Za-z]+")
+# The phrase about that Java type in the element's definition: "Generic value
+# domain for a java datatype that ...", "Value Domain for java language String
+# datatype." or "Java Date Type". It often follows the text before it with no
+# full stop, so only the phrase is removed, not its sentence.
+JAVA_VALUE_DOMAIN = re.compile(
+    r"\s*(?:Generic value domain for a (?:primitive )?java\b.*?(?:\.(?=\s|$)|$)"
+    r"|Value Domain for java language \w+ datatype\b\.?"
+    r"|Java (?:\w+ Type|Double Wrapper for primitive type double)\b\.?)",
+    re.IGNORECASE,
 )
 # The curation mark that caDSR leaves in a definition, such as
 # "[Manually-curated]" or "[Standard-based]", with a full stop after it, if any.
@@ -250,10 +266,11 @@ def without_tags(text):
 def clean(text):
     """A text with its markup removed and its characters and spaces normalised.
 
-    Escapes such as R's ``<U+00A0>`` are read first, and entities such as
-    ``&gt;`` are unescaped. ftfy then repairs text read with the wrong
-    encoding, such as ``Iâ€™m`` to ``I’m``, removes control characters and
-    normalises Unicode to NFC. HTML tags are removed, and other text in angle
+    Escapes such as R's ``<U+00A0>`` are read first. ftfy then unescapes
+    entities such as ``&gt;``, repairs text read with the wrong encoding, such
+    as ``Iâ€™m`` to ``I’m``, removes control characters and normalises Unicode
+    to NFC. It repeats these fixes until the text stops changing, so a clean
+    text cleans to itself. HTML tags are removed, and other text in angle
     brackets, such as ``<time point>``, is kept. A replacement character
     becomes a space. BERT's text cleaning then removes the characters that
     hold no text, and every run of whitespace becomes one space.
@@ -267,12 +284,23 @@ def clean(text):
     if not isinstance(text, str):
         return ""
     text = ESCAPE.sub(escaped, text)
-    text = HTML_ENTITY.sub(lambda entity: html.unescape(entity.group(0)), text)
     text = ftfy.fix_text(text, FIXES).replace(LOST_IN_MAC_ROMAN, "\ufffd")
     if HTML_TAG.search(text):
         text = without_tags(text)
     text = BERT_CLEANING.normalize_str(text.replace("\ufffd", " "))
     return " ".join(text.split())
+
+
+def without_java(text):
+    """A long name or definition without its Java type and the phrase about it.
+
+    Args:
+        text (str): The long name or definition.
+
+    Returns:
+        str: The text without them.
+    """
+    return JAVA_TYPE.sub("", JAVA_VALUE_DOMAIN.sub("", text))
 
 
 def cadsr_definition(text):
@@ -436,7 +464,7 @@ def worded(text):
 
 
 def cleaned(item):
-    """An item with every text cleaned once, and texts that clean to nothing dropped.
+    """An item with every text cleaned, and texts that clean to nothing dropped.
 
     When the description is empty, the first other description takes its
     place. A description loses the empty headings of the template that some

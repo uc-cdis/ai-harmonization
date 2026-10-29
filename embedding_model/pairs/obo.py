@@ -16,8 +16,11 @@ from embedding_model.sources.common import report_new
 
 SAME_MEANING = {"EXACT"}
 # How an obsolete term's texts are marked: "obsolete abcd", "OBSOLETE. An
-# abcd." or "Thin abcd (obsolete)".
-OBSOLETE = re.compile(r"^\s*obsoleted?\b[.:]?\s*|\s*\(obsolete\)\s*$", re.IGNORECASE)
+# abcd." or "Thin abcd (obsolete)". The word at the start can repeat, as in
+# "obsolete obsolete abcd", as sources.obo strips it from a label.
+OBSOLETE = re.compile(
+    r"^(?:\s*obsoleted?\b[.:]?\s*)+|\s*\(obsolete\)\s*$", re.IGNORECASE
+)
 NOT_SAME_MEANING = {"RELATED", "BROAD", "NARROW"}
 
 

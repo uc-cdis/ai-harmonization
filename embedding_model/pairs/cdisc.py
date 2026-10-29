@@ -98,7 +98,9 @@ def items(tables):
     members = terms[~is_codelist]
     values = {
         codelist: list(
-            dict.fromkeys(name for name in group["NCI Preferred Term"] if name)
+            dict.fromkeys(
+                name for name in map(clean, group["NCI Preferred Term"]) if name
+            )
         )
         for codelist, group in members.groupby("Codelist Code", sort=False)
     }

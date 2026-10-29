@@ -982,6 +982,48 @@ class TestCde:
         assert (second.status, second.canonical, second.texts) == (CURRENT, "", [])
         assert "'Abcd status'" in capsys.readouterr().out
 
+    def test_only_designations_tagged_as_names_are_texts(self, capsys):
+        """Instructions, consumer names and new tags are left out; a new tag is printed."""
+        tables = {
+            "elements": table(
+                tiny_id=["abcd1"],
+                steward=["Abcd"],
+                registration_status=["Qualified"],
+                datatype=["Text"],
+                open=[True],
+            ),
+            "designations": table(
+                tiny_id=["abcd1"] * 6,
+                position=list(range(6)),
+                designation=[
+                    "Abcd indicator",
+                    "Abcd ind",
+                    "Answer this question only if abcd.",
+                    "Abcd, Blood",
+                    "Abcd efgh",
+                    "Abcd ijkl",
+                ],
+                tags=[
+                    "",
+                    "Short Name|Question Text",
+                    "Guide For Use",
+                    "Consumer Name ALPHA",
+                    "Short Name|Abcd Tag",
+                    "Abcd Tag",
+                ],
+            ),
+            "definitions": table(tiny_id=[], position=[], definition=[], tags=[]),
+            "values": table(
+                tiny_id=[], position=[], permissible_value=[], value_meaning_name=[]
+            ),
+        }
+        (element,) = cde.items(tables)
+        assert element.canonical == "Abcd indicator"
+        assert [t.text for t in element.texts] == ["Abcd ind"]
+        printed = capsys.readouterr().out
+        assert "'Abcd Tag' on 2 items; its designations not used" in printed
+        assert "Guide For Use" not in printed
+
 
 class TestCadsr:
     """caDSR's data elements."""

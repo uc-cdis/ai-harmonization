@@ -361,11 +361,15 @@ does not name is read as current, and `pairs prepare` prints it.
 ### NIH CDE
 
 - **Items:** each data element, a row of `elements`.
-- **Canonical:** the first `designation`.
-- **Anchors:** the other designations, whatever their `tags`. Some start
-  with the word "Deprecated", and it is removed. A designation is a question
-  text when a tag names a question, such as `Preferred Question Text`, or
-  when it ends with a question mark.
+- **Canonical:** the first `designation` whose `tags` mark a name.
+- **Anchors:** the other designations whose `tags` are all on the reader's
+  list of name and question tags, such as `Short Name` or
+  `Preferred Question Text`. A designation with no tag counts as a name. A
+  designation with any other tag is not used. A tag that the reader has not
+  seen before is printed, so that someone can review it. Some designations
+  start with the word "Deprecated", and it is removed. A designation is a
+  question text when a tag names a question, or when it ends with a question
+  mark.
 - **Description:** the first `definition`. Other definitions give
   `description_description` pairs. The elements whose `steward` is `NCI` copy
   their definitions from caDSR, so they are cleaned in the same way as

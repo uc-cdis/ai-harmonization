@@ -45,6 +45,45 @@ STATUSES = {
     "Preferred Standard": CURRENT,
     "Retired": RETIRED,
 }
+# The designation tags whose designations name the element or ask its
+# question. A designation with no tag is a name too.
+NAME_TAGS = {
+    "Alternate Question Text",
+    "Alternative Question Text",
+    "Application Standard Question Text",
+    "Common Formats - Patient Safety",
+    "Display Name",
+    "Full Name",
+    "Health",
+    "ISO",
+    "In the past 7 days",
+    "LOINC",
+    "Long Common Name",
+    "Long Name",
+    "NBSTRN Krabbe disease",
+    "NICHD",
+    "Preferred Question Text",
+    "Primary Name",
+    "Question",
+    "Question Text",
+    "Question text",
+    "RADx Question Text",
+    "RADx-UP Variable Name",
+    "Short Name",
+    "Shortname",
+    "Suggested Question Text",
+}
+# The tags whose designations are not names: instructions to the person who
+# fills a form ("Answer this question only if ..."), LOINC's consumer names,
+# which the LOINC reader leaves out too, and notes about an instrument.
+OTHER_TAGS = {
+    "Consumer Name ALPHA",
+    "Guide For Use",
+    "Guide For Use - HERF.Q16",
+    "SAH",
+    "Short Description",
+}
+TAG_SEPARATOR = "|"
 
 
 def by_element(frame, column):
@@ -72,8 +111,19 @@ def items(tables):
     designations = tables["designations"].sort_values(
         ["tiny_id", "position"], kind="stable"
     )
+    tags = designations.tags.str.split(TAG_SEPARATOR)
+    every_tag = tags.explode()
+    report_new(
+        every_tag[every_tag != ""],
+        NAME_TAGS | OTHER_TAGS,
+        "a designation's tags",
+        "its designations not used",
+    )
+    named = tags.map(
+        lambda listed: all(tag in NAME_TAGS or tag == "" for tag in listed)
+    )
     names = defaultdict(list)
-    for row in designations.itertuples():
+    for row in designations[named].itertuples():
         designation = undeprecated(row.designation)
         if designation.strip():
             asks = designation.rstrip().endswith("?")

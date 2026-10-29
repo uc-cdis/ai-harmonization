@@ -117,7 +117,12 @@ sources fetch --source ncit`.
 
 ## Making a new version
 
-A difference that is meant makes a new version:
+Only benchmarks and sources have versions, since only they have a committed
+manifest. A source's pairs, a corpus and a tokenizer have none. Each build of
+one of them replaces the last build of that name.
+
+When a benchmark or a source differs on purpose, such as after a new release,
+make a new version of it:
 
 1. In the committed manifest, raise `version`. For a new pin, such as another
    commit of a benchmark's documentation or a source's new release, also edit
@@ -128,10 +133,19 @@ A difference that is meant makes a new version:
    `sources fetch`. It records the new checksums in the committed manifest.
 3. Commit the manifest.
 
-A version committed in git never changes. `--update-manifest` refuses a build
-that differs while `version` is still the committed version, so raise it first.
-Until the new version is committed, it can be built and accepted as often as
-needed. The new folder replaces the working one.
+A version committed in git never changes. So the build asks the local git
+checkout which version is committed at `HEAD`. For example, a source's manifest
+is committed at version 2, and a new release makes the fetch differ:
 
-The build asks the local git checkout whether a version is committed. If git
-cannot answer, the build cannot tell, so it refuses a differing build.
+| the build | `version` in the manifest file | git's committed version | `--update-manifest` | result |
+|---|---|---|---|---|
+| matches | 2 | not asked | given or not | kept |
+| differs | 2 | 2 | given or not | refused: version 2 is committed, so raise `version` first |
+| differs | 3 | 2 | not given | refused: the message gives the command with `--update-manifest` |
+| differs | 3 | 2 | given | accepted as version 3: the new build's checksums are recorded in the manifest file, which you then commit |
+| differs | 3 | git cannot answer | given or not | refused: the message asks for a git checkout where `git status` works |
+
+A build that matches needs no git, so it also works in a copy without git. Until
+version 3 is committed, it can be built and accepted as often as needed. A
+refused build is deleted, and the working folder stays as it was. An accepted
+build replaces it.

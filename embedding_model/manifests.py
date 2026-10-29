@@ -188,25 +188,29 @@ def differences(committed, built_manifest):
 
 
 def git(folder, *args):
-    """Run git in a folder, and give back its result, with the output as text.
+    """Run git in a folder, and give back what it prints.
 
     Args:
         folder (Path): Where git runs.
-        *args (str): git's own arguments, such as ``rev-parse``.
+        *args (str): git's own arguments, such as ``ls-tree``.
 
     Returns:
-        subprocess.CompletedProcess: The result, with ``stdout`` and ``stderr``
-            as text.
+        str: git's output.
 
     Raises:
-        RuntimeError: If git cannot run at all, such as when it is missing.
+        RuntimeError: If git cannot run, such as when it is missing, or if it
+            fails. The error holds git's own message, such as ``fatal: not a
+            git repository``.
     """
     try:
-        return subprocess.run(
+        result = subprocess.run(
             ["git", *args], cwd=folder, capture_output=True, text=True
         )
     except Exception as error:
         raise RuntimeError(f"git could not run: {error}") from error
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or f"git {args[0]} failed")
+    return result.stdout
 
 
 def committed_version(folder, name):
@@ -224,21 +228,16 @@ def committed_version(folder, name):
             yet.
 
     Raises:
-        RuntimeError: If git cannot be asked: outside a checkout, with git
-            missing, or when git refuses the folder.
+        RuntimeError: From ``git``, if git cannot answer: outside a checkout,
+            with git missing, when git refuses the folder, or in a checkout
+            without a commit. The error holds git's own message.
     """
-    inside = git(folder, "rev-parse", "--is-inside-work-tree")
-    if inside.returncode != 0:
-        raise RuntimeError(inside.stderr.strip() or "not a git checkout")
-    listed = git(folder, "ls-tree", "--name-only", "HEAD")
+    listed = git(folder, "ls-tree", "--name-only", "HEAD").splitlines()
     wanted = f"{name}.json"
-    entry = next((e for e in listed.stdout.splitlines() if e == wanted), None)
-    if listed.returncode != 0 or entry is None:
+    entry = next((e for e in listed if e == wanted), None)
+    if entry is None:
         return None
-    shown = git(folder, "show", f"HEAD:./{entry}")
-    if shown.returncode != 0:
-        return None
-    return json.loads(shown.stdout)["version"]
+    return json.loads(git(folder, "show", f"HEAD:./{entry}"))["version"]
 
 
 def pinned(manifest, name):
@@ -367,8 +366,9 @@ def decide(committed_path, built_manifest, update_manifest, command):
         head_version = committed_version(committed_path.parent, committed_path.stem)
     except RuntimeError as error:
         refusal = (
-            f"git cannot say whether version {version} is committed ({error});"
-            " fix that to accept this build"
+            f"git cannot say whether version {version} is committed ({error})."
+            " To accept this build, run it in a git checkout of this repository"
+            " where `git status` works"
         )
     else:
         if head_version == version:

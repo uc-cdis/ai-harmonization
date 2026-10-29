@@ -169,11 +169,14 @@ class TestDecide:
         path.write_text(json.dumps({"version": "1", "files": {}, "sources": [PIN]}))
         return path
 
-    def test_a_matching_build_may_be_kept(self, tmp_path):
-        """A build that matches its committed manifest is kept, with no difference."""
+    def test_a_matching_build_may_be_kept(self, tmp_path, monkeypatch):
+        """A build that matches its committed manifest is kept, and git is not asked."""
         path = tmp_path / "abcd.json"
         path.write_text(json.dumps(self.BUILT))
+        no_git = MagicMock(side_effect=RuntimeError("git could not run"))
+        monkeypatch.setattr(manifests, "committed_version", no_git)
         assert manifests.decide(path, self.BUILT, False, self.COMMAND) == []
+        no_git.assert_not_called()
 
     def test_a_differing_build_needs_update_manifest(
         self, committed, monkeypatch, capsys
@@ -210,7 +213,9 @@ class TestDecide:
         """When git cannot say whether the version is committed, the build is refused."""
         no_answer = MagicMock(side_effect=RuntimeError("not a git repository"))
         monkeypatch.setattr(manifests, "committed_version", no_answer)
-        with pytest.raises(manifests.Refused, match="git cannot say"):
+        with pytest.raises(
+            manifests.Refused, match="git cannot say.*`git status` works"
+        ):
             manifests.decide(committed, self.BUILT, True, self.COMMAND)
 
 
@@ -309,9 +314,34 @@ class TestCommittedVersion:
         assert manifests.committed_version(folder, "abcd") == "1"
         assert manifests.committed_version(folder, "efgh") is None
 
-    def test_outside_a_checkout_is_an_error(self, tmp_path):
-        """Without a git checkout to ask, the answer is an error, not 'not committed'."""
+    def test_outside_a_checkout_is_an_error(self, tmp_path, monkeypatch):
+        """Without a git checkout to ask, the error holds git's own message."""
+        monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+        with pytest.raises(RuntimeError, match="not a git repository"):
+            manifests.committed_version(tmp_path, "abcd")
+
+    def test_a_checkout_without_a_commit_is_an_error(self, tmp_path):
+        """Without a HEAD to read, the answer is an error, not 'not committed'."""
+        self.git(tmp_path, "init", "-q")
         with pytest.raises(RuntimeError):
+            manifests.committed_version(tmp_path, "abcd")
+
+    def test_a_manifest_that_git_cannot_show_is_an_error(self, monkeypatch, tmp_path):
+        """A listed manifest that git then cannot show is an error, not 'not committed'."""
+        (tmp_path / "abcd.json").write_text(json.dumps({"version": "1"}))
+        self.git(tmp_path, "init", "-q")
+        self.git(tmp_path, "add", ".")
+        self.git(tmp_path, "commit", "-q", "-m", "abcd")
+        run = manifests.subprocess.run
+
+        def failing_show(command, **options):
+            """git, except that ``git show`` fails with a message."""
+            if command[1] == "show":
+                return subprocess.CompletedProcess(command, 128, "", "fatal: abcd")
+            return run(command, **options)
+
+        monkeypatch.setattr(manifests.subprocess, "run", failing_show)
+        with pytest.raises(RuntimeError, match="fatal: abcd"):
             manifests.committed_version(tmp_path, "abcd")
 
     def test_git_missing_is_an_error(self, monkeypatch, tmp_path):

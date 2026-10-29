@@ -100,12 +100,20 @@ characters and spaces are normalised. Two texts match when they are equal after 
 
 So two texts always match when the tokenizer normalises them to one text.
 
-A side text also matches a benchmark description when one contains the other
-as whole words, and the shorter has at least 10 words. For example, a
-benchmark describes a target with a terminology's definition and one
-sentence of its own. A pair that holds the same definition then matches that
-description. Every side text is compared, since some pairs keep a description
-in a name field. Values are never compared: a common list, such as
+A side text also matches a benchmark description when the two share 8 words
+in a row, after the same three changes. For example, a benchmark copies a
+terminology's definition, changes a word, and adds a sentence:
+
+| text | from |
+|---|---|
+| `The total number of lymph nodes that were examined by a pathologist in the surgical specimen.` | a pair's positive description |
+| `The total number of lymph nodes that were examined by the pathologist. Includes nodes from every site.` | a benchmark target's description |
+
+They share 10 words in a row: `the total number of lymph nodes that were
+examined by`. So the two texts match.
+
+Every side text is compared, since some pairs keep a description in a name
+field. Values are never compared: a common list, such as
 `Unknown | Not Reported | No | Yes`, matches many targets.
 
 ### The study rule: `benchmark_study`
@@ -173,7 +181,8 @@ leaves the previous corpus as it was; see
     - `benchmark_target_property` and `benchmark_target_description`: the
       expected target that matched;
     - `fields`: the two fields that matched, such as `anchor name = source
-      name, positive name = target name`. A `~` marks a near-duplicate;
+      name, positive name = target name`. A `~` marks a match by 8 words in a
+      row;
   - for the study rule: `benchmark_study_id`, the benchmark's study that the
     pair holds.
 - **`manifest.json`:** the corpus's manifest, with the fields that
@@ -182,8 +191,8 @@ leaves the previous corpus as it was; see
     its file's `sha256` and its table's `csv_sha256`;
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
-  - `settings`: the near-duplicate words, the validation share and the number
-    of buckets;
+  - `settings`: the number of words in a row that make a match, the
+    validation share and the number of buckets;
   - `counts`:
     - `rows`:
       - `combined`: the pairs of all the sources;

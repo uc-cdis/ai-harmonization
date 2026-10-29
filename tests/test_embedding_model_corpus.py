@@ -163,27 +163,20 @@ class TestLeakage:
             "efgh value",
         }
 
-    def test_near_duplicates_need_whole_words_and_ten_of_them(self):
-        """One text contains the other as whole words, and the shorter has 10 words."""
-        reference = "one two three four five six seven eight nine ten"
-        texts = [
-            f"before {reference} after",
-            f"{reference} eleven",
-            "one two three four five six seven eight nine",
-            f"x{reference}",
-            reference,
-        ]
-        matched = leakage.near_duplicates(
-            texts, [reference, f"zero {reference}"], min_words=10
+    def test_texts_overlap_when_they_share_eight_words_in_a_row(self):
+        """An edited copy overlaps. Seven shared words do not, nor the same words reordered."""
+        reference = "one two three four five six seven eight nine ten eleven twelve"
+        edited = "one two three four five six seven eight nine ten zero twelve"
+        seven = "zero two three four five six seven eight zero"
+        reordered = "twelve eleven ten nine eight seven six five four three two one"
+        cut = "one two three four five six seven eigh"
+        matched = leakage.overlaps(
+            [edited, seven, reordered, cut, reference], [reference], length=8
         )
-        assert matched == {
-            (f"before {reference} after", reference),
-            (f"{reference} eleven", reference),
-            (reference, f"zero {reference}"),
-        }
+        assert matched == {(edited, reference)}
 
-    def test_the_threshold_is_read_when_the_audit_runs(self, monkeypatch):
-        """The module's threshold applies when the audit runs, and must cover a shingle."""
+    def test_the_run_length_is_read_when_the_audit_runs(self, monkeypatch):
+        """The module's run length applies when the audit runs."""
         pairs = pd.DataFrame(
             [
                 pair(
@@ -195,13 +188,11 @@ class TestLeakage:
         )
         benchmark = {"abcd": (TARGETS, MAPPINGS)}
         assert leakage.audit(pairs, benchmark)[0].empty
-        monkeypatch.setattr(leakage, "NEAR_DUPLICATE_WORDS", 5)
+        monkeypatch.setattr(leakage, "OVERLAP_WORDS", 5)
         findings, _ = leakage.audit(pairs, benchmark)
         assert findings.fields.tolist() == [
             "anchor name = source name, positive description ~ target description"
         ]
-        with pytest.raises(ValueError):
-            leakage.near_duplicates(["a b"], ["a b"], min_words=2)
 
     def test_benchmark_texts_are_cleaned_and_named_after_their_last_dot(self):
         """A benchmark's texts are cleaned before keying, as the pairs' texts were."""

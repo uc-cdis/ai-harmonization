@@ -246,7 +246,7 @@ def manifest(
             ),
         ],
         "settings": {
-            "near_duplicate_words": leakage.NEAR_DUPLICATE_WORDS,
+            "overlap_words": leakage.OVERLAP_WORDS,
             "validation_share": validation_share,
             "buckets": BUCKETS,
         },

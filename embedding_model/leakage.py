@@ -16,11 +16,11 @@ differs. The fields compared are:
 The benchmark texts are cleaned first with ``pairs.common.clean``, the
 cleaning that ``pairs prepare`` gives every text. Two texts match when their
 keys are equal, as ``pairs.common.key`` writes them: normalised as the
-tokenizer normalises them, case-folded, with punctuation as spaces. A side text also matches a benchmark description when
-one contains the other, and the shorter has at least NEAR_DUPLICATE_WORDS
-words. A pair can hold a description in a name field, such as a
-``name_to_description`` pair's positive, so every side text is compared,
-whatever its field.
+tokenizer normalises them, case-folded, with punctuation as spaces. A side
+text also matches a benchmark description when the two keys share
+OVERLAP_WORDS words in a row. A pair can hold a description in a name field,
+such as a ``name_to_description`` pair's positive, so every side text is
+compared, whatever its field.
 
 A finding is a reason to drop a pair, found against one benchmark. There are
 two kinds:
@@ -56,12 +56,11 @@ import pandas as pd
 from embedding_model.benchmarks import TARGET_SEPARATOR
 from embedding_model.pairs.common import STUDY_SEPARATOR, clean, key
 
-# The words that the shorter of two texts needs, for one containing the other
-# to count as a match.
-NEAR_DUPLICATE_WORDS = 10
-# The near-duplicate search indexes texts by their sequences of SHINGLE
-# words, called shingles. It changes the search's speed, not what it finds.
-SHINGLE = 3
+# A side text overlaps a benchmark description when the two share this many
+# words in a row. GPT-3's authors check for their test data in their training
+# data the same way (Brown et al., 2020, Appendix C). Their rule gives 8 words
+# for texts as short as the benchmarks' descriptions.
+OVERLAP_WORDS = 8
 # The two findings, as the findings table and the corpus's manifest name them.
 ANSWER_KEY = "answer_key"
 BENCHMARK_STUDY = "benchmark_study"
@@ -194,87 +193,60 @@ def side_keys(pairs):
     return side_texts[side_texts.key != ""]
 
 
-def shingles(words):
-    """The sequences of SHINGLE words in a list of words, in order."""
-    return [" ".join(words[i : i + SHINGLE]) for i in range(len(words) - SHINGLE + 1)]
+def runs(words, length):
+    """The runs of ``length`` words in a row in a list of words, in order."""
+    return [" ".join(words[i : i + length]) for i in range(len(words) - length + 1)]
 
 
-def near_duplicates(texts, references, min_words):
-    """The texts and references where one contains the other.
+def overlaps(texts, references, length):
+    """The texts and references that share ``length`` words in a row.
 
-    Only texts and references with at least ``min_words`` words can match, since
-    the shorter of the two needs them. A text contains another when the other
-    appears in it as whole words. Each reference is indexed by its shingles,
-    its sequences of SHINGLE words. A text is then compared only with the
-    references that could contain it, or that it could contain.
+    The words are whole words, as ``str.split`` cuts a key. Each reference is
+    indexed by its runs of ``length`` words, and each text looks up its own.
 
     Args:
         texts (Iterable[str]): Keys, as ``keys`` writes them.
         references (Iterable[str]): Keys to compare them with.
-        min_words (int): The fewest words of the shorter key, such as
-            NEAR_DUPLICATE_WORDS.
+        length (int): The words in a run, such as OVERLAP_WORDS.
 
     Returns:
-        set[tuple[str, str]]: (text, reference), for each match that is not
-            already an equal key.
-
-    Raises:
-        ValueError: If ``min_words`` is fewer than SHINGLE.
+        set[tuple[str, str]]: (text, reference), for each text and reference
+            that share a run and are not already equal keys.
     """
-    if min_words < SHINGLE:
-        raise ValueError(f"a near-duplicate needs at least {SHINGLE} words")
-    long_enough = {
-        reference for reference in references if len(reference.split()) >= min_words
-    }
-    # Each reference, by its first shingle and by every shingle it has.
-    first, anywhere = defaultdict(set), defaultdict(set)
-    for reference in long_enough:
-        parts = shingles(reference.split())
-        first[parts[0]].add(reference)
-        for part in parts:
-            anywhere[part].add(reference)
+    index = defaultdict(set)
+    for reference in set(references):
+        for run in runs(reference.split(), length):
+            index[run].add(reference)
     matched = set()
     for text in set(texts):
-        split = text.split()
-        if len(split) < min_words:
-            continue
-        parts = shingles(split)
-        # Spaces around both texts make the check below match whole words
-        # only, so "abcd" is not found inside "xabcd".
-        padded = f" {text} "
-        # A reference that contains the text holds the text's first shingle.
-        candidates = set(anywhere.get(parts[0], ()))
-        # A reference inside the text has its first shingle among the text's.
-        for part in parts:
-            candidates |= first.get(part, set())
-        # The index only narrows the candidates. The containment check decides.
-        for reference in candidates:
-            if reference == text:
-                continue
-            if f" {reference} " in padded or padded in f" {reference} ":
-                matched.add((text, reference))
+        for run in runs(text.split(), length):
+            matched.update(
+                (text, reference)
+                for reference in index.get(run, ())
+                if reference != text
+            )
     return matched
 
 
-def matches(sides, texts, near_matches):
-    """The side texts that match benchmark texts, exactly or as near-duplicates.
+def matches(sides, texts, overlapping):
+    """The side texts that match benchmark texts, exactly or by an overlap.
 
     Args:
         sides (pd.DataFrame): From ``side_keys``.
         texts (pd.DataFrame): Benchmark texts, from ``benchmark_texts``.
-        near_matches (pd.DataFrame): The side texts that contain, or are
-            contained in, a benchmark description: ``sides``' columns, and
-            ``reference``, the description's key.
+        overlapping (pd.DataFrame): The side texts that overlap a benchmark
+            description: ``sides``' columns, and ``reference``, the
+            description's key.
 
     Returns:
         pd.DataFrame: One row per match: the side's columns, the benchmark
-            text's columns, and ``how``, ``=`` for an equal key or ``~`` for a
-            near-duplicate.
+            text's columns, and ``how``, ``=`` for an equal key or ``~`` for an
+            overlap.
     """
     exact = sides.merge(texts, on="key").assign(how="=")
     descriptions = texts[texts.field.str.endswith("description")]
     linked = (
-        near_matches.drop(columns="key")
+        overlapping.drop(columns="key")
         .merge(descriptions.rename(columns={"key": "reference"}), on="reference")
         .drop(columns="reference")
         .assign(how="~")
@@ -303,15 +275,15 @@ def answer_keys(sides, source_texts, target_texts):
             for frame in (source_texts, target_texts)
         ]
     )
-    near_matches = sides.merge(
+    overlapping = sides.merge(
         pd.DataFrame(
-            sorted(near_duplicates(sides.key, references, NEAR_DUPLICATE_WORDS)),
+            sorted(overlaps(sides.key, references, OVERLAP_WORDS)),
             columns=["key", "reference"],
         ),
         on="key",
     )
-    on_source = matches(sides, source_texts, near_matches)
-    on_target = matches(sides, target_texts, near_matches)
+    on_source = matches(sides, source_texts, overlapping)
+    on_target = matches(sides, target_texts, overlapping)
     both = on_source.merge(
         on_target, on=["pair", "benchmark", "row"], suffixes=("_source", "_target")
     )

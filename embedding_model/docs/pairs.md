@@ -111,10 +111,15 @@ lists the texts that it uses.
 ### Names
 
 An anchor must be a name: it has two letters in a row. So ids and bare
-numbers, such as `2223612v3.0:2178533v1.0` or `535`, are not anchors. A text
-that equals the canonical is skipped, ignoring case, accents and
-punctuation. An item
-uses each of its texts once, even when its source lists a text twice.
+numbers, such as `2223612v3.0:2178533v1.0` or `535`, are not anchors.
+
+An item uses each of its texts once as a name, even when its source lists a
+text twice. Texts are compared as the tokenizer
+[normalises](tokenizer.md#step-1-normalize) them, and a repeat is not used.
+The canonical is not used as an anchor either, since it is the positive. For
+example, `BODY WEIGHT` repeats the canonical `Body Weight`, so it is not used.
+But `body_weight` is an anchor, since the tokenizer reads its `_` as a token
+of its own.
 
 ### Expansions and paraphrases
 

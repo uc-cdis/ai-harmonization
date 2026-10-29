@@ -558,16 +558,23 @@ def joined_studies(studies):
     return STUDY_SEPARATOR.join(sorted(found - {""}))
 
 
+def normalised_text(text):
+    """A text as the tokenizer normalises it, to compare two texts as the model reads them."""
+    return TOKENIZER_NORMALIZER.normalize_str(text)
+
+
 def distinct(texts, canonical):
     """The texts that are names, each once, without texts equal to the canonical.
 
-    Texts are compared by their key, without a form's item number, so ``Q2.
-    Abcd?`` equals ``Abcd?``. Texts with the same key become one text. It keeps
-    the first spelling and the studies of all of them.
+    Texts are compared as the tokenizer normalises them, as copies are, and
+    without a form's item number. So ``Q2. Abcd?`` equals ``Abcd?``, and
+    ``ABCD`` equals ``abcd``, but ``abcd_efgh`` and ``abcd efgh`` differ, as
+    their tokens do. Equal texts become one text. It keeps the first spelling
+    and the studies of all of them.
     """
-    found, canonical_key = {}, key(without_item_number(canonical))
+    found, canonical_key = {}, normalised_text(without_item_number(canonical))
     for text in texts:
-        text_key = key(without_item_number(text.text))
+        text_key = normalised_text(without_item_number(text.text))
         if text_key and text_key != canonical_key and is_name(text.text):
             kept = found.setdefault(text_key, text)
             if text.study and text.study != kept.study:

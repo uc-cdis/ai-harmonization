@@ -326,18 +326,24 @@ class TestStar:
         ]
 
     def test_texts_once_without_the_canonical_or_ids(self):
-        """A text equal to the canonical, a repeated text and a text with no name are skipped."""
+        """Texts are compared as the tokenizer reads them: case does not count, punctuation does."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
             texts=[
+                Text("abcd EFGH", "SY"),
                 Text("abcd-efgh", "SY"),
+                Text("abcd_efgh", "SY"),
                 Text("AE", "AB"),
                 Text("ae", "SY"),
                 Text("1234", "SY"),
             ],
         )
-        assert made([item]) == [("name", "AE", "Abcd efgh")]
+        assert made([item]) == [
+            ("name", "abcd-efgh", "Abcd efgh"),
+            ("name", "abcd_efgh", "Abcd efgh"),
+            ("name", "AE", "Abcd efgh"),
+        ]
 
     def test_a_lone_canonical_is_paired_with_its_description(self):
         """An item with no other name pairs its canonical with its description alone."""

@@ -1,4 +1,4 @@
-"""Tests for embedding_model.benchmarks: building TOPMed and GDC, and checking each build."""
+"""Tests for embedding_model.benchmarks: building the TOPMed and GDC benchmarks, and checking each build."""
 
 import csv
 import io
@@ -241,7 +241,7 @@ class TestBuilders:
         ).encode()
 
     def test_gdc_keeps_the_dictionary_for_the_next_build(self, monkeypatch, tmp_path):
-        """A second GDC build reads the kept dictionary and status, with no network."""
+        """A second build of the GDC benchmark reads the kept dictionary and status, with no network."""
         dictionary = json.dumps(TestDictionaryTargets.DICTIONARY).encode()
         served = {
             gdc.GDC_STATUS: self.status("Data Release 99.0"),
@@ -298,7 +298,7 @@ class TestBuilders:
 
 
 class TestTargetRows:
-    """TOPMed's targets: a phenotype target, and an age target where the variable has an age."""
+    """The TOPMed benchmark's targets: a phenotype target, and an age target where the variable has an age."""
 
     def test_phenotype_and_age_targets(self):
         """A variable with an age column gives a phenotype target and an age_at_ target."""
@@ -445,7 +445,7 @@ class TestResolveComponents:
 
 
 class TestTopmedMappingRows:
-    """TOPMed's mappings: one row per component variable, with every target it maps to."""
+    """The TOPMed benchmark's mappings: one row per component variable, with every target it maps to."""
 
     def variables(self):
         """Two harmonized variables citing the same age and their own values."""
@@ -509,7 +509,7 @@ class TestTopmedMappingRows:
 
 
 class TestDictionaryTargets:
-    """GDC's targets: the properties of its dictionary that a variable can map to."""
+    """The GDC benchmark's targets: the properties of GDC's dictionary that a variable can map to."""
 
     DICTIONARY = {
         "_definitions": {"properties": {"ignored": {"type": "string"}}},
@@ -706,7 +706,7 @@ class TestGdcPapers:
 
 
 class TestGdcMappingRows:
-    """GDC's mappings: one row per source variable, with each node's expected target."""
+    """The GDC benchmark's mappings: one row per source variable, with each node's expected target."""
 
     TARGETS = [
         {"target_property": key}

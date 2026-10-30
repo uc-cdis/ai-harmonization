@@ -297,14 +297,15 @@ fetch reads these restriction fields too. Each source's main table has an
 Where the field holds one of a list of values, an item is open only when its
 value is known to allow use. A value that the fetch has not seen before means
 the item is not open. The value is printed, so it can be reviewed. For caDSR,
-the field is a document instead. A new kind of document is printed too, but
-only a Proprietary Measure Permission closes an element.
+the field is the element's reference documents: each must be of a kind known
+to allow use. A Proprietary Measure Permission closes an element. A kind that
+the fetch has not seen before closes it too.
 
 | source | restriction field | open when |
 |---|---|---|
 | NCIt, ontologies, CDISC | none per item | always: the source's license covers every item |
 | LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
 | NIH CDE | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
-| caDSR | a "Proprietary Measure Permission" reference document | the element has none |
+| caDSR | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission" |
 | NHANES | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
 | PhenX | the protocol's availability | it is "Available" |

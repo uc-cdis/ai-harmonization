@@ -721,7 +721,7 @@ class TestCadsr:
     """caDSR's snapshot: latest versions, and its restriction field."""
 
     def test_latest_version_once_and_the_use_field(self, capsys):
-        """Each element is kept at its latest version, once; a proprietary one is closed."""
+        """Each element is kept once, at its latest version; a proprietary or new document closes it."""
         xml = (
             "<DataElementsList>"
             + "".join(
@@ -749,7 +749,7 @@ class TestCadsr:
         assert elements.open.to_dict() == {
             "9999901": True,
             "9999902": False,
-            "9999903": True,
+            "9999903": False,
         }
         assert "Abcd Note" in capsys.readouterr().out
         documents = tables["documents"]

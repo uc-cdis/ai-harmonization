@@ -15,7 +15,7 @@ from defusedxml.ElementTree import iterparse
 
 from embedding_model.download import downloaded
 from embedding_model.manifests import file_sha256, pinned
-from embedding_model.sources.common import report_new
+from embedding_model.sources.common import open_where
 
 SNAPSHOT = "caDSR released data elements"
 ARCHIVE = (
@@ -29,10 +29,11 @@ CITATION = "embedding_model/docs/licenses.md#cadsr"
 # An element with this reference document is part of a proprietary measure,
 # whose owner's permission is needed: caDSR's restriction field.
 PROPRIETARY = "Proprietary Measure Permission"
-# The reference document types that caDSR is known to use. A new type is
-# reported, in case it restricts use, as the Proprietary Measure Permission
-# does.
-DOCUMENT_TYPES = {
+# The reference document types that caDSR is known to use, other than
+# PROPRIETARY. An element is open only when each of its documents is of one of
+# these types. A new type closes its elements and is reported, in case it
+# restricts use, as PROPRIETARY does.
+OPEN_DOCUMENT_TYPES = {
     "AHRQ Form",
     "Activity Diagram",
     "Alternate Question Text",
@@ -65,7 +66,6 @@ DOCUMENT_TYPES = {
     "Outcome Measure Implementation",
     "PDF",
     "Preferred Question Text",
-    PROPRIETARY,
     "REFERENCE",
     "Reference Information",
     "SDTM Core",
@@ -192,8 +192,10 @@ def read_snapshot(archive):
 
     Versions are compared as decimal numbers, as ``version`` reads them. A
     row repeated within one element's lists is kept once. An element is open
-    unless it has a Proprietary Measure Permission document. A document type
-    not in DOCUMENT_TYPES is reported.
+    only when each of its reference documents is of a type in
+    OPEN_DOCUMENT_TYPES, as ``open_where`` decides. A Proprietary Measure
+    Permission closes it. A type not seen before closes it too, and is
+    reported.
 
     Args:
         archive (str | Path | file): The snapshot's zip, or its path.
@@ -217,11 +219,11 @@ def read_snapshot(archive):
         },
     }
     documents = tables["documents"]
-    report_new(
-        documents.type, DOCUMENT_TYPES, "reference document type", "elements stay open"
+    allowed = open_where(
+        documents.type, OPEN_DOCUMENT_TYPES, {PROPRIETARY}, "reference document type"
     )
-    proprietary = set(documents[documents.type == PROPRIETARY].public_id)
-    tables["elements"]["open"] = ~tables["elements"].public_id.isin(proprietary)
+    closed = set(documents.public_id[~allowed])
+    tables["elements"]["open"] = ~tables["elements"].public_id.isin(closed)
     keys = {
         "elements": ["public_id"],
         "alternate_names": ["public_id", "type", "name", "context", "language"],

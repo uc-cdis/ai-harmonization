@@ -1174,6 +1174,17 @@ class TestWriteAndRead:
         pd.testing.assert_frame_equal(tables["items"], TABLE)
         assert read == manifest
 
+    def test_texts_that_look_missing_stay_texts(self, tmp_path):
+        """Labels such as None and N/A, an empty text and true or false read back as written."""
+        table = pd.DataFrame(
+            {"label": ["None", "N/A", "NA", ""], "open": [True, False, True, False]}
+        )
+        directory = tmp_path / "sources" / "abcd"
+        directory.mkdir(parents=True)
+        sources.write_source(directory, "abcd", "1", {"values": table}, [], {})
+        tables, _ = sources.read_source(tmp_path, "abcd")
+        pd.testing.assert_frame_equal(tables["values"], table)
+
     def test_a_table_checksum_does_not_depend_on_the_system(self, monkeypatch):
         """A table's checksum is the same where lines end with \\r\\n, as on Windows."""
         before = manifests.table_sha256(TABLE)

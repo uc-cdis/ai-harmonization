@@ -310,6 +310,16 @@ def inputs(tmp_path, monkeypatch):
 class TestBuild:
     """``corpus build`` on a fictional inputs folder."""
 
+    def test_a_value_list_reads_back_as_a_list(self, inputs):
+        """A pair's values read back from the corpus as the list written, None too."""
+        values = ["Mild", "Moderate", "Severe", "None"]
+        write_pairs(
+            inputs, "cdisc", [pair("Opqr", "Opqr Abcd", positive_values=values)]
+        )
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        kept, _ = corpus.read_corpus(inputs, "abcd-corpus")
+        assert list(kept.set_index("anchor_name").positive_values["Opqr"]) == values
+
     def test_the_corpus_and_its_manifest(self, inputs, capsys):
         """Duplicates are kept once, leaks dropped, and the manifest counts both."""
         assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0

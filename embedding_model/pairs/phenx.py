@@ -50,12 +50,12 @@ def label(entry):
     if not left:
         return right.removeprefix("=").strip()
     sides = ((left, right), (right, left))
-    for code, found in sides:
+    for code, meaning in sides:
         if NUMBER.match(code):
-            return found
-    for code, found in sides:
+            return meaning
+    for code, meaning in sides:
         if TOKEN.match(code) and not is_name(code):
-            return found
+            return meaning
     if TOKEN.match(left) and left.isupper():
         return right
     return left
@@ -81,9 +81,9 @@ def labels(cell):
 
 def unquoted(text):
     """A description without the quotes around it, as in ``"How often?"``."""
-    found = text.strip()
-    if found.startswith('"') and found.endswith('"') and found.count('"') == 2:
-        return found[1:-1]
+    stripped = text.strip()
+    if stripped.startswith('"') and stripped.endswith('"') and stripped.count('"') == 2:
+        return stripped[1:-1]
     return text
 
 
@@ -102,12 +102,12 @@ def study_texts(mappings):
             (row.gap_variable_name, "dbGaP variable name"),
             (row.gap_variable_desc, "dbGaP variable description"),
         ):
-            found = studies[row.variable_id].setdefault((text, term_type), set())
-            found.add(row.gap_study_accession)
+            accessions = studies[row.variable_id].setdefault((text, term_type), set())
+            accessions.add(row.gap_study_accession)
     return {
         variable: [
-            Text(text, term_type, study=joined_studies(found))
-            for (text, term_type), found in texts.items()
+            Text(text, term_type, study=joined_studies(accessions))
+            for (text, term_type), accessions in texts.items()
         ]
         for variable, texts in studies.items()
     }
@@ -126,10 +126,10 @@ def items(tables):
     used = variables[variables.protocol_visible == "1"]
     mappings = tables["mappings"]
     mapped = study_texts(mappings[mappings.map_level == COMPARABLE])
-    found = []
+    source_items = []
     for row in used.itertuples():
         values = labels(row.variable_values)
-        found.append(
+        source_items.append(
             Item(
                 id=row.id,
                 canonical=unquoted(row.description),
@@ -139,4 +139,4 @@ def items(tables):
                 open=row.open,
             )
         )
-    return found
+    return source_items

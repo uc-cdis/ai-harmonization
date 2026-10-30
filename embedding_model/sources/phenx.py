@@ -48,7 +48,7 @@ ESCAPE = re.compile(r"\\(.)|''", re.S)
 def unquoted(text):
     """A quoted MySQL string's value, with its escapes read."""
     return ESCAPE.sub(
-        lambda found: ESCAPES.get(found[1], found[1]) if found[1] is not None else "'",
+        lambda match: ESCAPES.get(match[1], match[1]) if match[1] is not None else "'",
         text[1:-1],
     )
 
@@ -117,16 +117,18 @@ def read_dump(stream, tables):
         inserted = INSERT.match(line)
         if inserted and inserted.group(1) in tables:
             rows[inserted.group(1)] += insert_rows(line[inserted.end() :])
-    for name, found in rows.items():
+    for name, table_rows in rows.items():
         expected = len(columns.get(name, []))
-        wrong = sum(len(row) != expected for row in found)
+        wrong = sum(len(row) != expected for row in table_rows)
         if wrong:
             raise ValueError(
                 f"{wrong:,} rows of {name} do not have its {expected} columns"
             )
     return {
-        name: pd.DataFrame(found, columns=columns.get(name, [])).fillna("").astype(str)
-        for name, found in rows.items()
+        name: pd.DataFrame(table_rows, columns=columns.get(name, []))
+        .fillna("")
+        .astype(str)
+        for name, table_rows in rows.items()
     }
 
 
@@ -274,8 +276,8 @@ def fetch_source(downloads, manifest):
             f" {pin['version']}. To use {release}, follow 'Newer releases' in"
             " embedding_model/docs/sources.md#phenx"
         )
-    found = tables["variables"]
-    counts = {"variables": len(found), "not_open": int((~found.open).sum())}
+    variables = tables["variables"]
+    counts = {"variables": len(variables), "not_open": int((~variables.open).sum())}
     print(
         f"  {release}: {counts['variables']:,} variables, "
         f"{counts['variables'] - counts['not_open']:,} open"

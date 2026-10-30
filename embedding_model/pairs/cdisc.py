@@ -39,9 +39,9 @@ def is_question(definition):
 
 def without_source(definition):
     """A definition without the source that CDISC notes after it, as ``(NCI)``."""
-    found = NOTE.search(definition)
-    if found and len(found.group(2).split()) <= SOURCE_WORDS:
-        return definition[: found.start()] + found.group(1)
+    note = NOTE.search(definition)
+    if note and len(note.group(2).split()) <= SOURCE_WORDS:
+        return definition[: note.start()] + note.group(1)
     return definition
 
 
@@ -104,7 +104,7 @@ def items(tables):
         )
         for codelist, group in members.groupby("Codelist Code", sort=False)
     }
-    found = [
+    source_items = [
         merged(
             code,
             rows,
@@ -113,8 +113,8 @@ def items(tables):
         )
         for code, rows in terms[is_codelist].groupby("Code", sort=False)
     ]
-    found += [
+    source_items += [
         merged(code, rows, "NCI Preferred Term", [])
         for code, rows in members.groupby("Code", sort=False)
     ]
-    return found
+    return source_items

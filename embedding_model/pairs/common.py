@@ -457,11 +457,11 @@ def value_labels(values):
     """
     values = [clean(value) for value in values]
     for code, fewest in ((CODED_VALUE, 1), (DASHED_CODE, 3)):
-        found = [code.match(value) for value in values]
-        if len(values) < fewest or not all(found):
+        code_matches = [code.match(value) for value in values]
+        if len(values) < fewest or not all(code_matches):
             continue
-        codes = [match.group(0).strip() for match in found]
-        labels = [value[match.end() :] for value, match in zip(values, found)]
+        codes = [match.group(0).strip() for match in code_matches]
+        labels = [value[match.end() :] for value, match in zip(values, code_matches)]
         if len(set(codes)) == len(codes) and len(set(labels)) == len(labels):
             return labels
     return values
@@ -485,11 +485,11 @@ def worded(text):
     Returns:
         str: The clean text.
     """
-    found = clean(text.text)
+    clean_text = clean(text.text)
     if not text.question:
-        return found
-    found = without_item_number(found)
-    return LETTER_ITEM.sub("", found) if found.endswith("?") else found
+        return clean_text
+    clean_text = without_item_number(clean_text)
+    return LETTER_ITEM.sub("", clean_text) if clean_text.endswith("?") else clean_text
 
 
 def cleaned(item):
@@ -503,29 +503,29 @@ def cleaned(item):
     values are kept once.
     """
     texts = [
-        Text(text, found.term_type, found.question, found.study)
-        for found in item.texts
-        if (text := worded(found))
+        Text(text, original.term_type, original.question, original.study)
+        for original in item.texts
+        if (text := worded(original))
     ]
     descriptions = [
         text
         for text in (
-            " ".join(EMPTY_HEADING.sub(" ", NOTICE.sub(" ", clean(found))).split())
-            for found in [item.description, *item.descriptions]
+            " ".join(EMPTY_HEADING.sub(" ", NOTICE.sub(" ", clean(original))).split())
+            for original in [item.description, *item.descriptions]
         )
         if text
     ]
-    found_lists = {}
+    distinct_lists = {}
     for name, values in item.lists:
         values = [value for value in map(clean, values) if value]
         if values:
-            found_lists.setdefault(tuple(values), name)
+            distinct_lists.setdefault(tuple(values), name)
     return Item(
         id=item.id,
         canonical=clean(item.canonical),
         type=clean(item.type),
         description=next(iter(descriptions), ""),
-        lists=[(name, list(values)) for values, name in found_lists.items()],
+        lists=[(name, list(values)) for values, name in distinct_lists.items()],
         texts=texts,
         descriptions=descriptions[1:],
         status=item.status,
@@ -547,7 +547,7 @@ def replacements(item, by_id):
     Returns:
         list[Item]: The replacements, in the order given, each once.
     """
-    found, seen, waiting = [], {item.id}, list(item.replaced_by)
+    replacing_items, seen, waiting = [], {item.id}, list(item.replaced_by)
     while waiting:
         replacement = by_id.get(waiting.pop(0))
         if replacement is None or replacement.id in seen:
@@ -556,8 +556,8 @@ def replacements(item, by_id):
         if replacement.status == RETIRED:
             waiting += replacement.replaced_by
         elif replacement.open and replacement.canonical:
-            found.append(replacement)
-    return found
+            replacing_items.append(replacement)
+    return replacing_items
 
 
 def joined_studies(studies):
@@ -574,8 +574,8 @@ def joined_studies(studies):
     Returns:
         str: The studies, joined by STUDY_SEPARATOR.
     """
-    found = {part for study in studies for part in study.split(STUDY_SEPARATOR)}
-    return STUDY_SEPARATOR.join(sorted(found - {""}))
+    parts = {part for study in studies for part in study.split(STUDY_SEPARATOR)}
+    return STUDY_SEPARATOR.join(sorted(parts - {""}))
 
 
 def normalised_text(text):
@@ -592,15 +592,17 @@ def distinct(texts, canonical):
     their tokens do. Equal texts become one text. It keeps the first spelling
     and the studies of all of them.
     """
-    found, canonical_key = {}, normalised_text(without_item_number(canonical))
+    by_key, canonical_key = {}, normalised_text(without_item_number(canonical))
     for text in texts:
         text_key = normalised_text(without_item_number(text.text))
         if text_key and text_key != canonical_key and is_name(text.text):
-            kept = found.setdefault(text_key, text)
-            if text.study and text.study != kept.study:
-                study = joined_studies([kept.study, text.study])
-                found[text_key] = Text(kept.text, kept.term_type, kept.question, study)
-    return list(found.values())
+            first = by_key.setdefault(text_key, text)
+            if text.study and text.study != first.study:
+                study = joined_studies([first.study, text.study])
+                by_key[text_key] = Text(
+                    first.text, first.term_type, first.question, study
+                )
+    return list(by_key.values())
 
 
 def item_pairs(
@@ -752,13 +754,13 @@ def distinct_pairs(pairs):
         .agg(joined_studies)
     )
     # One row per pair: its first copy. The later copies are dropped.
-    kept = pairs[~group.duplicated()]
+    first_copies = pairs[~group.duplicated()]
     if studies.empty:
-        return kept
+        return first_copies
     # Each kept pair takes its pair's joined studies. A pair without copies
     # gets none there, and keeps its own study.
-    merged = group[kept.index].map(studies)
-    return kept.assign(study=merged.fillna(kept.study))
+    merged = group[first_copies.index].map(studies)
+    return first_copies.assign(study=merged.fillna(first_copies.study))
 
 
 def star(items, source):
@@ -792,12 +794,12 @@ def star(items, source):
         if not item.open:
             continue
         anchor_type = type_word(item.type, [])
-        found = replacements(item, by_id) if item.status == RETIRED else []
-        if found:
+        replacing_items = replacements(item, by_id) if item.status == RETIRED else []
+        if replacing_items:
             names = item.texts
             if item.canonical:
                 names = [Text(item.canonical, "canonical"), *names]
-            for replacement in found:
+            for replacement in replacing_items:
                 rows += item_pairs(
                     replacement,
                     names,
@@ -823,10 +825,10 @@ def star(items, source):
     pairs = pd.DataFrame(rows, columns=COLUMNS)
     rank = pairs.status.map({CURRENT: 0, DRAFT: 1, RETIRED: 2})
     first = pairs.loc[rank.sort_values(kind="stable").index]
-    kept = distinct_pairs(first).sort_index().reset_index(drop=True)
+    kept_pairs = distinct_pairs(first).sort_index().reset_index(drop=True)
     counts = {
         "items": len(items),
         "items_not_open": sum(not item.open for item in items),
-        "duplicates_removed": len(pairs) - len(kept),
+        "duplicates_removed": len(pairs) - len(kept_pairs),
     }
-    return kept, counts
+    return kept_pairs, counts

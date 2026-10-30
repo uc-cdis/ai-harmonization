@@ -224,7 +224,7 @@ def manifest(
     distinct,
     copy_sources,
     dropped,
-    kept,
+    kept_pairs,
     files_sha256,
     pairs_manifests,
     benchmark_manifests,
@@ -243,7 +243,7 @@ def manifest(
             ``combine``.
         dropped (pd.DataFrame): The dropped pairs, one row per pair and
             benchmark that it leaks.
-        kept (pd.DataFrame): The kept pairs, with ``split``.
+        kept_pairs (pd.DataFrame): The kept pairs, with ``split``.
         files_sha256 (dict[str, str]): The SHA-256 of each written file, by
             its name.
         pairs_manifests (list[dict]): The manifest of each source's pairs, as
@@ -261,9 +261,9 @@ def manifest(
         "built": date.today().isoformat(),
         "files": {
             "pairs.parquet": {
-                "rows": len(kept),
+                "rows": len(kept_pairs),
                 "sha256": files_sha256["pairs.parquet"],
-                "csv_sha256": pairs_sha256(kept),
+                "csv_sha256": pairs_sha256(kept_pairs),
             },
             "dropped.parquet": {
                 "rows": len(dropped),
@@ -301,10 +301,10 @@ def manifest(
             "rows": {
                 "combined": len(distinct) + len(copy_sources),
                 "duplicates_removed": len(copy_sources),
-                "leakage_removed": len(distinct) - len(kept),
-                "kept": len(kept),
+                "leakage_removed": len(distinct) - len(kept_pairs),
+                "kept": len(kept_pairs),
                 **{
-                    split: int((kept.split == split).sum())
+                    split: int((kept_pairs.split == split).sum())
                     for split in (TRAIN, VALIDATION)
                 },
             },
@@ -415,26 +415,26 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
     dropped = pd.concat(
         [distinct.loc[findings.pair].reset_index(drop=True), detail], axis=1
     )
-    kept = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
-    if kept.empty:
+    kept_pairs = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
+    if kept_pairs.empty:
         print(
             f"leakage prevention dropped all {len(distinct):,} pairs, so there is"
             " no corpus to build",
             file=sys.stderr,
         )
         return 1
-    kept["split"] = splits(kept, validation_share)
+    kept_pairs["split"] = splits(kept_pairs, validation_share)
 
     destination = Path(inputs) / "corpora" / name
     with staged(destination) as built:
-        kept.to_parquet(built / "pairs.parquet", index=False)
+        kept_pairs.to_parquet(built / "pairs.parquet", index=False)
         dropped.to_parquet(built / "dropped.parquet", index=False)
         corpus_manifest = manifest(
             name=name,
             distinct=distinct,
             copy_sources=copy_sources,
             dropped=dropped,
-            kept=kept,
+            kept_pairs=kept_pairs,
             files_sha256={
                 file: file_sha256(built / file)
                 for file in ("pairs.parquet", "dropped.parquet")

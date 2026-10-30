@@ -87,7 +87,7 @@ def new_pairs(pairs, seen):
     """
     texts = zip(normalised(pairs.anchor), normalised(pairs.positive))
     hashes = [hash(pair_texts) for pair_texts in texts]
-    new = pd.Series([found not in seen for found in hashes], index=pairs.index)
+    new = pd.Series([pair_hash not in seen for pair_hash in hashes], index=pairs.index)
     seen.update(hashes)
     return new.astype(bool)
 
@@ -322,8 +322,10 @@ def prepare(names, inputs):
             continue
         shared[name] = int((~new_pairs(pairs, seen)).sum())
     if len(shared) > 1:
-        found = ", ".join(
+        copy_counts = ", ".join(
             f"{name} {count:,}" for name, count in shared.items() if count
         )
-        print(f"pairs also in an earlier source, kept there once: {found or 'none'}")
+        print(
+            f"pairs also in an earlier source, kept there once: {copy_counts or 'none'}"
+        )
     return status

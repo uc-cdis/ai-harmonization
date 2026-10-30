@@ -58,7 +58,9 @@ def answer_lists(answers, links):
         ["AnswerListId", "order"], kind="stable"
     )
     grouped = ordered.groupby("AnswerListId").DisplayText.agg(list)
-    texts = {list_id: value_labels(found) for list_id, found in grouped.items()}
+    texts = {
+        list_id: value_labels(list_answers) for list_id, list_answers in grouped.items()
+    }
     lists = {}
     for row in links[links.ApplicableContext == ""].itertuples():
         if texts.get(row.AnswerListId):

@@ -157,12 +157,12 @@ def cited_variables(dictionary, report, study, wanted):
     table_id, model = parse_dbgap_table(
         str(dictionary), str(report) if report else None
     )
-    found = {}
+    variables = {}
     for variable in model.nodes[0].properties:
         accession = (variable.additional_metadata or {}).get("variable_id") or ""
         phv = accession.split(".")[0]
         if phv in wanted:
-            found[phv] = {
+            variables[phv] = {
                 "source_study_id": study,
                 "source_table_id": table_id,
                 "source_variable_id": accession,
@@ -171,7 +171,7 @@ def cited_variables(dictionary, report, study, wanted):
                 "source_description": variable.description or "",
                 "source_values": VALUE_SEPARATOR.join(variable.values or []),
             }
-    return found
+    return variables
 
 
 def resolve_components(references, downloads):
@@ -203,7 +203,7 @@ def resolve_components(references, downloads):
             (pht, table_version), set()
         ).add(phv)
 
-    found, sources = {}, []
+    variables, sources = {}, []
     for (phs, release), cited in sorted(tables.items()):
         listing_path = downloads / phs / "listing.html"
         folders = []
@@ -244,7 +244,7 @@ def resolve_components(references, downloads):
             missing = phvs - set(table)
             if missing:
                 raise LookupError(f"{folder} {pht} lacks {sorted(missing)}")
-            found.update({(phs, release, phv): row for phv, row in table.items()})
+            variables.update({(phs, release, phv): row for phv, row in table.items()})
         sources.append(
             {
                 "role": "source text",
@@ -255,7 +255,7 @@ def resolve_components(references, downloads):
                 "citation": "embedding_model/docs/licenses.md#topmed",
             }
         )
-    return found, sources
+    return variables, sources
 
 
 def mapping_rows(variables, resolved):

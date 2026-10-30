@@ -149,14 +149,16 @@ def items(tables):
         values.value_meaning_name != "", values.permissible_value
     )
     listed = {
-        element: value_labels(found)
-        for element, found in by_element(values.assign(label=labels), "label").items()
+        element: value_labels(element_values)
+        for element, element_values in by_element(
+            values.assign(label=labels), "label"
+        ).items()
     }
-    found = []
+    source_items = []
     for row in elements.itertuples():
         own = names[row.tiny_id]
         definitions = described.get(row.tiny_id, [])
-        found.append(
+        source_items.append(
             Item(
                 id=row.tiny_id,
                 canonical=own[0].text if own else "",
@@ -169,4 +171,4 @@ def items(tables):
                 open=row.open,
             )
         )
-    return found
+    return source_items

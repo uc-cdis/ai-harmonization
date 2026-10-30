@@ -34,16 +34,16 @@ def statements(element):
     Returns:
         list[tuple[str, str]]: The statements, in the file's order.
     """
-    found = []
+    entries = []
     for child in element:
         if not len(child):
-            found.append((child.tag, child.get(RDF + "resource") or child.text or ""))
+            entries.append((child.tag, child.get(RDF + "resource") or child.text or ""))
         elif child.tag == OWL + "equivalentClass":
             members = child.find(f"{OWL}Class/{OWL}intersectionOf")
             for member in members if members is not None else []:
                 if member.tag == RDF + "Description" and member.get(RDF + "about"):
-                    found.append((DEFINED_PARENT, member.get(RDF + "about")))
-    return found
+                    entries.append((DEFINED_PARENT, member.get(RDF + "about")))
+    return entries
 
 
 def read_owl(stream):
@@ -61,7 +61,7 @@ def read_owl(stream):
             sources. One axiom can carry several values, such as a synonym with
             two types.
     """
-    found = {"ontology": [], "classes": {}, "properties": {}, "axioms": {}}
+    owl = {"ontology": [], "classes": {}, "properties": {}, "axioms": {}}
     depth, root = 0, None
     for event, element in iterparse(stream, events=("start", "end")):
         if event == "start":
@@ -73,18 +73,18 @@ def read_owl(stream):
             continue
         about = element.get(RDF + "about")
         if element.tag == OWL + "Ontology":
-            found["ontology"].extend(statements(element))
+            owl["ontology"].extend(statements(element))
         elif element.tag in KINDS and about:
-            found[KINDS[element.tag]].setdefault(about, []).extend(statements(element))
+            owl[KINDS[element.tag]].setdefault(about, []).extend(statements(element))
         elif element.tag == OWL + "Axiom":
             fields = grouped(statements(element))
             key = tuple(
                 fields.pop(OWL + name, [""])[0]
                 for name in ("annotatedSource", "annotatedProperty", "annotatedTarget")
             )
-            found["axioms"].setdefault(key, []).append(fields)
+            owl["axioms"].setdefault(key, []).append(fields)
         root.clear()
-    return found
+    return owl
 
 
 def grouped(annotations):

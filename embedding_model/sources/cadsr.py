@@ -81,8 +81,8 @@ DOCUMENT_TYPES = {
 
 def text(element, path):
     """The stripped text at a path under an element, or ``""``."""
-    found = element.find(path) if element is not None else None
-    return (found.text or "").strip() if found is not None else ""
+    child = element.find(path) if element is not None else None
+    return (child.text or "").strip() if child is not None else ""
 
 
 def version(element):
@@ -250,8 +250,8 @@ def fetch_source(downloads, manifest):
     url = ARCHIVE.format(date=day)
     path = downloaded(url, downloads / f"releasedCDEsXML-OD.zip.{day}")
     tables = read_snapshot(path)
-    found = tables["elements"]
-    counts = {"elements": len(found), "not_open": int((~found.open).sum())}
+    elements = tables["elements"]
+    counts = {"elements": len(elements), "not_open": int((~elements.open).sum())}
     print(f"  {counts['elements']:,} elements, {counts['not_open']:,} proprietary")
     sources = [
         {

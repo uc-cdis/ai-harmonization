@@ -177,11 +177,11 @@ def md5_check(expected):
         LOINC publishes MD5 checksums, so the check uses MD5. It finds a
         corrupt or wrong download, and is not used for security.
         """
-        found = hashlib.md5(data, usedforsecurity=False).hexdigest()
+        digest = hashlib.md5(data, usedforsecurity=False).hexdigest()
         for whose, md5 in expected.items():
-            if md5 and found != md5:
+            if md5 and digest != md5:
                 raise ValueError(
-                    f"the download has MD5 {found}, and {whose} is {md5}; "
+                    f"the download has MD5 {digest}, and {whose} is {md5}; "
                     "nothing was kept"
                 )
 

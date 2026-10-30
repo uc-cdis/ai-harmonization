@@ -36,10 +36,10 @@ def items(tables):
     values = values.assign(label=values.label.map(clean))
     values = values[~values.label.isin(NOT_VALUES)]
     listed = values.groupby(KEY).label.agg(list).to_dict()
-    found = []
+    source_items = []
     for row in both.itertuples():
         key = (row.cycle, row.data_file, row.name)
-        found.append(
+        source_items.append(
             Item(
                 id="/".join(key),
                 canonical=without_item_number(clean(row.english_text))
@@ -54,4 +54,4 @@ def items(tables):
                 open=bool(row.open_list and row.open_codebook),
             )
         )
-    return found
+    return source_items

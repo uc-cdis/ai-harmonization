@@ -58,7 +58,7 @@ def items(tables):
                 for text in texts[row.id]
             ],
             status=RETIRED if row.obsolete else CURRENT,
-            replaced_by=[found for found in row.replaced_by.split("|") if found],
+            replaced_by=[code for code in row.replaced_by.split("|") if code],
             open=row.open,
         )
         for row in tables["terms"].itertuples()

@@ -114,13 +114,13 @@ def read_ontology(stream, ontology):
             ``""`` when not stated.
     """
     prefix = ONTOLOGIES[ontology][0] + ":"
-    found = read_owl(stream)
-    header = grouped(found["ontology"])
+    owl = read_owl(stream)
+    header = grouped(owl["ontology"])
     license_ = next((header[key][0].strip() for key in LICENSES if header.get(key)), "")
     released = RELEASED.search((header.get(VERSION_IRI) or [""])[0])
     stated = {"license": license_, "release": released.group(1) if released else ""}
     rows = {"terms": [], "synonyms": [], "definitions": []}
-    for iri, annotations in found["classes"].items():
+    for iri, annotations in owl["classes"].items():
         values = grouped(annotations)
         term = short_id(iri)
         if not term.startswith(prefix):
@@ -152,7 +152,7 @@ def read_ontology(stream, ontology):
         ]
         for prop, scope in SCOPES.items():
             for text in values.get(prop, []):
-                axioms = found["axioms"].get((iri, iri_of(prop), text), [])
+                axioms = owl["axioms"].get((iri, iri_of(prop), text), [])
                 kinds = sorted(
                     {short_id(k) for a in axioms for k in a.get(SYNONYM_TYPE, [])}
                 )
@@ -166,7 +166,7 @@ def read_ontology(stream, ontology):
                     }
                 )
     return {
-        table: pd.DataFrame(found_rows) for table, found_rows in rows.items()
+        table: pd.DataFrame(table_rows) for table, table_rows in rows.items()
     }, stated
 
 

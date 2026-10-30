@@ -272,10 +272,10 @@ def word_matches(texts, names, min_words):
         words = sorted(set(name.split()), key=lambda word: len(holding[word]))
         if len(words) < min_words:
             continue
-        found = set(holding[words[0]])
+        holders = set(holding[words[0]])
         for word in words[1:]:
-            found &= holding[word]
-        matched.update((text, name) for text in found if text != name)
+            holders &= holding[word]
+        matched.update((text, name) for text in holders if text != name)
     return matched
 
 

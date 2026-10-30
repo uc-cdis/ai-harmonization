@@ -53,10 +53,10 @@ MARKER = re.compile(r"\s*\(([^()]+)\)\s*$")
 
 def status_of(statuses):
     """A concept's status, from NCIt's ``Concept_Status`` values joined by ``|``."""
-    found = set(statuses.split("|"))
-    if found & RETIRED_STATUSES:
+    listed = set(statuses.split("|"))
+    if listed & RETIRED_STATUSES:
         return RETIRED
-    if found & DRAFT_STATUSES:
+    if listed & DRAFT_STATUSES:
         return DRAFT
     return CURRENT
 
@@ -75,11 +75,11 @@ def without_source(definition, sources):
     Returns:
         str: The definition without its source.
     """
-    found = MARKER.search(definition)
-    if found:
-        marker = found.group(1).upper()
+    match = MARKER.search(definition)
+    if match:
+        marker = match.group(1).upper()
         dated = marker[-2:].isdigit() and marker[:-2] in sources
-        before = definition[: found.start()]
+        before = definition[: match.start()]
         left_open = before.count("(") > before.count(")")
         if not left_open and (marker in sources or dated):
             return before
@@ -119,13 +119,15 @@ def items(tables):
         described[row.code].append(without_source(row.definition, sources))
     lists = defaultdict(dict)
     for (code, association), group in tables["values"].groupby(["code", "association"]):
-        found = set(map(clean, group.value)) - {""}
-        values = tuple(sorted(found, key=lambda value: (value.casefold(), value)))
+        cleaned_values = set(map(clean, group.value)) - {""}
+        values = tuple(
+            sorted(cleaned_values, key=lambda value: (value.casefold(), value))
+        )
         if values:
             lists[code].setdefault(values, association)
-    found = tables["replacements"]
+    replacement_rows = tables["replacements"]
     replaced_by = defaultdict(list)
-    for row in found[found.replacement_code != ""].itertuples():
+    for row in replacement_rows[replacement_rows.replacement_code != ""].itertuples():
         replaced_by[row.code].append(row.replacement_code)
     return [
         Item(

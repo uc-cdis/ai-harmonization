@@ -102,15 +102,15 @@ def read_variable_list(page):
     table = max(tables, key=lambda t: len(t.find_all("tr")))
     rows = table.find_all("tr")
     header = [clean(cell.get_text()) for cell in rows[0].find_all(["th", "td"])]
-    found = []
+    list_rows = []
     for row in rows[1:]:
         cells = [clean(cell.get_text()) for cell in row.find_all("td")]
         if len(cells) == len(header):
-            found.append(dict(zip(header, cells)))
+            list_rows.append(dict(zip(header, cells)))
     missing = [column for column in LIST_COLUMNS if column not in header]
     if missing:
         raise ValueError(f"the variable list has no column {', '.join(missing)}")
-    frame = pd.DataFrame(found, columns=header)[list(LIST_COLUMNS)]
+    frame = pd.DataFrame(list_rows, columns=header)[list(LIST_COLUMNS)]
     return frame.rename(columns=LIST_COLUMNS)
 
 
@@ -142,7 +142,10 @@ def read_codebook(page):
                     clean(term.find_next_sibling("dd").get_text())
                 )
         variables.append(
-            {"name": name, **{key: "|".join(found) for key, found in fields.items()}}
+            {
+                "name": name,
+                **{key: "|".join(field_values) for key, field_values in fields.items()},
+            }
         )
         table = block.find("table", class_="values")
         for position, row in enumerate(table.select("tbody tr") if table else []):
@@ -203,8 +206,8 @@ def add_open(codebook, variables):
         pd.DataFrame: The codebook, with an ``open`` column.
     """
     files = variables.groupby(["cycle", "data_file"]).open.all().rename("open")
-    found = codebook.join(files, on=["cycle", "data_file"])
-    return found.assign(open=found.open.fillna(False).astype(bool))
+    joined = codebook.join(files, on=["cycle", "data_file"])
+    return joined.assign(open=joined.open.fillna(False).astype(bool))
 
 
 def keep_not_found(path, data_files):
@@ -312,9 +315,9 @@ def fetch_source(downloads, manifest):
             ) from error
         read.append(path)
         digest.update(f"{entry}:".encode() + hashlib.sha256(text).digest())
-        found, labels = read_codebook(text)
+        codebook_rows, labels = read_codebook(text)
         key = {"cycle": str(first_year), "data_file": data_file}
-        codebook += [{**key, **row} for row in found]
+        codebook += [{**key, **row} for row in codebook_rows]
         values += [{**key, **row} for row in labels]
         if index % 200 == 0:
             print(f"  {index:,} of {len(files):,} codebooks")
@@ -335,7 +338,11 @@ def fetch_source(downloads, manifest):
             "name": "NHANES codebooks",
             "location": CODEBOOK,
             "fetched": modified(
-                max(read, key=lambda kept: kept.stat().st_mtime, default=listed)
+                max(
+                    read,
+                    key=lambda page_path: page_path.stat().st_mtime,
+                    default=listed,
+                )
             ),
             "sha256": digest.hexdigest(),
             "license": LICENSE,

@@ -146,13 +146,16 @@ def read_export(elements):
                     "value": str(entry.get("value", "")),
                 }
             )
-    tables = {table: pd.DataFrame(found) for table, found in rows.items()}
-    found = tables["elements"]
-    found["open"] = (
+    tables = {table: pd.DataFrame(table_rows) for table, table_rows in rows.items()}
+    element_table = tables["elements"]
+    element_table["open"] = (
         open_where(
-            found.copyright_status, OPEN_COPYRIGHT, CLOSED_COPYRIGHT, "copyrightStatus"
+            element_table.copyright_status,
+            OPEN_COPYRIGHT,
+            CLOSED_COPYRIGHT,
+            "copyrightStatus",
         )
-        & ~found.no_render_allowed
+        & ~element_table.no_render_allowed
     )
     keys = {
         "elements": ["tiny_id"],
@@ -189,8 +192,11 @@ def fetch_source(downloads, manifest):
     query = {**SEARCH_EXPORT_QUERY, "includeRetired": True}
     elements = export(path, SEARCH_EXPORT_URL, query)
     tables = read_export(elements)
-    found = tables["elements"]
-    counts = {"elements": len(found), "not_open": int((~found.open).sum())}
+    element_table = tables["elements"]
+    counts = {
+        "elements": len(element_table),
+        "not_open": int((~element_table.open).sum()),
+    }
     print(f"  {counts['elements']:,} elements, {counts['not_open']:,} not open")
     source = {
         "role": "service",

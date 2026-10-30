@@ -179,7 +179,10 @@ def items(tables):
     values = tables["values"].sort_values(["public_id", "position"], kind="stable")
     labels = values.meaning.where(values.meaning != "", values.value)
     grouped = values.assign(label=labels).groupby("public_id").label.agg(list)
-    listed = {element: value_labels(found) for element, found in grouped.items()}
+    listed = {
+        element: value_labels(element_values)
+        for element, element_values in grouped.items()
+    }
     return [
         Item(
             id=row.public_id,

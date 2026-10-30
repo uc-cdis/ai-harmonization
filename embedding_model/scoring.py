@@ -133,7 +133,6 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     # The approaches embed both sides with model.encode(), which adds only the
     # model's default prompt, if its config names one. Left alone, the
     # evaluator would add the model's "query" and "document" prompts instead.
-    # A model with a Router module still has its two sides routed apart.
     #
     # The approaches rank by cosine similarity, even when a model's config
     # names another similarity function. So the evaluator ranks by cosine too.

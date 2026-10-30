@@ -131,6 +131,7 @@ class TestRankTargets:
         assert metrics == {
             "mrr": round((1 + 1 + 1 / 3) / 3, 4),
             "accuracy@1": round(2 / 3, 4),
+            "accuracy@3": 1.0,
             "accuracy@5": 1.0,
             "accuracy@10": 1.0,
             "median_rank": 1.0,

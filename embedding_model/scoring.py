@@ -27,7 +27,7 @@ from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
 from embedding_model.folders import staged
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
-ACCURACY_AT_K = (1, 5, 10)
+ACCURACY_AT_K = (1, 3, 5, 10)
 METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
 # The files whose changes can change a score, as git pathspecs from the top of
 # the checkout.

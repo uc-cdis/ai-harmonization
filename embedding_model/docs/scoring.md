@@ -22,8 +22,8 @@ From those ranks:
 - **MRR**, mean reciprocal rank: the average of 1 / rank. An expected target
   at the top counts fully, second counts half, and so on. MRR is one number with
   no cut-off.
-- **accuracy@k**, for k of 1, 5 and 10: how often an expected target is among
-  the first k. It is what someone reviewing the top k suggestions sees.
+- **accuracy@k**, for k of 1, 3, 5 and 10: how often an expected target is
+  among the first k. It is what someone reviewing the top k suggestions sees.
 - **median rank**: where the expected target typically lands.
 
 sentence-transformers' `InformationRetrievalEvaluator` ranks the targets and
@@ -120,8 +120,8 @@ scores as they were; see [Inputs and outputs](../README.md#inputs-and-outputs).
 It holds:
 
 - `metrics.csv`, one row: `model`, `benchmark`, `benchmark_version`, `format`,
-  `n` (the variables scored), `targets`, `mrr`, `accuracy@1`, `accuracy@5`,
-  `accuracy@10` and `median_rank`.
+  `n` (the variables scored), `targets`, `mrr`, `accuracy@1`, `accuracy@3`,
+  `accuracy@5`, `accuracy@10` and `median_rank`.
 - `per_variable.csv`, one row per source variable: `source_study_id`,
   `source_table_id`, `source_variable_id`, `source_variable_name`,
   `expected_target`, `rank`, and the target that the model ranked first,

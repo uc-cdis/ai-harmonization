@@ -4,14 +4,13 @@ Variables from the supplementary tables of ten cancer papers, mapped by
 experts to the GDC data dictionary: the ground truth of GDC-SM, the schema
 matching benchmark published with Magneto. GDC-SM distributes the mappings
 only, so the source tables are downloaded from their publishers and the
-targets from the live GDC submission dictionary. Each variable's study is the
-dbGaP study of its paper's cohort.
+targets from the GDC submission dictionary that the GDC API serves. Each
+variable's study is the dbGaP study of its paper's cohort.
 """
 
 import io
 import json
 import zipfile
-from datetime import date
 from pathlib import PurePosixPath
 
 import pandas as pd
@@ -19,7 +18,7 @@ import pandas as pd
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
-from embedding_model.download import cached, fetch
+from embedding_model.download import cached, fetch, keep, modified
 from embedding_model.manifests import sha256
 
 # The manifest source that pins the ground truth, by its Zenodo record.
@@ -27,6 +26,8 @@ GROUND_TRUTH = "GDC-SM ground truth"
 ZENODO_FILE = "https://zenodo.org/records/{record}/files/{name}?download=1"
 GDC_DICTIONARY = "https://api.gdc.cancer.gov/v0/submission/_dictionary/_all"
 GDC_STATUS = "https://api.gdc.cancer.gov/status"
+# The status's fields that the manifest records as the dictionary's version.
+STATUS_FIELDS = ("data_release", "tag", "commit")
 # Entries the API serves beside the nodes: the JSON meta-schema and the root.
 NOT_NODES = {"metaschema", "root"}
 
@@ -350,13 +351,53 @@ def mapping_rows(truth, tables, targets, papers):
     ]
 
 
+def kept_dictionary(downloads):
+    """The GDC API's status and dictionary, fetched once and kept together.
+
+    Both are fetched again when either one is missing, so the kept status
+    always names the release of the kept dictionary. Both responses are read
+    before either is kept. A response that is not JSON, or a status without
+    STATUS_FIELDS, is never kept, so the next build tries again.
+
+    Args:
+        downloads (Path): Where the GDC benchmark's downloads are kept.
+
+    Returns:
+        tuple[dict, dict, Path]: The status, the dictionary, and the kept
+            dictionary's file.
+
+    Raises:
+        ValueError: If the status lacks one of STATUS_FIELDS.
+    """
+    files = {
+        GDC_STATUS: downloads / "dictionary" / "status.json",
+        GDC_DICTIONARY: downloads / "dictionary" / "dictionary.json",
+    }
+    if not all(path.exists() for path in files.values()):
+        served = {url: fetch(url) for url in files}
+        status = json.loads(served[GDC_STATUS])
+        json.loads(served[GDC_DICTIONARY])
+        missing = [field for field in STATUS_FIELDS if field not in status]
+        if missing:
+            raise ValueError(
+                f"{GDC_STATUS} answered without {', '.join(missing)}. Nothing "
+                "was kept; try again later."
+            )
+        for url, path in files.items():
+            keep(path, served[url])
+    status, dictionary = (json.loads(path.read_bytes()) for path in files.values())
+    return status, dictionary, files[GDC_DICTIONARY]
+
+
 def build(downloads, manifest):
     """Build the GDC benchmark from the inputs that its manifest pins.
 
-    The ground truth and the publishers' spreadsheets are kept between builds.
-    The dictionary is fetched each time, since the GDC API serves only the
-    current dictionary. The manifest records its SHA-256, so a build on a
-    changed dictionary shows as a different benchmark.
+    The ground truth, the publishers' spreadsheets and the dictionary are kept
+    between builds. The GDC API serves only the current dictionary, so the
+    kept copy is the only copy of the dictionary that the manifest pins. The
+    API's status, which names the data release, is kept with it, as
+    ``kept_dictionary`` says. The manifest records the dictionary's SHA-256,
+    so a build on a changed dictionary shows as a different benchmark.
 
     Args:
         downloads (Path): Where downloaded files are kept between builds.
@@ -392,8 +433,7 @@ def build(downloads, manifest):
         tables[paper] = read_source_table(spreadsheet, info["Sheet Name"], paper)
         sources.append(paper_source(paper, info, spreadsheet, PAPERS))
 
-    status = json.loads(fetch(GDC_STATUS))
-    dictionary = json.loads(fetch(GDC_DICTIONARY))
+    status, dictionary, dictionary_file = kept_dictionary(downloads)
     targets = dictionary_targets(dictionary)
     mappings = mapping_rows(truth, tables, targets, PAPERS)
     counts = {
@@ -416,7 +456,7 @@ def build(downloads, manifest):
                 f"{status['data_release']}; API {status['tag']}, "
                 f"commit {status['commit']}"
             ),
-            "fetched": date.today().isoformat(),
+            "fetched": modified(dictionary_file),
             # The SHA-256 is of the content, with keys sorted, so a reordering
             # by the API is not a new dictionary.
             "sha256": sha256(json.dumps(dictionary, sort_keys=True).encode()),

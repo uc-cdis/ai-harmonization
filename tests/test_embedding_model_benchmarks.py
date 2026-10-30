@@ -3,16 +3,18 @@
 import csv
 import io
 import json
+import os
 import tarfile
 import textwrap
 import zipfile
+from datetime import date
 from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
 
 from ai_harmonization.formatters import MAX_VALUES_IN_PROMPT, VALUE_SEPARATOR
-from embedding_model import benchmarks, manifests
+from embedding_model import benchmarks, download, manifests
 from embedding_model.__main__ import main
 from embedding_model.benchmarks import gdc, topmed
 
@@ -207,6 +209,86 @@ class TestBuilders:
         assert sources == [pin]
         assert counts["source_variables"] == len(mappings) == 1
         assert counts["targets"] == len(targets)
+
+    GDC_PIN = {"name": gdc.GROUND_TRUTH, "role": "mappings", "version": "999999",
+               "location": "https://doi.org/10.5281/zenodo.999999"}  # fmt: skip
+
+    def serve_gdc(self, monkeypatch, served):
+        """Serve a fictional GDC API and Zenodo record, and give the addresses asked for.
+
+        The ground truth, its papers and its mappings are stubbed, so a build
+        reads only the API's status and dictionary.
+        """
+        asked = []
+
+        def fake_fetch(url, **request):
+            """Serve the fictional response for an address, and note it."""
+            asked.append(url)
+            return served.get(url, b"{}")
+
+        monkeypatch.setattr(download, "fetch", fake_fetch)
+        monkeypatch.setattr(gdc, "fetch", fake_fetch)
+        monkeypatch.setattr(gdc, "read_ground_truth", lambda archive: {})
+        monkeypatch.setattr(gdc, "require_papers", lambda *args: None)
+        monkeypatch.setattr(gdc, "mapping_rows", lambda *args: [])
+        return asked
+
+    @staticmethod
+    def status(release):
+        """A fictional response of the GDC API's status."""
+        return json.dumps(
+            {"data_release": release, "tag": "9.9.9", "commit": "abcd123"}
+        ).encode()
+
+    def test_gdc_keeps_the_dictionary_for_the_next_build(self, monkeypatch, tmp_path):
+        """A second GDC build reads the kept dictionary and status, with no network."""
+        dictionary = json.dumps(TestDictionaryTargets.DICTIONARY).encode()
+        served = {
+            gdc.GDC_STATUS: self.status("Data Release 99.0"),
+            gdc.GDC_DICTIONARY: dictionary,
+        }
+        asked = self.serve_gdc(monkeypatch, served)
+        first_targets = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})[0]
+        kept = tmp_path / "dictionary"
+        assert (kept / "status.json").read_bytes() == served[gdc.GDC_STATUS]
+        assert (kept / "dictionary.json").read_bytes() == dictionary
+        os.utime(kept / "dictionary.json", (0, 1_000_000_000))
+        asked.clear()
+        targets, _, sources, _ = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
+        assert asked == []
+        assert targets == first_targets
+        (dictionary_source,) = [s for s in sources if s["role"] == "targets"]
+        assert dictionary_source["version"] == (
+            "Data Release 99.0; API 9.9.9, commit abcd123"
+        )
+        assert dictionary_source["fetched"] == date.fromtimestamp(1e9).isoformat()
+
+    def test_gdc_fetches_both_again_when_one_is_missing(self, monkeypatch, tmp_path):
+        """A kept status without its dictionary is fetched again, so the two always match."""
+        served = {
+            gdc.GDC_STATUS: self.status("Data Release 99.0"),
+            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
+        }
+        asked = self.serve_gdc(monkeypatch, served)
+        gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
+        (tmp_path / "dictionary" / "dictionary.json").unlink()
+        served[gdc.GDC_STATUS] = self.status("Data Release 100.0")
+        asked.clear()
+        sources = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})[2]
+        assert {gdc.GDC_STATUS, gdc.GDC_DICTIONARY} <= set(asked)
+        (dictionary_source,) = [s for s in sources if s["role"] == "targets"]
+        assert dictionary_source["version"].startswith("Data Release 100.0;")
+
+    def test_gdc_keeps_no_status_without_its_release(self, monkeypatch, tmp_path):
+        """A status that does not name its release is refused, and nothing is kept."""
+        served = {
+            gdc.GDC_STATUS: json.dumps({"message": "down for maintenance"}).encode(),
+            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
+        }
+        self.serve_gdc(monkeypatch, served)
+        with pytest.raises(ValueError, match="without data_release, tag, commit"):
+            gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
+        assert not (tmp_path / "dictionary").exists()
 
     @pytest.mark.parametrize("builder", [topmed, gdc])
     def test_a_missing_pin_is_named(self, builder, tmp_path):

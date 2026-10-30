@@ -154,8 +154,9 @@ Identifier), such as `.../mondo/releases/2026-10-06/mondo.owl`. The first few
 kilobytes of the file hold it. A date newer than the pin means a newer release:
 write it as the release's `version`. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. CMO and MMO
-have no dated releases. The fetch keeps their current files, so delete
-`downloads/obo/cmo.owl` and `downloads/obo/mmo.owl` to fetch the newest ones.
+have no dated releases. The fetch keeps their current files. To fetch the
+newest ones, move `downloads/obo/cmo.owl` and `downloads/obo/mmo.owl` aside,
+for example by adding `.old` to their names.
 
 [licenses.md](licenses.md#ontologies) gives its license and reference.
 
@@ -257,9 +258,10 @@ LOINC's. Whether an element is open depends on its `copyrightStatus` and
 
 **Newer releases.** The repository serves only its current state, so there is
 no release to pin. The fetch keeps the export in
-`downloads/cde/SearchExport.json`. To read the current state, delete that file
-and fetch again. A fetch that differs from the committed manifest is a new
-version, as [Making a new version](manifests.md#making-a-new-version) says.
+`downloads/cde/SearchExport.json`. To read the current state, move that file
+aside, for example by adding `.old` to its name, and fetch again. A fetch that
+differs from the committed manifest is a new version, as
+[Making a new version](manifests.md#making-a-new-version) says.
 
 [licenses.md](licenses.md#nih-cde) gives its license and reference.
 
@@ -314,10 +316,11 @@ only the pages still missing.
 
 **Newer releases.** NHANES serves only its current pages: the variable lists
 and each data file's codebook. The fetch keeps every page in
-`downloads/nhanes/`. To read the current pages, delete them and fetch again. A
-data file listed in `codebooks/not_found.txt` is not asked for again until that
-list is deleted too. A fetch that differs from the committed manifest is a new
-version, as [Making a new version](manifests.md#making-a-new-version) says.
+`downloads/nhanes/`. To read the current pages, move that folder aside, for
+example to `downloads/nhanes.old/`, and fetch again. A data file listed in
+`codebooks/not_found.txt` is not asked for again until that list is gone too.
+A fetch that differs from the committed manifest is a new version, as
+[Making a new version](manifests.md#making-a-new-version) says.
 
 [licenses.md](licenses.md#nhanes) gives its license and reference.
 
@@ -348,8 +351,9 @@ A protocol that PhenX replaced by a newer one is hidden: its `visible` is
 
 **Newer releases.** The export's address serves only PhenX's latest release,
 and the export names it, such as `Ver 49.0`. The fetch keeps the export in
-`downloads/phenx/Phenx_DB.zip`. To use a newer release, delete that file, and
-write the new release as the export's `version`. Then make a new version, as
+`downloads/phenx/Phenx_DB.zip`. To use a newer release, move that file aside,
+for example by adding `.old` to its name. Write the new release as the export's
+`version`. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. A fetch refuses
 an export of another release than the pin.
 

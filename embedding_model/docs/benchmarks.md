@@ -249,7 +249,7 @@ It is built from three published inputs:
   publishers, for each variable's type and values. They are prepared as
   GDC-SM's own download script prepares them (`gdc_download.py` in the Zenodo
   record). GDC-SM describes no variable, so the description is empty.
-- the live **GDC submission dictionary**, for the targets.
+- the **GDC submission dictionary**, as the GDC API serves it, for the targets.
 
 Each variable's study is the dbGaP study of its paper's cohort:
 
@@ -274,11 +274,16 @@ text that they build. These properties are not targets:
 - every node's `type`, which holds the node's own name;
 - the JSON meta-schema and the root, which the API serves beside the nodes.
 
-The GDC API serves only the current dictionary. So the manifest records its
-data release and the SHA-256 of its content, with keys sorted. A build on a
-changed dictionary then shows as a different benchmark. After GDC publishes a
-new dictionary, a build reports the difference and keeps the files that it had.
-To build from the new dictionary, raise the benchmark's version; see
+The GDC API serves only the current dictionary. So the first build keeps it in
+`downloads/gdc/dictionary/`, with the API's status, which names the data
+release. Later builds read that copy. The manifest records the data release
+and the SHA-256 of the dictionary's content, with keys sorted.
+
+To build from a newer dictionary, move `downloads/gdc/dictionary/` aside, for
+example to `downloads/gdc/dictionary.old/`, and build again. The build keeps
+the new dictionary in `downloads/gdc/dictionary/`. If the dictionary changed,
+the build reports the difference, and `benchmarks/gdc/` keeps its previous
+files. To use the new dictionary, raise the benchmark's version; see
 [Making a new version](manifests.md#making-a-new-version). Version 2's
 dictionary is gdcdictionary release
 [4.0.3](https://github.com/NCI-GDC/gdcdictionary/releases/tag/4.0.3) (commit
@@ -309,8 +314,8 @@ only, so its scores and these are not comparable.
 **Newer releases.** The ground truth is pinned by its Zenodo record. A new
 version of GDC-SM is a new record: write its number as the ground truth's
 `version`, and its DOI as its `location`. Then make a new version, as
-[Making a new version](manifests.md#making-a-new-version) says. The GDC API
-serves only the current dictionary, and each build reads it. So a new GDC data
-release shows as a build that differs (see [The targets](#the-targets)).
+[Making a new version](manifests.md#making-a-new-version) says. The build
+keeps a copy of the GDC dictionary. To read a new GDC data release, move that
+copy aside and build again, as [The targets](#the-targets) says.
 
 [licenses.md](licenses.md#gdc) gives its license and reference.

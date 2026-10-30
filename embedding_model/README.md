@@ -256,9 +256,12 @@ first writes the new corpus into a hidden staging folder,
 complete does it replace `corpora/abcd/`. So a run that fails leaves the
 previous corpus as it was.
 
-A run that is killed, such as by a time limit, cannot delete its staging
-folder. The next run of `corpus build --name abcd` then prints a warning with
-that folder's path, so you can check the folder and delete it.
+A run that is stopped, by its user or by a time limit, cannot delete its
+staging folder. The next run of `corpus build --name abcd` then prints a
+warning with that folder's path. The warning says what to do with the folder.
+Usually nothing in it is needed, so you delete it. A run can also stop while it
+swaps the two folders. Then the staging folder holds the previous corpus, and
+the warning says how to move it back.
 
 ```
 inputs/

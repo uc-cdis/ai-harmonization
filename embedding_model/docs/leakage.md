@@ -132,6 +132,26 @@ So the pair is an answer key. Two limits keep general vocabulary:
   `Waist in cm` -> `Waist` is kept, since `Waist` matches only the target's
   name.
 
+### An answer key's twin
+
+Each anchor gives two pairs: a `name` pair, with the canonical alone, and a
+`name_description` pair, with the canonical and its description. Often only
+the second matches a benchmark row, by its description. A pair with the same
+item, anchor and canonical as an answer key is dropped with it, for the same
+benchmark row. In `dropped.parquet`, its `fields` are its answer key's, after
+`twin of: `. For example:
+
+```
+twin of: anchor name = source name, positive description = target description
+```
+
+The anchor `Waist in cm` of the example above gives two pairs:
+
+| kind | positive | finding |
+|---|---|---|
+| `name_description` | `Participant Waist Circumference: The waist circumference of the participant in centimeters.` | an answer key, as above |
+| `name` | `Participant Waist Circumference` | its twin, dropped with it |
+
 ## The study rule: `benchmark_study`
 
 A pair gets the finding `benchmark_study` when its `study` holds the source

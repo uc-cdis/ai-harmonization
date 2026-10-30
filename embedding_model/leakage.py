@@ -39,7 +39,10 @@ two kinds:
   For example, a benchmark maps the variable ``body_weight`` to
   ``vitals.weight``. Then the pair ``Weight`` -> ``Body Weight`` is an answer
   key: its positive matches the source variable, and its anchor matches the
-  expected target.
+  expected target. A pair with the same item, anchor and canonical as an
+  answer key goes with it: each anchor gives a ``name`` pair and a
+  ``name_description`` pair, and often only the second holds the description
+  that matches.
 - ``benchmark_study``, the study rule: the pair's ``study`` holds the source
   study of a benchmark row. For example, a benchmark row comes from the study
   ``phs999901``. Then every pair made from a dbGaP variable of ``phs999901``
@@ -74,6 +77,8 @@ MIN_OVERLAP_WORDS = 8
 # words. A one-word name, such as "age", matches only an equal text, since a
 # side that holds one shared word is mostly general vocabulary.
 MIN_NAME_WORDS = 2
+# What a twin's ``fields`` start with, before its answer key's own fields.
+TWIN = "twin of: "
 # The two findings, as the findings table and the corpus's manifest name them.
 ANSWER_KEY = "answer_key"
 BENCHMARK_STUDY = "benchmark_study"
@@ -372,6 +377,38 @@ def answer_keys(sides, source_texts, target_texts):
     ]
 
 
+def answer_key_twins(pairs, answer_key_findings):
+    """The pairs with the same item, anchor and canonical as an answer key.
+
+    An anchor gives a ``name`` pair and a ``name_description`` pair. The
+    second holds the canonical's description, which can match the target
+    while the first matches nothing. Kept, the first would still pair the
+    source's text with the canonical of the answer key.
+
+    Args:
+        pairs (pd.DataFrame): The combined pairs.
+        answer_key_findings (pd.DataFrame): The answer keys, from
+            ``answer_keys``.
+
+    Returns:
+        pd.DataFrame: The twins that are not answer keys themselves, in the
+            columns of ``answer_keys``. A twin's ``fields`` are its answer
+            key's, after TWIN, such as ``twin of: anchor name = source name,
+            positive description = target description``.
+    """
+    identity = ["source", "item", "anchor_name", "positive_name"]
+    identities = pairs[identity].assign(pair=pairs.index)
+    twins = (
+        answer_key_findings.merge(identities, on="pair")
+        .drop(columns="pair")
+        .merge(identities, on=identity)
+    )
+    twins = twins[~twins.pair.isin(answer_key_findings.pair)]
+    return twins.assign(fields=TWIN + twins.fields).drop_duplicates(
+        ["pair", "benchmark"]
+    )[list(answer_key_findings.columns)]
+
+
 def study_matches(pairs, studies):
     """The pairs whose ``study`` holds a benchmark row's source study.
 
@@ -460,9 +497,11 @@ def audit(pairs, benchmarks):
     )
     studies = studies[studies.study_id != ""].drop_duplicates()
     sides = side_keys(pairs)
+    answer_key_findings = answer_keys(sides, source_texts, target_texts)
     findings = pd.concat(
         [
-            answer_keys(sides, source_texts, target_texts).assign(finding=ANSWER_KEY),
+            answer_key_findings.assign(finding=ANSWER_KEY),
+            answer_key_twins(pairs, answer_key_findings).assign(finding=ANSWER_KEY),
             study_matches(pairs, studies).assign(finding=BENCHMARK_STUDY),
         ],
         ignore_index=True,

@@ -163,6 +163,28 @@ class TestLeakage:
             "anchor name ~ source name, positive name = target name"
         ]
 
+    def test_an_answer_keys_twin_goes_with_it(self):
+        """The pair with an answer key's item, anchor and canonical is dropped too."""
+        pairs = pd.DataFrame(
+            [
+                pair(
+                    "efgh_level",
+                    "Efgh",
+                    kind="name_description",
+                    positive_description="The efgh value",
+                ),
+                pair("efgh_level", "Efgh"),
+                pair("efgh_level", "Efgh", item="C999902"),
+            ]
+        )
+        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        assert findings.pair.tolist() == [0, 1]
+        assert findings.fields.tolist()[1] == (
+            "twin of: anchor name = source name,"
+            " positive description = target description"
+        )
+        assert findings.target_property.tolist() == ["node2.efgh_value"] * 2
+
     def test_a_pair_that_leaks_two_benchmarks_has_a_finding_for_each(self):
         """One pair can leak two benchmarks, and each one gets its finding."""
         pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index")])

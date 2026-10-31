@@ -1,0 +1,48 @@
+{
+  "source": "loinc",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "codes.parquet": {
+      "rows": 112405,
+      "sha256": "31e3c059dbafa916ac138ad298c41a1b53bfbc1084cb9c8d930f6df7109382df",
+      "content_sha256": "e9a4515c6d8d08c154a8cf0605c365c5af00c8b88650d2fd4205ecea555981f7"
+    },
+    "map_to.parquet": {
+      "rows": 4667,
+      "sha256": "604ed010b6c8c4117dad00413c824f6cf30bb8990dc6658f1f61c0d172b902e5",
+      "content_sha256": "adcdfb2bc0c8d19621e701f8af80ba896668e3080854eb8f112393c949d8db3f"
+    },
+    "forms.parquet": {
+      "rows": 98519,
+      "sha256": "d0ec5f767fd9d24b0e8cf0cecc0534e9678d93cb722e2fb4e83ee1845e57f334",
+      "content_sha256": "8a1afedcdab595fe47c5a15501ea40bffe901cf7fdac8e31bea4fd85c6c4f6ca"
+    },
+    "answers.parquet": {
+      "rows": 34249,
+      "sha256": "25d2dc328b222a3bbf97c42b01ae4cef998aafebbe89784e027d62985d3a3b0a",
+      "content_sha256": "35e96b96d489fc2e4e31e8f72e5baf303e88c5de5d994fc7a1fd17e6ba02a50b"
+    },
+    "answer_links.parquet": {
+      "rows": 30063,
+      "sha256": "c53d81ce440614fc09619c5df45f0bec4a2d7c1ccaa0e76841eb9d9ea4e08ab3",
+      "content_sha256": "db2da604992273d27b8545355d733397eae282f4a478ca3269eee86ae4366e03"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "LOINC release",
+      "location": "https://loinc.regenstrief.org/api/v1/Loinc/Download?version=2.83",
+      "version": "2.83",
+      "md5": "057ddf203164705d5a4c3604257060a4",
+      "sha256": "077a0718e87d8309ffe3a673f75b836a8e783dc36a646413ef97c71c12eab27e",
+      "license": "LicenseRef-LOINC",
+      "citation": "embedding_model/docs/licenses.md#loinc"
+    }
+  ],
+  "counts": {
+    "codes": 112405,
+    "not_open": 8099
+  }
+}

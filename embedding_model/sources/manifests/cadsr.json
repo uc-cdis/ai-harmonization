@@ -1,0 +1,42 @@
+{
+  "source": "cadsr",
+  "version": "1",
+  "fetched": "2026-10-22",
+  "files": {
+    "elements.parquet": {
+      "rows": 79157,
+      "sha256": "53eb4ad32c01f579edcc4b104f492d5d90aebb5485c4a9b0b5a826aed3e72526",
+      "content_sha256": "d32e40638d519743df31d3e7292e515756369402a5779763e16c8c591a379840"
+    },
+    "alternate_names.parquet": {
+      "rows": 131131,
+      "sha256": "a8a7d31d5dfc05b4d7f185be54f087484a252ac5f811e91b04d7e5c35715f8f1",
+      "content_sha256": "9f970fe8e1a545352699019f67320cb4b922eb4506ec782c0aca66560f9628ce"
+    },
+    "documents.parquet": {
+      "rows": 172075,
+      "sha256": "45d21e24ebfbc772d67ae13edb7a4ad1ab1c749f0d0f0b235def4d368a3c5288",
+      "content_sha256": "d8466865668d2b1a5eda691d5ab33c16b0b705ad1e393f24fbbc24968ecf95e3"
+    },
+    "values.parquet": {
+      "rows": 702888,
+      "sha256": "99434d6f513636bbf28188b0f8d1068e0c7917b77112841ca0c3922487467770",
+      "content_sha256": "b044b4374e27c0cecd2e990f833fe859e559df2d4efdc816c6d200908b2eb9b1"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "caDSR released data elements",
+      "location": "https://cadsr.nci.nih.gov/ftp/caDSR_Downloads/CDE/XML_Archive/releasedCDEsXML-OD.zip.2026-07-01",
+      "version": "2026-07-01",
+      "sha256": "68a99b43cd763b063394b545e1ff02f38051927bf8a50c8d7cb1c388e2d39748",
+      "license": "LicenseRef-NCI-Reuse",
+      "citation": "embedding_model/docs/licenses.md#cadsr"
+    }
+  ],
+  "counts": {
+    "elements": 79157,
+    "not_open": 1607
+  }
+}

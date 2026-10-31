@@ -10,7 +10,9 @@ from ai_harmonization.dbgap import (
     CSV_HEADERS,
     build_mapping_rows,
     find_study_metadata_files,
+    map_dbgap_type,
     parse_dbgap_table,
+    resolve_variable_type,
     summarize_rank1_similarity,
 )
 from ai_harmonization.formatters import VALUE_SEPARATOR
@@ -37,15 +39,9 @@ DATA_DICT_XML = textwrap.dedent(
 VAR_REPORT_XML = textwrap.dedent(
     """\
     <?xml version="1.0" encoding="UTF-8"?>
-    <data_table>
-      <variable>
-        <name>SUBJID</name>
-        <type>string</type>
-      </variable>
-      <variable>
-        <name>SEX</name>
-        <type>encoded value</type>
-      </variable>
+    <data_table id="pht999999.v1" study_id="phs999999.v1">
+      <variable id="phv99999901.v1.p1" var_name="SUBJID" calculated_type="string"/>
+      <variable id="phv99999902.v1.p1" var_name="SEX" calculated_type="enum_integer"/>
     </data_table>
 """
 )
@@ -153,16 +149,116 @@ class TestParseDbgapTable:
         assert variable_ids == ["phv99999801.v1", "phv99999701.v1"]
 
     def test_var_report_sets_type(self, dict_path, report_path):
-        """The var report's "encoded value" type maps to string/encoded."""
+        """The var report's computed enum_integer type maps to string/encoded."""
         _, model = parse_dbgap_table(dict_path, report_path)
         sex = next(p for p in model.nodes[0].properties if p.name == "SEX")
         assert sex.type == "string/encoded"
 
-    def test_missing_report_defaults_to_string(self, dict_path):
-        """Without a var report every property gets the string type."""
+    def test_without_a_report_codes_make_a_variable_encoded(self, dict_path):
+        """With no report and no dictionary type, value codes mean encoded, else string."""
         _, model = parse_dbgap_table(dict_path, report_path=None)
-        for prop in model.nodes[0].properties:
-            assert prop.type == "string"
+        types = {p.name: p.type for p in model.nodes[0].properties}
+        assert types == {"SUBJID": "string", "SEX": "string/encoded"}
+
+    def test_report_attributes_set_type(self, dict_path, tmp_path):
+        """A report in dbGaP's own shape, with var_name and calculated_type attributes, sets types."""
+        report = tmp_path / "pht999999.v1.p1_var_report.xml"
+        report.write_text(
+            '<data_table id="pht999999.v1" study_id="phs999999.v1">'
+            '<variable id="phv99999901.v1.p1" var_name="SUBJID" calculated_type="integer"/>'
+            '<variable id="phv99999902.v1.p1" var_name="SEX" calculated_type="enum_integer"/>'
+            "</data_table>"
+        )
+        _, model = parse_dbgap_table(dict_path, str(report))
+        types = {p.name: p.type for p in model.nodes[0].properties}
+        assert types == {"SUBJID": "integer", "SEX": "string/encoded"}
+
+    def test_dictionary_type_without_a_report(self, tmp_path):
+        """With no report type, a variable's own <type> in the dictionary is used."""
+        path = tmp_path / "pht999996.v1_data_dict.xml"
+        path.write_text(
+            '<data_table id="pht999996.v1" study_id="phs999999">'
+            '<variable id="phv99999601.v1"><name>AGE</name>'
+            "<type>integer, encoded value</type></variable>"
+            '<variable id="phv99999602.v1"><name>BMI</name><type>NUMERIC</type></variable>'
+            "</data_table>"
+        )
+        _, model = parse_dbgap_table(str(path))
+        types = {p.name: p.type for p in model.nodes[0].properties}
+        assert types == {"AGE": "integer", "BMI": "float"}
+
+    def test_coded_answers_are_encoded_when_the_report_computes_string(self, tmp_path):
+        """Y/N answers that the report computes as string are encoded, by codes or by declaration."""
+        path = tmp_path / "pht999995.v1_data_dict.xml"
+        path.write_text(
+            '<data_table id="pht999995.v1" study_id="phs999999">'
+            '<variable id="phv99999501.v1"><name>EVER</name><type>encoded value</type>'
+            '<value code="N">No</value><value code="Y">Yes</value></variable>'
+            '<variable id="phv99999502.v1"><name>NOW</name>'
+            '<value code="N">No</value><value code="Y">Yes</value></variable>'
+            "</data_table>"
+        )
+        report = tmp_path / "pht999995.v1.p1_var_report.xml"
+        report.write_text(
+            '<data_table id="pht999995.v1">'
+            '<variable id="phv99999501.v1.p1" var_name="EVER" calculated_type="string"/>'
+            '<variable id="phv99999502.v1.p1" var_name="NOW" calculated_type="string"/>'
+            "</data_table>"
+        )
+        _, model = parse_dbgap_table(str(path), str(report))
+        types = {p.name: p.type for p in model.nodes[0].properties}
+        assert types == {"EVER": "string/encoded", "NOW": "string/encoded"}
+
+
+class TestMapDbgapType:
+    @pytest.mark.parametrize(
+        "declared, expected",
+        [
+            ("enum_integer", "string/encoded"),
+            ("Encoded value", "string/encoded"),
+            ("encoded,string", "string/encoded"),
+            ("integer, encoded value", "integer"),
+            ("decimal, encoded", "float"),
+            ("NUMERIC", "float"),
+            ("", None),
+            (None, None),
+            ("blob", None),
+        ],
+    )
+    def test_types(self, declared, expected):
+        """A spelling maps by the first part that the map knows, or else to None."""
+        assert map_dbgap_type(declared) == expected
+
+
+class TestResolveVariableType:
+    @pytest.mark.parametrize(
+        "calculated, declared, has_codes, expected",
+        [
+            # A computed number stays a number, its codes marking missing values.
+            ("decimal", "decimal, encoded", True, "float"),
+            ("integer", "integer, encoded value", True, "integer"),
+            # A computed enumeration is encoded.
+            ("enum_integer", None, True, "string/encoded"),
+            # The computed type corrects a wrong declaration.
+            ("enum_integer", "decimal", True, "string/encoded"),
+            ("decimal", "string", False, "float"),
+            # Computed text: a declared number decides ...
+            ("string", "integer", False, "integer"),
+            ("string", "NUMERIC", True, "float"),
+            # ... otherwise codes, or an encoded declaration, make it encoded ...
+            ("string", None, True, "string/encoded"),
+            ("string", "encoded value", False, "string/encoded"),
+            # ... and anything else is a string.
+            ("string", None, False, "string"),
+            # No report, or a computed type the map does not know: the declaration.
+            (None, "integer", False, "integer"),
+            ("unknown_kind", "decimal", False, "float"),
+            (None, None, False, "string"),
+        ],
+    )
+    def test_types(self, calculated, declared, has_codes, expected):
+        """The computed type, the declared type and the codes give one type."""
+        assert resolve_variable_type(calculated, declared, has_codes) == expected
 
 
 class TestFindStudyMetadataFiles:

@@ -45,11 +45,14 @@ dependencies = [
 ]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
+minversion = "7.0"
 addopts = "-v"
 testpaths = [
     "tests",
 ]
+# embedding_model runs from a checkout rather than being installed, so the
+# tests import it from the repository root.
+pythonpath = ["."]
 
 [tool.setuptools]
 packages = ["ai_harmonization", "ai_harmonization.harmonization_approaches"]
@@ -67,3 +70,38 @@ dev = [
     "nbconvert>=7.16.6,<8.0.0",
     "ipykernel>=6.30.0",
 ]
+# Required by embedding_model only, which runs from a checkout. Installing
+# ai_harmonization as a package leaves them out.
+embedding-model = [
+    # embedding_model.benchmarks.gdc (publishers' .xlsx tables, read through
+    # pandas.read_excel)
+    "openpyxl>=3.1.5",
+    # embedding_model.sources.nhanes and embedding_model.pairs (HTML pages and
+    # tags, read with BeautifulSoup)
+    "beautifulsoup4>=4.12.0",
+    # embedding_model.pairs (text read with the wrong encoding, repaired with
+    # ftfy)
+    "ftfy>=6.3.1",
+    # embedding_model.sources (OWL files and caDSR's XML, parsed without entities
+    # or external references)
+    "defusedxml>=0.7.1",
+    # embedding_model.sources, pairs, corpus and tokenizer (tables written and
+    # read as parquet through pandas)
+    "pyarrow>=14.0.0",
+    # embedding_model.normalization (BERT's text cleaning and the tokenizer's
+    # normaliser) and embedding_model.tokenizer (the BPE vocabulary, trained
+    # and saved)
+    "tokenizers>=0.23.2",
+    # embedding_model.scoring (the commit of a cached Hugging Face model, for
+    # the scores' config). Its minimum version is the one that
+    # sentence-transformers 5.1.2, the lowest version allowed, requires.
+    "huggingface-hub>=0.20.0",
+    # embedding_model.corpus (the split's groups, as the connected components
+    # of a graph of items and canonical texts). Its minimum version is the
+    # first with wheels for Python 3.12, the project's lowest Python.
+    "scipy>=1.11.2",
+]
+
+[tool.uv]
+# uv sync installs both groups, so a checkout gets everything at once.
+default-groups = ["dev", "embedding-model"]

@@ -61,7 +61,7 @@ def write_source(directory, name, version, tables, sources, counts):
         files[path.name] = {
             "rows": len(frame),
             "sha256": file_sha256(path),
-            "csv_sha256": table_sha256(frame),
+            "content_sha256": table_sha256(frame),
         }
     manifest = {
         "source": name,

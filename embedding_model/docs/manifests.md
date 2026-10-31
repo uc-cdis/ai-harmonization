@@ -39,9 +39,11 @@ Every manifest has these fields. A field that does not apply is left out:
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
 - `files`: each file's row count, and its `sha256`, the SHA-256 of the
-  file's bytes. A table kept as parquet also has `csv_sha256`, the SHA-256 of
-  the table written as CSV. [Two checksums](#two-checksums) says what each
-  one is for;
+  file's bytes. A table kept as parquet also has `content_sha256`, the SHA-256
+  of its content. That content is a line with its column names and types,
+  then its rows as CSV. A missing value is written as `\N`, and each backslash
+  in a text is written twice. No CSV file is written.
+  [Two checksums](#two-checksums) says what each one is for;
 - `sources`: what the build was made from, one entry each, with
   - `role`: what the input is for, such as `mappings` or `release`;
   - `name` and `location`: a URL, DOI or record;
@@ -72,7 +74,7 @@ A checksum answers one of two questions:
 
 - **Do two builds hold the same data?** A new build is compared with its
   committed manifest, on any machine and with any library version. A table
-  kept as parquet is compared by its row count and its `csv_sha256`. The
+  kept as parquet is compared by its row count and its `content_sha256`. The
   bytes of a parquet file depend on the library that wrote it, so its
   `sha256` is recorded but not compared. Any other file is compared by its
   row count and its `sha256`.

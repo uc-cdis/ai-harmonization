@@ -6,17 +6,17 @@
     "terms.parquet": {
       "rows": 103612,
       "sha256": "3fa77883fb7e17af5b271a84f37dde1553e2b797dbf159c722fb4307e78186ec",
-      "csv_sha256": "f3b10bc5cfca65f35a8d5e2862b4e214ccb89553d3e4aec410017afa67c5857e"
+      "content_sha256": "de2610a58dd45ea3a3f848aedaf670848ae53f9a6fb8546aa29c6456fa83a7ab"
     },
     "synonyms.parquet": {
       "rows": 225173,
       "sha256": "d5f5f345fa934236f8e7e5b58d422e02b1211aa0c3956bfb18fe4e8ad5fed206",
-      "csv_sha256": "aeda24a98725868d5f17fa00a45b321a769043c57144a124d7fd5b06fe00cab2"
+      "content_sha256": "465c0ef322dae6557f6adb99ff8fe0abeafa4083810e35c1cccd5ec7d57f3e32"
     },
     "definitions.parquet": {
       "rows": 80204,
       "sha256": "edd6b4ecff5e9ba162169a95b42427d45e090e17c775777d9dac3cbb503b269c",
-      "csv_sha256": "5741f006cf4f0c789e6fa9de37c40aa56d5112a2f64d6a8e72abe25b113ad734"
+      "content_sha256": "18a7368f4a707bb7fce33b2a37ce17464519faa674d1e758dd996161fb9a5541"
     }
   },
   "sources": [

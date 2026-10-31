@@ -6,27 +6,27 @@
     "codes.parquet": {
       "rows": 112405,
       "sha256": "31e3c059dbafa916ac138ad298c41a1b53bfbc1084cb9c8d930f6df7109382df",
-      "csv_sha256": "40abe7b61875120d97bf4f2466f574bf49ccda4441a8f9d6d1e29f0055d0bc10"
+      "content_sha256": "e9a4515c6d8d08c154a8cf0605c365c5af00c8b88650d2fd4205ecea555981f7"
     },
     "map_to.parquet": {
       "rows": 4667,
       "sha256": "604ed010b6c8c4117dad00413c824f6cf30bb8990dc6658f1f61c0d172b902e5",
-      "csv_sha256": "9a4f72cb2d316a9665442639119f4df3bba1cd95a7355fe71c90aa705d649cd7"
+      "content_sha256": "adcdfb2bc0c8d19621e701f8af80ba896668e3080854eb8f112393c949d8db3f"
     },
     "forms.parquet": {
       "rows": 98519,
       "sha256": "d0ec5f767fd9d24b0e8cf0cecc0534e9678d93cb722e2fb4e83ee1845e57f334",
-      "csv_sha256": "a0eec5ef1592284a1126a0e4fdf3fa44effe9545335d6711d3a1dc69503481e2"
+      "content_sha256": "8a1afedcdab595fe47c5a15501ea40bffe901cf7fdac8e31bea4fd85c6c4f6ca"
     },
     "answers.parquet": {
       "rows": 34249,
       "sha256": "25d2dc328b222a3bbf97c42b01ae4cef998aafebbe89784e027d62985d3a3b0a",
-      "csv_sha256": "8e1fa2b8264f390af28534d1c142c5f1858111bf3b256eaf16f522c6f210431b"
+      "content_sha256": "35e96b96d489fc2e4e31e8f72e5baf303e88c5de5d994fc7a1fd17e6ba02a50b"
     },
     "answer_links.parquet": {
       "rows": 30063,
       "sha256": "c53d81ce440614fc09619c5df45f0bec4a2d7c1ccaa0e76841eb9d9ea4e08ab3",
-      "csv_sha256": "a5b126eae9c3560f4fb5ca955a9efdbbabe1c3f734671539708d8494f8975ddf"
+      "content_sha256": "db2da604992273d27b8545355d733397eae282f4a478ca3269eee86ae4366e03"
     }
   },
   "sources": [

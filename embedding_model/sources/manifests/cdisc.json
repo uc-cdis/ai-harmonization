@@ -6,7 +6,7 @@
     "terms.parquet": {
       "rows": 48813,
       "sha256": "0a437394764ac9759dccba1b1c3f89731f1f889d4ec892f322f0a1aa5090b657",
-      "csv_sha256": "9f95dfcbf6ea99b5cdb11ad2203bb0947527cac91206ab06eb3b070c7a585969"
+      "content_sha256": "6efeea36e7006af87d7f1b49b04ff3d36421cbf686c1c500b42004bc0aafb70a"
     }
   },
   "sources": [

@@ -349,12 +349,12 @@ class TestBuild:
         assert written["files"]["pairs.parquet"] == {
             "rows": 3,
             "sha256": file_sha256(folder / "pairs.parquet"),
-            "csv_sha256": pairs_sha256(kept),
+            "content_sha256": pairs_sha256(kept),
         }
         assert written["files"]["dropped.parquet"] == {
             "rows": 3,
             "sha256": file_sha256(folder / "dropped.parquet"),
-            "csv_sha256": pairs_sha256(dropped),
+            "content_sha256": pairs_sha256(dropped),
         }
         assert [(entry["role"], entry["name"]) for entry in written["sources"]] == [
             ("pairs", "ncit"),
@@ -536,7 +536,7 @@ class TestBuild:
         fetch.parent.mkdir(parents=True)
         fetch.write_text(json.dumps({"source": "ncit", "files": {}}))
         assert corpus.build("abcd", ["ncit"], inputs) == 0
-        files = {"abcd.parquet": {"rows": 1, "csv_sha256": "abcd"}}
+        files = {"abcd.parquet": {"rows": 1, "content_sha256": "abcd"}}
         fetch.write_text(json.dumps({"source": "ncit", "files": files}))
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "come from another fetch" in capsys.readouterr().err

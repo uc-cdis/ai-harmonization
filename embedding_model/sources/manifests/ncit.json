@@ -6,27 +6,27 @@
     "concepts.parquet": {
       "rows": 213524,
       "sha256": "f591580cca8f3576c1840d7857e21f77588520d15072472014053ad3e69a3e6e",
-      "csv_sha256": "fc1893427b8e2f23506137852739cf40f8821dd59142507a91c7177d53caf2be"
+      "content_sha256": "84b0de63caf3c0f45a6bdc030a59efc2cecec6135dfc5f84a525c61613080d44"
     },
     "synonyms.parquet": {
       "rows": 821596,
       "sha256": "5a1e8b3153c2ea595d22fd818d302c4e7c648f4da402db7106bc7b2ceacfaa7c",
-      "csv_sha256": "53697c90d7cfee6b485cd31e7b82ac2b7f35c506d540e8d2c3176bf53fbfa8b7"
+      "content_sha256": "17a10a5f1d8b6ad852e10603c3be8375e398193689875a69ab8dffb819b30d0d"
     },
     "definitions.parquet": {
       "rows": 242486,
       "sha256": "db08cb85398436411ca26b9424c71ea28b769cdad05ac7b917e675683a834c72",
-      "csv_sha256": "6f948017968cf6e839c7781edbf4fc6666402fb15db66e22fca9886c3db2d744"
+      "content_sha256": "4e08865dafba9a4d983502a65282580f3fe75a13b2ee37a6e955476b505bcf97"
     },
     "values.parquet": {
       "rows": 22869,
       "sha256": "2e5647a64e8cb12605475b7972ade906ea8743ebfe57a1af57a37ae4f4a901a0",
-      "csv_sha256": "56671cd59a0e69044c1b8e656a437fa23eb92e9ea0c3739189b63ee278082c53"
+      "content_sha256": "25b8cd35f2464e648408f6b361232f944093d4a4a42c20a943815a060b731a35"
     },
     "replacements.parquet": {
       "rows": 8462,
       "sha256": "950e738bdbe5f750ac9752cd5f7140f60a73be7942fbc2ca27f7c299c606ac8e",
-      "csv_sha256": "0c187b27a2384b344f40baba3b190e91b4bab505ba0924e4982fc1dd0b7c82b0"
+      "content_sha256": "1151a4e322665deb557edb416d295398b1aa29c0890a626070d9801635185625"
     }
   },
   "sources": [

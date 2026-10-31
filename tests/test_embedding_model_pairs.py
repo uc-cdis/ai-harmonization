@@ -1341,7 +1341,7 @@ class TestPrepare:
             "pairs.parquet": {
                 "rows": 2,
                 "sha256": file_sha256(tmp_path / "pairs" / "nhanes" / "pairs.parquet"),
-                "csv_sha256": pairs.pairs_sha256(found),
+                "content_sha256": pairs.pairs_sha256(found),
             }
         }
         assert written["counts"]["kind"] == {"name": 2}

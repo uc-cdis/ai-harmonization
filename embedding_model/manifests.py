@@ -12,13 +12,17 @@ The module also computes the checksums that a manifest records:
 
 - a file's ``sha256``, by ``file_sha256`` for a file on disk, or by ``sha256``
   for bytes in memory. Both give the same value for the same bytes;
-- a table's ``csv_sha256``, by ``table_sha256``, from the table's content.
+- a table's ``content_sha256``, by ``table_sha256``, from the table's content.
 """
 
+import csv
 import hashlib
 import json
 import subprocess
 import sys
+
+import pandas as pd
+import pyarrow as pa
 
 from embedding_model.folders import staged
 
@@ -74,6 +78,13 @@ def file_sha256(path):
     return file_digest(path, "sha256")
 
 
+# A missing value in a table's hashed CSV text, as MySQL's and PostgreSQL's
+# data files write one. It tells a missing value from an empty text.
+MISSING = "\\N"
+# The Arrow types that a schema line reads as ``string``.
+AS_STRING = {"large_string": "string", "null": "string"}
+
+
 class Digest:
     """A file-like object that adds the text written to it to a SHA-256.
 
@@ -98,16 +109,39 @@ class Digest:
         return iter(())
 
 
-def table_sha256(frame):
-    """The SHA-256 of a table's content, written as CSV without its index.
+def schema_line(frame):
+    """A table's column names and their pyarrow types, as one line of text.
 
-    A manifest records it as a table's ``csv_sha256``. The content is hashed
+    The types are those that pyarrow gives the frame's columns. ``large_string``
+    and ``null`` are read as ``string``, so the line does not depend on how
+    pandas holds a column.
+
+    Args:
+        frame (pd.DataFrame): The table.
+
+    Returns:
+        str: The line, such as ``name: string, open: bool``.
+    """
+    schema = pa.Schema.from_pandas(frame, preserve_index=False)
+    return ", ".join(
+        f"{field.name}: {AS_STRING.get(str(field.type), str(field.type))}"
+        for field in schema
+    )
+
+
+def table_sha256(frame):
+    """The SHA-256 of a table's content: its schema line, then its rows as CSV.
+
+    A manifest records it as a table's ``content_sha256``. The content is hashed
     rather than the parquet file, whose bytes depend on the library that wrote
-    it. Lines end with ``\\n`` on every system, so the
-    checksum is the same on Windows. pandas writes the CSV to the hash piece by
-    piece, through ``Digest``, so the whole text is never held in memory. pandas
-    uses the same pieces for a whole text, so the checksum is that of the whole
-    text.
+    it. The schema line keeps the types that CSV loses, so ``True`` and the
+    text ``"True"`` give different checksums. A missing value is written as
+    MISSING, so it differs from an empty text and from the text ``\\N``. The
+    separator, the quoting and the line ending are set, and lines end with
+    ``\\n`` on every system, so the checksum is the same on Windows. pandas
+    writes the CSV to the hash piece by piece, through ``Digest``, so the whole
+    text is never held in memory. pandas uses the same pieces for a whole
+    text, so the checksum is that of the whole text.
 
     Args:
         frame (pd.DataFrame): The table.
@@ -115,15 +149,34 @@ def table_sha256(frame):
     Returns:
         str: The SHA-256, as hex.
     """
+    # A backslash in a text is written twice, as PostgreSQL writes one, so the
+    # text "\N" cannot read like MISSING. Only the text columns that hold a
+    # backslash are copied, to keep a large table's memory low.
+    escaped = {
+        name: frame[name].str.replace("\\", "\\\\", regex=False)
+        for name, kind in frame.dtypes.items()
+        if pd.api.types.is_string_dtype(kind)
+        and frame[name].str.contains("\\", regex=False).any()
+    }
+    frame = frame.assign(**escaped) if escaped else frame
     digest = Digest()
-    frame.to_csv(digest, index=False, lineterminator="\n")
+    digest.write(schema_line(frame) + "\n")
+    frame.to_csv(
+        digest,
+        index=False,
+        sep=",",
+        quotechar='"',
+        quoting=csv.QUOTE_MINIMAL,
+        lineterminator="\n",
+        na_rep=MISSING,
+    )
     return digest.hash.hexdigest()
 
 
 def file_identity(file_entry):
     """What a file is compared by, from its entry in a manifest's ``files``.
 
-    A parquet table has ``csv_sha256``, the SHA-256 of its content, and is
+    A parquet table has ``content_sha256``, the SHA-256 of its content, and is
     compared by it and its rows. Its file's bytes depend on the library that
     wrote it, so the same table can have another ``sha256`` on another machine.
     Any other file is compared by its rows and its ``sha256``.
@@ -134,7 +187,7 @@ def file_identity(file_entry):
     Returns:
         dict: Its rows, and the one checksum that it is compared by.
     """
-    key = "csv_sha256" if "csv_sha256" in file_entry else "sha256"
+    key = "content_sha256" if "content_sha256" in file_entry else "sha256"
     return {"rows": file_entry.get("rows"), key: file_entry.get(key)}
 
 

@@ -1165,7 +1165,7 @@ class TestWriteAndRead:
         )
         assert manifest["counts"] == {"items": 3}
         assert manifest["files"]["items.parquet"][
-            "csv_sha256"
+            "content_sha256"
         ] == manifests.table_sha256(TABLE)
         assert manifest["files"]["items.parquet"]["sha256"] == manifests.file_sha256(
             directory / "items.parquet"
@@ -1204,8 +1204,54 @@ class TestWriteAndRead:
             ["2020-01-01"] * 110_000 + ["2020-01-03 10:00"] * 10_000, format="ISO8601"
         )
         table = pd.DataFrame({"when": when, "name": ["Abcd", "Éfgh"] * 60_000})
-        text = table.to_csv(index=False, lineterminator="\n").encode("utf-8")
-        assert manifests.table_sha256(table) == hashlib.sha256(text).hexdigest()
+        text = (
+            manifests.schema_line(table)
+            + "\n"
+            + table.to_csv(index=False, lineterminator="\n", na_rep=manifests.MISSING)
+        )
+        assert (
+            manifests.table_sha256(table)
+            == hashlib.sha256(text.encode("utf-8")).hexdigest()
+        )
+
+    def test_a_known_table_has_a_known_checksum(self):
+        """The checksum of a fixed table is pinned, so a change of its format shows."""
+        table = pd.DataFrame(
+            {
+                "label": ["Mild", "", None],
+                "position": [1, 2, 3],
+                "open": [True, False, True],
+            }
+        )
+        assert manifests.table_sha256(table) == (
+            "7d0e4cd57c449f9654fa824c5bb1e0e6dc6de714ddfbb477a30985941f3bac8b"  # pragma: allowlist secret
+        )
+
+    def test_a_type_changes_the_checksum(self):
+        """A boolean and the same value as a text give different checksums."""
+        flag = pd.DataFrame({"open": [True, False]})
+        text = pd.DataFrame({"open": ["True", "False"]})
+        assert manifests.table_sha256(flag) != manifests.table_sha256(text)
+
+    def test_a_missing_value_differs_from_an_empty_text(self):
+        """A missing value and an empty text give different checksums."""
+        missing = pd.DataFrame({"label": ["Mild", None]})
+        empty = pd.DataFrame({"label": ["Mild", ""]})
+        assert manifests.table_sha256(missing) != manifests.table_sha256(empty)
+
+    def test_the_text_of_the_missing_marker_differs_from_a_missing_value(self):
+        """A text that reads like the missing-value marker keeps its own checksum."""
+        missing = pd.DataFrame({"label": ["Mild", None]})
+        marker_text = pd.DataFrame({"label": ["Mild", "\\N"]})
+        assert manifests.table_sha256(missing) != manifests.table_sha256(marker_text)
+
+    def test_an_empty_column_has_one_checksum(self):
+        """An empty column's checksum does not depend on how pandas holds it."""
+        held_as_objects = pd.DataFrame({"label": pd.Series([], dtype=object)})
+        held_as_text = pd.DataFrame({"label": pd.Series([], dtype="string[pyarrow]")})
+        assert manifests.table_sha256(held_as_objects) == manifests.table_sha256(
+            held_as_text
+        )
 
     def test_a_changed_table_is_refused(self, tmp_path):
         """A table whose content changed since its fetch is refused."""

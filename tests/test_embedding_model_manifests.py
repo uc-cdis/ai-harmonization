@@ -66,7 +66,7 @@ class TestDifferences:
 
     def test_a_parquet_table_is_compared_by_its_content(self):
         """A table with the same rows and content matches, though its file's bytes differ."""
-        table = {"rows": 2, "sha256": "aa", "csv_sha256": "cc"}
+        table = {"rows": 2, "sha256": "aa", "content_sha256": "cc"}
         committed = {**self.MANIFEST, "files": {"abcd.parquet": table}}
         rewritten = {
             **self.MANIFEST,
@@ -75,19 +75,21 @@ class TestDifferences:
         assert manifests.differences(committed, rewritten) == []
         changed = {
             **self.MANIFEST,
-            "files": {"abcd.parquet": {**table, "csv_sha256": "dd"}},
+            "files": {"abcd.parquet": {**table, "content_sha256": "dd"}},
         }
         assert manifests.differences(committed, changed) != []
 
     def test_a_table_without_its_file_hash_matches_one_with_it(self):
-        """A committed table that records only csv_sha256 matches a build with both."""
+        """A committed table that records only content_sha256 matches a build with both."""
         committed = {
             **self.MANIFEST,
-            "files": {"abcd.parquet": {"rows": 2, "csv_sha256": "cc"}},
+            "files": {"abcd.parquet": {"rows": 2, "content_sha256": "cc"}},
         }
         built = {
             **self.MANIFEST,
-            "files": {"abcd.parquet": {"rows": 2, "sha256": "aa", "csv_sha256": "cc"}},
+            "files": {
+                "abcd.parquet": {"rows": 2, "sha256": "aa", "content_sha256": "cc"}
+            },
         }
         assert manifests.differences(committed, built) == []
 

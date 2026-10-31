@@ -6,17 +6,17 @@
     "variables.parquet": {
       "rows": 60008,
       "sha256": "55f4e11671956553c0ddc953de869ae11ae325f3df29eb1e48e7993ed5ca27bc",
-      "csv_sha256": "1371034781e70377f2dd0e47b0abe6e8eb1457b12e47b9cfc01c6c169deb76ac"
+      "content_sha256": "53cbf7ad44515c7d34862b0a88d017f5caeb553b362014f05aba8c1edb76dc1b"
     },
     "codebook.parquet": {
       "rows": 58787,
       "sha256": "dd4df0ac392e222823f952e8696935b932c1de00b527d0e8a623095aaea86cfe",
-      "csv_sha256": "b6bfe32c60a0df6d19ee01ffdd5615c4fb6d8ad4659da2743593f4f063f98395"
+      "content_sha256": "03b951a3c6017cc9bd7f6d7702e395a2d524eddac2aeac8a3075454addd6b830"
     },
     "values.parquet": {
       "rows": 200753,
       "sha256": "43fd1d63f451e922732915d22169c8596fb1ba45c3ee316a2bc735131af0173b",
-      "csv_sha256": "9f23f491f45a7d193bce8f756298855e3fbc0207c055d526632340f8e8777986"
+      "content_sha256": "647251eae63f8f4cf20917857e702391054182f8c53852b98d23cd519ba4a313"
     }
   },
   "sources": [

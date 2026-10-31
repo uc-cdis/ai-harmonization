@@ -51,7 +51,7 @@ def write_corpus(inputs, name, rows):
             "pairs.parquet": {
                 "rows": len(written),
                 "sha256": file_sha256(folder / "pairs.parquet"),
-                "csv_sha256": pairs_sha256(written),
+                "content_sha256": pairs_sha256(written),
             }
         },
     }

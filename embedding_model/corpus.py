@@ -263,12 +263,12 @@ def manifest(
             "pairs.parquet": {
                 "rows": len(kept_pairs),
                 "sha256": files_sha256["pairs.parquet"],
-                "csv_sha256": pairs_sha256(kept_pairs),
+                "content_sha256": pairs_sha256(kept_pairs),
             },
             "dropped.parquet": {
                 "rows": len(dropped),
                 "sha256": files_sha256["dropped.parquet"],
-                "csv_sha256": pairs_sha256(dropped),
+                "content_sha256": pairs_sha256(dropped),
             },
         },
         "sources": [

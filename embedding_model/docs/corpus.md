@@ -126,7 +126,7 @@ leaves the previous corpus as it was; see
 - **`manifest.json`:** the corpus's manifest, with the fields that
   [manifests.md](manifests.md#its-fields) lists:
   - `files`: `pairs.parquet` and `dropped.parquet`, each with its row count,
-    its file's `sha256` and its table's `csv_sha256`;
+    its file's `sha256` and its table's `content_sha256`;
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
   - `settings`:

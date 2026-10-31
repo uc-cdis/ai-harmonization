@@ -132,7 +132,7 @@ def manifest(name, pairs, pairs_file_sha256, counts, fetch):
             "pairs.parquet": {
                 "rows": len(pairs),
                 "sha256": pairs_file_sha256,
-                "csv_sha256": pairs_sha256(pairs),
+                "content_sha256": pairs_sha256(pairs),
             }
         },
         "sources": [
@@ -168,7 +168,7 @@ def read_pairs_file(table, manifest, field, name, columns, command):
        since its step wrote it;
     5. the pairs can be read, and have the columns given.
 
-    ``csv_sha256`` is not checked here: it compares the tables of two builds.
+    ``content_sha256`` is not checked here: it compares the tables of two builds.
 
     Args:
         table (Path): The parquet file of the pairs.

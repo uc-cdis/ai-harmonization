@@ -400,7 +400,8 @@ does not name is read as current, and `pairs prepare` prints it.
   names, and the question texts:
   - an alternate name's `name` is an anchor when its `type` holds names, in
     words or as codes. The other types hold mostly context names, ids, model
-    paths, table names or mixed text;
+    paths, table names or mixed text. A type that the reader has not seen
+    before is printed, so that someone can review it;
   - a question text is the `text` of a document whose `type` ends in
     "Question Text", such as the preferred, alternate and application
     standard ones.

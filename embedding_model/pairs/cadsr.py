@@ -4,7 +4,8 @@ The source side holds the element's short name, some of its alternate names,
 and its question texts. An alternate name is used when its type holds names,
 in words or as codes and variable names. Alternate names of other types hold
 mostly context names, ids, model paths, table names or mixed text, so they are
-not used. A question text is a reference document whose type ends in "Question
+not used. A type that the reader has not seen is printed, and its names are not
+used. A question text is a reference document whose type ends in "Question
 Text", such as the preferred and alternate question texts. caDSR writes a
 placeholder sentence when an element has no question text, and this sentence
 is not used.
@@ -153,6 +154,97 @@ NAME_TYPES = {
     "VM Alt Name",
     "XML Tag",
 }
+# The alternate-name types that hold no name for the element: contexts, ids,
+# model paths, table names and mixed text, such as the USED_BY context "ABTC"
+# or the UML Class:UML Attr "Patient:race". A type in neither list is new.
+OTHER_TYPES = {
+    "3.1 VM Name",
+    "ABBREVIATION",
+    "ACRIN Alt Name",
+    "ACRIN Question No.",
+    "ACT Table",
+    "AHRQ Identifier",
+    "AU data field name",
+    "C3DC Table",
+    "CCDI Table",
+    "CDISC SDTM Domain",
+    "CIDC Table",
+    "COG GDE #",
+    "CONTEXT NAME",
+    "CRITERION_NAME",
+    "CTDC Table",
+    "DICOM Type",
+    "DICOM_TAG",
+    "ePRO Field Name",
+    "FHIR US CORE Name",
+    "FHIR US CORE Table",
+    "GC Table",
+    "GME_XMLLocReference",
+    "GO_CODE",
+    "HCT_BRIDG",
+    "HCT_BRIDG_5",
+    "HISTORICAL_CDE_ID",
+    "IDC Table",
+    "LOINC_CODE",
+    "Manually-curated",
+    "Map:AE",
+    "Map:AIM v4 rv48",
+    "Map:BRIDGSCC",
+    "Map:BRIDGv2.2",
+    "Map:BRIDGv5.3",
+    "Map:C3PR",
+    "Map:C3PRv2.9",
+    "Map:caAERSv2.2",
+    "Map:CDASHv1.1",
+    "Map:CDISCLabv1.0.1",
+    "Map:CDMHv1.0",
+    "Map:CTOM",
+    "Map:CTRPv1.0",
+    "Map:CTRPv3.8",
+    "Map:CTRRr3",
+    "Map:CTRv1.0",
+    "Map:DICOM",
+    "Map:HCTv1.0",
+    "Map:HL7SD",
+    "Map:HL7SDr1",
+    "Map:HL7SP",
+    "Map:HSDBv1.0",
+    "Map:i2b2/ACTv1.4",
+    "Map:ICSRr2",
+    "Map:Lab",
+    "Map:LabViewer2.2",
+    "Map:LSDAMv2.2.3Plus",
+    "Map:NCI CRF Standard",
+    "Map:OMOPv5.2",
+    "Map:PCORNetv3.1",
+    "Map:PCORNetv4.0",
+    "Map:PSC",
+    "Map:PSCv2.6",
+    "Map:SDTM IGv3.1.1",
+    "Map:SDTM IGv3.1.2",
+    "Map:SDTM IGv3.1.3",
+    "Map:SDTM IGv3.2",
+    "Map:SEER 2015",
+    "Map:Sentinelv6.0.2",
+    "Map:Statistics v1.0",
+    "Map:TDM",
+    "Map:TDMv2",
+    "Measure Alt Name",
+    "MedDRA_LLT_Code",
+    "MedDRA_PT_Code",
+    "NAACCR Item #",
+    "OBIB Identifier",
+    "OMOP Table",
+    "PCORnet Table",
+    "PSDC Table",
+    "Sentinel Table",
+    "System-Generated",
+    "TW data field name",
+    "UML Class:UML Attr",
+    "UML Qualified Attr",
+    "UML Qualified Class",
+    "USED_BY",
+}
 
 
 def items(tables):
@@ -170,6 +262,7 @@ def items(tables):
     )
     texts = defaultdict(list)
     alternate = tables["alternate_names"]
+    report_new(alternate.type, NAME_TYPES | OTHER_TYPES, "type", "not used")
     for row in alternate[alternate.type.isin(NAME_TYPES)].itertuples():
         texts[row.public_id].append(Text(row.name, row.type))
     documents = tables["documents"]

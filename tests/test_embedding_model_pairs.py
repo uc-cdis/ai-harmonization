@@ -1118,6 +1118,34 @@ class TestCadsr:
             [("", ["Abcd", "B"])],
         )
 
+    def test_a_new_alternate_name_type_is_reported(self, capsys):
+        """An alternate-name type in neither list is not used, and is reported."""
+        tables = {
+            "elements": table(
+                public_id=["9999903"],
+                long_name=["Abcd Score"],
+                short_name=["ABCD_SCR"],
+                definition=["An abcd score."],
+                workflow_status=["RELEASED"],
+                datatype=["NUMBER"],
+                open=[True],
+            ),
+            "alternate_names": table(
+                public_id=["9999903"] * 3,
+                name=["abcd_score", "Abcd Context", "abcd score new"],
+                type=["GDC Alt Name", "USED_BY", "Abcd Alt Type"],
+            ),
+            "documents": table(
+                public_id=["9999903"], type=["REFERENCE"], text=["Abcd et al."]
+            ),
+            "values": table(public_id=[], position=[], value=[], meaning=[]),
+        }
+        (element,) = cadsr.items(tables)
+        assert [t.text for t in element.texts] == ["ABCD_SCR", "abcd_score"]
+        printed = capsys.readouterr().out
+        assert "'Abcd Alt Type' on 1 items; not used" in printed
+        assert "USED_BY" not in printed
+
     def test_java_types_go(self):
         """A long name loses its Java type, and a definition the phrase about it."""
         tables = {

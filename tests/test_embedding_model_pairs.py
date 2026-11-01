@@ -426,17 +426,20 @@ class TestStar:
         assert old.term_type.tolist() == ["canonical"] * 2 + ["AB"] * 2
 
     def test_a_retired_item_without_one_keeps_only_new_names(self):
-        """Without a replacement, only names that no current item has are used."""
-        current = Item(id="abcd1", canonical="Abcd", texts=[Text("AB", "AB")])
+        """Without a replacement, only names that no current item has are used.
+
+        Names are compared by their keys, so ``ab_cd`` is the current ``AB CD``.
+        """
+        current = Item(id="abcd1", canonical="Abcd", texts=[Text("AB CD", "AB")])
         retired = Item(
             id="abcd2",
             canonical="Abcd",
             description="An old abcd.",
-            texts=[Text("ab", "AB"), Text("ABC", "AB")],
+            texts=[Text("ab_cd", "AB"), Text("ABC", "AB")],
             status=RETIRED,
         )
         assert made([current, retired]) == [
-            ("name", "AB", "Abcd"),
+            ("name", "AB CD", "Abcd"),
             ("name", "ABC", "Abcd"),
             ("name_description", "ABC", "Abcd"),
         ]

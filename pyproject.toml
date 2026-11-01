@@ -88,10 +88,10 @@ embedding-model = [
     # embedding_model.sources, pairs, corpus and tokenizer (tables written and
     # read as parquet through pandas)
     "pyarrow>=14.0.0",
-    # embedding_model.normalization (BERT's text cleaning and the tokenizer's
-    # normaliser) and embedding_model.tokenizer (the BPE vocabulary, trained
-    # and saved). Below 1.0 for now: the Python bindings of its first release
-    # candidate cannot yet train or save a tokenizer.
+    # embedding_model.normalization (the text cleaning of BERT's tokenizer, and
+    # the tokenizer's normaliser) and embedding_model.tokenizer (the BPE
+    # vocabulary, trained and saved). Below 1.0 for now: the Python bindings
+    # of its first release candidate cannot yet train or save a tokenizer.
     "tokenizers>=0.23.2,<1.0.0",
     # embedding_model.scoring (the commit of a cached Hugging Face model, for
     # the scores' config). Its minimum version is the one that

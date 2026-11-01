@@ -288,9 +288,9 @@ def clean(text):
     entities such as ``&gt;``, repairs text read with the wrong encoding, such
     as ``Iâ€™m`` to ``I’m``, removes control characters and normalises Unicode
     to NFC. HTML tags are removed, and other text in angle brackets, such as
-    ``<time point>``, is kept. A replacement character becomes a space. BERT's
-    text cleaning then removes the characters that hold no text, and every run
-    of whitespace becomes one space.
+    ``<time point>``, is kept. A replacement character becomes a space. The
+    text cleaning of BERT's tokenizer then removes the characters that hold no
+    text, and every run of whitespace becomes one space.
 
     These steps repeat until the text stops changing, as ftfy repeats its own
     fixes. So a clean text cleans to itself, even when one step leaves work for

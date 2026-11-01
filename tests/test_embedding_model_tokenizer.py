@@ -75,7 +75,7 @@ class TestTokenizer:
     """The tokenizer's steps, its training texts and its diagnostics."""
 
     def test_text_is_cleaned_lowercased_stripped_of_accents_and_split(self):
-        """BERT's cleaning, NFD, lowercase and no accents, then a split at punctuation."""
+        """Text is normalised as BERT's tokenizer does, then split at punctuation."""
         untrained = tokenizer.new_tokenizer()
         assert untrained.normalizer.normalize_str("Café Größe") == "cafe große"
         assert untrained.normalizer.normalize_str("Ab\u200bcd\u202c") == "abcd"

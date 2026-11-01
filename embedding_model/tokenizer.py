@@ -6,10 +6,10 @@ which Hugging Face ``tokenizers`` reads, and ``manifest.json``.
 
 The tokenizer works in three steps:
 
-1. Text is cleaned as BERT cleans it, which removes control and format
-   characters, such as a zero-width space. It is decomposed into letters and
-   accents (NFD), lowercased, and stripped of its accents: ``Café`` becomes
-   ``cafe``.
+1. Text is cleaned as BERT's tokenizer cleans it, which removes control and
+   format characters, such as a zero-width space. It is decomposed into
+   letters and accents (NFD), lowercased, and stripped of its accents:
+   ``Café`` becomes ``cafe``.
 2. It is split at whitespace and at every punctuation character, as
    ``BertPreTokenizer`` splits it: ``SUBJECT_ID`` becomes ``subject``, ``_``
    and ``id``.

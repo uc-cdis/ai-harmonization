@@ -448,9 +448,12 @@ FORM_ROW = {
 }
 
 
-def loinc_zip():
-    """A fictional LOINC release with the five tables read, and a SNOMED column."""
-    code = dict.fromkeys(loinc.TABLES["codes"][1], "")
+def loinc_zip(extra_code_columns=None):
+    """A fictional LOINC release with the five tables read, and a SNOMED column.
+
+    Each code row also has the columns of ``extra_code_columns``, with their values.
+    """
+    code = {**dict.fromkeys(loinc.TABLES["codes"][1], ""), **(extra_code_columns or {})}
     rows = {
         "LoincTable/Loinc.csv": [
             {**code, "LOINC_NUM": "99999-1", "STATUS": "ACTIVE", "LONG_COMMON_NAME": "Abcd [Mass]"},
@@ -505,6 +508,16 @@ class TestLoinc:
             "5": False,
             "6": False,
         }
+
+    def test_a_new_column_is_reported(self, capsys):
+        """A column in neither list is printed and not read; a known column is not printed."""
+        data = loinc_zip({"ABCD_NEW": "abcd", "FORMULA": ""})
+        tables = loinc.read_release(io.BytesIO(data))
+        assert "ABCD_NEW" not in tables["codes"].columns
+        printed = capsys.readouterr().out
+        assert "new column in LoincTable/Loinc.csv: 'ABCD_NEW'; not read" in printed
+        assert "FORMULA" not in printed
+        assert "ExtCodeDisplayName" not in printed
 
     def test_without_credentials_or_zip_the_instructions_are_given(
         self, monkeypatch, tmp_path

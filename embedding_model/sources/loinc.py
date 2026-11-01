@@ -5,7 +5,8 @@ manifest records for it. The release zip needs a free loinc.org account. With
 ``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, it is downloaded through LOINC's
 API. Without them, it can be placed by hand in the downloads folder.
 
-Only named columns are read. The SNOMED CT codes and names that the answer
+Only named columns are read. A column that a newer release adds is printed, so
+that someone can review it. The SNOMED CT codes and names that the answer
 file carries in columns of their own are never read: LOINC's license does not
 cover them.
 """
@@ -90,6 +91,71 @@ TABLES = {
 }
 
 
+# The columns of each table that are not read. A column in neither list, such
+# as one that a newer release adds, is printed, so that someone can review it.
+UNREAD_COLUMNS = {
+    "codes": [
+        "VersionLastChanged",
+        "CHNG_TYPE",
+        "FORMULA",
+        "UNITSREQUIRED",
+        "HL7_FIELD_SUBFIELD_ID",
+        "EXAMPLE_UCUM_UNITS",
+        "STATUS_REASON",
+        "STATUS_TEXT",
+        "CHANGE_REASON_PUBLIC",
+        "COMMON_TEST_RANK",
+        "COMMON_ORDER_RANK",
+        "HL7_ATTACHMENT_STRUCTURE",
+        "PanelType",
+        "AskAtOrderEntry",
+        "AssociatedObservations",
+        "VersionFirstReleased",
+        "ValidHL7AttachmentRequest",
+    ],
+    "map_to": [],
+    "forms": [
+        "ParentName",
+        "LoincName",
+        "ObservationRequiredInPanel",
+        "ObservationIdInForm",
+        "SkipLogicHelpText",
+        "DefaultValue",
+        "EntryType",
+        "DataTypeInForm",
+        "DataTypeSource",
+        "AnswerSequenceOverride",
+        "ConditionForInclusion",
+        "AllowableAlternative",
+        "ObservationCategory",
+        "Context",
+        "ConsistencyChecks",
+        "RelevanceEquation",
+        "CodingInstructions",
+        "QuestionCardinality",
+        "AnswerCardinality",
+        "AnswerListIdOverride",
+        "AnswerListTypeOverride",
+    ],
+    "answers": [
+        "AnswerListOID",
+        "ExtDefinedYN",
+        "ExtDefinedAnswerListCodeSystem",
+        "ExtDefinedAnswerListLink",
+        "LocalAnswerCodeSystem",
+        "ExtCodeId",
+        "ExtCodeDisplayName",
+        "ExtCodeSystem",
+        "ExtCodeSystemVersion",
+        "ExtCodeSystemCopyrightNotice",
+        "SubsequentTextPrompt",
+        "Score",
+    ],
+    "answer_links": [
+        "LongCommonName",
+        "AnswerListName",
+    ],
+}
 # Each table's restriction fields: its notices of third-party content.
 RESTRICTION_FIELDS = {
     "codes": ["EXTERNAL_COPYRIGHT_NOTICE"],
@@ -99,6 +165,9 @@ RESTRICTION_FIELDS = {
 
 def read_release(archive):
     """The named columns of LOINC's tables, from a release zip.
+
+    A column that is in neither TABLES nor UNREAD_COLUMNS is printed, and it is
+    not read.
 
     A code, and a form's row, are open when their RESTRICTION_FIELDS are
     empty. A form's row is also closed when its code carries a notice, or when
@@ -124,6 +193,11 @@ def read_release(archive):
             member = next((n for n in bundle.namelist() if n.endswith(end)), None)
             if member is None:
                 raise KeyError(f"the LOINC zip has no {end}")
+            with bundle.open(member) as handle:
+                header = pd.read_csv(handle, nrows=0, encoding="utf-8-sig").columns
+            known = set(columns) | set(UNREAD_COLUMNS[table])
+            for name in header[~header.isin(known)]:
+                print(f"  new column in {end}: {name!r}; not read")
             with bundle.open(member) as handle:
                 frame = pd.read_csv(
                     handle,

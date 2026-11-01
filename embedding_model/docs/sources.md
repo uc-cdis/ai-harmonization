@@ -188,7 +188,9 @@ it takes the `open` of the code that uses it.
 
 Codes of every status are kept: active, trial, discouraged and deprecated.
 The answer file's SNOMED CT codes and names are not read: LOINC's license
-does not cover them.
+does not cover them. The fetch knows every column of the pinned release, read
+or not. A column that it does not know is printed, so that someone can review
+it.
 
 **Newer releases.** Regenstrief publishes a numbered LOINC release twice a
 year, and loinc.org lists them. To use a newer one, write its number as the

@@ -117,7 +117,7 @@ embedding-model = [
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "scipy", specifier = ">=1.11.2" },
-    { name = "tokenizers", specifier = ">=0.23.2" },
+    { name = "tokenizers", specifier = ">=0.23.2,<1.0.0" },
 ]
 
 [[package]]

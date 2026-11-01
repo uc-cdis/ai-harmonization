@@ -6,8 +6,8 @@ accents. It is used in three places:
 1. Preparing the training pairs, in ``pairs prepare`` and ``corpus build``.
    ``pairs.common.clean`` removes invisible characters with
    ``BERT_CLEANING``. The rule that keeps each pair once,
-   ``pairs.common.distinct_pairs``, and leakage prevention, through
-   ``pairs.common.key``, compare texts after the whole normalisation.
+   ``pairs.common.distinct_pairs``, compares texts after the whole
+   normalisation. ``pairs.common.text_key`` starts from it too.
 2. Training the tokenizer. ``tokenizer train`` counts each training text
    once after this normalisation, and BPE learns the vocabulary from the
    normalised texts.

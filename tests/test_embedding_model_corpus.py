@@ -259,19 +259,19 @@ class TestLeakage:
             target_property=["node1.sub.abcd_index", *TARGETS.target_property[1:]]
         )
         sources, expected = leakage.benchmark_texts("abcd", targets, mappings)
-        assert "abcd efgh score" in set(sources.key)
-        assert "abcd index" in set(expected.key)
+        assert "abcd efgh score" in set(sources.text_key)
+        assert "abcd index" in set(expected.text_key)
 
-    def test_keys_are_those_of_pairs(self):
-        """A key is what pairs.common.key writes: accents go, Greek letters stay."""
+    def test_text_keys_are_those_of_pairs(self):
+        """``text_keys`` writes pairs.common.text_key: accents go, Greek letters stay."""
         texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", None])
-        assert leakage.keys(texts).tolist() == [
-            common.key("Abcd_Efgh (ijkl)!"),
-            common.key("α-tocopherol"),
-            common.key("Größe"),
+        assert leakage.text_keys(texts).tolist() == [
+            common.text_key("Abcd_Efgh (ijkl)!"),
+            common.text_key("α-tocopherol"),
+            common.text_key("Größe"),
             "",
         ]
-        assert leakage.keys(texts).tolist()[1] == "α tocopherol"
+        assert leakage.text_keys(texts).tolist()[1] == "α tocopherol"
 
 
 def write_pairs(inputs, source, rows):
@@ -562,7 +562,7 @@ class TestBuild:
                 "positive_name": ["Abcd", "Abcd", "Efgh", "Ijkl", "Ijkl"],
             }
         )
-        assert corpus.group_keys(pairs).tolist() == [
+        assert corpus.group_ids(pairs).tolist() == [
             "ncit:C0",
             "ncit:C0",
             "cadsr:C0",
@@ -578,7 +578,7 @@ class TestBuild:
         ]
 
     def test_items_with_one_canonical_text_share_a_group(self):
-        """Items linked by a canonical text, directly or through a code, take the first key."""
+        """Items linked by a canonical text, or through a code, take the first ``item_id``."""
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "obo", "cdisc", "cde", "cadsr", "nhanes"],
@@ -595,13 +595,13 @@ class TestBuild:
                 ],
             }
         )
-        assert corpus.group_keys(pairs).tolist() == ["cde:abcd1"] * 4 + [
+        assert corpus.group_ids(pairs).tolist() == ["cde:abcd1"] * 4 + [
             "cadsr:abcd2",
             "cadsr:abcd2",
         ]
 
     def test_canonicals_that_differ_in_punctuation_share_a_group(self):
-        """Canonicals are linked by their keys, and an empty key links nothing."""
+        """Canonicals are linked by their ``text_key``, and an empty one links nothing."""
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "obo", "cde", "cadsr"],
@@ -611,7 +611,7 @@ class TestBuild:
                 "positive_name": ["Abcd, Efgh", "abcd-efgh", "?", "?"],
             }
         )
-        assert corpus.group_keys(pairs).tolist() == [
+        assert corpus.group_ids(pairs).tolist() == [
             "ncit:C1",
             "ncit:C1",
             "cde:abcd1",

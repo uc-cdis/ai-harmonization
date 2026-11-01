@@ -63,7 +63,7 @@ COLUMNS = [
 ]
 # Two letters in a row, in any script: what makes a text a name, not an id.
 LETTERS = re.compile(r"[^\W\d_]{2}")
-# What key() turns into a space: punctuation, underscores and whitespace.
+# What text_key() turns into a space: punctuation, underscores and whitespace.
 NOT_ALPHANUMERIC = re.compile(r"[\W_]+")
 # A word, or one letter.
 WORD = re.compile(r"[A-Za-z][a-z]*")
@@ -354,12 +354,12 @@ def undeprecated(name):
     return DEPRECATED.sub("", name)
 
 
-def key(text):
-    """A text's key for comparing texts.
+def text_key(text):
+    """The key that texts are compared by, broader than the tokenizer's rule.
 
     The text is normalised as the tokenizer normalises it, then case-folded,
-    with punctuation as spaces. So ``Größe`` and ``GROSSE`` have one key, and
-    ``Abcdé_Efgh`` and ``abcde efgh`` too.
+    with punctuation as spaces. So ``Größe`` and ``GROSSE`` have one
+    ``text_key``, and ``Abcdé_Efgh`` and ``abcde efgh`` too.
     """
     folded = TOKENIZER_NORMALIZER.normalize_str(text).casefold()
     return NOT_ALPHANUMERIC.sub(" ", folded).strip()
@@ -631,13 +631,14 @@ def item_pairs(
         list[tuple]: The pairs, as rows in COLUMNS' order.
     """
     names = distinct(names, target.canonical)
-    description_key, canonical_key = key(target.description), key(target.canonical)
+    description_key = text_key(target.description)
+    canonical_key = text_key(target.canonical)
     skipped = {"", description_key, canonical_key}
     others = {}
     for text in descriptions:
-        text_key = key(text)
-        if text_key not in skipped and is_name(text):
-            others.setdefault(text_key, text)
+        other_key = text_key(text)
+        if other_key not in skipped and is_name(text):
+            others.setdefault(other_key, text)
     anchors = {}
     rows = []
     for list_name, values in target.lists or [("", [])]:
@@ -787,8 +788,8 @@ def star(items, source):
     live = set()
     for item in items:
         if item.status != RETIRED:
-            live.add(key(item.canonical))
-            live.update(key(text.text) for text in item.texts)
+            live.add(text_key(item.canonical))
+            live.update(text_key(text.text) for text in item.texts)
     rows = []
     for item in items:
         if not item.open:
@@ -812,14 +813,14 @@ def star(items, source):
         elif item.canonical:
             names = item.texts
             if item.status == RETIRED:
-                names = [text for text in names if key(text.text) not in live]
+                names = [text for text in names if text_key(text.text) not in live]
             rows += item_pairs(
                 item,
                 names,
                 item.status,
                 anchor_type,
                 item.descriptions,
-                item.status != RETIRED or key(item.canonical) not in live,
+                item.status != RETIRED or text_key(item.canonical) not in live,
                 source=source,
             )
     pairs = pd.DataFrame(rows, columns=COLUMNS)

@@ -14,13 +14,13 @@ differs. The fields compared are:
   without its node.
 
 The benchmark texts are cleaned first with ``pairs.common.clean``, the
-cleaning that ``pairs prepare`` gives every text. Two texts match when their
-keys are equal, as ``pairs.common.key`` writes them: normalised as the
-tokenizer normalises them, case-folded, with punctuation as spaces. A side
-text also matches any benchmark text, a name or a description, when the two
-keys share at least MIN_OVERLAP_WORDS words in a row. A pair can hold a
-description in a name field, such as a ``name_to_description`` pair's
-positive, so every side text is compared, whatever its field.
+cleaning that ``pairs prepare`` gives every text. Two texts match when they
+have the same ``text_key``, as ``pairs.common.text_key`` writes it: normalised
+as the tokenizer normalises them, case-folded, with punctuation as spaces. A
+side text also matches any benchmark text, a name or a description, when
+their ``text_key`` values share at least MIN_OVERLAP_WORDS words in a row. A
+pair can hold a description in a name field, such as a ``name_to_description``
+pair's positive, so every side text is compared, whatever its field.
 
 A name also matches by its words, with a description on the other side. When
 one side of a pair matches a benchmark row's description, the other side also
@@ -64,7 +64,7 @@ from collections import defaultdict
 import pandas as pd
 
 from embedding_model.benchmarks import TARGET_SEPARATOR
-from embedding_model.pairs.common import STUDY_SEPARATOR, clean, key
+from embedding_model.pairs.common import STUDY_SEPARATOR, clean, text_key
 
 # A side text overlaps a benchmark text when the two share at least this many
 # words in a row. GPT-3's authors check for their test data in their training
@@ -100,10 +100,10 @@ COLUMNS = [
 ]
 
 
-def keys(texts, cleaned=True):
-    """The key of each text, as ``pairs.common.key`` writes it.
+def text_keys(texts, cleaned=True):
+    """The ``text_key`` of each text, as ``pairs.common.text_key`` writes it.
 
-    Each distinct text is keyed once.
+    Each distinct text goes through ``text_key`` once.
 
     Args:
         texts (pd.Series): Texts.
@@ -111,16 +111,16 @@ def keys(texts, cleaned=True):
             texts are not, so they go through ``pairs.common.clean`` first.
 
     Returns:
-        pd.Series: The keys.
+        pd.Series: The ``text_key`` of each text.
     """
     texts = texts.fillna("")
     unique = texts.unique()
     prepared = unique if cleaned else [clean(text) for text in unique]
-    return texts.map(dict(zip(unique, map(key, prepared))))
+    return texts.map(dict(zip(unique, map(text_key, prepared))))
 
 
 def benchmark_texts(name, targets, mappings):
-    """A benchmark's source and expected-target texts, as keys.
+    """A benchmark's source and expected-target texts, with their ``text_key``.
 
     Args:
         name (str): The benchmark, such as ``topmed``.
@@ -129,7 +129,7 @@ def benchmark_texts(name, targets, mappings):
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame]: The source texts, one row per text:
-            ``benchmark``, ``row``, ``variable``, ``field`` and ``key``. The
+            ``benchmark``, ``row``, ``variable``, ``field`` and ``text_key``. The
             expected targets' texts, one row per text: the same, and
             ``target``.
     """
@@ -141,7 +141,7 @@ def benchmark_texts(name, targets, mappings):
                     "row": rows.index,
                     "variable": rows.source_variable_name,
                     "field": f"source {field}",
-                    "key": keys(rows[column], cleaned=False),
+                    "text_key": text_keys(rows[column], cleaned=False),
                 }
             )
             for field, column in (
@@ -156,7 +156,7 @@ def benchmark_texts(name, targets, mappings):
                 {
                     "target": targets.target_property,
                     "field": "target name",
-                    "key": keys(
+                    "text_key": text_keys(
                         targets.target_property.str.rpartition(".")[2], cleaned=False
                     ),
                 }
@@ -165,7 +165,7 @@ def benchmark_texts(name, targets, mappings):
                 {
                     "target": targets.target_property,
                     "field": "target description",
-                    "key": keys(targets.target_description, cleaned=False),
+                    "text_key": text_keys(targets.target_description, cleaned=False),
                 }
             ),
         ]
@@ -178,13 +178,15 @@ def benchmark_texts(name, targets, mappings):
     )
     target_texts = expected.merge(every_target, on="target")
     return (
-        source_texts[source_texts.key != ""].assign(benchmark=name),
-        target_texts[target_texts.key != ""].assign(benchmark=name),
+        source_texts[source_texts.text_key != ""].assign(benchmark=name),
+        target_texts[target_texts.text_key != ""].assign(benchmark=name),
     )
 
 
-def side_keys(pairs):
-    """Each pair's side names and descriptions, as keys, one row per text.
+def side_text_keys(pairs):
+    """Each pair's side names and descriptions, with their ``text_key``.
+
+    Each text is one row.
 
     Args:
         pairs (pd.DataFrame): The pairs, with ``anchor_name`` and the other
@@ -192,7 +194,7 @@ def side_keys(pairs):
 
     Returns:
         pd.DataFrame: ``pair`` (the pair's index), ``side``, ``side_field``
-            and ``key``, without empty keys.
+            and ``text_key``, without an empty ``text_key``.
     """
     side_texts = pd.concat(
         [
@@ -201,14 +203,14 @@ def side_keys(pairs):
                     "pair": pairs.index,
                     "side": side,
                     "side_field": field,
-                    "key": keys(pairs[f"{side}_{field}"]),
+                    "text_key": text_keys(pairs[f"{side}_{field}"]),
                 }
             )
             for side in SIDES
             for field in FIELDS
         ]
     )
-    return side_texts[side_texts.key != ""]
+    return side_texts[side_texts.text_key != ""]
 
 
 def runs(words, length):
@@ -219,17 +221,17 @@ def runs(words, length):
 def overlaps(texts, references, length):
     """The texts and references that share ``length`` words in a row.
 
-    The words are whole words, as ``str.split`` cuts a key. Each reference is
+    The words are whole words, as ``str.split`` cuts a ``text_key``. Each reference is
     indexed by its runs of ``length`` words, and each text looks up its own.
 
     Args:
-        texts (Iterable[str]): Keys, as ``keys`` writes them.
-        references (Iterable[str]): Keys to compare them with.
+        texts (Iterable[str]): ``text_key`` values, from ``text_keys``.
+        references (Iterable[str]): ``text_key`` values to compare them with.
         length (int): The words in a run, such as MIN_OVERLAP_WORDS.
 
     Returns:
         set[tuple[str, str]]: (text, reference), for each text and reference
-            that share a run and are not already equal keys.
+            that share a run and are not already equal.
     """
     index = defaultdict(set)
     for reference in set(references):
@@ -254,14 +256,14 @@ def word_matches(texts, names, min_words):
     the texts that hold its rarest word, then keeps those that hold the rest.
 
     Args:
-        texts (Iterable[str]): Keys, as ``keys`` writes them.
-        names (Iterable[str]): Benchmark names' keys.
+        texts (Iterable[str]): ``text_key`` values, from ``text_keys``.
+        names (Iterable[str]): Benchmark names' ``text_key`` values.
         min_words (int): The minimum number of words of a name that can
             match, such as MIN_NAME_WORDS.
 
     Returns:
         set[tuple[str, str]]: (text, name), for each text that holds the
-            name's words and is not already the name's equal key.
+            name's words and is not already equal to the name.
     """
     holding = defaultdict(set)
     for text in set(texts):
@@ -282,12 +284,12 @@ def word_matches(texts, names, min_words):
 def matches(sides, texts):
     """Every match of a side text with a benchmark text, in each of the three ways.
 
-    The three ways are an equal key (``=``), at least MIN_OVERLAP_WORDS words
+    The three ways are an equal ``text_key`` (``=``), at least MIN_OVERLAP_WORDS words
     in a row (``~``), and a name's words (``>=``), for names of MIN_NAME_WORDS
     words or more.
 
     Args:
-        sides (pd.DataFrame): From ``side_keys``.
+        sides (pd.DataFrame): From ``side_text_keys``.
         texts (pd.DataFrame): Benchmark texts, from ``benchmark_texts``: the
             source texts and the target texts together.
 
@@ -298,21 +300,27 @@ def matches(sides, texts):
     names = texts[texts.field.str.endswith("name")]
 
     def joined(matched_keys, candidates, how):
-        """The side texts and benchmark texts of (side key, benchmark key) tuples."""
-        matched = pd.DataFrame(sorted(matched_keys), columns=["key", "reference"])
+        """The side and benchmark texts of (side, benchmark) ``text_key`` tuples."""
+        matched = pd.DataFrame(sorted(matched_keys), columns=["text_key", "reference"])
         return (
-            sides.merge(matched, on="key")
-            .drop(columns="key")
-            .merge(candidates.rename(columns={"key": "reference"}), on="reference")
+            sides.merge(matched, on="text_key")
+            .drop(columns="text_key")
+            .merge(candidates.rename(columns={"text_key": "reference"}), on="reference")
             .drop(columns="reference")
             .assign(how=how)
         )
 
     return pd.concat(
         [
-            sides.merge(texts, on="key").assign(how="="),
-            joined(overlaps(sides.key, texts.key, MIN_OVERLAP_WORDS), texts, "~"),
-            joined(word_matches(sides.key, names.key, MIN_NAME_WORDS), names, ">="),
+            sides.merge(texts, on="text_key").assign(how="="),
+            joined(
+                overlaps(sides.text_key, texts.text_key, MIN_OVERLAP_WORDS), texts, "~"
+            ),
+            joined(
+                word_matches(sides.text_key, names.text_key, MIN_NAME_WORDS),
+                names,
+                ">=",
+            ),
         ],
         ignore_index=True,
     )
@@ -322,7 +330,7 @@ def answer_keys(sides, source_texts, target_texts):
     """The pairs with a benchmark source on one side and its target on the other.
 
     Args:
-        sides (pd.DataFrame): The pairs' side texts, from ``side_keys``.
+        sides (pd.DataFrame): The pairs' side texts, from ``side_text_keys``.
         source_texts (pd.DataFrame): Every benchmark's source texts.
         target_texts (pd.DataFrame): Every benchmark's expected-target texts.
 
@@ -436,7 +444,7 @@ def shared_vocabulary(kept_sides, source_texts, target_texts):
 
     Args:
         kept_sides (pd.DataFrame): The side texts of the pairs that leakage
-            prevention keeps, from ``side_keys``.
+            prevention keeps, from ``side_text_keys``.
         source_texts (pd.DataFrame): Every benchmark's source texts.
         target_texts (pd.DataFrame): Every benchmark's expected-target texts.
 
@@ -445,19 +453,19 @@ def shared_vocabulary(kept_sides, source_texts, target_texts):
             ``rows_with_shared_target``, and ``most_common``, the shared
             texts that the most benchmark rows hold, each with that count.
     """
-    held = set(kept_sides.key)
+    held = set(kept_sides.text_key)
     vocabulary = {}
     for benchmark in source_texts.benchmark.unique():
         shared_sources = source_texts[
-            (source_texts.benchmark == benchmark) & source_texts.key.isin(held)
+            (source_texts.benchmark == benchmark) & source_texts.text_key.isin(held)
         ]
         shared_targets = target_texts[
-            (target_texts.benchmark == benchmark) & target_texts.key.isin(held)
+            (target_texts.benchmark == benchmark) & target_texts.text_key.isin(held)
         ]
         shared_texts = pd.concat([shared_sources, shared_targets]).drop_duplicates(
-            ["row", "key"]
+            ["row", "text_key"]
         )
-        common = shared_texts.key.value_counts().head(SHARED_SHOWN)
+        common = shared_texts.text_key.value_counts().head(SHARED_SHOWN)
         vocabulary[benchmark] = {
             "rows_with_shared_source": int(shared_sources.row.nunique()),
             "rows_with_shared_target": int(shared_targets.row.nunique()),
@@ -496,7 +504,7 @@ def audit(pairs, benchmarks):
         ]
     )
     studies = studies[studies.study_id != ""].drop_duplicates()
-    sides = side_keys(pairs)
+    sides = side_text_keys(pairs)
     answer_key_findings = answer_keys(sides, source_texts, target_texts)
     findings = pd.concat(
         [

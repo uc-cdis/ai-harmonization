@@ -177,11 +177,11 @@ class TestClean:
         assert common.clean(None) == ""
         assert common.clean(float("nan")) == ""
 
-    def test_a_key_is_the_text_as_the_tokenizer_normalises_it(self):
-        """Case, accents and punctuation do not change a key; other letters stay."""
-        assert common.key("Ábcd_Éfgh (IJKL)") == "abcd efgh ijkl"
-        assert common.key("Größe") == common.key("GROSSE") == "grosse"
-        assert common.key("α-Abcd") == "α abcd"
+    def test_a_text_key_is_the_text_as_the_tokenizer_normalises_it(self):
+        """Case, accents and punctuation do not change a ``text_key``; other letters stay."""
+        assert common.text_key("Ábcd_Éfgh (IJKL)") == "abcd efgh ijkl"
+        assert common.text_key("Größe") == common.text_key("GROSSE") == "grosse"
+        assert common.text_key("α-Abcd") == "α abcd"
 
 
 class TestNamesAndTypes:
@@ -270,7 +270,7 @@ class TestNamesAndTypes:
         assert common.type_word("", ["a"]) == "string/encoded"
         assert common.type_word("", []) == "string"
 
-    def test_texts_of_one_key_keep_every_study(self):
+    def test_spellings_of_one_name_keep_every_study(self):
         """Spellings of one text are one anchor, with the studies of all of them."""
         item = Item(
             id="abcd1",
@@ -428,7 +428,7 @@ class TestStar:
     def test_a_retired_item_without_one_keeps_only_new_names(self):
         """Without a replacement, only names that no current item has are used.
 
-        Names are compared by their keys, so ``ab_cd`` is the current ``AB CD``.
+        Names are compared by their ``text_key``, so ``ab_cd`` is the current ``AB CD``.
         """
         current = Item(id="abcd1", canonical="Abcd", texts=[Text("AB CD", "AB")])
         retired = Item(

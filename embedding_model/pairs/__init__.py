@@ -99,11 +99,11 @@ def ambiguous_texts(pairs):
         pairs (pd.DataFrame): A source's pairs.
 
     Returns:
-        int: The number of such texts, compared by ``common.key``.
+        int: The number of such texts, compared by ``common.text_key``.
     """
     names = pairs[pairs.kind == common.NAME]
-    targets = names.positive_name.map(common.key).groupby(
-        names.anchor_name.map(common.key)
+    targets = names.positive_name.map(common.text_key).groupby(
+        names.anchor_name.map(common.text_key)
     )
     return int((targets.nunique() > 1).sum())
 

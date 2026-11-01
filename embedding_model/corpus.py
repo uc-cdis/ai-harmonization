@@ -11,7 +11,7 @@ named, and writes one corpus under ``<inputs>/corpora/<name>/``:
    ``<inputs>/benchmarks/`` (see ``embedding_model.leakage``).
 3. The kept pairs are split into training and validation pairs. All pairs of
    one group go to the same side: items that share an NCIt concept code or a
-   canonical text, as ``group_keys`` links them. A hash of the group decides,
+   canonical text, as ``group_ids`` links them. A hash of the group decides,
    so the same sources and benchmarks always give the same split.
 
 The corpus holds ``pairs.parquet``, the kept pairs with their ``split``,
@@ -118,8 +118,8 @@ def combine(frames):
     return distinct.reset_index(drop=True), combined.source.drop(index=distinct.index)
 
 
-def item_keys(pairs):
-    """The item of each pair: its source and item, or the NCIt concept code."""
+def item_ids(pairs):
+    """The ``item_id`` of each pair: its source and item, or the NCIt concept code."""
     ncit_codes = pairs.source.isin(CONCEPT_CODES)
     return ("ncit:" + pairs["item"]).where(
         ncit_codes, pairs.source + ":" + pairs["item"]
@@ -134,27 +134,27 @@ def canonical_texts(pairs):
     )
 
 
-def group_keys(pairs):
-    """The group of each pair, as the key of the group's first item.
+def group_ids(pairs):
+    """The ``group_id`` of each pair: the ``item_id`` of its group's first item.
 
-    Two items are in one group when they share an item key, as an NCIt
-    concept and its CDISC terms do, or a canonical text's key, as
-    ``pairs.common.key`` writes it. So two canonicals that differ only in
-    case or punctuation link their items. An empty key links nothing. The
-    links carry over, so the groups are the
-    connected components of a graph: each pair links its item to its
-    canonical text. A group's key is the first of its items' keys in sorted
-    order, so the same pairs always give the same keys.
+    Two items are in one group when they share an ``item_id``, as an NCIt
+    concept and its CDISC terms do, or a canonical text's ``text_key``, as
+    ``pairs.common.text_key`` writes it. So two canonicals that differ only in
+    case or punctuation link their items. An empty ``text_key`` links nothing.
+    The links carry over, so the groups are the connected components of a
+    graph: each pair links its item to its canonical text. A group's
+    ``group_id`` is the first ``item_id`` of its items in sorted order, so the
+    same pairs always give the same ``group_id``.
 
     Args:
         pairs (pd.DataFrame): The pairs, with ``source``, ``item``, ``kind``,
             ``anchor_name`` and ``positive_name``.
 
     Returns:
-        pd.Series: The group key of each pair.
+        pd.Series: The ``group_id`` of each pair.
     """
-    items = item_keys(pairs)
-    canonical_keys = leakage.keys(canonical_texts(pairs))
+    items = item_ids(pairs)
+    canonical_keys = leakage.text_keys(canonical_texts(pairs))
     texts = ("text:" + canonical_keys).where(canonical_keys != "", items)
     nodes = pd.Index(np.concatenate([items, texts])).unique()
     item_nodes, text_nodes = nodes.get_indexer(items), nodes.get_indexer(texts)
@@ -168,9 +168,14 @@ def group_keys(pairs):
     )
 
 
-def bucket(key):
-    """A stable hash bucket of a text. Python's own hash() differs per process."""
-    return int(hashlib.blake2b(key.encode(), digest_size=8).hexdigest(), 16) % BUCKETS
+def bucket(group_id):
+    """A stable hash bucket of a ``group_id``.
+
+    Python's own hash() differs per process.
+    """
+    return (
+        int(hashlib.blake2b(group_id.encode(), digest_size=8).hexdigest(), 16) % BUCKETS
+    )
 
 
 def validation_buckets(validation_share):
@@ -204,7 +209,7 @@ def splits(pairs, validation_share=VALIDATION_SHARE):
     adds others.
 
     Args:
-        pairs (pd.DataFrame): The pairs, with the columns that ``group_keys``
+        pairs (pd.DataFrame): The pairs, with the columns that ``group_ids``
             reads.
         validation_share (float): The share of groups held out for
             validation, a multiple of 1 / BUCKETS.
@@ -212,7 +217,7 @@ def splits(pairs, validation_share=VALIDATION_SHARE):
     Returns:
         pd.Series: TRAIN or VALIDATION, per pair.
     """
-    groups = group_keys(pairs)
+    groups = group_ids(pairs)
     cut = validation_buckets(validation_share)
     held_out = {group for group in groups.unique() if bucket(group) < cut}
     return groups.isin(held_out).map({True: VALIDATION, False: TRAIN})

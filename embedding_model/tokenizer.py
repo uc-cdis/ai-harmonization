@@ -251,18 +251,9 @@ def read_tokenizer(inputs, name):
         f"python -m embedding_model tokenizer train --name {name} --corpus <corpus>"
     )
     path = folder / "tokenizer.json"
-    if not path.exists():
-        raise FileNotFoundError(f"{path} was not written; run: {command}")
-    record = manifests.read(folder / "manifest.json", command, "tokenizer", name)
-    try:
-        checksum = record["files"]["tokenizer.json"]["sha256"]
-    except Exception as error:
-        raise ValueError(
-            f"{folder / 'manifest.json'} records no SHA-256 for tokenizer.json"
-            f" ({type(error).__name__}: {error}); run: {command}"
-        ) from error
-    if file_sha256(path) != checksum:
-        raise ValueError(f"{path} differs from its manifest; run: {command}")
+    manifest_path = folder / "manifest.json"
+    record = manifests.read(manifest_path, command, "tokenizer", name)
+    manifests.check_file(path, record, manifest_path, command)
     try:
         trained = Tokenizer.from_file(str(path))
     except Exception as error:

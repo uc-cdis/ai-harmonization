@@ -363,6 +363,37 @@ def read(path, command, field, name):
     return manifest
 
 
+def check_file(path, manifest, manifest_path, command):
+    """Check that a file exists, and has the SHA-256 that its manifest records.
+
+    The manifest records each file under its name, in ``files``. So a file
+    that differs from it has changed since its step wrote it.
+
+    Args:
+        path (Path): The file.
+        manifest (dict): The manifest, from ``read``.
+        manifest_path (Path): Where the manifest is, for the messages.
+        command (str): The command that writes the file again, for the
+            messages.
+
+    Raises:
+        FileNotFoundError: If the file is missing.
+        ValueError: If the manifest records no SHA-256 for the file, or the
+            file differs from it.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"{path} is missing; run: {command}")
+    try:
+        checksum = manifest["files"][path.name]["sha256"]
+    except Exception as error:
+        raise ValueError(
+            f"{manifest_path} records no SHA-256 for {path.name}"
+            f" ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    if file_sha256(path) != checksum:
+        raise ValueError(f"{path} differs from its manifest; run: {command}")
+
+
 def warn_if_not_committed(label, version, committed_path, command):
     """Print a warning when a build's version is not the committed version.
 

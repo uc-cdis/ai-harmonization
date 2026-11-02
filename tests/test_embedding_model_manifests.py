@@ -154,6 +154,50 @@ class TestRead:
             self.read(path)
 
 
+class TestCheckFile:
+    """A file checked against the SHA-256 that its manifest records."""
+
+    COMMAND = "python -m embedding_model abcd build"
+
+    @pytest.fixture
+    def written(self, tmp_path):
+        """A file and a manifest that records its SHA-256."""
+        path = tmp_path / "abcd-table.parquet"
+        path.write_bytes(b"abcd")
+        manifest = {"files": {path.name: {"sha256": manifests.file_sha256(path)}}}
+        return path, manifest
+
+    def check(self, path, manifest):
+        """Check the file, with a manifest beside it."""
+        manifests.check_file(
+            path, manifest, path.parent / "manifest.json", self.COMMAND
+        )
+
+    def test_a_file_that_matches_passes(self, written):
+        """A file unchanged since its manifest was written passes."""
+        self.check(*written)
+
+    def test_a_missing_file_names_the_command(self, written):
+        """A missing file is named, with the command that writes it again."""
+        path, manifest = written
+        path.unlink()
+        with pytest.raises(FileNotFoundError, match=f"is missing; run: {self.COMMAND}"):
+            self.check(path, manifest)
+
+    def test_a_changed_file_is_refused(self, written):
+        """A file that differs from its manifest's SHA-256 is refused."""
+        path, manifest = written
+        path.write_bytes(b"efgh")
+        with pytest.raises(ValueError, match="differs from its manifest"):
+            self.check(path, manifest)
+
+    def test_a_file_that_the_manifest_does_not_record_is_refused(self, written):
+        """A manifest without the file's SHA-256 names the file."""
+        path, _ = written
+        with pytest.raises(ValueError, match="records no SHA-256 for abcd-table"):
+            self.check(path, {"files": {}})
+
+
 class TestDecide:
     """Whether a build may replace the working one, against its committed manifest."""
 

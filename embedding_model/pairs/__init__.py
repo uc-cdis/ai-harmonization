@@ -164,12 +164,12 @@ def read_pairs_file(table, manifest, field, name, columns, command):
     manifest that names it and records its checksums. Five things are checked,
     in this order:
 
-    1. the pairs and the manifest exist;
-    2. the manifest can be read;
-    3. the manifest names the build asked for;
-    4. the file's ``sha256`` matches the manifest, so the file is unchanged
-       since its step wrote it;
-    5. the pairs can be read, and have the columns given.
+    1. the manifest exists and can be read;
+    2. the manifest names the build asked for;
+    3. the pairs exist, and their ``sha256`` matches the manifest, so the
+       file is unchanged since its step wrote it;
+    4. the pairs can be read;
+    5. the pairs have the columns given.
 
     ``content_sha256`` is not checked here: it compares the tables of two builds.
 
@@ -192,18 +192,8 @@ def read_pairs_file(table, manifest, field, name, columns, command):
             names another build, or the pairs lack a column or differ from the
             manifest.
     """
-    if not table.exists():
-        raise FileNotFoundError(f"{table} was not written; run: {command}")
     record = manifests.read(manifest, command, field, name)
-    try:
-        checksum = record["files"][table.name]["sha256"]
-    except Exception as error:
-        raise ValueError(
-            f"{manifest} records no SHA-256 for {table.name}"
-            f" ({type(error).__name__}: {error}); run: {command}"
-        ) from error
-    if file_sha256(table) != checksum:
-        raise ValueError(f"{table} differs from its manifest; run: {command}")
+    manifests.check_file(table, record, manifest, command)
     try:
         pairs = pd.read_parquet(table)
     except Exception as error:

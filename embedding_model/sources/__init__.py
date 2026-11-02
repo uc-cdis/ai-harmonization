@@ -102,7 +102,7 @@ def read_source(inputs, name):
     manifest = manifests.read(manifest_path, command, "source", name)
     try:
         version = manifest["version"]
-        checksums = {file: entry["sha256"] for file, entry in manifest["files"].items()}
+        files = list(manifest["files"])
     except Exception as error:
         raise ValueError(
             f"{manifest_path} does not record the fetch's version and tables"
@@ -112,12 +112,9 @@ def read_source(inputs, name):
         f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
     )
     tables = {}
-    for file, checksum in checksums.items():
+    for file in files:
         path = directory / file
-        if not path.exists():
-            raise FileNotFoundError(f"{path} is missing; run: {command}")
-        if file_sha256(path) != checksum:
-            raise ValueError(f"{path} differs from its manifest; run: {command}")
+        manifests.check_file(path, manifest, manifest_path, command)
         try:
             frame = pd.read_parquet(path)
         except Exception as error:

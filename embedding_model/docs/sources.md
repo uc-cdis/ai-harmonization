@@ -23,7 +23,8 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 | [PhenX](#phenx) | standard study measures' variables, and their mappings to dbGaP variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
 The manifest records the SHA-256 of every file read, and a new fetch is
-compared with it.
+compared with it. [design_decisions.md](design_decisions.md#sources) gives the
+reasons for the fetch's rules.
 
 ## What a fetch writes
 
@@ -104,8 +105,7 @@ retired concept was merged into: its replacement, in `replacement_code`. A
 retire record names the concept's old parent instead, as EVS's
 [ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt) says, so it gives no replacement.
 
-Reading NCIt takes a few minutes, and about 4 GB of memory for release
-26.09d.
+Reading NCIt takes a few minutes and several gigabytes of memory.
 
 **Newer releases.** EVS publishes a new NCIt release each month. EVS's
 `NCI_Thesaurus/archive/` folder lists every release, such as `26.09d_Release`.
@@ -206,14 +206,18 @@ records the new release's MD5.
 CDISC's controlled terminology is read as NCI EVS publishes it, in four
 packages:
 
-- SDTM, for the data that a clinical trial collects;
-- ADaM, for the data that its analysis uses;
-- Protocol, for trial protocols;
-- the Glossary of clinical research terms.
+- [SDTM](https://www.cdisc.org/standards/foundational/sdtm), the Study Data
+  Tabulation Model, for the data that a clinical trial collects;
+- [ADaM](https://www.cdisc.org/standards/foundational/adam), the Analysis Data
+  Model, for the data that its analysis uses;
+- [Protocol](https://www.cdisc.org/standards/foundational/protocol), for trial
+  protocols;
+- the [Glossary](https://www.cdisc.org/standards/glossary) of clinical
+  research terms.
 
 Each package is read from EVS's archive at a pinned release date, such as
-`CDISC/SDTM/Archive/SDTM Terminology 2026-09-25.txt`. CDISC retired the
-Protocol package in March 2026, so its last release is older than the others.
+`CDISC/SDTM/Archive/SDTM Terminology 2026-09-25.txt`. CDISC has retired the
+Protocol package, so its last release is older than the others.
 
 | table | one row per | columns |
 |---|---|---|

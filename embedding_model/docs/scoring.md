@@ -3,6 +3,8 @@
 `python -m embedding_model score` measures how well a model ranks each source
 variable's expected targets on a benchmark. The [benchmarks](benchmarks.md) are
 built first; see [The workflow](../README.md#the-workflow).
+[design_decisions.md](design_decisions.md#scoring) gives the reasons for the
+choices below.
 
 ## How a model is scored
 
@@ -26,11 +28,11 @@ From those ranks:
   among the first k. It is what someone reviewing the top k suggestions sees.
 - **median rank**: where the expected target typically lands.
 
-sentence-transformers' `InformationRetrievalEvaluator` ranks the targets and
-computes MRR and accuracy@k. It embeds both sides as the harmonization
-approaches' `encode()` does: a model's `query` and `document` prompts are not
-added. A model with a Router module is an exception: the evaluator routes its
-two sides apart.
+The `InformationRetrievalEvaluator` of
+[sentence-transformers](https://sbert.net), which Hugging Face maintains, ranks
+the targets and computes MRR and accuracy@k. It embeds both sides with the
+model's default prompt only: a model's `query` and `document` prompts are not
+added.
 
 Every source variable's rank is kept, in `per_variable.csv`.
 
@@ -41,9 +43,9 @@ python -m embedding_model score --model uc-ctds/bge-large-en-v1.5-bio-mapping --
 ```
 
 `--model` is a Hugging Face model id or a model folder on disk. `--format` is
-the shape that the source and target texts are written in. This pipeline's
-models are trained in the default shape. Models are compared in that one shape,
-so two scores differ only by the model. A released model can also be scored in
+the shape that the source and target texts are written in. Models are
+compared in the default shape, the one that this pipeline's models are trained
+in. A released model can also be scored in
 the shape of its own training samples: `name_description` for
 `uc-ctds/bge-large-en-v1.5-bio-mapping`, and `stdelement` for
 `uc-ctds/StdElement-Mapper`. `uc-ctds/StdElement-Mapper` is private: scoring
@@ -81,17 +83,14 @@ In every format but `stdelement`, a target's text includes its node, as in
 `vitals.body_weight (float): Body weight in kilograms`. `stdelement` leaves the
 node out, as StdElement-Mapper's training pairs do. So a property that several
 nodes carry alike has the same text in each. Each copy of a wrong target then
-takes a rank of its own. Identical texts tie, up to float noise between
-encoding batches. sentence-transformers 6 breaks a tie by target key. Earlier
-releases break it in no fixed order.
+takes a rank of its own. Identical texts tie. sentence-transformers 6
+breaks a tie by target key. Earlier releases break it in no fixed order.
 
-A source variable's text leaves the node out, in every format. Its node would
-be its dbGaP table, such as `pht999999.v1`, or the paper that it comes from,
-and neither says what the variable means. So the text starts at the variable's
-name: `body_weight (float): Body weight in kilograms`. The harmonization
-approaches do write a source's node, as in
-`pht999999.v1.body_weight (float): ...`. A score measures the variable
-without it.
+A source variable's text leaves its node out, in every format. Its node would
+be its dbGaP table, such as `pht999999.v1`, or the paper that it comes from.
+The text starts at the variable's name: `body_weight (float): Body weight in
+kilograms`. The harmonization approaches do write a source's node, as in
+`pht999999.v1.body_weight (float): ...`.
 
 Every format that shows values keeps the first 12. The two released models'
 shapes follow the training samples on their model cards.

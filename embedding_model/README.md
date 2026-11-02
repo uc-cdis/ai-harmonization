@@ -13,6 +13,14 @@ The model is a static embedding table trained from scratch. It is small enough
 to encode thousands of texts a second on a CPU. Everything here runs from the
 command line, from a checkout of this repository.
 
+The model is built, trained and scored with
+[sentence-transformers](https://sbert.net), the library for embedding models
+that UKP Lab created and Hugging Face maintains. Its trainer builds on the
+`Trainer` of Hugging Face's `transformers`. So a trained model is a
+sentence-transformers model, and it loads wherever one does.
+[docs/design_decisions.md](docs/design_decisions.md#the-model-is-built-trained-and-scored-with-sentence-transformers)
+says why.
+
 ## How it fits with the rest of the repository
 
 - A model trains and is scored on texts such as a study variable or a
@@ -21,8 +29,9 @@ command line, from a checkout of this repository.
   `ai_harmonization.formatters`, which the harmonization approaches use, with
   one change: a description appears only when there is one. So a model is
   trained and evaluated on texts laid out almost as it will see them in use.
-  See [docs/scoring.md](docs/scoring.md#running-score) for the differences,
-  and for why a source's node is left out. Training and benchmark texts share
+  See [docs/scoring.md](docs/scoring.md#running-score) for the differences.
+  [docs/design_decisions.md](docs/design_decisions.md#scoring) says why a
+  source's node is left out. Training and benchmark texts share
   their layout. The corpus build drops the pairs that would teach a benchmark's
   mappings, such as a benchmark variable paired with its expected target. A
   word that both share on its own, such as `age`, is kept: it is not leakage.
@@ -75,10 +84,10 @@ own:
 - `independent_run_example.yaml`: the configuration for one training run;
 - `small_series_example.yaml`: a small series of experiments.
 
-Both use one benchmark, [TOPMed](docs/benchmarks.md#topmed), and one training
-source, [NHANES](docs/sources.md#nhanes). NHANES gives about 29,000 pairs of
-variable names, descriptions and values from CDC's public codebooks. The
-examples use a small vocabulary and a short run, so they finish in minutes.
+Both use one benchmark, the [TOPMed benchmark](docs/benchmarks.md#topmed), and
+one training source, [NHANES](docs/sources.md#nhanes). NHANES gives pairs of variable
+names, descriptions and values from CDC's public codebooks. The examples use
+a small vocabulary and a short run, so they finish in minutes.
 They are small examples to see every step work. A model meant for use should
 be trained on more sources.
 
@@ -88,7 +97,7 @@ be trained on more sources.
 python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
-python -m embedding_model corpus build --name example --source nhanes  # checked against the benchmarks built: here TOPMed
+python -m embedding_model corpus build --name example --source nhanes  # checked against the benchmarks built: here the TOPMed benchmark
 python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 python -m embedding_model train --config embedding_model/examples/independent_run_example.yaml --seed 0
 python -m embedding_model score --run independent_run_example_s0 --benchmark topmed
@@ -177,8 +186,8 @@ rerun on its own.
 
 | | step | what it does | writes |
 |---|---|---|---|
-| benchmarks | `benchmarks build --topmed` | builds [TOPMed](docs/benchmarks.md#topmed), the benchmark that models are developed on | `inputs/benchmarks/` |
-| | `benchmarks build --gdc` | builds [GDC](docs/benchmarks.md#gdc), held back: scored once per series' pick (the series' winner) | `inputs/benchmarks/` |
+| benchmarks | `benchmarks build --topmed` | builds the [TOPMed benchmark](docs/benchmarks.md#topmed) | `inputs/benchmarks/` |
+| | `benchmarks build --gdc` | builds the [GDC benchmark](docs/benchmarks.md#gdc) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/<source>/` |
@@ -221,14 +230,10 @@ explains:
 There are two benchmarks:
 
 - **[TOPMed](docs/benchmarks.md#topmed)**: dbGaP study variables mapped by experts
-  to the harmonized variables of the TOPMed Data Coordinating Center. As built
-  here, it has 1,162 source variables and 148 targets. Models are developed on
-  it.
+  to the harmonized variables of the TOPMed Data Coordinating Center.
 - **[GDC](docs/benchmarks.md#gdc)**: the GDC-SM ground truth, published with the
-  Magneto paper: variables from ten cancer papers, mapped by experts to the
-  GDC data dictionary. As built here, it has 165 source variables and 1,217
-  targets. It is held back, and scored once on a series' pick (the series'
-  winner).
+  Magneto paper: variables from cancer papers, mapped by experts to the GDC
+  data dictionary.
 
 [docs/benchmarks.md](docs/benchmarks.md) describes what each one is built from,
 and how to build it or make a new version.
@@ -250,12 +255,22 @@ scores. Both folders are gitignored.
 That is useful for a full corpus's token cache, which can run to tens of
 gigabytes.
 
+The large tables, such as a corpus's pairs, are parquet files. The benchmarks
+and the scores are CSV files. To look at a parquet file, read it with pandas.
+Or open it in VS Code with an extension such as
+[Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) or Microsoft's
+[Data Wrangler](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.datawrangler).
+[docs/design_decisions.md](docs/design_decisions.md#large-tables-are-kept-as-parquet)
+says why the tables are parquet.
+
 A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer and a
 model's scores are each written whole. For example, `corpus build --name abcd`
 first writes the new corpus into a hidden staging folder,
 `corpora/.abcd.x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
 complete does it replace `corpora/abcd/`. So a run that fails leaves the
 previous corpus as it was.
+[docs/design_decisions.md](docs/design_decisions.md#each-output-folder-is-written-whole)
+says why the steps write their outputs this way.
 
 A run that is stopped, by its user or by a time limit, cannot delete its
 staging folder. The next run of `corpus build --name abcd` then prints a

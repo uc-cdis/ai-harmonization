@@ -1,0 +1,2014 @@
+# Design decisions
+
+The documentation file of each step, listed in
+[The workflow](../README.md#the-workflow), says what the step does. This file
+says why. Each entry links to the documentation that describes the
+behaviour, and has these parts:
+
+- **Context:** the facts and forces that the decision answers, without
+  judgement, in a few sentences;
+- **Decision:** what was chosen, in a few sentences. The linked documentation
+  says how it works;
+- **Consequences:** what follows, each one good or bad, with the evidence for
+  the choice;
+- **Confidence:** only where it is low, with what would settle it;
+- **Alternatives considered:** each option, with the facts about it and why
+  it was not chosen;
+- **Confirmation:** the tests that check the decision.
+
+The entries follow the shape of an architecture decision record
+([Nygard, 2011](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)),
+with the alternatives and the confirmation of the
+[MADR 4.0 template](https://github.com/adr/madr/tree/4.0.0/template)
+([Kopp et al., 2018](https://ceur-ws.org/Vol-2072/paper9.pdf)). A decision can
+change. Its entry is then rewritten, and the earlier choice joins its
+alternatives, with the reason it was replaced. Git's history keeps the
+earlier text.
+
+- [All steps](#all-steps)
+- [Benchmarks](#benchmarks)
+- [Scoring](#scoring)
+- [Sources](#sources)
+- [Pairs](#pairs)
+- [Corpus](#corpus)
+- [Tokenizer](#tokenizer)
+- [References](#references)
+
+## All steps
+
+### The model is built, trained and scored with sentence-transformers
+
+**Described in:** [README.md](../README.md#embedding-model).
+
+**Context.** ai-harmonization's embedding approach loads a model with
+sentence-transformers (`ai_harmonization/harmonization_approaches/embeddings.py`).
+It embeds texts with the model's `encode`. The model here is a static
+embedding table, trained from pairs of texts. Training needs a loop, a loss,
+batches, checkpoints and a saved format. Scoring needs ranks and metrics.
+
+**Decision.** sentence-transformers is used wherever it does the job:
+
+- the model is a sentence-transformers model, with the library's static
+  embedding table, its `StaticEmbedding` module;
+- the pairs take its column names, `anchor` and `positive`;
+- training will use its `SentenceTransformerTrainer`, losses and batch
+  samplers;
+- scoring loads the model with it, and ranks with its
+  `InformationRetrievalEvaluator`.
+
+**Consequences.**
+
+- Good, because the code here holds only what the library does not do: the
+  training data, the tokenizer, leakage prevention and the experiments.
+- Good, because a trained model loads wherever a sentence-transformers model
+  does, such as in the embedding approach or from the Hugging Face Hub. Using
+  it needs no new code.
+- Good, because the library is well established. It is the library of
+  Sentence-BERT
+  ([Reimers & Gurevych, 2019](https://doi.org/10.18653/v1/d19-1410)). UKP Lab
+  created it, and Hugging Face maintains it ([SBERT.net](https://sbert.net)).
+  Hugging Face publishes a recipe that trains a static model with it
+  ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)).
+- Good, because `SentenceTransformerTrainer` builds on the `Trainer` of Hugging
+  Face's [`transformers`](https://huggingface.co/docs/transformers). That
+  Trainer handles checkpoints, logging, seeds and devices, so none of this is
+  our own code.
+- Good, because the library maintains and tests its losses, samplers and
+  evaluator, and its documentation cites their sources.
+- Bad, because the library's defaults decide much of what happens. Each
+  default that matters is checked and recorded, as in
+  [A model is scored as the approaches use it](#a-model-is-scored-as-the-approaches-use-it).
+- Bad, because a new major version can change behaviour or move modules.
+  Version 6 moves `sentence_transformers.models` to
+  `sentence_transformers.sentence_transformer.modules`, for one. `uv.lock`
+  pins the version, and each score records it.
+
+**Alternatives considered.**
+
+- Plain PyTorch: a static model's forward pass is short, so it could be
+  written by hand. But the training loop, the loss, batches without
+  duplicates, checkpoints and the saved format would all be our code to
+  write, test and defend. And the embedding approach could not load the
+  model without a converter.
+- A training loop of our own around sentence-transformers' modules: it
+  would replace the `transformers` Trainer with our code, for no known gain.
+
+### Committed manifests pin the inputs
+
+**Described in:**
+[manifests.md](manifests.md#the-committed-manifest-and-the-builds-own),
+[manifests.md](manifests.md#making-a-new-version) and
+[sources.md](sources.md#what-a-fetch-writes).
+
+**Context.** The repository holds no data from the benchmarks or the sources.
+Much of that data is third-party text under its own license, as
+[licenses.md](licenses.md) says. So each machine builds the benchmarks and the
+sources itself, perhaps months later. Some sources, and GDC's dictionary for
+the [GDC benchmark](benchmarks.md#gdc), serve only their current state. That
+state can change without notice.
+
+**Decision.** Each benchmark and source has a committed manifest.
+It pins each input by its version or its SHA-256, and records each file
+built, with its checksum. A build that differs is refused, and the previous
+build's files are kept. An intended change becomes a
+[new version](manifests.md#making-a-new-version) of the benchmark or the
+source. Downloads are kept for later builds.
+
+**Consequences.**
+
+- Good, because two builds with the same checksums hold the same data. A
+  manifest works like a lock file, such as `uv.lock`. The code says how to
+  build, and the manifest says from which inputs, with which checksums.
+- Good, because the data never changes silently. A source that changed shows
+  as a build that differs.
+- Good, because a committed version never changes, as a released package
+  version never does.
+- Good, because a kept download is read again without the network. So a
+  change to a reader can be tested on the same files.
+- Good, because some inputs serve only their current state, such as
+  [NHANES](sources.md#nhanes)'s pages and GDC's dictionary. Their kept files
+  are the only copy of the state that the manifest pins.
+- Bad, because a newer state of such an input is read only after someone
+  moves its kept copy aside. The docs say to move it, not to delete it, so
+  the copy that a committed version pins is not lost.
+- Bad, because a build that differs needs git. When git cannot say which
+  version is committed, a build that differs is refused. It cannot tell
+  whether a raised version is new or already committed. A build that matches
+  needs no git.
+- Bad, because a new release of a source can be built only after its new
+  version is made.
+
+**Alternatives considered.**
+
+- Committing the built files: they hold the third-party text that the
+  repository does not redistribute.
+- Pins in the code: a new release would need a code change, and the files
+  built would have nowhere to record their checksums.
+- A committed manifest for pairs, corpora and tokenizers: the code makes them
+  from inputs that have one. Their own manifests record those inputs.
+- Writing a differing build, with a warning, when git cannot say which
+  version is committed: the build could change a committed version without
+  anyone noticing.
+- Downloading on every build: a source that serves only its current state
+  could change between two builds. And every build would wait on the network.
+
+**Confirmation.** The tests in
+[test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py)
+check that:
+
+- a build that differs is refused without `--update-manifest`;
+- with `--update-manifest`, a build under an uncommitted version records its
+  checksums;
+- a build that differs is refused when git cannot say which version is
+  committed;
+- a matching build needs no git.
+
+### Licenses are SPDX license expressions
+
+**Described in:** [manifests.md](manifests.md#its-fields) and
+[licenses.md](licenses.md).
+
+**Context.** Each input has a license, and some have terms of their own. A
+manifest records each input's license, for tools and for people. One license
+can be spelled in several ways, and license pages move.
+
+**Decision.** Each input's `license` is an
+[SPDX license expression](https://spdx.github.io/spdx-spec/v2.3.1/SPDX-license-expressions/).
+SPDX is the System Package Data Exchange. A license on SPDX's
+[License List](https://spdx.org/licenses/) has its short id, such as
+`CC-BY-4.0`. Other terms have a `LicenseRef-` id, such as
+`LicenseRef-Abcd-Terms`. An input that states no license is `NONE`.
+[licenses.md](licenses.md) gives each id's terms and links.
+
+**Consequences.**
+
+- Good, because SPDX is the standard way to name a license so that tools can
+  read it. It is the ISO/IEC 5962:2021 standard, and Python's package
+  metadata uses it too ([PEP 639](https://peps.python.org/pep-0639/)).
+- Good, because a manifest records only the id, not the address of the
+  terms. Each address is written once, in licenses.md. So when a license page
+  moves, one link in licenses.md changes, and no manifest does.
+- Good, because `NONE` is SPDX's own value for no license. It is not a
+  license expression, but SPDX's license fields allow it beside one.
+- Bad, because terms without an SPDX id get a `LicenseRef-` id of our own,
+  which only licenses.md explains.
+
+**Alternatives considered.**
+
+- A license's name or address in each manifest: one license is spelled in
+  several ways. And a moved address would need a fix in every manifest.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- a stated license becomes its SPDX expression;
+- an unknown license stops the fetch.
+
+### Each output folder is written whole
+
+**Described in:** [Inputs and outputs](../README.md#inputs-and-outputs).
+
+**Context.** A step writes many files into one output folder, such as
+`corpora/abcd/` for a corpus. A run can fail halfway through, or be stopped
+by its user or by a time limit. A later step reads the folder as a whole. A
+folder cannot be renamed over a folder that holds files, and a rename can
+fail across two file systems.
+
+**Decision.** `folders.staged` gives each step a new folder in a hidden
+staging folder beside the destination, such as `corpora/.abcd.x1y2/abcd/` for
+`corpora/abcd/`. The step writes its whole output there. Then
+`folders.replace` swaps it in with two renames: the previous folder into the
+staging folder, then the new folder into its place. If the second rename
+fails, the previous folder is moved back.
+
+**Consequences.**
+
+- Good, because a later step never reads half an output. Each rename is
+  atomic, for a folder as for a file. `folders.replace` renames with
+  `Path.rename`, which calls `os.rename`. Its
+  [documentation](https://docs.python.org/3/library/os.html#os.rename) says:
+  "If successful, the renaming will be an atomic operation (this is a POSIX
+  requirement)." So the destination holds the
+  whole previous output or the whole new one.
+- Good, because a run that fails leaves the previous output as it was.
+- Bad, because the swap as a whole is not atomic. Between its two renames, no
+  folder is at the destination, for a moment. The steps run one after
+  another, so no step reads a folder in that moment.
+- Bad, because the staging folder must sit on the destination's file
+  system. So it cannot be in a temporary folder such as `/tmp`.
+- Bad, because a run that is stopped leaves its staging folder behind. The
+  next run warns about it and says what to do: delete it, or move the
+  previous output back from it. Someone has to do that by hand.
+
+**Alternatives considered.**
+
+- Writing the files in place: a failed run leaves a mix of old and new files.
+- Deleting the previous folder first: if the new folder then cannot move in,
+  neither folder is left.
+- `shutil.move`: across file systems, it copies the folder and then deletes
+  the original. A run that fails during the copy leaves half a folder.
+- `os.replace` in place of `Path.rename`: the two work the same here. On
+  Linux and macOS, both make the same system call. On Windows, they differ
+  when something already has the new name: `os.replace` replaces it, and
+  `os.rename` raises an error. In the swap, nothing has the new name, so
+  this case never comes up.
+- Linux's `renameat2` with `RENAME_EXCHANGE`, which swaps two folders in one
+  call: Python's `os` module does not offer it. It works only on Linux, and
+  only on file systems that support it. A package that calls it would be one
+  more dependency.
+- A symbolic link to the current version's folder: each build writes a new
+  version beside the link. One `os.replace` then points the link to the new
+  version, and the earlier version is deleted. So the output is never
+  missing, even for a moment. But every output becomes a link, and common
+  tools treat a link differently from a folder. On Linux, `cp -r
+  corpora/abcd` and `tar` copy only the link, so the copy points to a folder
+  that is not there. `rm -r corpora/abcd` deletes only the link, and leaves
+  the data. The gain is small: it closes only the moment between the two
+  renames, when no step reads the folder.
+
+**Confirmation.** The tests in
+[test_embedding_model_folders.py](../../tests/test_embedding_model_folders.py)
+check that:
+
+- a finished run replaces the previous folder;
+- a run that raises keeps the previous folder;
+- a failed move puts the previous folder back;
+- a previous folder that cannot be put back is kept, and the warning names it;
+- a staging folder that a stopped run left is warned about;
+- the warning says whether to delete that folder or to move the previous
+  folder back;
+- the staging folder of a longer name, such as `abcd.v2`, is not warned about.
+
+### Large tables are kept as parquet
+
+**Described in:** [sources.md](sources.md#what-a-fetch-writes),
+[pairs.md](pairs.md#what-a-pair-holds) and
+[corpus.md](corpus.md#what-a-corpus-holds).
+
+**Context.** The source, pairs and corpus tables are large tables of text. Some
+of their columns hold lists, or true and false. Many of their texts are real
+labels that look like missing values, such as `None` in the list
+`Mild | Moderate | Severe | None`, or `N/A`. Training will read the corpus with
+Hugging Face's [`datasets`](https://huggingface.co/docs/datasets). The
+benchmark and score tables are small, and people open them to check them.
+
+**Decision.** The source, pairs and corpus tables are written as parquet, by
+pandas with [pyarrow](https://arrow.apache.org/docs/python/). The benchmark and
+score tables are written as CSV, which opens in a text editor or a spreadsheet.
+A benchmark table is read with every cell as a text, so an empty cell stays an
+empty text.
+
+**Consequences.**
+
+- Good, because each column keeps its type. A list stays a list, true or
+  false stays a boolean, and the text `None` stays a text. Parquet stores a
+  list with the encoding of Dremel
+  ([Melnik et al., 2010](https://doi.org/10.14778/1920841.1920886)), as its
+  [format](https://github.com/apache/parquet-format) says.
+- Good, because parquet stores a table by column, and compresses each
+  column. pandas compresses with snappy by default. So a large table takes
+  less space than as CSV, and it is read without parsing text.
+- Good, because `datasets` reads parquet directly, with `Dataset.from_parquet`.
+  [sentence-transformers](https://sbert.net)' trainer takes a
+  `datasets.Dataset`.
+- Good, because parquet is a common standard. In data analytics, Parquet and
+  [ORC](https://orc.apache.org/) are the most widely adopted open-source
+  columnar formats
+  ([Zeng et al., 2023](https://doi.org/10.14778/3626292.3626298)). Hugging
+  Face's dataset viewer converts every dataset on the Hub to parquet
+  ([Hugging Face](https://huggingface.co/docs/dataset-viewer/parquet)).
+- Bad, because a parquet file's bytes depend on the library that wrote it.
+  So a table has a second checksum, as
+  [Two checksums, for two questions](#two-checksums-for-two-questions) says.
+- Bad, because a text editor or a spreadsheet cannot open a parquet file.
+  pandas, `datasets` and viewers read it, such as the VS Code extensions
+  [Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer)
+  and Microsoft's
+  [Data Wrangler](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.datawrangler).
+  Both run on Linux, macOS and Windows.
+
+**Alternatives considered.**
+
+- CSV for every table: a list would need a text format of its own. By
+  default, pandas reads an empty cell, and texts such as `NA`, `NULL` and
+  `None`, as missing values
+  ([`pandas.read_csv`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)).
+  So every read would need `keep_default_na=False`. And a large table would
+  take more space.
+- [JSON Lines](https://jsonlines.org/): it keeps lists, booleans and texts. But
+  it is not compressed, and every read parses each row as text.
+- ORC, the other widely adopted columnar format: pandas writes it, but
+  `datasets` has no reader for it.
+- Reading a benchmark table with pandas' defaults: each empty cell would
+  become `NaN`. So would a cell that holds only a text such as `None` or
+  `N/A`, such as a value list with that one label. A column whose cells are
+  all empty would also get a number type, `float64`. A missing description
+  would then be formatted as `nan`.
+
+**Confirmation.** The tests check that:
+
+- texts that look missing, such as `None` and `N/A`, an empty text, and true
+  or false read back as written
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+- a pair's values read back from the corpus as the list written
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+
+### Two checksums, for two questions
+
+**Described in:** [manifests.md](manifests.md#two-checksums).
+
+**Context.** Two builds are compared across machines, and a step checks each
+file that it reads. The bytes of a [parquet](#large-tables-are-kept-as-parquet)
+file depend on the libraries that wrote it. The file stores each column's
+[Arrow](https://arrow.apache.org/docs/python/api/datatypes.html) type, such as
+`string`, `bool` or `int64`. CSV text loses these types: it writes `True` and
+the text `"True"` alike, and a missing value like an empty text. Hashing a
+large table's content takes far longer than hashing the file's bytes.
+
+**Decision.** A manifest records each file's `sha256`, the SHA-256 of its
+bytes. A parquet table also gets `content_sha256`: the SHA-256 of a line
+with the column names and Arrow types, then the rows as CSV. No CSV file is
+written. Builds compare parquet tables by `content_sha256`, and other
+files by `sha256`. A step that reads a file checks its `sha256`.
+
+**Consequences.**
+
+- Good, because the same table has one `content_sha256` on every machine,
+  whichever versions of [pyarrow](https://arrow.apache.org/docs/python/) and
+  pandas wrote it. It came out the same under pandas 2.2 with pyarrow 17 as
+  under pandas 3.0 with pyarrow 25, for every table.
+- Good, because a change of type changes the checksum: `True` and the text
+  `"True"` differ. A missing value differs from any text, the empty text
+  included.
+- Good, because a step checks the file that it reads quickly, by its
+  `sha256`. The bytes settle the step's question: is this the file that the
+  earlier step wrote?
+- Good, because comparing two builds is fast. It compares their recorded
+  `content_sha256` for a parquet table, and their `sha256` for any other file.
+  No table is read again.
+- Bad, because a new build hashes each parquet table twice when it writes it:
+  its file's bytes for `sha256`, and its content for `content_sha256`. The
+  second hash takes longer. For a large table, such as a corpus's pairs, it
+  adds time to the build.
+- Bad, because the checksum relies on pandas' CSV writer and on pyarrow's
+  type names. pandas could change how it writes a value, or hold a type in
+  another unit, such as a timestamp in microseconds. Every checksum would then
+  change, though the data would not. The build would be refused, so nothing
+  would pass unnoticed. No table holds a timestamp.
+
+**Alternatives considered.**
+
+- `sha256` alone: a build would differ only because other versions of pyarrow
+  or pandas wrote it. The file's metadata names them, such as
+  `parquet-cpp-arrow version 25.0.1` and pandas' version. And the bytes can
+  differ even when the same versions write the same data again.
+- `content_sha256` alone: every read of a large table would be slow.
+- The rows as CSV, without the schema line or the missing-value marker: a
+  column that turned from booleans into text would keep its checksum.
+- The schema line with pyarrow's type names as given: an empty column is
+  `null` under pandas 2 and `large_string` under pandas 3. So the checksum
+  would change with pandas' version.
+- The missing-value marker without the backslashes written twice: a cell that
+  holds exactly the text `\N` would read like a missing value.
+- `pandas.util.hash_pandas_object`: it cannot hash list columns, and its hash
+  is pandas' internal algorithm, with no text to compare when two builds
+  differ.
+- Python's own `csv` module, writing the rows: it relies on no library, but
+  writing millions of rows through Python is slower than pandas' writer.
+- Comparing two tables row by row, as with pandas: both tables must then be
+  on one machine. A checksum fits in a manifest.
+
+**Confirmation.** The tests check that:
+
+- a parquet table is compared by its content
+  ([test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py));
+- a table's checksum does not depend on the system
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+- a change of type, or a missing value in place of an empty text, changes the
+  checksum, and an empty column has one checksum
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+- a fixed table keeps its pinned checksum
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+- a corpus's files are checked when the corpus is read back
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+
+## Benchmarks
+
+### A benchmark is two files: mappings and targets
+
+**Described in:**
+[benchmarks.md](benchmarks.md#how-a-benchmark-is-laid-out).
+
+**Context.** Harmonizing a real study means searching a whole data model. A
+source variable has a few expected targets among many properties. In the TOPMed
+benchmark, nearly every target is some variable's expected target. In the GDC
+benchmark, only a small share of the targets are.
+
+**Decision.** A benchmark is two files:
+
+- `<benchmark>_mappings.csv`, one row per source variable, with its expected
+  targets;
+- `<benchmark>_targets.csv`, every target property.
+
+Each source variable is ranked against every target in the targets file.
+
+**Consequences.**
+
+- Good, because a score measures a search of the whole data model, as
+  harmonizing a real study needs.
+- Good, because the layout has the three parts of standard retrieval
+  benchmarks, such as BEIR
+  ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and MTEB
+  ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)):
+  - a corpus to search: here, the targets file;
+  - queries: here, the source variables;
+  - the corpus entries that each query should find: here,
+    `expected_target`.
+- Good, because the targets are written once per benchmark, not once per
+  mapping. Mappings can be added without touching the targets file.
+- Bad, because the two files must agree: each expected target must be a
+  property of the targets file. The build checks this, and refuses a
+  benchmark whose files disagree.
+
+**Alternatives considered.**
+
+- The mappings file alone, with the candidates taken from the expected
+  targets: the GDC benchmark would shrink to a choice among its few expected
+  targets. Its scores would then overstate how a model does.
+- BEIR's layout, with the queries apart from the entries that they should
+  find: here, one row holds a source variable and all its expected targets.
+  Each row is then the experts' mapping, whole.
+
+**Confirmation.** The tests in
+[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
+check that:
+
+- an expected target missing from the targets is refused;
+- a target listed twice is refused.
+
+### In the GDC benchmark, a variable maps to its property in every node that carries it
+
+**Described in:**
+[benchmarks.md](benchmarks.md#which-targets-a-variable-maps-to).
+
+**Context.** The [GDC benchmark](benchmarks.md#gdc) starts from the mappings of
+GDC-SM, the GDC Schema Matching Benchmark
+([Santos et al., 2025](https://doi.org/10.5281/zenodo.14963588)). Its ground
+truth names a property without its node, such as `race`. The targets are
+`node.property`, as the harmonization approaches build them. Several nodes of
+the GDC data dictionary can carry a property of the same name, such as
+`clinical.race` and `demographic.race`. Three nodes give the name another
+meaning: `project.primary_site`, `project.disease_type` and `portion.weight`.
+
+**Decision.** Each node whose property of that name means the same thing
+gives an expected target. The three properties of another meaning are not
+expected targets. So one mapping of GDC-SM can give several expected
+targets, one from each of these nodes.
+
+**Consequences.**
+
+- Good, because the experts named a property, not a node. A model that ranks
+  `clinical.race` or `demographic.race` first has found what they meant, and
+  either counts.
+- Good, because each variable counts once in a score, however many expected
+  targets it has.
+- Bad, because a variable with several expected targets has more chances:
+  only its best-placed one counts.
+- Bad, because the three properties of another meaning were found by hand.
+  The code leaves them out by a fixed list, `NOT_EXPECTED` in
+  `benchmarks/gdc.py`. A new dictionary may need the list reviewed.
+
+**Alternatives considered.**
+
+- GDC-SM's ground truth as it is, with bare property names as targets, such
+  as `race`: the approaches rank `node.property` targets, so the benchmark
+  would not score them as they are used. And `project.primary_site`, which
+  describes a project, would merge with `case.primary_site`, a patient's.
+- One node per property: a target of the same meaning in another node would
+  count as wrong.
+
+**Confirmation.** The tests in
+[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
+check that:
+
+- a property that two nodes carry is expected in both;
+- a node that gives the property another meaning is left out.
+
+### The GDC benchmark's targets come from the live dictionary
+
+**Described in:** [benchmarks.md](benchmarks.md#the-targets).
+
+**Context.** The GDC API serves only the current
+[dictionary](https://api.gdc.cancer.gov/v0/submission/_dictionary/_all), and it
+does not name its release of
+[gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). gdcdictionary is the
+GitHub project of GDC's data dictionary. It is a Python package that holds the
+schemas, which refer to each other by `$ref`, and a loader that resolves them.
+The GDC benchmark will change: its next version also changes the source texts.
+
+**Decision.** The GDC benchmark's build reads the dictionary that the GDC API
+serves. The first build saves it, with the API's
+[status](https://api.gdc.cancer.gov/status), in `downloads/gdc/dictionary/`,
+and later builds read that copy. The manifest records the status's data
+release and the SHA-256 of the dictionary's content. A build on a changed
+dictionary is refused until a new version is made.
+
+**Consequences.**
+
+- Good, because the manifest's checksum catches every change of the
+  dictionary, as it does for every input that
+  [Committed manifests pin the inputs](#committed-manifests-pin-the-inputs)
+  covers.
+- Good, because the status and the dictionary are fetched and kept
+  together. So the kept status names the kept dictionary's release.
+- Good, because the API serves the dictionary with its `$ref`s resolved, so
+  the build needs no loader of gdcdictionary's own.
+- Bad, because a machine without the kept copy can rebuild a version only
+  until GDC publishes a new dictionary. After that, it gets the new release,
+  which needs a new version of the benchmark, as
+  [Making a new version](manifests.md#making-a-new-version) says.
+- Bad, because [GDC-SM](https://doi.org/10.5281/zenodo.14963588)'s names and
+  the dictionary's can drift apart. For example, the variables that GDC-SM maps
+  to `gender` have `clinical.gender` as their only expected target. The
+  dictionary also has `demographic.sex_at_birth`, which then counts as wrong
+  for them.
+
+**Alternatives considered.**
+
+- A pinned release of gdcdictionary from its GitHub repository, read with its
+  own loader: any machine could then rebuild any version of the benchmark.
+  But ai-harmonization would depend on a package installed from git.
+- The `gdcdictionary` package on PyPI: it is not GDC's current dictionary.
+  It is an old release, not updated since, that calls itself a "Gen3 generic
+  data dictionary".
+- Reading the dictionary from the API on every build: each build would need
+  the network. A version could not be built again once GDC publishes a new
+  dictionary, even on the machine that built it. A kept copy avoids both, as
+  for the other inputs that serve only their current state.
+
+**Confirmation.** The tests in
+[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
+check that:
+
+- a second build reads the kept dictionary and status, with no network;
+- both are fetched again when one of them is missing;
+- a status that does not name its release is refused, and nothing is kept.
+
+## Scoring
+
+### A model is scored as the approaches use it
+
+**Described in:** [scoring.md](scoring.md#how-a-model-is-scored) and
+[scoring.md](scoring.md#the-metrics).
+
+**Context.** The harmonization approaches embed both sides with
+`model.encode()`, and rank by cosine similarity
+(`ai_harmonization/utils.py`). By default,
+[sentence-transformers](https://sbert.net)' `InformationRetrievalEvaluator`
+adds a model's `query` and `document` prompts instead. It also ranks by the
+similarity function that the model's config names, such as `dot`.
+
+**Decision.** `score` embeds both sides as `model.encode()` does, and ranks by
+cosine similarity, whatever the model's config names.
+
+**Consequences.**
+
+- Good, because a score measures a model as the approaches use it, and every
+  model is ranked the same way.
+- Good, because it changes nothing for a model without prompts that ranks by
+  cosine, such as the models trained here. It guards only against a model
+  made elsewhere.
+- Bad, because a model made for the dot product, or for its own prompts, can
+  score lower here than in its own setting.
+
+**Alternatives considered.**
+
+- The evaluator's defaults: a model would be scored with prompts, or a
+  similarity, that the approaches never use. Its scores would not compare
+  with the others'.
+
+**Confirmation.** The tests in
+[test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+check that:
+
+- targets are ranked by cosine;
+- a query prompt is not added;
+- the default prompt goes on both sides.
+
+### MRR, accuracy@k and the median rank
+
+**Described in:** [scoring.md](scoring.md#the-metrics).
+
+**Context.** A reviewer harmonizes a source variable by choosing its target
+from the suggestions. One expected target near the top is what the reviewer
+needs. In both benchmarks, many source variables have several expected targets.
+By default, [sentence-transformers](https://sbert.net)' evaluator reports:
+
+- the mean reciprocal rank at 10, MRR@10;
+- the normalized discounted cumulative gain at 10, nDCG@10, as its main score;
+- accuracy, precision and recall at 1, 3, 5 and 10;
+- the mean average precision at 100, MAP@100.
+
+**Decision.** `score` reports where each source variable's best-placed expected
+target lands, in three metrics:
+
+- MRR with no cut-off, in place of the evaluator's MRR@10;
+- accuracy@k at the evaluator's own cut-offs, 1, 3, 5 and 10;
+- the median rank, which `score` computes from the ranks that the evaluator
+  writes.
+
+**Consequences.**
+
+- Good, because MRR, accuracy@k and the median rank depend only on a source
+  variable's highest expected target: MRR and accuracy@k by their
+  definitions, and the median rank because `score` takes that rank. A
+  reviewer needs only that one target to harmonize the variable. Precision,
+  recall, MAP and nDCG count every expected target.
+- Good, because MRR without a cut-off counts every rank. A model that moves an
+  expected target from rank 50 to rank 20 scores better. MRR@10 scores every
+  rank below 10 as 0.
+- Good, because accuracy@k is what a reviewer of the top k suggestions sees:
+  whether an expected target is among them.
+- Good, because a few very low ranks do not move the median rank, as they
+  move a mean.
+- Bad, because the scores do not compare with the nDCG@10 that BEIR and MTEB
+  report.
+
+**Alternatives considered.**
+
+- nDCG@10, the evaluator's own main score, and the main score of BEIR
+  ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and MTEB
+  ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)):
+  it rewards ranking every expected target high, and it gives no credit below
+  rank 10.
+- Recall@k or MAP: they measure how many of a variable's expected targets
+  are found. One is enough to harmonize a variable.
+
+**Confirmation.** The tests in
+[test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+check that:
+
+- the ranks and the metrics are right on a fictional benchmark.
+
+### Models are compared in one text format
+
+**Described in:** [scoring.md](scoring.md#running-score).
+
+**Context.** A format writes a source variable or a target as one text, such
+as `compact` or `name_description`. This pipeline's models are trained in
+`compact`. Each released model was trained on texts of its own format.
+
+**Decision.** Models are compared in `compact`. A released model can also be
+scored in the format of its own training samples.
+
+**Consequences.**
+
+- Good, because in one format, two scores differ only by the model.
+- Good, because no format is chosen on the benchmarks for each model.
+- Bad, because a released model can score lower in `compact` than in its own
+  format. So it is also scored in its own.
+
+**Alternatives considered.**
+
+- Each model in its own training format: two scores would then differ by the
+  model and by the format at once. A gap between them could not be put down
+  to the model alone. So a model's score in its own format is kept only as an
+  additional score.
+- Each model in the format that scores best for it: the scores would mix the
+  model and the format as well. And each model's format would be chosen on
+  the benchmarks.
+
+**Confirmation.** The tests in
+[test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+check that:
+
+- each format has its own folder of scores.
+
+### A source variable's text leaves its node out
+
+**Described in:** [scoring.md](scoring.md#running-score).
+
+**Context.** `score` writes each source variable as a text for the model. A
+TOPMed source variable comes from a table of a
+[dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study, such as `pht999999.v1`. A
+GDC source variable comes from a paper. The approaches
+read a study as a `SimpleDataModel`, with each table as a node of
+properties. So they write the table first, as in
+`pht999999.v1.body_weight (float): ...`. Neither a table nor a paper says
+what the variable means.
+
+**Decision.** When `score` writes a benchmark's texts, a source variable's
+text starts at its name, in every format, as
+`body_weight (float): Body weight in kilograms`.
+
+**Consequences.**
+
+- Good, because a score measures the model on the text that carries meaning.
+- Bad, because the text differs by its node from the text that the approaches
+  give a model.
+- Bad, because the targets keep their node, as the approaches write them,
+  while the training texts have no node on either side.
+
+**Alternatives considered.**
+
+- The node, as the approaches write it: `pht999999.v1.body_weight (float):
+  ...`.
+
+**Confirmation.** The tests in
+[test_embedding_model_texts.py](../../tests/test_embedding_model_texts.py)
+check that:
+
+- a source's text has no leading dot;
+- a text that starts with a dot of its own keeps it.
+
+### Ties keep sentence-transformers' order
+
+**Described in:** [scoring.md](scoring.md#running-score).
+
+**Context.** A tie needs two targets with identical texts. For a static model,
+which averages its tokens, the same tokens in another order tie too. Only
+`stdelement` leaves a target's node out, so only it gives one property in
+several nodes the same text. In the [GDC benchmark](benchmarks.md#gdc), many
+targets share their `stdelement` text, but no expected target shares it with
+a target that is not expected. The [TOPMed
+benchmark](benchmarks.md#topmed)'s targets share no texts.
+
+**Decision.** Targets with the same similarity keep the order that
+[sentence-transformers](https://sbert.net)' evaluator gives them. Version 6
+breaks a tie by target key, in alphabetical order: `clinical.race` comes
+before `demographic.race`.
+
+**Consequences.**
+
+- Good, because every metric comes from the evaluator, with no code of our
+  own.
+- Good, because the order changes no score on these benchmarks. A tie changes
+  a rank only when an expected target ties with a target that is not expected.
+- Bad, because a future benchmark could hold such ties. Its scores would
+  then depend on which tied target comes first. Version 6 puts them in a fixed
+  order, so a score repeats. Earlier releases leave the order to chance, so a
+  score could change from one run to the next.
+- Bad, because each copy of a target that is not expected still takes a rank
+  of its own. That cost belongs to the `stdelement` format.
+
+**Alternatives considered.**
+
+- The realistic rank, the mean of the best and the worst place among tied
+  targets
+  ([Berrendorf et al., 2020](https://doi.org/10.1109/wiiat50758.2020.00053)).
+  Two targets tied at places 2 and 3 would each be at 2.5. Every metric would
+  then be computed in code of our own, not by the evaluator. And it changes no
+  score on these benchmarks.
+
+## Sources
+
+### Restriction fields are read as allow-lists
+
+**Described in:** [licenses.md](licenses.md#restricted-items).
+
+**Context.** Some sources mark the items that may not be used.
+[LOINC](sources.md#loinc) marks them by a copyright notice, and
+[NIH CDE](sources.md#nih-cde) by a copyright status and by `noRenderAllowed`.
+[caDSR](sources.md#cadsr) marks them by a Proprietary Measure Permission, one
+kind of an element's reference documents. The other kinds are mostly texts
+about the element. A source can add a new restriction value, or a new kind of document,
+at any time.
+
+**Decision.** An item is open only when its source's restriction field holds
+a value known to allow use. For caDSR, the field is the element's reference
+documents, and each must be of a kind known to allow use. A new value closes
+the item, and the fetch prints it for review.
+
+**Consequences.**
+
+- Good, because a new restriction value keeps an item out until someone
+  reviews it. This is the principle of fail-safe defaults: "Base access
+  decisions on permission rather than exclusion"
+  ([Saltzer & Schroeder, 1975](https://doi.org/10.1109/proc.1975.9939)).
+- Good, because the fetch keeps every item, closed ones too, and marks each in
+  its `open` column. So a later change of verdict needs no new fetch.
+- Bad, because a harmless new value closes items until its source's
+  allow-list is updated.
+
+**Alternatives considered.**
+
+- A deny-list of the values known to restrict: a new value would let its
+  items in unseen.
+- For caDSR, closing an element only on a Proprietary Measure Permission: a
+  new kind of document would leave its elements open before anyone reviews
+  it. That bases the decision on exclusion, against the fail-safe default
+  above. A new kind arrives only with a new fetch, which is reviewed anyway.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- a new value is read as closed, and reported;
+- LOINC's notices close items;
+- NIH CDE's allow-list closes items;
+- a caDSR element with a proprietary or a new kind of document is closed.
+
+### Two readers of our own: OWL files and PhenX's export
+
+**Described in:** [sources.md](sources.md#ontologies) and
+[sources.md](sources.md#phenx).
+
+**Context.** [NCIt](sources.md#ncit) and
+[the ontologies](sources.md#ontologies) publish
+[OWL](https://www.w3.org/OWL/) files in RDF/XML. pronto, rdflib and owlready2
+read OWL files. PhenX publishes a MySQL database export. Neither Python nor the
+repository's dependencies read MySQL exports.
+
+**Decision.** `sources/owl.py` reads OWL files in RDF/XML in one streaming
+pass, with defusedxml. `sources/phenx.py` reads PhenX's export as text: a
+regex tokenizer reads its `INSERT` statements, and checks each row's field
+count.
+
+**Consequences.**
+
+- Good, because one OWL reader reads NCIt and every ontology.
+- Good, because defusedxml refuses entities and external references in the
+  XML.
+- Good, because the PhenX reader needs no MySQL server.
+- Bad, because both readers are code of our own to maintain. A change in a
+  file's layout needs a change in its reader.
+
+**Alternatives considered.**
+
+- rdflib, for the OWL files: it builds the whole graph in memory. It was many
+  times slower than this reader on the base file of HP, the Human Phenotype
+  Ontology. Only this file was timed with both readers.
+- pronto: it is not a dependency. It knows the annotations that OBO defines,
+  such as a synonym and its scope. NCIt writes its synonyms with properties of
+  its own, which pronto does not know. On the ontologies' base files, pronto
+  kept one definition per term and no synonym types.
+- owlready2, not tried: it loads each file into a database of its own before
+  it can be read.
+- The ontologies' OBO files, read with pronto: EVS publishes NCIt in OWL and
+  as a flat file, not in OBO. So NCIt would still need an OWL reader. pronto's
+  strict OBO parser fails on the OBO file of Uberon, the anatomy ontology.
+- sqlite3, for the PhenX export: it cannot run the export's `CREATE TABLE`
+  statements. Turning only `\'` into SQL's own escape leaves many variables
+  wrong, from `\"`, `\n` and `\r`.
+- sqlparse: it is not a dependency. It splits SQL into tokens, such as one
+  quoted string, and groups them. A token keeps its text as written, with its
+  quotes and backslash escapes. So the code that reads each value would still
+  be ours.
+- mysql-to-sqlite3 and SQLAlchemy: both need a running MySQL server.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- the OWL reader keeps each statement's exact text;
+- the PhenX reader reads rows with quotes, escapes and nulls.
+
+### NCIt is read from its OWL release
+
+**Described in:** [sources.md](sources.md#ncit) and
+[pairs.md](pairs.md#ncit).
+
+**Context.** EVS publishes each NCIt release as an
+[OWL](https://www.w3.org/OWL/) file and as a flat file, and its archive keeps
+every release. The flat file has one row per concept: its names, one definition
+and its parents, as EVS's
+[ReadMe](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ReadMe.txt) describes it.
+It has no term types and no associations. The pairs need three things that the
+OWL release holds:
+
+- each synonym's term type and source;
+- every definition, with its source;
+- the associations that give value lists.
+
+**Decision.** `sources fetch` reads NCIt from its OWL release,
+`Thesaurus_<version>.OWL.zip`, in EVS's archive.
+
+**Consequences.**
+
+- Good, because the rule that picks names of the same meaning can run, and
+  value lists can be built.
+- Good, because the manifest pins a release, and every later fetch reads the
+  same file. It is a release file, so another machine can rebuild the same
+  version.
+- Bad, because the OWL release is the larger file to download, and it needs
+  the OWL reader of our own.
+
+**Alternatives considered.**
+
+- The flat file, `Thesaurus.FLAT.zip`: it is smaller and simpler to read. But
+  without term types, the rule that picks names of the same meaning could not
+  run, and no value list could be built.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- a fictional OWL release gives its concepts, synonyms, definitions and value
+  lists.
+
+### NCIt's replacements come from its merge records
+
+**Described in:** [sources.md](sources.md#ncit).
+
+**Context.** A retired NCIt concept can name the concept that replaced it.
+Each release folder holds the release's history file. Each of its records has
+an action, such as `merge` or `retire`. A `merge` record names the concept
+that a retired concept was merged into. A `retire` record names the concept's
+old parent, as EVS's
+[ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt)
+says. EVS's replacements service, a live service, also gives that parent as a
+replacement.
+
+**Decision.** `sources fetch` reads NCIt's replacements from the history file
+of the same release, from its `merge` records only.
+
+**Consequences.**
+
+- Good, because a retired concept is never paired with its broader parent.
+- Good, because the history file is a release file, which the manifest pins
+  with the [OWL](https://www.w3.org/OWL/) release. So another machine reads the
+  same replacements.
+- Good, because the history file also holds merges that the service does not
+  give.
+- Bad, because a concept retired without a merge gets no replacement. Its
+  names follow the rule for a retired item without one, as
+  [Retired items are used](#retired-items-are-used) says.
+
+**Alternatives considered.**
+
+- EVS's replacements service: it serves only its current state. And it gives
+  a retired concept's old parent as its replacement.
+- `retire` records as replacements too: they name the old parent, a broader
+  concept, not one of the same meaning.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- a merge record names a replacement, and a retire record its old parent.
+
+### CDISC is a source of its own
+
+**Described in:** [sources.md](sources.md#cdisc) and
+[pairs.md](pairs.md#cdisc).
+
+**Context.** NCI [EVS](https://evs.nci.nih.gov/) publishes CDISC's controlled
+terminology as four [packages](sources.md#cdisc): SDTM, ADaM, Protocol and the
+Glossary, each with dated releases of its own. Every CDISC term and codelist is also an
+[NCIt](sources.md#ncit) concept. The packages hold what CDISC adds to the
+concepts: each term's submission value, the short value that a dataset stores,
+and its CDISC synonyms. They also list each codelist with its terms.
+
+**Decision.** CDISC is fetched as its own source, from these packages. Its
+pairs are read from the packages, not derived from NCIt.
+
+**Consequences.**
+
+- Good, because a codelist becomes an item whose values are its terms, as a
+  data model's property has a value list.
+- Good, because the codelists are CDISC's own addition: their pairs, with
+  the terms as values, are pairs that NCIt does not give.
+- Good, because the manifest pins each package's release by its date, apart
+  from NCIt's version. A corpus can leave CDISC out with `--source`, as any
+  other source.
+- Bad, because most of CDISC's other pairs repeat an NCIt pair's anchor and
+  canonical names. They differ in another field, most often the description or
+  the kind.
+  [Copies are kept once](#copies-are-kept-once-as-the-tokenizer-reads-them)
+  removes only pairs with the same two texts. So the corpus keeps these pairs.
+
+**Confidence.** Low for CDISC's terms beyond its codelists: no training run
+has measured what they add.
+
+**Alternatives considered.**
+
+- Deriving CDISC from NCIt's CDISC subsets and its CDISC synonyms: code of
+  our own would have to rebuild the codelists from the subsets. And CDISC
+  would follow NCIt's releases, not its own.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- a fictional package gives its codelists and terms.
+
+## Pairs
+
+### A star around each item
+
+**Described in:**
+[pairs.md](pairs.md#the-shape-a-star-around-each-item).
+
+**Context.** An item has a canonical and other texts, such as synonyms,
+descriptions and question texts. The task pairs a study's wording with a data
+model's property. Training uses in-batch negatives, as
+[sentence-transformers](https://sbert.net)' `MultipleNegativesRankingLoss`
+does. So two pairs of one item in one batch work against each other.
+
+**Decision.** Each pair joins the item's canonical to one of the item's other
+texts. For example, the synonyms `BMI` and "Quetelet Index" are each paired
+with the canonical "Body Mass Index". They are never paired with each other.
+
+**Consequences.**
+
+- Good, because the shape follows the task: a study's wording on one side, a
+  property on the other.
+- Good, because every text is pulled toward the same canonical. So the texts
+  also come close to each other.
+- Good, because n texts give about 2n pairs, not n(n-1)/2. Each text gives a `name` pair, and a `name_description` pair when the item has a
+  description. These are two of the
+  [kinds of pair](pairs.md#the-shape-a-star-around-each-item). So an item with
+  many synonyms does not outweigh the rest of the corpus.
+- Good, because an item has few pairs, so two of them rarely share a batch.
+  So an item's texts rarely work against each other as in-batch negatives.
+- Good, because each pair records what it is made of. A training run can
+  choose pairs by these marks:
+  - `kind`, such as `name_to_description`, whose positive is a description
+    alone;
+  - `term_group`: an [expansion](pairs.md#expansions-and-paraphrases) of a
+    short form, such as `BMI`, or a paraphrase;
+  - `term_type`, the source's own label for a text, such as a synonym type;
+  - `status`: `current`, `retired` or `draft`, as
+    [Retired items are used](#retired-items-are-used) says;
+  - `value_list`: the name of the positive's value list.
+- Bad, because two of an item's other texts, such as `BMI` and "Quetelet
+  Index", are never paired directly.
+
+**Confidence.** Low: no training run has compared the star with other shapes.
+
+**Alternatives considered.**
+
+- Pairs among all the texts of a concept, as SapBERT builds them from UMLS
+  ([Liu et al., 2021](https://doi.org/10.18653/v1/2021.naacl-main.334)).
+  SapBERT caps a concept at 50 pairs, to keep the data balanced.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- a fictional item gives the pairs that the test lists;
+- each of them joins a text to the canonical.
+
+### Retired items are used
+
+**Described in:** [pairs.md](pairs.md#retired-items).
+
+**Context.** Sources retire items. A source can name a replacement for a
+retired item, or none. Older studies use the old wording. A text can belong
+to a retired item and to a current one.
+
+**Decision.** Retired items give pairs too:
+
+- A retired item with a replacement gives its canonical and texts as anchors
+  of the replacement's canonical.
+- A retired item without a replacement keeps its own canonical. It uses only
+  the texts that no current or draft item has.
+
+Each pair's `status` marks a retired item's pairs as `retired`.
+
+**Consequences.**
+
+- Good, because a model that knows the retired names can map older studies
+  too.
+- Good, because a training run can leave retired items out by their `status`.
+- Good, because a retired item without a replacement gives no pair for a text
+  that a current item also has. For example, a retired "Blood Pressure
+  Finding" and a current "Blood Pressure Measurement" can both have the text
+  `BP`. Then `BP` is paired only with "Blood Pressure Measurement". So the
+  model does not learn to map a current name to a retired item.
+- Bad, because every corpus holds the retired texts, and nothing reads
+  `status` by default.
+- Bad, because a retired item with a replacement gives the replacement all
+  its texts, even one that another current item also has.
+
+**Confidence.** Low: no training run has measured what retired items add.
+
+**Alternatives considered.**
+
+- Leaving retired items out: a model would not know the names that older
+  studies use.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- a retired item gives its names to its replacement, marked `retired`;
+- one without a replacement keeps only the names that no current item has.
+
+### Draft items are used like current ones
+
+**Described in:** [pairs.md](pairs.md#retired-items).
+
+**Context.** Some sources mark items as drafts: NCIt's provisional concepts,
+LOINC's trial codes and caDSR's draft elements. A later release can still
+change a draft, or drop it. The source writes a draft's texts, as it writes a
+current item's.
+
+**Decision.** Draft items give pairs, as current items do. A draft can also
+replace a retired item. Each pair's `status` marks a draft's pairs as `draft`.
+
+**Consequences.**
+
+- Good, because a draft's texts mean the same as its canonical, as a current
+  item's do. A pair needs nothing more.
+- Good, because a training run can leave drafts out by their `status`.
+- Bad, because a later release can change a draft. The corpus can then hold
+  texts that the newer release does not give.
+
+**Confidence.** Low: no training run has measured what drafts add.
+
+**Alternatives considered.**
+
+- Leaving drafts out: their texts would be lost, though they mean the same as
+  their canonical.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- a draft is used and marked;
+- a draft can replace a retired item.
+
+### A source's own marks choose the anchors
+
+**Described in:** [pairs.md](pairs.md#texts-of-the-same-meaning).
+
+**Context.** Sources mark what each text of an item is. Only some marks mean
+the same thing as the item:
+
+- NCIt's term types, such as `SY` for a synonym or `AD` for a grammar form;
+- the ontologies' synonym scopes, such as `EXACT` or `RELATED`;
+- caDSR's alternate-name types, which also mark ids and table names;
+- NIH CDE's designation tags, which also mark instructions for a form;
+- LOINC's fields: LOINC says that consumer names are not synonyms.
+
+**Decision.** Each reader keeps an allow-list of the marks that mean the same
+thing as the canonical. A text is an anchor only when its mark is on that list.
+A mark that a reader has not seen is printed, and its texts are not used. For
+LOINC, whose marks are its columns, the fetch prints a new column.
+
+**Consequences.**
+
+- Good, because an anchor means the same thing as the canonical. Instructions,
+  ids and related or broader names stay out.
+- Good, because every reader follows one rule. NIH CDE holds copies of LOINC's
+  consumer names, and its tags mark them. So they stay out, as in LOINC.
+- Good, because a new mark stays out until someone reviews it, as a new
+  restriction value does in
+  [Restriction fields are read as allow-lists](#restriction-fields-are-read-as-allow-lists).
+- Bad, because a new mark of names also stays out until its allow-list is
+  updated.
+
+**Alternatives considered.**
+
+- Every text, whatever its mark: instructions and related names would become
+  anchors of the same meaning.
+- A deny-list of the marks known not to be names: a new mark would let its
+  texts in unseen.
+
+**Confirmation.** The tests check that:
+
+- NCIt and the ontologies use only their same-meaning term types and scopes
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- caDSR uses only its name types
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- NIH CDE uses only designations tagged as names
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- the NCIt, NIH CDE and caDSR readers print a term type, a tag or a type
+  that they have not seen
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- the LOINC fetch prints a column that it does not know
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)).
+
+### LOINC's example answer lists are used too
+
+**Described in:** [pairs.md](pairs.md#loinc).
+
+**Context.** LOINC links answer lists to its codes, each link with a type:
+`NORMATIVE`, `PREFERRED` or `EXAMPLE`. A list linked without a panel is the
+code's default list. Many of the codes with a default list have an
+`EXAMPLE` list. Values show what a variable records. Leakage
+prevention never compares values.
+
+**Decision.** A LOINC code's values are its default answer list, of any link
+type: `NORMATIVE`, `PREFERRED` or `EXAMPLE`. `value_list` records the type, as
+in `LL9999-1 (EXAMPLE)`.
+
+**Consequences.**
+
+- Good, because the codes with an example list keep their values.
+- Good, because an example list still shows the kind of answer that a code
+  collects.
+- Good, because `value_list` keeps the link type. So a training run can read
+  it later, as it can read `status`.
+- Bad, because an example list is not LOINC's answer for the code. So a pair
+  can teach values that a study would not use.
+
+**Confidence.** Low: no training run has measured what the example lists add
+or cost.
+
+**Alternatives considered.**
+
+- `NORMATIVE` and `PREFERRED` lists only, the answers that LOINC requires or
+  prefers: many of the codes with a list would lose their values.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- a code takes its default list, an `EXAMPLE` one, in the list's order.
+
+### Copies are kept once, as the tokenizer reads them
+
+**Described in:** [pairs.md](pairs.md#duplicates),
+[pairs.md](pairs.md#names) and
+[corpus.md](corpus.md#combining-the-sources).
+
+**Context.** The same pair can come twice: from two items of one source, or
+from two sources. [CDISC](sources.md#cdisc) publishes its terms as
+[NCIt](sources.md#ncit) subsets. The model sees only token ids, and its
+tokenizer normalises every text. Two texts that normalise to one text get the
+same ids. The tokenizer keeps punctuation as tokens, so `body_weight` and
+`Body Weight` get different ids.
+[The study rule](#leakage-the-answer-key-rule-and-the-study-rule)
+needs every study of a text.
+
+**Decision.** Two pairs are copies when the tokenizer normalises their texts
+to the same two texts. The first copy is kept, with the studies of all its
+copies. `corpus build` reads the sources in a fixed order, with NCIt first.
+An item's names are compared the same way, so a name that repeats another,
+or the canonical, is used once.
+
+**Consequences.**
+
+- Good, because no pair counts twice. Duplicates make a model weigh some
+  examples more than others. For a language model's training text,
+  [Lee et al. (2022)](https://doi.org/10.18653/v1/2022.acl-long.577) show that
+  removing near-duplicates can "reduce train-test overlap, which affects over
+  4% of the validation set of standard datasets". Here each pair is kept
+  once, before the split, so it lands on one side.
+- Good, because the steps cannot disagree. `normalization.py` holds the one
+  normaliser that the duplicate rule, leakage prevention and the tokenizer
+  share. When the tokenizer reads two texts as one text, the duplicate rule
+  and leakage prevention do too.
+- Good, because `body_weight` stays an anchor of the canonical `Body Weight`.
+  A study's variable names are written that way, and the pair teaches the
+  model to read them.
+- Good, because the same sources give the same corpus on every build. A copy
+  is kept in the source that it comes from, since NCIt comes before CDISC.
+- Good, because no copy's study is lost. The pair kept takes the studies of
+  all its copies. So when any copy comes from a benchmark's study, the study
+  rule drops the pair kept as well.
+- Bad, because a count of pairs by source puts every shared pair under the
+  earliest source.
+
+**Alternatives considered.**
+
+- Exact comparison of the texts: `BMI` and `bmi` would stay two pairs,
+  though the model reads them as one.
+- [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
+  for an item's names too: `body_weight` would be dropped beside
+  `Body Weight`, though the model reads them apart.
+- Storing the normalised texts, such as `cafe` for `Café`: the model
+  normalises every text that it reads anyway, since its normaliser is part of
+  `tokenizer.json`. A tokenizer with another normaliser, such as a cased one,
+  could not see case and accents in them. And people read the stored texts,
+  in reviews and in `dropped.parquet`.
+
+**Confirmation.** The tests check that:
+
+- pairs that the tokenizer cannot tell apart are kept once
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- a duplicate keeps the studies of every copy
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- the sources combine in their own order, whatever the order named
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+
+### Texts are cleaned with ftfy, until nothing changes
+
+**Described in:** [pairs.md](pairs.md#cleaning).
+
+**Context.** Source texts hold markup, HTML entities, escapes such as R's
+`<U+00A0>`, and text decoded with the wrong encoding. A source can escape a
+text twice by mistake, as in `&amp;lt;5`. One cleaning step can leave work
+for an earlier one: `Caf&lt;U+00E9&gt;` becomes `Caf<U+00E9>` after one
+pass.
+
+**Decision.** `pairs.common.clean` repairs encodings and unescapes HTML
+entities with ftfy's `fix_text`
+([Speer, 2019](https://doi.org/10.5281/ZENODO.2591652)), with
+`unescape_html=True`. Its other steps read escapes, remove HTML tags, and
+normalise characters and spaces. All of `clean`'s steps repeat until the text
+stops changing.
+
+**Consequences.**
+
+- Good, because ftfy is a maintained library for text decoded with the wrong
+  encoding. Its `fix_text` repeats its fixes until the text stops changing.
+- Good, because cleaning is idempotent: cleaning a clean text changes nothing,
+  as with Unicode's normal forms. So a step that cleans a text again does no
+  harm.
+- Good, because a text that a source escaped twice becomes the text that its
+  author meant: `&amp;lt;5` becomes `<5`.
+- Bad, because a text about HTML entities would lose them. Data dictionaries
+  hold none.
+
+**Alternatives considered.**
+
+- Unescaping once, as a web page shows a text: `&amp;lt;5` would stay
+  `&lt;5`.
+- ftfy's default for HTML, `unescape_html="auto"`: it leaves the entities of
+  a text that holds a `<`, such as a tag.
+- ftfy's `decode_escapes`, for escapes such as `\u2122`: it also turns the
+  `\n` of `C:\new` into a line break.
+- [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) alone, for
+  tags: it reads any text in angle brackets as a tag. So "Candida
+  <Debaryomycetaceae> infection" would lose a word. Only known HTML tags are
+  removed.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- cleaning a clean text changes nothing;
+- an escape written with entities is read;
+- entities are read until none is left.
+
+## Corpus
+
+### Texts are compared by a broader `text_key` for leakage, the split, retired items and descriptions
+
+**Described in:** [leakage.md](leakage.md#how-two-texts-match) and
+[corpus.md](corpus.md#the-split).
+
+**Context.** The [copy rule](#copies-are-kept-once-as-the-tokenizer-reads-them)
+asks whether the model reads two texts as one. So it uses the tokenizer's
+normalisation, which keeps `body_wt` and `body wt` apart. Four other
+comparisons ask whether two texts name the same thing: leakage prevention, the
+split, retired items and descriptions.
+
+**Decision.** `pairs.common.text_key` gives each text its `text_key`: the
+text as the tokenizer normalises it, with case folded and punctuation turned
+into spaces. An empty `text_key` matches nothing. Leakage prevention, the
+split, retired items and descriptions compare texts by their `text_key`.
+
+**Consequences.**
+
+- Good, because the broader `text_key` finds texts that name the same thing, such as
+  `Waist.cm` and `waist cm`. In each comparison, a match prevents a harm:
+
+  | comparison | compares | a match prevents |
+  |---|---|---|
+  | leakage prevention | benchmark texts with pair texts | training on a benchmark's text |
+  | the split | canonical texts | one concept in both training and validation |
+  | retired items | a retired item's texts with current and draft items' texts | a current name pulled toward a retired item |
+  | descriptions | an item's descriptions with its canonical | the canonical paired with its own repeat |
+
+- Good, because `text_key` starts from the tokenizer's normalisation. So it
+  matches every text that the tokenizer reads as the same.
+- Bad, because `text_key` can join two texts that differ in meaning only by their
+  punctuation. A pair is then dropped, or moved with its group, without need.
+
+**Alternatives considered.**
+
+- The broader `text_key` for copies too: `body_wt -> Body Weight` and
+  `body wt -> Body Weight` would be copies, and one would be dropped. Yet the
+  model reads them apart, and `body_wt` teaches it to read a variable name.
+- The [copy rule](#copies-are-kept-once-as-the-tokenizer-reads-them) for the
+  four comparisons too: `Waist.cm` and `waist cm` would not match. Yet a pair
+  with `waist cm` leaks a benchmark's `Waist.cm`.
+
+**Confirmation.** The tests check that:
+
+- a `text_key` is the text as the tokenizer normalises it, with case folded and
+  punctuation turned into spaces
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- accents and case do not hide an answer key
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py));
+- canonicals that differ in punctuation share a group
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py));
+- a description that repeats the canonical, or differs from it only in
+  punctuation, gives no pair of its own
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)).
+
+### The split keeps each group on one side, by a hash
+
+**Described in:** [corpus.md](corpus.md#the-split).
+
+**Context.** The pairs of one item share its canonical. One concept can be two
+items, in two sources or in two files of one source. Their pairs are not copies
+when a description differs. A [CDISC](sources.md#cdisc) codelist's canonical is
+its Codelist Name, which differs from its [NCIt](sources.md#ncit) concept's
+name.
+
+**Decision.** A group holds the items that an NCIt concept code or a
+canonical text's [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
+links, directly or through other items. A hash of its `group_id`, the first
+`item_id` of its items, puts it into one of 1,000 buckets. The groups in the first buckets go to validation:
+buckets 0 to 19 by default, 2% of the groups.
+
+**Consequences.**
+
+- Good, because validation never tests a canonical that the model trained on. A
+  repeat shares its canonical's `text_key`, and so its group. scikit-learn's guide to
+  grouped data asks for the same: "all the samples in the validation fold come
+  from groups that are not represented at all in the paired training fold"
+  ([Cross-validation iterators for grouped
+  data](https://scikit-learn.org/stable/modules/cross_validation.html#group-cv)).
+- Good, because a hash needs no random draw and no seed. So the same sources
+  and benchmarks give the same split on every build. Géron (2022) splits a
+  test set by a hash of each row's identifier, in the
+  [notebook of its chapter 2](https://github.com/ageron/handson-ml3/blob/main/02_end_to_end_machine_learning_project.ipynb).
+- Good, because the groups are the connected components of a graph of items and
+  canonical texts, which
+  [`scipy.sparse.csgraph.connected_components`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csgraph.connected_components.html)
+  finds.
+- Good, because an added source moves only the groups that it links.
+- Good, because a larger share only adds buckets. So a group held out at a
+  smaller share is held out at the larger one too.
+- Bad, because the split is not stratified. Each source has many groups, so
+  its share of validation pairs is close to the whole corpus's share, but not
+  equal to it.
+- Bad, because a share between two steps of 0.001 is refused. It would record
+  one share and hold out another.
+
+**Confidence.** Medium: grouped and hashed splits are standard practice. But a
+group links only canonicals with the same `text_key`, so two canonicals that
+differ by a word stay in two groups.
+
+**Alternatives considered.**
+
+- Groups by item alone: a concept in two sources can have pairs on both
+  sides. Grouped by item, some validation pairs repeated a training pair's
+  anchor and canonical.
+- Groups by canonical text alone: a codelist and its NCIt concept would fall
+  into two groups. So the concept code is still needed.
+- Canonical texts compared as the tokenizer normalises them: a validation
+  pair can then repeat a training canonical that differs only in case or
+  punctuation.
+- A union-find of our own: scipy's function is the standard tool, and scipy
+  was already installed.
+- A seeded random split, such as scikit-learn's `GroupShuffleSplit`: every
+  added source would redraw every group's side.
+
+**Confirmation.** The tests in
+[test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
+check that:
+
+- the split follows a fixed hash of the group;
+- items with one canonical text share a group;
+- a larger share keeps the smaller share's groups;
+- a share between two buckets stops the build.
+
+### Leakage: the answer-key rule and the study rule
+
+**Described in:** [leakage.md](leakage.md).
+
+**Context.** A model trained on a benchmark's mappings has seen its expected
+targets. Its score there would look too good. An anchor gives twin pairs, a
+`name` pair and a `name_description` pair: two
+[kinds](pairs.md#the-shape-a-star-around-each-item) of pair. Often only the
+second matches a benchmark row. Some sources hold
+variables of the benchmarks' own [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)
+studies: [PhenX](sources.md#phenx) maps its variables to dbGaP study variables.
+A word such as `age` occurs in many pairs and in many benchmark rows.
+
+**Decision.** A pair is dropped when:
+
+- it is an answer key: its sides match a source variable and one of its
+  expected targets;
+- it is an answer key's twin, with the same item, anchor and canonical;
+- it comes from a dbGaP variable of a benchmark's study.
+
+A benchmark text on one side only is shared vocabulary: the pair is kept.
+
+**Consequences.**
+
+- Good, because no training pair holds a benchmark's mapping, as far as the
+  matching rules can see. This guards against test-set contamination, which
+  GPT-3's authors checked for
+  ([Brown et al., 2020](https://doi.org/10.48550/ARXIV.2005.14165)).
+- Good, because an answer key's twin cannot keep the source's text paired with
+  the answer key's canonical.
+- Good, because the study rule drops what text matching cannot see: the other
+  variables of a benchmark's studies, whose wording the model would learn.
+- Good, because `age` alone stays in the corpus. It is general vocabulary,
+  which the model must learn.
+- Good, because every benchmark built is checked, so any of them can be
+  scored later.
+- Bad, because a mapping reworded beyond the matching rules stays in the
+  corpus.
+
+**Alternatives considered.**
+
+- Dropping every pair that shares a text with a benchmark: general
+  vocabulary, such as `age`, would leave the corpus.
+
+**Confirmation.** The tests in
+[test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
+plant leaks of each kind. They check that:
+
+- each planted leak is dropped, and nothing else;
+- an answer key comes before a benchmark study;
+- shared vocabulary is reported.
+
+### What leakage prevention compares
+
+**Described in:** [leakage.md](leakage.md#the-fields-compared).
+
+**Context.** Each side of a pair is a text formatted from its fields: a name,
+a type, a description and values. The same name can come with another type
+or other values. Some pairs keep a description in a name field. A common
+value list, such as `Unknown | Not Reported | No | Yes`, matches many
+targets.
+
+**Decision.** Leakage prevention compares four
+[fields](pairs.md#what-a-pair-holds) of a pair: `anchor_name`,
+`anchor_description`, `positive_name` and `positive_description`. Each is
+compared with the benchmark's names and with its descriptions. It never
+compares formatted texts, and it never compares values.
+
+**Consequences.**
+
+- Good, because a name with another type or other values still matches.
+- Good, because a description kept in a name field is compared with the
+  benchmark's descriptions.
+- Good, because a common value list drops no pair.
+- Bad, because values alone never drop a pair. A pair whose names and
+  descriptions match no mapping is kept, even when it has a mapping's own
+  value list.
+
+**Alternatives considered.**
+
+- Comparing formatted texts: a name with another type or other values would
+  not match.
+- Comparing values too: a common list would drop many pairs that leak
+  nothing.
+
+**Confirmation.** The tests in
+[test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
+check that:
+
+- a dropped pair names the fields that matched.
+
+### Two texts match when equal, by 8 words in a row, or by a name's words
+
+**Described in:** [leakage.md](leakage.md#how-two-texts-match).
+
+**Context.** A benchmark's descriptions often repeat a source's descriptions,
+with small edits. For example, many target descriptions of
+[GDC](benchmarks.md#gdc) repeat [caDSR](sources.md#cadsr)'s or
+[NCIt](sources.md#ncit)'s definitions. Most names are shorter than 8 words. A
+study's variable names are often variants of a benchmark name, such as
+`Waist in cm` for `Waist.cm`.
+
+**Decision.** Two texts match by their
+[`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
+in one of three ways:
+
+- `=`: they are equal;
+- `~`: they share at least 8 words in a row (`min_overlap_words`);
+- `>=`: a side holds every word of a benchmark name of 2 words or more
+  (`min_name_words`), and the other side matches that row's description.
+
+The source and the target must match on different sides.
+
+**Consequences.**
+
+- Good, because a copied description with a changed word still matches. The
+  run of words is the published check. GPT-3's authors write: "We define a
+  'dirty' example as one with any N-gram overlap with any training document"
+  ([Brown et al., 2020](https://doi.org/10.48550/ARXIV.2005.14165), Appendix
+  C). EleutherAI's evaluation tool uses the same check, as its
+  [decontamination docs](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/decontamination.md)
+  say. GPT-3 sets N per benchmark, from the 5th percentile of its examples'
+  lengths, between 8 and 13 words. Applied to each compared text, that rule
+  gives 8 here, since the benchmarks' descriptions are short.
+- Good, because equal texts match for every text, as Dodge et al. "measure
+  exact matches, normalized for capitalization and punctuation"
+  ([Dodge et al., 2021](https://doi.org/10.18653/v1/2021.emnlp-main.98)).
+  Tutubalina et al. match short mentions only when equal
+  ([Tutubalina et al., 2020](https://doi.org/10.18653/v1/2020.coling-main.588)).
+- Good, because a name's variants match, next to a description of the same
+  row.
+- Good, because a shared phrase alone never drops a pair. An answer key needs
+  both sides to match the same benchmark row.
+- Good, because each of the three ways finds answer keys that the other two
+  miss.
+- Bad, because the name rule is our own combination of published parts, with
+  no published evaluation. Its closest precedent is GPT-4's check of a short
+  example whole. Its authors "use the entire example if it's less than 50
+  characters"
+  ([OpenAI et al., 2023](https://doi.org/10.48550/ARXIV.2303.08774), Appendix
+  C).
+- Bad, because a side must hold every word of a benchmark name. A pair whose
+  side drops one word, such as a unit, is kept, though it can hold the
+  mapping. For example, `Waist Circumference` lacks the `cm` of the source
+  name `Waist_Circumference_cm`. Paired with the target's description, it
+  stays in the corpus.
+
+**Confidence.** Low for the two thresholds, 8 words and 2 words: they were
+checked by counting answer keys, not by their effect on scores.
+
+**Alternatives considered.**
+
+- Skipping texts shorter than 8 words, as GPT-3 skipped "examples less than
+  8 words long" ([Brown et al., 2020](https://doi.org/10.48550/ARXIV.2005.14165)):
+  most names are shorter. So no copied name would match.
+- One text containing the other whole, from 10 words: one changed word hides
+  a copy. So it misses many copies that 8 words in a row find.
+- A longer run, such as the 13 words of EleutherAI's tool: it misses copies
+  that 8 words in a row find. GPT-3 caps N at 13 for speed.
+- A benchmark name contained in a side, of any length: it drops many times
+  more pairs. Most come through one-word names, such as `weight`, which are
+  general vocabulary.
+- A name's words for one-word names too: it drops more pairs, mostly through
+  common words, such as `Stage` beside a stock staging description.
+- A similarity search with a threshold, such as TF-IDF or embeddings: it
+  finds rephrased copies, but
+  [Yang et al. (2023)](https://doi.org/10.48550/ARXIV.2311.04850) find that
+  "choosing an appropriate similarity threshold ... is often challenging". It
+  ranks candidates for a person to judge, rather than drop pairs by itself.
+
+**Confirmation.** The tests in
+[test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
+check that:
+
+- texts overlap when they share eight words in a row;
+- a long name matches that way too;
+- a one-word name matches only an equal text;
+- a text that matches the source and the target on one side is kept.
+
+## Tokenizer
+
+### The tokenizer is built with Hugging Face's tokenizers
+
+**Described in:** [tokenizer.md](tokenizer.md).
+
+**Context.** A later step trains the model, a static embedding table of
+[sentence-transformers](#the-model-is-built-trained-and-scored-with-sentence-transformers).
+Its `StaticEmbedding` module reads the tokenizer. It takes a tokenizer of
+Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers)
+library, or a `transformers` tokenizer that wraps one. Its docstring says the
+tokenizer "Must be a fast tokenizer". The tokenizer is trained from scratch,
+on the corpus's training texts. It needs a normaliser, a pre-tokenizer, a vocabulary
+trainer and a file that other tools read.
+
+**Decision.** The tokenizer is built from the parts of `tokenizers`: its
+normalizers, its `BertPreTokenizer`, a `BPE` model that its `BpeTrainer`
+trains, and its `tokenizer.json` file.
+[The vocabulary's entry](#the-vocabulary-is-learned-by-bpe-not-wordpiece)
+says why BPE. Our own code, in [`tokenizer.py`](../tokenizer.py), chooses the
+[training texts](tokenizer.md#what-it-learns-from) and the settings. It also
+counts the [diagnostics](tokenizer.md#diagnostics) from the tokens that the
+library gives.
+
+**Consequences.**
+
+- Good, because `StaticEmbedding` reads the tokenizer directly, with no
+  conversion.
+- Good, because `tokenizer.json` loads anywhere: with `Tokenizer.from_file`,
+  or in `transformers`, whose fast tokenizers wrap the same library.
+- Good, because none of the tokenizer's algorithms is our own code. Hugging
+  Face maintains the library.
+- Bad, because the library's defaults decide part of the result.
+  `tokenizer train` sets each setting that matters, and the manifest records
+  the library's version.
+- Bad, because `tokenizers` 1.0 cannot yet train or save a tokenizer from
+  Python, in its first release candidate. So the project requires a version
+  below 1.0 for now. Hugging Face's
+  [roadmap for 1.0](https://github.com/huggingface/tokenizers#v100-roadmap)
+  brings back the whole Python API before the final release.
+
+**Alternatives considered.**
+
+- [SentencePiece](https://github.com/google/sentencepiece), Google's tokenizer
+  library: `StaticEmbedding` cannot read its model file, so each tokenizer
+  would need a conversion to `tokenizer.json`.
+- [TkTkT](https://github.com/bauwenst/TkTkT) for the diagnostics: this toolkit
+  of tokenizers and of measures for them would give more measures, such as
+  Rényi entropy and morphological boundaries. But it adds many other
+  dependencies.
+
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
+
+- the `tokenizer.json` that `tokenizer train` writes loads with
+  `Tokenizer.from_file`.
+
+### The vocabulary is learned by BPE, not WordPiece
+
+**Described in:** [tokenizer.md](tokenizer.md#how-bpe-learns-its-vocabulary).
+
+**Context.** The model that a later step trains keeps one row of its table
+per token id. With one seed, the same ids give the same starting rows. Hugging Face's
+[`tokenizers`](https://github.com/huggingface/tokenizers) library trains
+[BPE](https://huggingface.co/learn/llm-course/chapter6/5),
+[WordPiece](https://huggingface.co/learn/llm-course/chapter6/6) and
+[Unigram](https://huggingface.co/learn/llm-course/chapter6/7) vocabularies. In
+separate processes on the same texts, BPE gives the same `tokenizer.json` each
+time. WordPiece gives different files, with other ids.
+
+**Decision.** `tokenizer train` learns its vocabulary by byte-pair encoding,
+with the library's `BpeTrainer`.
+
+**Consequences.**
+
+- Good, because the same texts give the same tokens, with the same ids, in
+  every run.
+
+**Alternatives considered.**
+
+- WordPiece: it can give the same tokens with other ids, and so another
+  starting point.
+- WordPiece with its ids renumbered in a fixed order: each run would give the
+  same file. But this is not a standard practice, and the ids would lose the
+  rough frequency order that the trainer gives them.
+- Unigram, as in [SentencePiece](https://github.com/google/sentencepiece): not
+  compared.
+
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
+
+- the same texts give the same tokenizer.
+
+### The normalisation of BERT's tokenizer, with NFD
+
+**Described in:** [tokenizer.md](tokenizer.md#step-1-normalize).
+
+**Context.** Variable names come in any case, and their case carries no
+meaning. Texts hold accents, invisible characters, and compatibility
+characters such as `µ`, `²` and `½`.
+
+**Decision.** The tokenizer normalises a text as
+[BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does for BERT's
+uncased models. It takes four steps: text cleaning, Unicode's
+[NFD](https://www.unicode.org/reports/tr15/#Norm_Forms), lowercase, and no
+accents. It leaves out only the spaces that BERT's tokenizer puts around
+Chinese characters. `normalization.py` builds the steps from `BertNormalizer`,
+`NFD`, `Lowercase` and `StripAccents` of `tokenizers`. Every step that
+compares texts uses them.
+
+**Consequences.**
+
+- Good, because `BMI`, `Bmi` and `bmi` get the same tokens. `Café` and
+  `Cafe` get the same tokens too.
+- Good, because the four steps are a standard: BERT's uncased models use
+  them, and `tokenizers` provides each one.
+- Bad, because `µ` and `μ` stay two characters, and `x²` and `x2` two texts,
+  though they often mean the same thing. Leakage prevention's `text_key` folds
+  `µ` into `μ` anyway, by case folding.
+
+**Alternatives considered.**
+
+- NFKD, or NFKC as in
+  [SentencePiece](https://github.com/google/sentencepiece)'s default rule,
+  `nmt_nfkc`: they fold the micro sign `µ` into the Greek `μ`, which mean the
+  same thing. But they also fold `x²` into `x2`, which can name another
+  variable. Unicode warns: "Normalization Forms KC and KD must not be blindly
+  applied to arbitrary text"
+  ([Unicode Consortium, 2026](https://www.unicode.org/reports/tr15/)). On a
+  corpus of all the sources, NFKD would change very few training texts. Most
+  changes are `µ`, `…`, `´` and `‑`. A few texts would become equal to another
+  training text, each a true duplicate, such as `SpO²` and `SpO2`.
+- Keeping case: `BMI` and `bmi` would get different tokens, though their case
+  carries no meaning.
+
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
+
+- a text is cleaned, lowercased, stripped of accents and split.
+
+### Only training texts shape the vocabulary
+
+**Described in:** [tokenizer.md](tokenizer.md#what-it-learns-from) and
+[tokenizer.md](tokenizer.md#diagnostics).
+
+**Context.** A tokenizer cuts the texts that it learned from into fewer tokens
+than new texts. A rare word in the texts that it learned from can become one
+whole token. A rare word that only new texts hold is usually cut into pieces.
+The validation loss and the benchmark scores judge a model.
+[BPE](https://huggingface.co/learn/llm-course/chapter6/5) counts how often each
+word occurs.
+
+**Decision.** The tokenizer learns from the training pairs' distinct texts,
+each once after normalisation. Four [diagnostics](tokenizer.md#diagnostics)
+are measured on the same texts:
+
+- the fertility, the tokens per word;
+- the share of words split;
+- the unknown rate;
+- the share of the vocabulary used.
+
+They are a sanity check, not a measure of quality.
+
+**Consequences.**
+
+- Good, because the tokenizer cuts validation and benchmark texts as it cuts
+  any new text.
+- Good, because nothing that makes a choice looks at the data that judges the
+  result.
+- Good, because
+  [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243) found,
+  across languages, that the fertility and the share of words split matter.
+  A lower fertility and a smaller share of continued words, their name for
+  words split, "correlate with an increase in downstream performance".
+- Bad, because the diagnostics are measured on the training texts, which the
+  tokenizer learned from. So they look a little better than on new texts. A
+  broken tokenizer still gives bad numbers on them. Examples are an unknown
+  rate above 0, and a high fertility when words are cut into single letters.
+
+**Alternatives considered.**
+
+- Learning the vocabulary from the validation and benchmark texts too: the
+  vocabulary would then depend on the data that judges the model. And a word that only
+  validation texts hold would get a token whose row training never updates.
+
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
+
+- only training texts shape the vocabulary;
+- spellings of one text count once.
+
+### Five special tokens
+
+**Described in:** [tokenizer.md](tokenizer.md#special-tokens).
+
+**Context.** A static model uses only `[UNK]`:
+[sentence-transformers](https://sbert.net)' `StaticEmbedding` turns padding
+off, and pools each text's tokens as they are. A
+[BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
+model also needs `[PAD]`, `[CLS]`, `[SEP]` and `[MASK]`, and `BertTokenizer`
+of `transformers` names them. Removing a token moves the id of every token after it.
+
+**Decision.** Every tokenizer has `[PAD]`, `[UNK]`, `[CLS]`, `[SEP]` and
+`[MASK]`, with the first five ids.
+
+**Consequences.**
+
+- Good, because a BERT model trained from scratch can use every vocabulary.
+- Bad, because a static model carries four rows that it never uses.
+- Bad, because the `[UNK]` row never trains. Every character of the training
+  texts is in the vocabulary, so `[UNK]` never occurs in them, and its row
+  keeps its random start.
+
+**Alternatives considered.**
+
+- `[PAD]` and `[UNK]` alone: a BERT model trained from scratch would need
+  another tokenizer, with every id moved.
+
+## References
+
+> Aarsen, T. (2025, January 15). *Train 400x faster Static Embedding Models
+> with Sentence Transformers*. Hugging Face.
+> https://huggingface.co/blog/static-embeddings
+
+> Berrendorf, M., Faerman, E., Vermue, L., & Tresp, V. (2020). Interpretable
+> and Fair Comparison of Link Prediction or Entity Alignment Methods. *2020
+> IEEE/WIC/ACM International Joint Conference on Web Intelligence and
+> Intelligent Agent Technology (WI-IAT)*, 371–374.
+> https://doi.org/10.1109/wiiat50758.2020.00053
+
+> Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P.,
+> Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S.,
+> Herbert-Voss, A., Krueger, G., Henighan, T., Child, R., Ramesh, A.,
+> Ziegler, D. M., Wu, J., Winter, C., … Amodei, D. (2020). *Language Models
+> are Few-Shot Learners* (Version 4). arXiv.
+> https://doi.org/10.48550/ARXIV.2005.14165
+
+> Dodge, J., Sap, M., Marasović, A., Agnew, W., Ilharco, G., Groeneveld, D.,
+> Mitchell, M., & Gardner, M. (2021). Documenting Large Webtext Corpora: A
+> Case Study on the Colossal Clean Crawled Corpus. *Proceedings of the 2021
+> Conference on Empirical Methods in Natural Language Processing*,
+> 1286–1305. https://doi.org/10.18653/v1/2021.emnlp-main.98
+
+> Géron, A. (2022). *Hands-on machine learning with Scikit-Learn, Keras, and
+> TensorFlow* (3rd ed.). O'Reilly Media.
+
+> Kopp, O., Armbruster, A., & Zimmermann, O. (2018). Markdown Architectural
+> Decision Records: Format and Tool Support. In N. Herzberg, C. Hochreiner, O.
+> Kopp, & J. Lenhard (Eds.), *Proceedings of the 10th Central European
+> Workshop on Services and their Composition* (pp. 55–62). CEUR-WS.org.
+> https://ceur-ws.org/Vol-2072/paper9.pdf
+
+> Lee, K., Ippolito, D., Nystrom, A., Zhang, C., Eck, D., Callison-Burch, C.,
+> & Carlini, N. (2022). Deduplicating Training Data Makes Language Models
+> Better. *Proceedings of the 60th Annual Meeting of the Association for
+> Computational Linguistics (Volume 1: Long Papers)*, 8424–8445.
+> https://doi.org/10.18653/v1/2022.acl-long.577
+
+> Liu, F., Shareghi, E., Meng, Z., Basaldella, M., & Collier, N. (2021).
+> Self-Alignment Pretraining for Biomedical Entity Representations.
+> *Proceedings of the 2021 Conference of the North American Chapter of the
+> Association for Computational Linguistics: Human Language Technologies*,
+> 4228–4238. https://doi.org/10.18653/v1/2021.naacl-main.334
+
+> Melnik, S., Gubarev, A., Long, J. J., Romer, G., Shivakumar, S., Tolton,
+> M., & Vassilakis, T. (2010). Dremel: Interactive Analysis of Web-Scale
+> Datasets. *Proceedings of the VLDB Endowment, 3*(1-2), 330–339.
+> https://doi.org/10.14778/1920841.1920886
+
+> Muennighoff, N., Tazi, N., Magne, L., & Reimers, N. (2023). MTEB: Massive
+> Text Embedding Benchmark. *Proceedings of the 17th Conference of the
+> European Chapter of the Association for Computational Linguistics*,
+> 2014–2037. https://doi.org/10.18653/v1/2023.eacl-main.148
+
+> Nygard, M. (2011, November 15). *Documenting architecture decisions*.
+> Cognitect.
+> https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
+
+> OpenAI, Achiam, J., Adler, S., Agarwal, S., Ahmad, L., Akkaya, I., Aleman,
+> F. L., Almeida, D., Altenschmidt, J., Altman, S., Anadkat, S., Avila, R.,
+> Babuschkin, I., Balaji, S., Balcom, V., Baltescu, P., Bao, H., Bavarian, M.,
+> Belgum, J., … Zoph, B. (2023). *GPT-4 Technical Report* (Version 6). arXiv.
+> https://doi.org/10.48550/ARXIV.2303.08774
+
+> Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence Embeddings
+> using Siamese BERT-Networks. *Proceedings of the 2019 Conference on
+> Empirical Methods in Natural Language Processing and the 9th International
+> Joint Conference on Natural Language Processing (EMNLP-IJCNLP)*, 3980–3990.
+> https://doi.org/10.18653/v1/d19-1410
+
+> Rust, P., Pfeiffer, J., Vulić, I., Ruder, S., & Gurevych, I. (2021). How
+> Good is Your Tokenizer? On the Monolingual Performance of Multilingual
+> Language Models. *Proceedings of the 59th Annual Meeting of the Association
+> for Computational Linguistics and the 11th International Joint Conference on
+> Natural Language Processing (Volume 1: Long Papers)*, 3118–3135.
+> https://doi.org/10.18653/v1/2021.acl-long.243
+
+> Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
+> Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
+> (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
+
+> Saltzer, J. H., & Schroeder, M. D. (1975). The protection of information in
+> computer systems. *Proceedings of the IEEE, 63*(9), 1278–1308.
+> https://doi.org/10.1109/proc.1975.9939
+
+> Speer, R. (2019). *ftfy* (Version 5.5.1) [Computer software]. Zenodo.
+> https://doi.org/10.5281/ZENODO.2591652
+
+> Thakur, N., Reimers, N., Rücklé, A., Srivastava, A., & Gurevych, I. (2021).
+> *BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information
+> Retrieval Models* (Version 4). arXiv.
+> https://doi.org/10.48550/ARXIV.2104.08663
+
+> Tutubalina, E., Kadurin, A., & Miftahutdinov, Z. (2020). Fair Evaluation in
+> Concept Normalization: a Large-scale Comparative Analysis for BERT-based
+> Models. *Proceedings of the 28th International Conference on Computational
+> Linguistics*, 6710–6716. https://doi.org/10.18653/v1/2020.coling-main.588
+
+> Unicode Consortium. (2026). *Unicode Normalization Forms* (Unicode Standard
+> Annex #15, Revision 58). https://www.unicode.org/reports/tr15/
+
+> Yang, S., Chiang, W.-L., Zheng, L., Gonzalez, J. E., & Stoica, I. (2023).
+> *Rethinking Benchmark and Contamination for Language Models with Rephrased
+> Samples* (Version 2). arXiv. https://doi.org/10.48550/ARXIV.2311.04850
+
+> Zeng, X., Hui, Y., Shen, J., Pavlo, A., McKinney, W., & Zhang, H. (2023). An
+> Empirical Evaluation of Columnar Storage Formats. *Proceedings of the VLDB
+> Endowment, 17*(2), 148–161. https://doi.org/10.14778/3626292.3626298

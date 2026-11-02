@@ -8,7 +8,9 @@ python -m embedding_model pairs prepare                        # every source
 python -m embedding_model pairs prepare --source nhanes phenx  # some of them
 ```
 
-A pair has two sides. Their names come from sentence-transformers:
+A pair has two sides. Their names come from
+[sentence-transformers](https://sbert.net), the library that Hugging Face
+maintains and that training uses:
 
 - the **anchor**: a text as a study might word a variable, such as a short
   name or a question;
@@ -25,6 +27,9 @@ anchor:   SVG (string)
 positive: Saphenous Vein Graft (string): A vessel graft comprised of the saphenous vein.
 ```
 
+[design_decisions.md](design_decisions.md#pairs) gives the reasons for the
+rules below.
+
 ## The shape: a star around each item
 
 Each source is read into items: a concept, a term, a code, a data element or a
@@ -32,7 +37,9 @@ variable. An item has one **canonical** text, the name that its source prefers,
 such as a thesaurus's preferred name or an ontology's label. Every other text
 of the item that means the same thing becomes one anchor. Its positive is the
 canonical, with the item's type, description and values. Each item is the
-centre of a star, and no pair joins two of its other texts.
+centre of a star: each pair joins the canonical to one other text. For
+example, `BMI` and "Quetelet Index" are both anchors of the canonical "Body
+Mass Index". They are never paired with each other.
 
 There are four kinds of pair:
 
@@ -44,7 +51,9 @@ There are four kinds of pair:
 | `name_to_description` | the canonical, for an item with no other text | the description alone, with the type and values |
 
 When the item has a description, each other text gives two pairs: a `name`
-pair and a `name_description` pair.
+pair and a `name_description` pair. Another description gives no pair when
+its [`text_key`](leakage.md#how-two-texts-match) equals the canonical's or the
+first description's.
 
 ## What a pair holds
 
@@ -64,7 +73,7 @@ row is one pair:
 | `term_type` | what the anchor's text is: the source's own label, such as a synonym type or an alternate-name type, or else its field, such as `short name`; `canonical` and `description` for a canonical and another description |
 | `term_group` | `expansion` or `paraphrase`; see [Expansions and paraphrases](#expansions-and-paraphrases) |
 | `status` | `current`, `retired` or `draft`: the status of the item the anchor's text comes from |
-| `study` | the dbGaP studies the anchor's text comes from, joined by `\|`, if any |
+| `study` | the dbGaP studies the anchor's text comes from, joined by `\|`, if any. Only [PhenX](#phenx)'s pairs have one |
 | `value_list` | the name of the positive's value list, where a source names its lists |
 | `anchor_name`, `anchor_type`, `anchor_description`, `anchor_values` | four columns: the fields the anchor was formatted from |
 | `positive_name`, `positive_type`, `positive_description`, `positive_values` | four columns: the fields the positive was formatted from |
@@ -144,7 +153,7 @@ source's section names the fields that hold them.
 
 ### Retired items
 
-Retired items are used too, since older studies use their wording:
+Retired items are used too:
 
 - A source can name a replacement for a retired item. The retired item's
   canonical and texts then become anchors of the replacement's canonical.
@@ -152,6 +161,10 @@ Retired items are used too, since older studies use their wording:
   item that is not retired.
 - A retired item without a replacement keeps its own canonical. Its texts are
   used only when no current or draft item has them.
+
+A retired item's texts are compared with the current and draft items' texts
+by their [`text_key`](leakage.md#how-two-texts-match). So a retired
+`blood_pressure` matches a current `Blood Pressure`.
 
 Draft items are used like current items. The `status` column keeps them
 apart, so a training run can leave them out.
@@ -164,9 +177,9 @@ used for each of them. The manifest counts such texts.
 ### Duplicates
 
 Each item is read once, by its source's id. Two pairs are copies when the
-[tokenizer](tokenizer.md) normalises their texts to the same two texts. The
-model cannot tell copies apart, so only the first copy is kept, as it is
-written. It keeps the studies of every copy. For example:
+[tokenizer](tokenizer.md) normalises their texts to the same two texts. Only
+the first copy is kept, as it is written. It keeps the studies of every copy.
+For example:
 
 | one pair | another pair | copies? |
 |---|---|---|
@@ -176,8 +189,8 @@ written. It keeps the studies of every copy. For example:
 
 `corpus build` combines the sources into one [corpus](corpus.md). A pair that
 two sources share is then kept only in the earlier source.
-[Each source](#each-source) lists the sources in this order. NCIt comes first,
-since CDISC publishes its terms as NCIt subsets. `pairs prepare` prints how
+[Each source](#each-source) lists the sources in this order, with NCIt first.
+`pairs prepare` prints how
 many pairs each source shares with an earlier source in the same run.
 
 ### Values
@@ -222,7 +235,7 @@ Every text is cleaned the same way:
 - HTML tags are removed. Other text in angle brackets is kept, as in
   "Candida <Debaryomycetaceae> infection";
 - Unicode is normalised;
-- characters that hold no text are removed, as BERT's text cleaning removes
+- characters that hold no text are removed, as BERT's tokenizer removes
   them: control, format and private-use characters, such as zero-width
   spaces and direction marks;
 - each run of whitespace becomes one space.

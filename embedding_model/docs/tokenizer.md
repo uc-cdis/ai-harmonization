@@ -3,7 +3,8 @@
 A tokenizer cuts a text into tokens: words, pieces of words and punctuation
 marks. Each token in its vocabulary has a number, the token's id. `tokenizer
 train` learns the vocabulary from a [corpus](corpus.md)'s training pairs, by
-[byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5):
+[byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
+It uses Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers) library:
 
 ```
 python -m embedding_model tokenizer train --corpus all-sources                # 16,000 tokens: all-sources-16k
@@ -25,14 +26,17 @@ with made-up ids:
 The first two texts get the same ids, so the model cannot tell them apart.
 The last one is cut into two tokens when `heartrate` is not a token itself.
 
+[design_decisions.md](design_decisions.md#tokenizer) gives the reasons for the
+tokenizer's settings.
+
 ## What a tokenizer does
 
 It cuts a text into tokens in three steps:
 
 | step | what it does | example |
 |---|---|---|
-| 1. normalize | removes control, format and private-use characters, as BERT does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
-| 2. split | splits at whitespace and at every punctuation character, as BERT does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
+| 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
+| 2. split | splits at whitespace and at every punctuation character, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
 | 3. cut into tokens | cuts each piece into vocabulary tokens, by byte-pair encoding (BPE) | `heartrate` -> `heart`, `rate`, if `heartrate` is not a token itself |
 
 The same rules run at two times:
@@ -127,14 +131,13 @@ prints a note, and the manifest records the size that was reached.
 ## Special tokens
 
 Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
-`[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses two of them:
-
-- `[PAD]` fills a short text in a batch;
-- `[UNK]` stands for a character that the training texts never had.
-
-The other three come from BERT's convention. A text that holds a special
-token's name, such as `[PAD]`, is read as that token, as in every Hugging
-Face tokenizer.
+`[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them:
+`[UNK]` stands for a character that the training texts never had.
+The `StaticEmbedding` module of [sentence-transformers](https://sbert.net),
+which Hugging Face maintains, pads nothing. A BERT model needs the other
+four: `[PAD]`, for one, fills a short text in a batch. A text that holds
+a special token's name, such as `[PAD]`, is read as that token, as in every
+Hugging Face tokenizer.
 
 ## What it learns from
 
@@ -183,7 +186,7 @@ its own code for each rule that the file names. The file holds:
 
 | field | what it holds | where it comes from |
 |---|---|---|
-| `normalizer` | [step 1](#step-1-normalize): BERT's cleaning, NFD, lowercase, no accents | the code, fixed |
+| `normalizer` | [step 1](#step-1-normalize): BERT's tokenizer: cleaning, NFD, lowercase, no accents | the code, fixed |
 | `pre_tokenizer` | [step 2](#step-2-split): `BertPreTokenizer` | the code, fixed |
 | `model` | [step 3](#step-3-cut-into-tokens): BPE's tokens and merges | learned from the training texts |
 | `added_tokens` | the [special tokens](#special-tokens) | the code, fixed |

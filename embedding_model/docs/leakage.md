@@ -3,6 +3,7 @@
 `corpus build` drops every training pair that would leak a benchmark. It does
 so after it combines the sources, and before it splits the pairs into training
 and validation pairs (see [corpus.md](corpus.md)). This doc gives the rules.
+[design_decisions.md](design_decisions.md#corpus) gives the reasons for them.
 
 A pair leaks a benchmark when it holds one of the benchmark's mappings, or
 when it comes from one of the benchmark's studies. A model trained on such a
@@ -43,9 +44,8 @@ an answer key, and it is dropped.
 Each side of a pair is a text formatted from its fields: a name, a type, a
 description and values. For example, the anchor `ABCD_SC (integer)` is
 formatted from the name `ABCD_SC` and the type `integer`. Leakage prevention
-compares the name and description fields rather than the formatted texts. The
-same name can come with another type or other values, and its formatted text
-then differs. The fields compared are:
+compares the name and description fields rather than the formatted texts.
+The fields compared are:
 
 | side | fields compared |
 |---|---|
@@ -53,9 +53,8 @@ then differs. The fields compared are:
 | a benchmark's source variable | its name and its description |
 | each of its expected targets | its property name, without the node, and its description |
 
-Every side text is compared, since some pairs keep a description in a name
-field. Values are never compared: a common list, such as
-`Unknown | Not Reported | No | Yes`, matches many targets.
+Every side text is compared, whatever its field. Values are never
+compared.
 
 ### How two texts match
 
@@ -69,8 +68,9 @@ changes:
 - case folding, which also makes `ß` and `ss` equal;
 - punctuation turned into spaces.
 
-After these changes, two texts match in one of three ways. Each way has a
-mark:
+These changes give each text its `text_key`, as `pairs.common.text_key`
+writes it. Two texts match by their `text_key` in one of three ways. Each way
+has a mark:
 
 | way | mark | for |
 |---|---|---|
@@ -157,8 +157,8 @@ The anchor `Waist in cm` of the example above gives two pairs:
 A pair gets the finding `benchmark_study` when its `study` holds the source
 study of a benchmark row. For example, a benchmark row comes from the study
 `phs999901`. Every pair made from a dbGaP variable of `phs999901` is then
-dropped. The study rule catches what text matching cannot see: the other
-variables of a benchmark's studies.
+dropped. Only PhenX's pairs have a study: PhenX maps its variables to dbGaP
+study variables (see [pairs.md](pairs.md#phenx)).
 
 A pair that several sources share is kept once, and it takes the studies of
 all its copies. So the study rule also sees a copy that came from a

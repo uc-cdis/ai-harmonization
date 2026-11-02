@@ -4,7 +4,8 @@ A manifest says what a build was made from, and what it made. Benchmarks,
 training sources, their pairs, corpora and tokenizers all have them, and they
 work the same way. Here, "a build" means a benchmark build, a source fetch,
 the preparation of a source's pairs, a corpus build or a tokenizer's
-training.
+training. [design_decisions.md](design_decisions.md#all-steps) gives the
+reasons for manifests and their checksums.
 
 ## The committed manifest and the build's own
 

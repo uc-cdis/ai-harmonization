@@ -20,6 +20,8 @@ train the tokenizer on the training pairs alone.
 `corpus build` prints how many pairs each step keeps and drops, and the
 corpus's manifest records the counts. They depend on the sources and the
 benchmarks of the build.
+[design_decisions.md](design_decisions.md#corpus) gives the reasons for the
+rules below.
 
 The build stops, and writes no corpus, in three cases:
 
@@ -38,8 +40,7 @@ copies when the tokenizer
 [normalises](tokenizer.md#step-1-normalize) their texts to the same two texts.
 [pairs.md](pairs.md#duplicates) shows examples. The pair kept takes the
 studies of all its copies, so the
-[study rule](leakage.md#the-study-rule-benchmark_study) still sees them. NCIt comes
-first, since CDISC publishes its terms as NCIt subsets.
+[study rule](leakage.md#the-study-rule-benchmark_study) still sees them.
 
 ## Leakage prevention
 
@@ -58,13 +59,14 @@ corpus can use a larger share, so that validation holds enough pairs.
 All pairs of a group go to the same side. A group holds one or more items,
 with all their pairs. Two items are in one group when they share:
 
-- an NCIt concept code. NCIt's concepts and CDISC's terms are both keyed by
-  it, so a CDISC term joins its NCIt concept. The other sources' items have
-  keys of their own, which never match across sources;
-- or a canonical text, compared as
-  [leakage prevention](leakage.md#how-two-texts-match) compares texts: after
-  the tokenizer's normalisation, with case folded and punctuation turned into
-  spaces. [Each source](pairs.md#each-source) lists each source's canonical.
+- an `item_id`: an item's source and id, such as `cadsr:9999901`. NCIt's
+  concepts and CDISC's terms both take NCIt's concept code, such as
+  `ncit:C999901`, so a CDISC term joins its NCIt concept. The other sources'
+  `item_id` values never match across sources;
+- or a canonical text's `text_key`, as
+  [leakage prevention](leakage.md#how-two-texts-match) compares texts: the text
+  after the tokenizer's normalisation, with case folded and punctuation turned
+  into spaces. [Each source](pairs.md#each-source) lists each source's canonical.
   For example, an NCIt concept's canonical is `Inverted Urothelial Papilloma`,
   and an ontology term's is `inverted urothelial-papilloma`. Compared this
   way, they are one text. A canonical made of punctuation alone links
@@ -76,8 +78,8 @@ has pairs on both sides. A pair that two sources share is kept once, in the
 earlier source's item, so it goes to that item's group.
 
 A hash of the group decides its side, with no random draw and no seed. The
-hash reads the group's key: the first key of its items in sorted order, such
-as `cadsr:9999901` or `ncit:C999901`. It puts each group into one of 1,000
+hash reads the group's `group_id`: the first `item_id` of its items in sorted
+order, such as `cadsr:9999901` or `ncit:C999901`. It puts each group into one of 1,000
 buckets, numbered 0 to 999. The first buckets go to validation, and the rest
 to training:
 
@@ -93,9 +95,6 @@ not exactly that share.
 A build from the same sources and the same benchmarks gives the same split.
 When a source or a benchmark changes, the groups can change, and so can the
 split.
-
-The split is not stratified. Each source has many groups, so its share of
-validation pairs is close to the share asked for.
 
 ## What a corpus holds
 

@@ -219,8 +219,9 @@ licensing restrictions", on its
 **License:** NLM's [web policies](https://www.nlm.nih.gov/web_policies.html)
 state that U.S. government works on its sites "may be freely used or reproduced
 without permission in the U.S.". Content contributed by others may be
-copyrighted. Each element's `copyrightStatus` says which: only "Public domain,
-free to use" is open.
+copyrighted. Each element's `copyrightStatus` and `noRenderAllowed` say which:
+an element is open when its status is "Public domain, free to use" and
+`noRenderAllowed` is not true.
 
 **SPDX:** `LicenseRef-NLM-Web-Policies`.
 

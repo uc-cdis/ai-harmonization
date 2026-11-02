@@ -1,9 +1,10 @@
 """The NIH CDE Repository: each data element, around its first designation.
 
-The source side holds the element's other designations, whatever their tags.
-The word "Deprecated" is removed from those that start with it. A designation
-is a question text when a tag names a question, such as ``Preferred Question
-Text``, or when it ends with a question mark.
+The source side holds the element's other designations whose tags are all
+name or question tags, in ``NAME_TAGS``. The word "Deprecated" is removed
+from those that start with it. A designation is a question text when a tag
+names a question, such as ``Preferred Question Text``, or when it ends with a
+question mark.
 
 The description is the first definition, and the other definitions are paired
 with it. NCI's elements copy their definitions from caDSR, so they are cleaned

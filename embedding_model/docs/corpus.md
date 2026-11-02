@@ -59,8 +59,8 @@ corpus can use a larger share, so that validation holds enough pairs.
 All pairs of a group go to the same side. A group holds one or more items,
 with all their pairs. Two items are in one group when they share:
 
-- an `item_id`: an item's source and id, such as `cadsr:9999901`. NCIt's
-  concepts and CDISC's terms both take NCIt's concept code, such as
+- an `item_id`: an item's source and id, such as `cadsr:9999901`. [NCIt](sources.md#ncit)'s
+  concepts and [CDISC](sources.md#cdisc)'s terms both take NCIt's concept code, such as
   `ncit:C999901`, so a CDISC term joins its NCIt concept. The other sources'
   `item_id` values never match across sources;
 - or a canonical text's `text_key`, as

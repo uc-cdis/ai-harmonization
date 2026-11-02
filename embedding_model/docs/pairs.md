@@ -73,7 +73,7 @@ row is one pair:
 | `term_type` | what the anchor's text is: the source's own label, such as a synonym type or an alternate-name type, or else its field, such as `short name`; `canonical` and `description` for a canonical and another description |
 | `term_group` | `expansion` or `paraphrase`; see [Expansions and paraphrases](#expansions-and-paraphrases) |
 | `status` | `current`, `retired` or `draft`: the status of the item the anchor's text comes from |
-| `study` | the dbGaP studies the anchor's text comes from, joined by `\|`, if any. Only [PhenX](#phenx)'s pairs have one |
+| `study` | the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) studies the anchor's text comes from, joined by `\|`, if any. Only [PhenX](#phenx)'s pairs have one |
 | `value_list` | the name of the positive's value list, where a source names its lists |
 | `anchor_name`, `anchor_type`, `anchor_description`, `anchor_values` | four columns: the fields the anchor was formatted from |
 | `positive_name`, `positive_type`, `positive_description`, `positive_values` | four columns: the fields the positive was formatted from |
@@ -114,7 +114,7 @@ The canonical is the source's own preferred field.
 
 A text is an anchor only when its source marks it as the same thing as the
 canonical. So ontology synonyms that are only related, broader or narrower
-are left out. LOINC's related names are left out too. Each source's section
+are left out. [LOINC](#loinc)'s related names are left out too. Each source's section
 lists the texts that it uses.
 
 ### Names
@@ -141,7 +141,7 @@ text decides it, so every kind of pair can have either group.
 | `paraphrase` | words, or a phrase | Heart Attack -> Myocardial Infarction; Adalat -> Nifedipine; Pre-Operative -> Preoperative; Galectin-10 -> Eosinophil Lysophospholipase |
 | `paraphrase` | a question text, whatever its shape | "Are you pregnant now?" -> Current Pregnancy Indicator; "Date of Birth" -> Person Birth Date |
 
-The examples come from NCIt, caDSR and the NIH CDE. Words joined by "-" or
+The examples come from [NCIt](#ncit), [caDSR](#cadsr) and the [NIH CDE](#nih-cde). Words joined by "-" or
 "/" are a paraphrase when one of them has five letters or more, as in
 `Pre-Operative` and `Galectin-10`. Otherwise they are a short form, as
 `Val-Trp` is. The rule looks only at shape, so `Long-Term` is an expansion
@@ -219,7 +219,7 @@ pairs once for each distinct list.
 
 A source's own type word is kept, such as `Value List`. When a
 source has none, the type is `string/encoded` for an item with values and
-`string` for one without. `ai_harmonization.dbgap` maps dbGaP's types to
+`string` for one without. `ai_harmonization.dbgap` maps [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)'s types to
 these same words. An anchor takes its item's type word, or `string` when
 there is none.
 
@@ -235,7 +235,7 @@ Every text is cleaned the same way:
 - HTML tags are removed. Other text in angle brackets is kept, as in
   "Candida <Debaryomycetaceae> infection";
 - Unicode is normalised;
-- characters that hold no text are removed, as BERT's tokenizer removes
+- characters that hold no text are removed, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) removes
   them: control, format and private-use characters, such as zero-width
   spaces and direction marks;
 - each run of whitespace becomes one space.
@@ -275,7 +275,7 @@ it is removed from a description.
 
 NCIt, caDSR and NIH CDE add notices about Executive Order 14168 to some
 definitions. One reads: "This content is being reviewed for compliance with
-Executive Order 14168 ...". CDISC copies NCIt's notices. A notice says
+Executive Order 14168 ...". [CDISC](#cdisc) copies NCIt's notices. A notice says
 nothing about the concept, so it is removed from a description. A description
 that was only a notice, as some retired NCIt concepts have, is dropped.
 
@@ -289,14 +289,14 @@ does not name is read as current, and `pairs prepare` prints it.
 
 | source | canonical (the positive's name) | anchors | description | values | retired items replaced by |
 |---|---|---|---|---|---|
-| [NCIt](#ncit) | the preferred name | synonyms of the same meaning | the first definition, NCI's where there is one | each registry's list | EVS's history |
+| [NCIt](#ncit) | the preferred name | synonyms of the same meaning | the first definition, NCI's where there is one | each registry's list | [EVS](https://evs.nci.nih.gov/)'s history |
 | [Ontologies](#ontologies) | the label | EXACT synonyms | the definition | none | "term replaced by" |
 | [LOINC](#loinc) | the long common name | short and display names, question texts | the definition | the default answer list | the MapTo file |
 | [CDISC](#cdisc) | a term's NCI Preferred Term; a codelist's Codelist Name | submission values, synonyms, question texts | the first definition | a codelist's terms | none |
 | [NIH CDE](#nih-cde) | the first designation | the other designations | the first definition | the value meanings | none |
 | [caDSR](#cadsr) | the long name | the short name, alternate names, question texts | the definition | the value meanings | none |
 | [NHANES](#nhanes) | the codebook's English Text | the variable's name and labels | none | the value labels | none |
-| [PhenX](#phenx) | the variable's description | the variable's name, and mapped dbGaP variables | none | the value labels | none |
+| [PhenX](#phenx) | the variable's description | the variable's name, and mapped [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | none | the value labels | none |
 
 ### NCIt
 

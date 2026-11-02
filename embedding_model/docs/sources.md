@@ -13,16 +13,16 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 
 | source | what it holds | fetched from | release read |
 |---|---|---|---|
-| [NCIt](#ncit) | biomedical concepts, such as diseases and drugs: their synonyms, definitions and registries' value lists | EVS's OWL release archive | the version that the manifest pins, such as `26.09d` |
+| [NCIt](#ncit) | biomedical concepts, such as diseases and drugs: their synonyms, definitions and registries' value lists | [EVS](https://evs.nci.nih.gov/)'s [OWL](https://www.w3.org/OWL/) release archive | the version that the manifest pins, such as `26.09d` |
 | [Ontologies](#ontologies) | diseases (MONDO), symptoms (HP), anatomy (Uberon), traits (OBA), measurements (CMO, MMO) and data use (DUO): terms, synonyms, definitions | each ontology's OWL release | the release date that the manifest pins; for CMO and MMO, their current state, kept after the first fetch |
 | [LOINC](#loinc) | lab tests and clinical measurements: their names, question texts and answer lists | LOINC's download API, or a zip placed by hand | the version that the manifest pins, such as `2.83` |
 | [CDISC](#cdisc) | the terms that clinical trials report their data with: codelists and their terms | EVS's CDISC archive | each package's release date, as the manifest pins it |
 | [NIH CDE](#nih-cde) | data elements, the fields that studies collect: names, definitions and values | the repository's one-call export | its current state, kept after the first fetch |
 | [caDSR](#cadsr) | NCI's data elements: names, question texts and values | the daily bulk XML snapshot | the snapshot date that the manifest pins |
 | [NHANES](#nhanes) | a US health survey's variables: their questions and value labels | the variable-list and codebook pages | their current state, kept after the first fetch |
-| [PhenX](#phenx) | standard study measures' variables, and their mappings to dbGaP variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
+| [PhenX](#phenx) | standard study measures' variables, and their mappings to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
-The manifest records the SHA-256 of every file read, and a new fetch is
+The manifest records the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every file read, and a new fetch is
 compared with it. [design_decisions.md](design_decisions.md#sources) gives the
 reasons for the fetch's rules.
 
@@ -83,7 +83,8 @@ reference. It also lists the fields that mark single items as restricted.
 
 ## NCIt
 
-The NCI Thesaurus is read from its OWL release in EVS's archive, such as
+The [NCI Thesaurus](https://evsexplore.semantics.cancer.gov/evsexplore/welcome) is read from its [OWL](https://www.w3.org/OWL/) release in
+[EVS's archive](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/), such as
 `NCI_Thesaurus/archive/26.09d_Release/Thesaurus_26.09d.OWL.zip`. The
 replacements of retired concepts come from the release's history file, in the
 same folder: `subset_cumulative_history_26.09d.zip`.
@@ -118,7 +119,7 @@ file of the same release is read with it.
 
 ## Ontologies
 
-Seven OBO Foundry ontologies are read. Ontologies reuse each other's terms: HP,
+Seven [OBO Foundry](https://obofoundry.org/) ontologies are read. Ontologies reuse each other's terms: HP,
 for example, uses Uberon's terms for body parts. Only each ontology's own terms
 are read, so each term is read once, from the ontology it belongs to.
 
@@ -139,13 +140,13 @@ abbreviation.
 
 | ontology | file read |
 |---|---|
-| MONDO, diseases | base release, such as `mondo/releases/<date>/mondo-base.owl` |
-| HP, phenotypes | base release |
-| Uberon, anatomy | base release |
-| OBA, biological attributes | base release |
-| CMO, clinical measurements | main file: no dated file can be downloaded, so its current state is kept |
-| MMO, measurement methods | main file, as for CMO |
-| DUO, data use | main release |
+| [MONDO](https://obofoundry.org/ontology/mondo.html), diseases | base release, such as `mondo/releases/<date>/mondo-base.owl` |
+| [HP](https://obofoundry.org/ontology/hp.html), phenotypes | base release |
+| [Uberon](https://obofoundry.org/ontology/uberon.html), anatomy | base release |
+| [OBA](https://obofoundry.org/ontology/oba.html), biological attributes | base release |
+| [CMO](https://obofoundry.org/ontology/cmo.html), clinical measurements | main file: no dated file can be downloaded, so its current state is kept |
+| [MMO](https://obofoundry.org/ontology/mmo.html), measurement methods | main file, as for CMO |
+| [DUO](https://obofoundry.org/ontology/duo.html), data use | main release |
 
 **Newer releases.** Each ontology's undated address, such as
 `https://purl.obolibrary.org/obo/mondo.owl`, serves its newest release. The
@@ -170,7 +171,7 @@ get it:
 - Download `Loinc_<version>.zip` from [loinc.org](https://loinc.org/downloads/)
   into `inputs/sources/downloads/loinc/`.
 
-Either way, the zip must have the MD5 checksum that the manifest pins. A
+Either way, the zip must have the [MD5](https://doi.org/10.17487/RFC1321) checksum that the manifest pins. A
 download must also have the MD5 that LOINC publishes for the release.
 
 | table | one row per | columns |
@@ -187,7 +188,7 @@ link by `AnswerListId`. An answer list has no restriction field of its own:
 it takes the `open` of the code that uses it.
 
 Codes of every status are kept: active, trial, discouraged and deprecated.
-The answer file's SNOMED CT codes and names are not read: LOINC's license
+The answer file's [SNOMED CT](https://www.snomed.org/) codes and names are not read: LOINC's license
 does not cover them. The fetch knows every column of the pinned release, read
 or not. A column that it does not know is printed, so that someone can review
 it.
@@ -203,7 +204,8 @@ records the new release's MD5.
 
 ## CDISC
 
-CDISC's controlled terminology is read as NCI EVS publishes it, in four
+CDISC's [controlled terminology](https://www.cdisc.org/standards/terminology/controlled-terminology) is read as
+[NCI EVS publishes it](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc), in four
 packages:
 
 - [SDTM](https://www.cdisc.org/standards/foundational/sdtm), the Study Data
@@ -224,7 +226,7 @@ Protocol package, so its last release is older than the others.
 | `terms` | codelist, or term of a codelist | `Code`, `Codelist Code`, `Codelist Extensible (Yes/No)`, `Codelist Name`, `CDISC Submission Value`, `CDISC Synonym(s)`, `CDISC Definition`, `NCI Preferred Term`, `package`, `open` |
 
 A term links to its codelist by `package` and `Codelist Code`. A codelist's
-own row has an empty `Codelist Code`. Every `Code` is an NCIt concept code.
+own row has an empty `Codelist Code`. Every `Code` is an [NCIt](#ncit) concept code.
 
 **Newer releases.** EVS publishes each package's terminology several times a
 year. A package's `Archive/` folder on EVS's server, such as
@@ -237,7 +239,7 @@ has its own date, so a package without a new release keeps its pin.
 
 ## NIH CDE
 
-The NIH Common Data Elements Repository serves only its current state. The
+The [NIH Common Data Elements Repository](https://cde.nlm.nih.gov/) serves only its current state. The
 fetch uses the export that `ai_harmonization.cde` uses, with retired elements
 included. The export is kept only when its count equals the total that the
 repository's search reports.
@@ -259,7 +261,7 @@ An element's `registration_status` says whether it is current, such as
 | `properties` | property | `tiny_id`, `key`, `value` |
 
 Some elements carry a copyright notice among their properties, such as
-LOINC's. Whether an element is open depends on its `copyrightStatus` and
+[LOINC](#loinc)'s. Whether an element is open depends on its `copyrightStatus` and
 `noRenderAllowed`, not on its properties.
 
 **Newer releases.** The repository serves only its current state, so there is
@@ -273,7 +275,7 @@ differs from the committed manifest is a new version, as
 
 ## caDSR
 
-The Cancer Data Standards Registry and Repository publishes a daily snapshot
+The [Cancer Data Standards Registry and Repository](https://cadsr.cancer.gov/) publishes a daily snapshot
 of its data elements, as a zip of XML files, such as
 `CDE/XML_Archive/releasedCDEsXML-OD.zip.2026-07-01`. A snapshot can hold an
 element's older versions: only the element's latest version is kept.
@@ -300,7 +302,7 @@ version, as [Making a new version](manifests.md#making-a-new-version) says.
 
 ## NHANES
 
-The National Health and Nutrition Examination Survey has no downloadable
+The [National Health and Nutrition Examination Survey](https://wwwn.cdc.gov/nchs/nhanes/) has no downloadable
 variable list. So the fetch reads its web pages: one variable-list page per
 component, such as Laboratory, and one codebook page per data file.
 
@@ -332,8 +334,8 @@ A fetch that differs from the committed manifest is a new version, as
 
 ## PhenX
 
-PhenX's database export holds its protocols, their variables and their
-availability. It also maps each variable to dbGaP variables of real studies.
+[PhenX](https://www.phenxtoolkit.org/)'s database export holds its protocols, their variables and their
+availability. It also maps each variable to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables of real studies.
 It is downloaded from
 `https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip`.
 That address serves only the latest export, so the zip is kept. A new PhenX

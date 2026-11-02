@@ -16,7 +16,7 @@ command line, from a checkout of this repository.
 The model is built, trained and scored with
 [sentence-transformers](https://sbert.net), the library for embedding models
 that UKP Lab created and Hugging Face maintains. Its trainer builds on the
-`Trainer` of Hugging Face's `transformers`. So a trained model is a
+`Trainer` of Hugging Face's [`transformers`](https://huggingface.co/docs/transformers). So a trained model is a
 sentence-transformers model, and it loads wherever one does.
 [docs/design_decisions.md](docs/design_decisions.md#the-model-is-built-trained-and-scored-with-sentence-transformers)
 says why.
@@ -36,7 +36,7 @@ says why.
   mappings, such as a benchmark variable paired with its expected target. A
   word that both share on its own, such as `age`, is kept: it is not leakage.
 - A trained model is used through `ai_harmonization`'s embedding approach,
-  like any other sentence-transformers model. It can be evaluated end to end
+  like any other [sentence-transformers](https://sbert.net) model. It can be evaluated end to end
   with `get_metrics_for_approach`
   (`ai_harmonization/harmonization_benchmark.py`).
 - `jupyter/embedding_model_training.ipynb` fine-tunes a pretrained model, while
@@ -51,7 +51,7 @@ uv pip install -e .
 ```
 
 `uv sync` also installs `embedding_model`'s own dependencies, such as
-BeautifulSoup and pyarrow. They are in the `embedding-model` dependency group
+[BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) and [pyarrow](https://arrow.apache.org/docs/python/). They are in the `embedding-model` dependency group
 of `pyproject.toml`, so installing `ai_harmonization` as a package leaves them
 out. With pip 25.1 or later, `pip install --group embedding-model` installs
 them.
@@ -64,7 +64,7 @@ and a series of experiments trains many models.
 
 A series' runs are trained in one of two ways:
 
-- `experiment submit` queues each run as its own SLURM job (`sbatch`), with
+- `experiment submit` queues each run as its own [SLURM](https://slurm.schedmd.com/) job (`sbatch`), with
   one GPU each, so they train in parallel. Use it on a cluster. Pass your
   cluster's settings, such as partition and time limit, through `--slurm`.
 - `experiment submit --local` trains them one after another on the machine that
@@ -129,7 +129,7 @@ python -m embedding_model experiment report embedding_model/examples/small_serie
 
 `--local` trains the fifteen runs on the machine, one after another. That is
 useful for a quick test on a laptop. Without `--local`, each run is submitted
-to SLURM as its own job, and they train at the same time.
+to [SLURM](https://slurm.schedmd.com/) as its own job, and they train at the same time.
 
 ## How the model works
 
@@ -195,7 +195,7 @@ rerun on its own.
 | | `tokenizer train --corpus <corpus> [--vocab-size <size>] [--min-frequency <n>] [--name <tokenizer>]` | learns the [tokenizer](docs/tokenizer.md)'s vocabulary from the corpus's training pairs | `inputs/tokenizers/<tokenizer>/` |
 | | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
 | one model | `train --config <config.yaml> --seed <seed>` | trains one model on its own | `outputs/independent_runs/` |
-| a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one SLURM job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
+| a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one [SLURM](https://slurm.schedmd.com/) job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
 | | `experiment status <series.yaml>` | says which runs are done, running or missing | -- |
 | | `experiment report <series.yaml>` | builds tables and figures, with each comparison's verdict | `outputs/series/<series>/` |
 | | `experiment pick <series.yaml>` | writes the series' pick record | `outputs/series/<series>/pick.md` |
@@ -229,10 +229,10 @@ explains:
 
 There are two benchmarks:
 
-- **[TOPMed](docs/benchmarks.md#topmed)**: dbGaP study variables mapped by experts
+- **[TOPMed](docs/benchmarks.md#topmed)**: [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study variables mapped by experts
   to the harmonized variables of the TOPMed Data Coordinating Center.
 - **[GDC](docs/benchmarks.md#gdc)**: the GDC-SM ground truth, published with the
-  Magneto paper: variables from cancer papers, mapped by experts to the GDC
+  [Magneto paper](https://doi.org/10.14778/3742728.3742757): variables from cancer papers, mapped by experts to the GDC
   data dictionary.
 
 [docs/benchmarks.md](docs/benchmarks.md) describes what each one is built from,
@@ -255,7 +255,7 @@ scores. Both folders are gitignored.
 That is useful for a full corpus's token cache, which can run to tens of
 gigabytes.
 
-The large tables, such as a corpus's pairs, are parquet files. The benchmarks
+The large tables, such as a corpus's pairs, are [parquet](https://parquet.apache.org/) files. The benchmarks
 and the scores are CSV files. To look at a parquet file, read it with pandas.
 Or open it in VS Code with an extension such as
 [Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) or Microsoft's
@@ -319,12 +319,12 @@ comparison tables or figures, since those come from comparing a series' runs.
 Of the files that the tools write, only the manifests of the benchmarks and the
 training sources are committed. They are under
 `embedding_model/benchmarks/manifests/` and
-`embedding_model/sources/manifests/`. A manifest holds the SHA-256 of every
+`embedding_model/sources/manifests/`. A manifest holds the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every
 file built, and the version and license of each input. So a rebuilt benchmark
 or a new fetch either matches its manifest or names what does not.
 [docs/manifests.md](docs/manifests.md) says how a new version is accepted. The
-files themselves carry third-party text, such as dbGaP variable descriptions,
-the GDC dictionary and LOINC's names. So they are built rather than
+files themselves carry third-party text, such as [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variable descriptions,
+the [GDC dictionary](docs/benchmarks.md#gdc) and [LOINC's names](docs/sources.md#loinc). So they are built rather than
 redistributed. [docs/licenses.md](docs/licenses.md) gives the license and
 reference of each benchmark and source.
 

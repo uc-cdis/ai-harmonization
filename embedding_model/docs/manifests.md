@@ -16,7 +16,7 @@ Each benchmark and each source has a manifest committed in git:
 
 It pins what the build is made from, such as a commit of a benchmark's
 documentation or a release of a source. It records each input that the build
-reads, by its version, its SHA-256 or both. A version can be a commit or a
+reads, by its version, its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) or both. A version can be a commit or a
 release, and a SHA-256 is that of a downloaded file, such as a zip. It also
 records each file that the build makes, with its row count and SHA-256. The
 code reads its pins from this file. So the code says how to build, and the
@@ -39,8 +39,8 @@ Every manifest has these fields. A field that does not apply is left out:
   kind of build that it is;
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
-- `files`: each file's row count, and its `sha256`, the SHA-256 of the
-  file's bytes. A table kept as parquet also has `content_sha256`, the SHA-256
+- `files`: each file's row count, and its `sha256`, the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the
+  file's bytes. A table kept as [parquet](https://parquet.apache.org/) also has `content_sha256`, the SHA-256
   of its content. That content is a line with its column names and types,
   then its rows as CSV. A missing value is written as `\N`, and each backslash
   in a text is written twice. No CSV file is written.
@@ -75,7 +75,7 @@ A checksum answers one of two questions:
 
 - **Do two builds hold the same data?** A new build is compared with its
   committed manifest, on any machine and with any library version. A table
-  kept as parquet is compared by its row count and its `content_sha256`. The
+  kept as [parquet](https://parquet.apache.org/) is compared by its row count and its `content_sha256`. The
   bytes of a parquet file depend on the library that wrote it, so its
   `sha256` is recorded but not compared. Any other file is compared by its
   row count and its `sha256`.
@@ -90,7 +90,7 @@ A new build compares its manifest with the committed one:
 
 - A file is the same when its row count and its checksum match, as the first
   question above says.
-- An input is the same when its SHA-256 matches, or its version where it has
+- An input is the same when its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) matches, or its version where it has
   no checksum.
 - Dates, counts, licenses and citations are not compared.
 

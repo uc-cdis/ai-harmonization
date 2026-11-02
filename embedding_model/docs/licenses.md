@@ -28,7 +28,7 @@ For the GDC benchmark, building on your machine is required: see [GDC](#gdc).
 [UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes).
 
 **License:** The documentation repository states no license. The benchmark
-also reads dbGaP's variable summaries, for its source variables' texts. They
+also reads [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)'s variable summaries, for its source variables' texts. They
 state no license either, and NCBI's
 [website policies](https://www.ncbi.nlm.nih.gov/home/about/policies/) do not
 cover them.
@@ -80,7 +80,7 @@ Cao, Clark and Dou, and `CC-BY-NC-ND-4.0` for the other seven.
 > of the VLDB Endowment*, *18*(8), 2681–2694.
 > https://doi.org/10.14778/3742728.3742757
 
-Each paper's table, with its SHA-256, and its article's DOI are listed in
+Each paper's table, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4), and its article's DOI are listed in
 `embedding_model/benchmarks/manifests/gdc.json`.
 
 ## Training sources
@@ -289,7 +289,7 @@ open.
 ## Restricted items
 
 Some sources also mark single items as restricted, in a field of their own.
-For example, LOINC marks a code whose content belongs to a third party. The
+For example, [LOINC](sources.md#loinc) marks a code whose content belongs to a third party. The
 fetch reads these restriction fields too. Each source's main table has an
 `open` column: true when the item's restriction field allows its use.
 `pairs prepare` uses only open items (see
@@ -297,16 +297,16 @@ fetch reads these restriction fields too. Each source's main table has an
 
 Where the field holds one of a list of values, an item is open only when its
 value is known to allow use. A value that the fetch has not seen before means
-the item is not open. The value is printed, so it can be reviewed. For caDSR,
+the item is not open. The value is printed, so it can be reviewed. For [caDSR](sources.md#cadsr),
 the field is the element's reference documents: each must be of a kind known
 to allow use. A Proprietary Measure Permission closes an element. A kind that
 the fetch has not seen before closes it too.
 
 | source | restriction field | open when |
 |---|---|---|
-| NCIt, ontologies, CDISC | none per item | always: the source's license covers every item |
+| [NCIt](sources.md#ncit), [ontologies](sources.md#ontologies), [CDISC](sources.md#cdisc) | none per item | always: the source's license covers every item |
 | LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
-| NIH CDE | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
+| [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
 | caDSR | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission" |
-| NHANES | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
-| PhenX | the protocol's availability | it is "Available" |
+| [NHANES](sources.md#nhanes) | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
+| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available" |

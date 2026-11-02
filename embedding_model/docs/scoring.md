@@ -47,14 +47,14 @@ the shape that the source and target texts are written in. Models are
 compared in the default shape, the one that this pipeline's models are trained
 in. A released model can also be scored in
 the shape of its own training samples: `name_description` for
-`uc-ctds/bge-large-en-v1.5-bio-mapping`, and `stdelement` for
+[`uc-ctds/bge-large-en-v1.5-bio-mapping`](https://huggingface.co/uc-ctds/bge-large-en-v1.5-bio-mapping), and `stdelement` for
 `uc-ctds/StdElement-Mapper`. `uc-ctds/StdElement-Mapper` is private: scoring
 it needs a Hugging Face login with access to it.
 
 `--benchmark` takes one or more benchmarks. `--benchmark topmed gdc` loads the
 model once and scores it on both.
 
-`score` checks each benchmark file against the SHA-256 that its manifest
+`score` checks each benchmark file against the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) that its manifest
 records. A file that differs stops scoring, and the error gives the command
 that rebuilds it. A build whose version is not the version committed under
 `embedding_model/benchmarks/manifests/` is scored, with a warning.
@@ -70,7 +70,7 @@ that rebuilds it. A build whose version is not the version committed under
 | `name_type_description` | `node.name (type): description`, what the harmonization approaches build unless given another formatter |
 | `name_type_description_values` | `node.name (type): description Values: a \| b` |
 | `name_type_values` | `node.name (type): Values: a \| b` |
-| `stdelement` | `name: ... \| description: ... \| values: a; b`, the shape of `uc-ctds/StdElement-Mapper`'s NCIt training pairs |
+| `stdelement` | `name: ... \| description: ... \| values: a; b`, the shape of `uc-ctds/StdElement-Mapper`'s [NCIt](sources.md#ncit) training pairs |
 
 `compact` writes the description, and the `": "` before it, only when a
 property has one. The formatters treat values the same way. A target
@@ -83,11 +83,11 @@ In every format but `stdelement`, a target's text includes its node, as in
 `vitals.body_weight (float): Body weight in kilograms`. `stdelement` leaves the
 node out, as StdElement-Mapper's training pairs do. So a property that several
 nodes carry alike has the same text in each. Each copy of a wrong target then
-takes a rank of its own. Identical texts tie. sentence-transformers 6
+takes a rank of its own. Identical texts tie. [sentence-transformers](https://sbert.net) 6
 breaks a tie by target key. Earlier releases break it in no fixed order.
 
 A source variable's text leaves its node out, in every format. Its node would
-be its dbGaP table, such as `pht999999.v1`, or the paper that it comes from.
+be its [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) table, such as `pht999999.v1`, or the paper that it comes from.
 The text starts at the variable's name: `body_weight (float): Body weight in
 kilograms`. The harmonization approaches do write a source's node, as in
 `pht999999.v1.body_weight (float): ...`.
@@ -134,5 +134,5 @@ It holds:
       that is, when a Python file of `ai_harmonization/` or `embedding_model/`
       was new or changed, or when `pyproject.toml` or `uv.lock` was changed.
       An uncommitted edit to any other file, such as a doc, leaves it false;
-  - the Python and sentence-transformers versions;
+  - the Python and [sentence-transformers](https://sbert.net) versions;
   - the benchmark's version and file checksums, from its manifest.

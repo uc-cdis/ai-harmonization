@@ -3,7 +3,7 @@
 Two benchmarks of expert mappings from study variables to data-model
 properties:
 
-- [TOPMed](#topmed): dbGaP study variables, mapped to TOPMed's harmonized
+- [TOPMed](#topmed): [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study variables, mapped to TOPMed's harmonized
   variables.
 - [GDC](#gdc): variables of cancer papers, mapped to the GDC data
   dictionary.
@@ -41,7 +41,7 @@ with two files and the manifest of its build:
 
 - **`<benchmark>_mappings.csv`**: one row per source variable, with its
   expected targets: the targets that the experts mapped it to. Any of them
-  counts as correct. Each is one mapping. GDC-SM's ground truth names a
+  counts as correct. Each is one mapping. [GDC-SM](#gdc)'s ground truth names a
   property without its node. So in the GDC benchmark, each node that carries
   the property gives a target of its own: see
   [Which targets a variable maps to](#which-targets-a-variable-maps-to).
@@ -50,7 +50,7 @@ with two files and the manifest of its build:
   expected targets. A format turns each row into the text that the model reads
   on the target side. [scoring.md](scoring.md#running-score) lists the formats.
 
-Scores on the two benchmarks do not compare. The TOPMed benchmark's targets
+Scores on the two benchmarks do not compare. The [TOPMed benchmark](#topmed)'s targets
 are nearly all some variable's expected target, and the GDC benchmark's
 mostly are not.
 
@@ -80,7 +80,7 @@ for is left empty.
 
 | column | what it holds | TOPMed | GDC |
 |---|---|---|---|
-| `source_study_id` | the dbGaP study of the variable's cohort, without its version | the variable's study: `phs000956` | the study of the paper's cohort: `phs001287` |
+| `source_study_id` | the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study of the variable's cohort, without its version | the variable's study: `phs000956` | the study of the paper's cohort: `phs001287` |
 | `source_table_id` | the table that holds the variable | its dbGaP table, at the version cited: `pht005002.v1` | the paper, named as in GDC-SM: `Clark` |
 | `source_variable_id` | the variable's own identifier | its dbGaP variable, at the version cited: `phv00252986.v1` | empty: GDC-SM gives none |
 | `source_variable_name` | the variable's name in its table | `cac_agatston_score` | `Race` |
@@ -111,7 +111,7 @@ experts cited, because their text comes from that release.
 Each benchmark has a manifest committed as
 `embedding_model/benchmarks/manifests/<benchmark>.json`. It pins what the
 benchmark is built from, such as the TOPMed documentation's commit or the
-GDC-SM ground truth's Zenodo record. Each build writes its own manifest beside
+GDC-SM ground truth's [Zenodo record](https://doi.org/10.5281/zenodo.14963588). Each build writes its own manifest beside
 the files, as `manifest.json`, with the date in `built`. An input's `role` is
 `mappings`, `source text` or `targets`. Its `counts` hold what the build
 prints:
@@ -126,7 +126,7 @@ against it, and how to make a new version.
 
 ## TOPMed
 
-dbGaP study variables mapped by the experts of the TOPMed Data Coordinating
+[dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study variables mapped by the experts of the [TOPMed](https://topmed.nhlbi.nih.gov/) Data Coordinating
 Center to its harmonized variables.
 
 It is built from the Center's harmonized phenotype documentation,
@@ -153,7 +153,7 @@ column is a target, written `node.property` with the dataset as the node:
   description and values of its documentation file (`data_type`,
   `description`, `encoded_values`);
 - the age, `atherosclerosis.age_at_cac_score_1` (70 targets), described "age
-  at measurement of cac_score_1 (years)", as the BioData Catalyst data model
+  at measurement of cac_score_1 (years)", as the [BioData Catalyst](https://biodatacatalyst.nhlbi.nih.gov/) data model
   describes the same properties.
 
 ### Which target a variable maps to
@@ -216,24 +216,24 @@ documentation.
 ## GDC
 
 Variables from the supplementary tables of cancer papers, mapped by experts
-to the GDC data dictionary.
+to the [GDC data dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/).
 
 It is built from three published inputs:
 
-- the ground truth of **GDC-SM**, the GDC Schema Matching Benchmark: the
+- the ground truth of **[GDC-SM](https://doi.org/10.5281/zenodo.14963588)**, the GDC Schema Matching Benchmark: the
   mappings from a paper's variable to a GDC property;
 - the papers' **supplementary tables**, downloaded from their
   publishers, for each variable's type and values. They are prepared as
   GDC-SM's own download script prepares them (`gdc_download.py` in the Zenodo
   record). GDC-SM describes no variable, so the description is empty.
-- the **GDC submission dictionary**, as the GDC API serves it, for the targets.
+- the **GDC submission dictionary**, as the [GDC API](https://docs.gdc.cancer.gov/API/Users_Guide/Getting_Started/) serves it, for the targets.
 
 The ground truth names each property without its node. Each node that
 carries the property gives an expected target, as
 [Which targets a variable maps to](#which-targets-a-variable-maps-to) says.
 So one mapping of the ground truth can give several expected targets.
 
-Each variable's study is the dbGaP study of its paper's cohort:
+Each variable's study is the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study of its paper's cohort:
 
 | GDC project | dbGaP study | papers |
 |---|---|---|
@@ -259,7 +259,7 @@ text that they build. These properties are not targets:
 The GDC API serves only the current dictionary. So the first build keeps it in
 `downloads/gdc/dictionary/`, with the API's status, which names the data
 release. Later builds read that copy. The manifest records the data release
-and the SHA-256 of the dictionary's content, with keys sorted.
+and the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the dictionary's content, with keys sorted.
 
 To build from a newer dictionary, move `downloads/gdc/dictionary/` aside, for
 example to `downloads/gdc/dictionary.old/`, and build again. The build keeps

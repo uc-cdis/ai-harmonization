@@ -37,7 +37,7 @@ It cuts a text into tokens in three steps:
 |---|---|---|
 | 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
 | 2. split | splits at whitespace and at every punctuation character, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
-| 3. cut into tokens | cuts each piece into vocabulary tokens, by byte-pair encoding (BPE) | `heartrate` -> `heart`, `rate`, if `heartrate` is not a token itself |
+| 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `heartrate` -> `heart`, `rate`, if `heartrate` is not a token itself |
 
 The same rules run at two times:
 
@@ -102,7 +102,7 @@ how BPE learns those tokens.
 
 ## How BPE learns its vocabulary
 
-BPE starts from the single characters of the training texts. It then finds
+[BPE](https://huggingface.co/learn/llm-course/chapter6/5) starts from the single characters of the training texts. It then finds
 the two adjacent tokens that occur together most often, and merges them into
 a new token. It repeats this until the vocabulary has its size. A common word
 ends as one token. A rare word is cut into pieces that are tokens, so it is
@@ -134,7 +134,7 @@ Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
 `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them:
 `[UNK]` stands for a character that the training texts never had.
 The `StaticEmbedding` module of [sentence-transformers](https://sbert.net),
-which Hugging Face maintains, pads nothing. A BERT model needs the other
+which Hugging Face maintains, pads nothing. A [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert) model needs the other
 four: `[PAD]`, for one, fills a short text in a batch. A text that holds
 a special token's name, such as `[PAD]`, is read as that token, as in every
 Hugging Face tokenizer.
@@ -160,7 +160,7 @@ holds three words.
 
 The diagnostics show whether the tokenizer works. A broken tokenizer shows
 at once, for example as unknown tokens or a high fertility. Fertility and the
-share of words split are the measures of Rust et al. (2021).
+share of words split are the measures of [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243).
 
 **Reference:**
 
@@ -181,7 +181,7 @@ failed training leaves the previous tokenizer as it was; see
 ### `tokenizer.json`
 
 The tokenizer's rules and its vocabulary, in one file. Hugging Face
-`tokenizers` reads it, with `Tokenizer.from_file("tokenizer.json")`, and runs
+[`tokenizers`](https://huggingface.co/docs/tokenizers/v0.23.2/en/quicktour) reads it, with `Tokenizer.from_file("tokenizer.json")`, and runs
 its own code for each rule that the file names. The file holds:
 
 | field | what it holds | where it comes from |
@@ -196,7 +196,7 @@ its own code for each rule that the file names. The file holds:
 The tokenizer's manifest, with the fields that
 [manifests.md](manifests.md#its-fields) lists:
 
-- `files`: `tokenizer.json`, with its SHA-256;
+- `files`: `tokenizer.json`, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4);
 - `sources`: the corpus, with its kept pairs' checksums;
 - `settings`: the vocabulary size asked for, the minimum frequency, and the
   version of `tokenizers`, since the bytes of `tokenizer.json` depend on it.

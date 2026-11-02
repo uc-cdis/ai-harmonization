@@ -18,7 +18,7 @@ two kinds:
 | finding | what it means | its rule |
 |---|---|---|
 | `answer_key` | the pair holds a mapping: a source variable on one side, one of its expected targets on the other | [the answer key rule](#the-answer-key-rule-answer_key) |
-| `benchmark_study` | the pair comes from a dbGaP variable of a benchmark's study | [the study rule](#the-study-rule-benchmark_study) |
+| `benchmark_study` | the pair comes from a [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variable of a benchmark's study | [the study rule](#the-study-rule-benchmark_study) |
 
 Each benchmark is checked on its own, with the same rules, and a pair is
 dropped if any benchmark finds it. Against one benchmark, a pair has at most
@@ -156,7 +156,7 @@ The anchor `Waist in cm` of the example above gives two pairs:
 
 A pair gets the finding `benchmark_study` when its `study` holds the source
 study of a benchmark row. For example, a benchmark row comes from the study
-`phs999901`. Every pair made from a dbGaP variable of `phs999901` is then
+`phs999901`. Every pair made from a [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variable of `phs999901` is then
 dropped. Only PhenX's pairs have a study: PhenX maps its variables to dbGaP
 study variables (see [pairs.md](pairs.md#phenx)).
 

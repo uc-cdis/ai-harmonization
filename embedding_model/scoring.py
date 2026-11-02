@@ -10,8 +10,6 @@ first k. It is what a reviewer of the top k suggestions sees.
 """
 
 import json
-import os
-import platform
 import sys
 import tempfile
 from datetime import datetime
@@ -22,21 +20,14 @@ import pandas as pd
 import yaml
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
-from embedding_model import manifests
 from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
 from embedding_model.folders import staged
+from embedding_model.manifests import file_sha256
+from embedding_model.provenance import code_commit, library_versions, model_revision
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 3, 5, 10)
 METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
-# The files whose changes can change a score, as git pathspecs from the top of
-# the checkout.
-CODE_PATHS = [
-    ":(top,glob)ai_harmonization/**/*.py",
-    ":(top,glob)embedding_model/**/*.py",
-    ":(top)pyproject.toml",
-    ":(top)uv.lock",
-]
 # sentence-transformers' own default, in encode() and in its
 # InformationRetrievalEvaluator.
 BATCH_SIZE = 32
@@ -109,6 +100,78 @@ def evaluator_class():
     return InformationRetrievalEvaluator
 
 
+def ranking_evaluator(
+    model,
+    queries,
+    corpus,
+    relevant,
+    batch_size=BATCH_SIZE,
+    name="",
+    write_predictions=False,
+    cutoff=None,
+):
+    """An InformationRetrievalEvaluator that ranks as the approaches rank.
+
+    Every text of the corpus is ranked for each query, by cosine similarity.
+    Scoring ranks a benchmark's targets with it, and MRR is computed over the
+    whole ranking. Training ranks the validation pairs' positives, with a
+    cutoff: the evaluator keeps each query's hits in Python lists, so a whole
+    ranking of tens of thousands of positives for each of tens of thousands of
+    queries would not fit.
+
+    Args:
+        model (SentenceTransformer): The model, for its default prompt.
+        queries (dict[str, str]): The query texts, by id.
+        corpus (dict[str, str]): The texts to rank, by id.
+        relevant (dict[str, set[str]]): Each query's relevant corpus ids.
+        batch_size (int): Texts encoded at a time.
+        name (str): The evaluator's name, which starts the names of its
+            metrics, such as ``validation_cosine_mrr@<corpus size>``.
+        write_predictions (bool): Whether the evaluator writes each query's
+            full ranking when it is given a folder.
+        cutoff (int | None): The last rank that the metrics count: MRR@cutoff,
+            and the evaluator's other metrics at most at the cutoff. None
+            counts the whole ranking.
+
+    Returns:
+        InformationRetrievalEvaluator: The evaluator.
+    """
+    # The approaches embed both sides with model.encode(), which adds only the
+    # model's default prompt, if its config names one. Left alone, the
+    # evaluator would add the model's "query" and "document" prompts instead.
+    #
+    # The approaches rank by cosine similarity, even when a model's config
+    # names another similarity function. So the evaluator ranks by cosine too.
+    from sentence_transformers.util import cos_sim
+
+    prompt = model.prompts.get(model.default_prompt_name, "")
+    # The evaluator also computes precision, recall, nDCG and MAP, at its own
+    # default cutoffs. With a cutoff, none of them looks further.
+    limits = {}
+    if cutoff is not None:
+        limits = {
+            "precision_recall_at_k": [cutoff],
+            "ndcg_at_k": [cutoff],
+            "map_at_k": [cutoff],
+        }
+    return evaluator_class()(
+        queries=queries,
+        corpus=corpus,
+        relevant_docs=relevant,
+        query_prompt=prompt,
+        corpus_prompt=prompt,
+        score_functions={"cosine": cos_sim},
+        mrr_at_k=[cutoff or len(corpus)],
+        accuracy_at_k=[k for k in ACCURACY_AT_K if cutoff is None or k <= cutoff],
+        **limits,
+        batch_size=batch_size,
+        name=name,
+        show_progress_bar=False,
+        write_csv=False,
+        write_predictions=write_predictions,
+    )
+
+
 def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_SIZE):
     """Rank every target for each source, and score the ranks.
 
@@ -130,28 +193,8 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
         tuple[dict, dict]: The metrics (METRIC_COLUMNS), and for each source
             id its rank, its top-1 target and that target's similarity.
     """
-    # The approaches embed both sides with model.encode(), which adds only the
-    # model's default prompt, if its config names one. Left alone, the
-    # evaluator would add the model's "query" and "document" prompts instead.
-    #
-    # The approaches rank by cosine similarity, even when a model's config
-    # names another similarity function. So the evaluator ranks by cosine too.
-    from sentence_transformers.util import cos_sim
-
-    prompt = model.prompts.get(model.default_prompt_name, "")
-    evaluator = evaluator_class()(
-        queries=source_texts,
-        corpus=target_texts,
-        relevant_docs=expected,
-        query_prompt=prompt,
-        corpus_prompt=prompt,
-        score_functions={"cosine": cos_sim},
-        mrr_at_k=[len(target_texts)],
-        accuracy_at_k=list(ACCURACY_AT_K),
-        batch_size=batch_size,
-        show_progress_bar=False,
-        write_csv=False,
-        write_predictions=True,
+    evaluator = ranking_evaluator(
+        model, source_texts, target_texts, expected, batch_size, write_predictions=True
     )
     with tempfile.TemporaryDirectory() as folder:
         scores = evaluator(model, output_path=folder)
@@ -187,65 +230,6 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
         "median_rank": float(np.median([r["rank"] for r in ranked.values()])),
     }
     return metrics, ranked
-
-
-def code_commit(folder=Path(__file__).resolve().parent):
-    """The ai-harmonization commit of the code that wrote the texts and ranked them.
-
-    Only what can change a score counts as an uncommitted change: CODE_PATHS,
-    the Python files of the two packages and the files that pin the
-    dependencies. A changed doc does not count.
-
-    Args:
-        folder (Path): A folder of the checkout to ask, by default this
-            package's.
-
-    Returns:
-        dict: ``commit``, the commit at ``HEAD``, and ``uncommitted_changes``,
-            whether a file of CODE_PATHS differs from it or is new. Both are
-            None when git cannot be asked.
-    """
-    try:
-        commit = manifests.git(folder, "rev-parse", "HEAD").strip()
-        status = manifests.git(
-            folder, "status", "--porcelain", "--untracked-files=all", "--", *CODE_PATHS
-        )
-    except RuntimeError:
-        return {"commit": None, "uncommitted_changes": None}
-    return {"commit": commit, "uncommitted_changes": bool(status.strip())}
-
-
-def model_revision(model):
-    """The Hugging Face commit of a model loaded by its id, read from the cache.
-
-    Loading a model by id downloads it into the Hugging Face cache, under its
-    commit. The commit is read from there, with no network, in the cache that
-    SentenceTransformer uses: ``SENTENCE_TRANSFORMERS_HOME``, where set.
-
-    The id is looked up as given. SentenceTransformer reads an id with no
-    owner, such as ``all-MiniLM-L6-v2``, as a ``sentence-transformers/``
-    model, so such an id gives None.
-
-    Args:
-        model (str): A Hugging Face model id or a model folder on disk.
-
-    Returns:
-        str | None: The commit, or None for a model folder on disk or an id
-            that the cache does not hold.
-    """
-    if Path(model).is_dir():
-        return None
-    from huggingface_hub import snapshot_download
-
-    try:
-        folder = snapshot_download(
-            model,
-            local_files_only=True,
-            cache_dir=os.getenv("SENTENCE_TRANSFORMERS_HOME"),
-        )
-    except Exception:
-        return None
-    return Path(folder).name
 
 
 def scores_folder(outputs, model, benchmark, text_format):
@@ -334,12 +318,88 @@ def scored_model(folder):
         return None
 
 
+def run_record(model):
+    """The record of a run trained here, when ``model`` is its folder or its model.
+
+    ``train`` writes a run's folder with its record, ``manifest.json``, beside
+    the model's folder, ``model/``. Either folder finds the record. The path is
+    resolved first, so ``.`` inside ``model/`` finds it too.
+
+    Args:
+        model (str): A Hugging Face model id, a model folder or a run folder.
+
+    Returns:
+        tuple[Path, dict] | None: The run's folder and its record, or None
+            when ``model`` is not a run of ``train``.
+
+    Raises:
+        ValueError: If the folder holds a run's record that cannot be read.
+            Scoring then stops, rather than scoring the run without its
+            leakage check.
+    """
+    folder = Path(model)
+    if not folder.is_dir():
+        return None
+    folder = folder.resolve()
+    run = folder.parent if folder.name == "model" else folder
+    path = run / "manifest.json"
+    if not path.exists() or not (run / "model").is_dir():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        raise ValueError(
+            f"{path} cannot be read ({type(error).__name__}: {error}), so the"
+            " run's leakage check cannot be read either"
+        ) from error
+    if not isinstance(record, dict) or "run" not in record:
+        return None
+    return run, record
+
+
+def check_run_files(run_folder, record):
+    """Check that a run's model is the one that its record names.
+
+    Args:
+        run_folder (Path): The run's folder.
+        record (dict): The run's record, whose ``files`` holds the SHA-256 of
+            each file of ``model/``.
+
+    Raises:
+        ValueError: If a file is missing or differs from the record.
+    """
+    for name, entry in record.get("files", {}).items():
+        path = run_folder / name
+        if not path.exists() or file_sha256(path) != entry.get("sha256"):
+            raise ValueError(
+                f"{path} differs from the run's record, so it is not the model"
+                f" that run {record['run']} trained"
+            )
+
+
+def checked_benchmarks(record):
+    """The benchmarks that a run's corpus was checked against, with their versions.
+
+    Args:
+        record (dict): The run's record.
+
+    Returns:
+        set[tuple[str, str]]: Each benchmark's name and version.
+    """
+    return {
+        (benchmark["name"], benchmark["version"])
+        for source in record.get("sources", [])
+        if source.get("role") == "corpus"
+        for benchmark in source.get("benchmarks", [])
+    }
+
+
 def score(
     model,
     benchmarks,
     inputs,
     outputs,
-    text_format=DEFAULT_FORMAT,
+    text_format=None,
     device=None,
     batch_size=BATCH_SIZE,
 ):
@@ -350,6 +410,14 @@ def score(
     and scored on each benchmark in turn. A model on disk is loaded without
     asking Hugging Face, and recorded by its full path. A Hugging Face model
     is recorded by its id.
+
+    A run of ``train`` is scored from its record. Its texts take the run's
+    training format, unless ``text_format`` names another. A benchmark that
+    the run's corpus was not checked against for leakage, by name and
+    version, is refused: the model may have learned its mappings. The run's
+    model must have the checksums that its record holds. The scores go into
+    the run's folder. Any other model has no record, so its
+    leakage is unknown, and scoring says so.
 
     For each benchmark, it writes:
 
@@ -363,7 +431,9 @@ def score(
         benchmarks (list[str]): The benchmarks, such as ``["topmed"]``.
         inputs (Path): The inputs folder that the benchmarks were built into.
         outputs (Path): The outputs folder.
-        text_format (str): A key of FORMATS: the shape of the texts.
+        text_format (str | None): A key of FORMATS: the shape of the texts.
+            None takes a run's training format, and DEFAULT_FORMAT for any
+            other model.
         device (str | None): ``cpu`` or ``cuda``. None uses a GPU if there is
             one, and the CPU otherwise.
         batch_size (int): Texts encoded at a time.
@@ -374,20 +444,43 @@ def score(
     Raises:
         FileNotFoundError: If a benchmark has not been built.
         ValueError: If a benchmark cannot be read, differs from its manifest
-            or lists an expected target that is not among its targets, or if
-            the model cannot be loaded.
+            or lists an expected target that is not among its targets, if a
+            run's corpus was not checked against it, if a run's record cannot
+            be read or its model differs from it, or if the model cannot be
+            loaded.
     """
-    import sentence_transformers
     from sentence_transformers import SentenceTransformer
 
     built = {name: read_benchmark(inputs, name) for name in benchmarks}
+    run = run_record(model)
+    if run is None:
+        text_format = text_format or DEFAULT_FORMAT
+        print(
+            f"note: {model} was not trained here, so whether its training data"
+            " leaks a benchmark is unknown"
+        )
+        model_path = model
+    else:
+        run_folder, record = run
+        text_format = text_format or record["settings"]["format"]
+        checked = checked_benchmarks(record)
+        for name, (_, _, manifest) in built.items():
+            if (name, manifest["version"]) not in checked:
+                raise ValueError(
+                    f"the corpus of run {record['run']} was not checked against"
+                    f" benchmark {name} version {manifest['version']} for"
+                    " leakage, so the model may have learned its mappings."
+                    " Build the corpus after the benchmark, and train again"
+                )
+        check_run_files(run_folder, record)
+        model, model_path = str(run_folder), str(run_folder / "model")
     texts = {
         name: benchmark_texts(targets, mappings, text_format)
         for name, (targets, mappings, _) in built.items()
     }
     try:
         encoder = SentenceTransformer(
-            model, device=device, local_files_only=Path(model).is_dir()
+            model_path, device=device, local_files_only=Path(model_path).is_dir()
         )
     except Exception as error:
         raise ValueError(
@@ -395,7 +488,7 @@ def score(
             f" {error}); give a model folder on disk or a Hugging Face model id"
         ) from error
     scored = str(Path(model).resolve()) if Path(model).is_dir() else model
-    code = code_commit()
+    commit = code_commit()
     revision = model_revision(model)
     rows = []
     for name, (_, mappings, manifest) in built.items():
@@ -428,12 +521,14 @@ def score(
                 for key in ("version", "built", "files")
                 if key in manifest
             },
-            "ai_harmonization": code,
-            "python": platform.python_version(),
-            "sentence_transformers": sentence_transformers.__version__,
+            "ai_harmonization": commit,
+            "libraries": library_versions(),
             "scored": datetime.now().isoformat(timespec="seconds"),
         }
-        folder = scores_folder(outputs, model, name, text_format)
+        if run is None:
+            folder = scores_folder(outputs, model, name, text_format)
+        else:
+            folder = Path(model) / "scores" / name / text_format
         previous = scored_model(folder)
         if previous and previous != scored:
             print(

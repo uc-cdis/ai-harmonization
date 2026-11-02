@@ -1,0 +1,670 @@
+"""Tests for embedding_model.train: a static model trained on a small fictional corpus, on a CPU."""
+
+import argparse
+import json
+import os
+from dataclasses import fields
+
+import pandas as pd
+import pytest
+import torch
+import yaml
+
+from embedding_model import benchmarks, corpus, scoring, texts, tokenizer, train
+from embedding_model.__main__ import main
+from embedding_model.manifests import file_sha256
+from embedding_model.architectures import static
+from embedding_model.pairs import pairs_sha256
+from embedding_model.pairs.common import COLUMNS
+
+TRAINING = [
+    ("Systolic blood pressure", "abcd_sbp (float): Systolic blood pressure"),
+    ("Diastolic blood pressure", "abcd_dbp (float): Diastolic blood pressure"),
+    ("Body mass index", "abcd_bmi (float): Body mass index"),
+    ("Heart rate", "abcd_hr (integer): Heart rate"),
+    ("Body weight", "abcd_weight (float): Body weight"),
+    ("Body height", "abcd_height (float): Body height"),
+    ("Fasting glucose", "abcd_glucose (float): Fasting glucose"),
+    ("Total cholesterol", "abcd_chol (float): Total cholesterol"),
+    ("Smoking status", "abcd_smoke (string): Smoking status"),
+    ("Age at enrollment", "abcd_age (integer): Age at enrollment"),
+    ("Sex at birth", "abcd_sex (string): Sex at birth"),
+    ("Waist circumference", "abcd_waist (float): Waist circumference"),
+]
+VALIDATION = [
+    ("Pulse rate", "abcd_pulse (integer): Pulse rate"),
+    ("Blood glucose", "abcd_bg (float): Blood glucose"),
+    ("Hip circumference", "abcd_hip (float): Hip circumference"),
+    ("Body temperature", "abcd_temp (float): Body temperature"),
+]
+CORPUS = "abcd-corpus"
+TOKENIZER = "abcd-tokenizer"
+# Two epochs of three batches of four training pairs.
+CONFIG = {
+    "data": {"corpus": CORPUS, "tokenizer": TOKENIZER},
+    "model": {"embedding_dim": 16},
+    "training": {
+        "num_train_epochs": 2,
+        "per_device_train_batch_size": 4,
+        "per_device_eval_batch_size": 4,
+        "eval_strategy": "steps",
+        "eval_steps": 2,
+        "logging_steps": 1,
+        "use_cpu": True,
+        "dataloader_num_workers": 0,
+    },
+}
+
+
+def pair(anchor, positive, split):
+    """One kept pair, with every column of a corpus's pairs."""
+    row = dict.fromkeys(COLUMNS, "")
+    row.update(
+        anchor=anchor,
+        positive=positive,
+        source="abcd",
+        kind="name_description",
+        anchor_values=[],
+        positive_values=[],
+        split=split,
+    )
+    return row
+
+
+def write_corpus(
+    inputs, rows, checked=(("topmed", "1"),), text_format=texts.DEFAULT_FORMAT
+):
+    """Write the fictional corpus's pairs and its manifest, as ``corpus build`` would.
+
+    Args:
+        inputs (Path): The inputs folder.
+        rows (list[dict]): The pairs.
+        checked (tuple[tuple[str, str]]): The benchmarks that the corpus was
+            checked against, each with its version.
+        text_format (str | None): The pairs' text format, or None for a
+            manifest that records none.
+    """
+    folder = inputs / "corpora" / CORPUS
+    folder.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_parquet(folder / "pairs.parquet", index=False)
+    written = pd.read_parquet(folder / "pairs.parquet")
+    record = {
+        "corpus": CORPUS,
+        "files": {
+            "pairs.parquet": {
+                "rows": len(written),
+                "sha256": file_sha256(folder / "pairs.parquet"),
+                "content_sha256": pairs_sha256(written),
+            }
+        },
+        "sources": [
+            {"role": "benchmark", "name": name, "version": version, "files": {}}
+            for name, version in checked
+        ],
+    }
+    if text_format is not None:
+        record["settings"] = {"format": text_format}
+    (folder / "manifest.json").write_text(json.dumps(record))
+
+
+def corpus_rows():
+    """The fictional corpus's pairs: the training pairs, then the validation pairs."""
+    rows = [pair(*texts, corpus.TRAIN) for texts in TRAINING]
+    return rows + [pair(*texts, corpus.VALIDATION) for texts in VALIDATION]
+
+
+@pytest.fixture(autouse=True)
+def no_gpu(monkeypatch):
+    """Every test sees no GPU, so that the training runs and the checks stay on the CPU."""
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+
+
+@pytest.fixture
+def inputs(tmp_path):
+    """An inputs folder with the fictional corpus and a tokenizer trained on it."""
+    folder = tmp_path / "inputs"
+    write_corpus(folder, corpus_rows())
+    assert tokenizer.train(CORPUS, TOKENIZER, 300, 1, folder) == 0
+    return folder
+
+
+@pytest.fixture
+def config(tmp_path):
+    """The run's config, as a YAML file named abcd-run.yaml."""
+    path = tmp_path / "abcd-run.yaml"
+    path.write_text(yaml.safe_dump(CONFIG))
+    return path
+
+
+def trained_tokenizer(inputs):
+    """The tokenizer that the inputs fixture trained."""
+    return tokenizer.read_tokenizer(inputs, TOKENIZER)[0]
+
+
+class TestFeatures:
+    """Token ids made before training give the batches that live tokenization gives."""
+
+    def test_ids_give_what_staticembedding_preprocess_gives(self, inputs):
+        """features() on the ids equals StaticEmbedding.preprocess() on the texts."""
+        trained = trained_tokenizer(inputs)
+        model = static.build(train.ModelSettings(embedding_dim=8), trained)
+        texts = [anchor for anchor, _ in TRAINING]
+        ids = [
+            encoding.ids
+            for encoding in trained.encode_batch(texts, add_special_tokens=False)
+        ]
+        expected = model[0].preprocess(texts)
+        found = static.features(ids)
+        assert found.keys() == expected.keys()
+        for key in expected:
+            assert torch.equal(found[key], expected[key])
+
+    def test_the_collator_gives_the_same_batches(self, inputs):
+        """The trainer's collator gives the same batch from cached ids as from the texts."""
+        from sentence_transformers.sentence_transformer.data_collator import (
+            SentenceTransformerDataCollator,
+        )
+
+        trained = trained_tokenizer(inputs)
+        model = static.build(train.ModelSettings(embedding_dim=8), trained)
+        pairs = pd.DataFrame(TRAINING, columns=["anchor", "positive"])
+        ids = train.token_ids(pairs, trained)
+        live = SentenceTransformerDataCollator(preprocess_fn=model.preprocess)
+        cached = SentenceTransformerDataCollator(preprocess_fn=static.features)
+        expected = live(pairs.to_dict("records"))
+        found = cached([ids[number] for number in range(len(ids))])
+        assert list(found) == list(expected)
+        for key in expected:
+            assert torch.equal(found[key], expected[key])
+
+    def test_the_validation_pairs_become_the_evaluators_texts(self):
+        """A repeated text is one entry; an anchor's positives are all relevant."""
+        full = "Body mass index: weight divided by height squared"
+        pairs = pd.DataFrame(
+            [("BMI", "Body mass index"), ("Quetelet index", "Body mass index"),
+             ("BMI", full)],
+            columns=["anchor", "positive"],
+        )  # fmt: skip
+        queries, corpus, relevant = train.validation_texts(pairs)
+        assert queries == {"BMI": "BMI", "Quetelet index": "Quetelet index"}
+        assert corpus == {"Body mass index": "Body mass index", full: full}
+        assert relevant == {
+            "BMI": {"Body mass index", full},
+            "Quetelet index": {"Body mass index"},
+        }
+
+    def test_a_prompt_is_refused(self):
+        """A prompt is text, so it cannot be added to token ids."""
+        with pytest.raises(ValueError, match="prompt"):
+            static.features([[1, 2]], prompt="query: ")
+
+
+class TestConfig:
+    """The config's sections, the defaults under them and the flags over them."""
+
+    def test_flags_override_the_config_and_the_config_the_defaults(self, config):
+        """A flag wins over the config, and the config over TRAINING_DEFAULTS."""
+        values, given = train.read_config(
+            config, 3, ["--learning_rate", "2e-2", "--embedding_dim", "32"]
+        )
+        assert values["learning_rate"] == 0.02
+        assert values["num_train_epochs"] == 2
+        assert values["warmup_steps"] == train.TRAINING_DEFAULTS["warmup_steps"]
+        assert values["seed"] == 3
+        assert values["embedding_dim"] == 32
+        assert values["corpus"] == CORPUS
+        assert {"learning_rate", "num_train_epochs"} <= given
+
+    def test_the_defaults_are_the_recipes(self, tmp_path):
+        """A config that names only its data trains at the recipe's settings, the library's where it is silent, and random batches."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(yaml.safe_dump({"data": CONFIG["data"]}))
+        values, _ = train.read_config(path, 0, ["--use_cpu"])
+        settings = train.apply_config(values)
+        training = settings["training"]
+        assert training.per_device_train_batch_size == 2048
+        assert training.learning_rate == 0.2
+        assert training.warmup_steps == 0.1
+        assert training.num_train_epochs == 5
+        sampler = training.batch_sampler
+        assert getattr(sampler, "value", sampler) == "batch_sampler"
+        assert settings["model"].embedding_dim == 1024
+        assert settings["loss"].scale == 20.0
+
+    def test_a_number_that_yaml_reads_as_text_becomes_a_number(self, tmp_path):
+        """YAML reads 1e-3 as text; the parser reads it by the setting's type."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump({"data": CONFIG["data"]})
+            + "training:\n  learning_rate: 1e-3\n  use_cpu: true\n"
+        )
+        values, _ = train.read_config(path, 0)
+        assert values["learning_rate"] == 0.001
+
+    @pytest.mark.parametrize(
+        "text, message",
+        [
+            ("abcd:\n  efgh: 1\n", "no section abcd"),
+            ("model:\n  dimension: 8\n", "no setting dimension"),
+            ("model: 8\n", "holds no settings"),
+        ],
+    )
+    def test_an_unknown_section_or_setting_is_refused(self, tmp_path, text, message):
+        """A section or a setting that does not exist names the config and itself."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(text)
+        with pytest.raises(ValueError, match=message):
+            train.read_config(path, 0)
+
+    def test_an_unknown_architecture_is_refused(self, tmp_path):
+        """argparse checks choices only for a flag, so read_config checks a config's architecture."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump({"data": CONFIG["data"], "model": {"architecture": "abcd"}})
+        )
+        with pytest.raises(ValueError, match="no architecture 'abcd'"):
+            train.read_config(path, 0)
+
+    def test_a_value_of_the_wrong_type_raises_an_error(self, tmp_path):
+        """A value that does not fit its setting's type raises, rather than exiting the process."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump({"data": CONFIG["data"], "model": {"embedding_dim": "abcd"}})
+        )
+        with pytest.raises(argparse.ArgumentError, match="embedding_dim"):
+            train.read_config(path, 0)
+
+    def test_each_setting_lives_in_one_section(self):
+        """No two sections share a setting's name, since each has one flag."""
+        names = [
+            setting.name
+            for settings_class in train.sections().values()
+            for setting in fields(settings_class)
+        ]
+        assert len(names) == len(set(names))
+
+    def test_the_run_name_is_the_trainers_unless_the_config_names_one(
+        self, config, tmp_path
+    ):
+        """The run's name becomes run_name, which W&B names the run after."""
+        values, _ = train.read_config(config, 0, run_name="abcd-run_s0")
+        assert values["run_name"] == "abcd-run_s0"
+        values, _ = train.read_config(
+            config, 0, ["--run_name", "efgh"], run_name="abcd-run_s0"
+        )
+        assert values["run_name"] == "efgh"
+
+    def test_an_abbreviated_flag_is_refused(self, config):
+        """--learning is not read as --learning_rate, which config.yaml would not record."""
+        with pytest.raises(ValueError, match="--learning"):
+            train.read_config(config, 0, ["--learning", "1e-2"])
+
+    def test_bf16_is_off_unless_the_config_turns_it_on(self, config, tmp_path):
+        """bf16 keeps the library's default, off; a config or a flag turns it on."""
+        values, _ = train.read_config(config, 0)
+        assert values["bf16"] is False
+        values, given = train.read_config(config, 0, ["--bf16"])
+        assert values["bf16"] is True
+        assert "bf16" in given
+
+    def test_reading_a_config_builds_no_settings(self, config, monkeypatch):
+        """read_config builds no training settings, so it sets up no device."""
+        from sentence_transformers import SentenceTransformerTrainingArguments
+
+        monkeypatch.setattr(
+            SentenceTransformerTrainingArguments,
+            "__post_init__",
+            lambda settings: pytest.fail("the training settings were built"),
+        )
+        values, _ = train.read_config(config, 0)
+        assert values["corpus"] == CORPUS
+
+    def test_the_settings_are_built_from_the_values(self, config):
+        """Each section becomes its own settings, with the values read."""
+        values, _ = train.read_config(config, 3, ["--use_cpu"])
+        settings = train.apply_config(values)
+        assert list(settings) == ["data", "model", "loss", "training"]
+        assert settings["data"].corpus == CORPUS
+        assert settings["training"].seed == 3
+        assert settings["training"].device.type == "cpu"
+
+
+class TestFirstGpuOnly:
+    """A process that sees several GPUs keeps to the first one."""
+
+    @pytest.fixture
+    def gpus(self, monkeypatch):
+        """Fake the number of visible GPUs, before CUDA starts."""
+
+        def set_count(count, initialized=False, fixed=False):
+            """Make torch see this many GPUs, then the ones that the list names.
+
+            ``fixed`` makes the count stay the same, as when the CUDA driver
+            has read the list.
+            """
+
+            def device_count():
+                """The GPUs that torch would count."""
+                listed = os.environ.get("CUDA_VISIBLE_DEVICES")
+                if fixed or not listed:
+                    return count
+                return min(count, len(listed.split(",")))
+
+            monkeypatch.setattr(torch.cuda, "device_count", device_count)
+            monkeypatch.setattr(torch.cuda, "is_initialized", lambda: initialized)
+
+        return set_count
+
+    def test_the_first_listed_gpu_is_kept(self, gpus, monkeypatch, capsys):
+        """With CUDA_VISIBLE_DEVICES=2,3, the run keeps GPU 2."""
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+        gpus(2)
+        assert train.first_gpu_only() == ["2", "3"]
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "2"
+        assert "trains on GPU 2 only" in capsys.readouterr().out
+
+    def test_without_a_list_gpu_0_is_kept(self, gpus, monkeypatch):
+        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0."""
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
+        gpus(2)
+        assert train.first_gpu_only() == ["0", "1"]
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
+
+    def test_one_gpu_changes_nothing(self, gpus, monkeypatch):
+        """With one GPU, CUDA_VISIBLE_DEVICES stays as it is."""
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "3")
+        gpus(1)
+        assert train.first_gpu_only() == []
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "3"
+
+    def test_a_count_that_stays_above_one_is_refused(self, gpus, monkeypatch):
+        """When the driver has read the list, narrowing it changes nothing, so the run stops."""
+        monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
+        gpus(2, fixed=True)
+        with pytest.raises(RuntimeError, match="could not keep to one"):
+            train.first_gpu_only()
+
+    def test_a_cpu_run_keeps_every_gpu_visible(self, gpus, monkeypatch, config):
+        """With use_cpu, the run uses no GPU, so CUDA_VISIBLE_DEVICES stays as it is."""
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+        gpus(2)
+        values, _ = train.read_config(config, 0, ["--use_cpu"])
+        train.apply_config(values)
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == "2,3"
+
+    def test_several_gpus_after_cuda_started_are_refused(self, gpus):
+        """Once CUDA has started, it has fixed the visible GPUs, so the run stops."""
+        gpus(2, initialized=True)
+        with pytest.raises(RuntimeError, match="CUDA_VISIBLE_DEVICES"):
+            train.first_gpu_only()
+
+
+class TestTrain:
+    """A run: the folder it writes and the inputs that stop it."""
+
+    def test_a_run_writes_its_folder(self, inputs, config, tmp_path):
+        """The model at the last step, its config, its record and the trainer's log."""
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        run = outputs / train.RUNS / "abcd-run_s0"
+        assert (run / "model" / "model.safetensors").exists()
+        assert not (run / "trainer").exists()
+        record = json.loads((run / "manifest.json").read_text())
+        assert record["run"] == "abcd-run_s0"
+        assert record["counts"]["steps"] == 6
+        assert record["device"] == "cpu"
+        assert set(record["validation"]) == {"loss", "mrr@10", "accuracy@1",
+                                             "accuracy@3", "accuracy@5",
+                                             "accuracy@10"}  # fmt: skip
+        corpus_source = record["sources"][0]
+        assert corpus_source["name"] == CORPUS
+        assert corpus_source["benchmarks"] == [{"name": "topmed", "version": "1"}]
+        assert record["files"]["model/model.safetensors"]["sha256"] == file_sha256(
+            run / "model" / "model.safetensors"
+        )
+        recorded = yaml.safe_load((run / "config.yaml").read_text())
+        assert list(recorded) == ["data", "model", "loss", "training"]
+        assert recorded["training"]["seed"] == 0
+        assert "output_dir" not in recorded["training"]
+        logged = json.loads((run / "trainer_state.json").read_text())["log_history"]
+        assert [entry["step"] for entry in logged if "loss" in entry] == list(
+            range(1, 7)
+        )
+        assert any("eval_validation_cosine_mrr@10" in entry for entry in logged)
+
+    def test_the_recorded_config_trains_the_same_model(self, inputs, config, tmp_path):
+        """The run's own config.yaml, with the same seed, gives the same model."""
+        first = tmp_path / "first"
+        assert train.train(config, 0, [], inputs, first) == 0
+        recorded = first / train.RUNS / "abcd-run_s0" / "config.yaml"
+        again = tmp_path / "again" / "abcd-run.yaml"
+        again.parent.mkdir()
+        again.write_text(recorded.read_text())
+        assert train.train(again, 0, [], inputs, tmp_path / "second") == 0
+        weights = "runs/abcd-run_s0/model/model.safetensors"
+        assert file_sha256(first / weights) == file_sha256(
+            tmp_path / "second" / weights
+        )
+
+    def test_a_flag_overrides_the_config_and_is_recorded(
+        self, inputs, config, tmp_path
+    ):
+        """--num_train_epochs 1 trains one epoch, and config.yaml says so."""
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, ["--num_train_epochs", "1"], inputs, outputs) == 0
+        run = outputs / train.RUNS / "abcd-run_s0"
+        assert json.loads((run / "manifest.json").read_text())["counts"]["steps"] == 3
+        assert (
+            yaml.safe_load((run / "config.yaml").read_text())["training"][
+                "num_train_epochs"
+            ]
+            == 1
+        )
+
+    def test_the_last_evaluation_is_not_repeated(
+        self, inputs, config, tmp_path, monkeypatch
+    ):
+        """When the trainer evaluated the last step, the run uses it, and evaluates no more."""
+        from sentence_transformers import SentenceTransformerTrainer
+
+        calls = []
+        evaluate = SentenceTransformerTrainer.evaluate
+
+        def counted(trainer, *args, **kwargs):
+            """The trainer's evaluate, counted."""
+            calls.append(trainer.state.global_step)
+            return evaluate(trainer, *args, **kwargs)
+
+        monkeypatch.setattr(SentenceTransformerTrainer, "evaluate", counted)
+        assert train.train(config, 0, [], inputs, tmp_path / "every-2") == 0
+        assert calls == [2, 4, 6]
+        calls.clear()
+        overrides = ["--eval_steps", "4"]
+        assert train.train(config, 0, overrides, inputs, tmp_path / "every-4") == 0
+        assert calls == [4, 6]
+
+    def test_the_commit_is_read_before_training(
+        self, inputs, config, tmp_path, monkeypatch
+    ):
+        """The run records the commit of the code that it started with."""
+        from sentence_transformers import SentenceTransformerTrainer
+
+        trained = []
+        fit = SentenceTransformerTrainer.train
+
+        def marked(trainer, *args, **kwargs):
+            """The trainer's train, marked as done."""
+            result = fit(trainer, *args, **kwargs)
+            trained.append(True)
+            return result
+
+        monkeypatch.setattr(SentenceTransformerTrainer, "train", marked)
+        monkeypatch.setattr(
+            train,
+            "code_commit",
+            lambda: {
+                "commit": "efgh" if trained else "abcd",
+                "uncommitted_changes": False,
+            },
+        )
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        record = json.loads(
+            (outputs / train.RUNS / "abcd-run_s0" / "manifest.json").read_text()
+        )
+        assert record["ai_harmonization"]["commit"] == "abcd"
+
+    def test_the_run_records_its_corpus_text_format(self, inputs, config, tmp_path):
+        """The run copies the text format from the corpus's manifest."""
+        write_corpus(inputs, corpus_rows(), text_format="name_description")
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        record = json.loads(
+            (outputs / train.RUNS / "abcd-run_s0" / "manifest.json").read_text()
+        )
+        assert record["settings"]["format"] == "name_description"
+
+    def test_a_corpus_without_a_text_format_is_refused(
+        self, inputs, config, tmp_path, capsys
+    ):
+        """A corpus whose manifest names no text format asks for corpus build again."""
+        write_corpus(inputs, corpus_rows(), text_format=None)
+        assert train.train(config, 0, [], inputs, tmp_path / "outputs") == 1
+        error = capsys.readouterr().err
+        assert "records no text format" in error
+        assert f"corpus build --name {CORPUS}" in error
+
+    def test_a_missing_tokenizer_names_the_command(self, inputs, tmp_path, capsys):
+        """A tokenizer that was not trained stops the run, and the message says how to train it."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump({**CONFIG, "data": {"corpus": CORPUS, "tokenizer": "efgh"}})
+        )
+        assert train.train(path, 0, [], inputs, tmp_path / "outputs") == 1
+        assert "tokenizer train --name efgh" in capsys.readouterr().err
+
+    def test_a_tokenizer_from_another_corpus_is_noted(self):
+        """The note names the corpus that the tokenizer learned its vocabulary from."""
+        manifest = {"sources": [{"role": "corpus", "name": "efgh-corpus"}]}
+        note = train.tokenizer_note("abcd-corpus", "efgh-8k", manifest)
+        assert "learned its vocabulary from efgh-corpus" in note
+        assert train.tokenizer_note("efgh-corpus", "efgh-8k", manifest) is None
+
+    def test_a_negative_seed_is_refused(self, inputs, config, tmp_path, capsys):
+        """A seed below 0 is refused before anything is read."""
+        assert train.train(config, -1, [], inputs, tmp_path / "outputs") == 1
+        assert "--seed must be 0 or more" in capsys.readouterr().err
+
+    def test_a_config_without_a_corpus_is_refused(self, inputs, tmp_path, capsys):
+        """The data section must name the corpus and the tokenizer."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(yaml.safe_dump({"training": CONFIG["training"]}))
+        assert train.train(path, 0, [], inputs, tmp_path / "outputs") == 1
+        assert "must name the corpus" in capsys.readouterr().err
+
+    def test_a_corpus_without_validation_pairs_is_refused(
+        self, inputs, config, tmp_path, capsys
+    ):
+        """A run evaluates on validation pairs, so a corpus needs them."""
+        write_corpus(inputs, [pair(*texts, corpus.TRAIN) for texts in TRAINING])
+        assert train.train(config, 0, [], inputs, tmp_path / "outputs") == 1
+        assert "no validation pairs" in capsys.readouterr().err
+
+    def test_the_command(self, inputs, config, tmp_path):
+        """python -m embedding_model train passes its other flags on as settings."""
+        outputs = tmp_path / "outputs"
+        assert main(["train", "--config", str(config), "--seed", "1",
+                     "--inputs", str(inputs), "--outputs", str(outputs),
+                     "--num_train_epochs", "1"]) == 0  # fmt: skip
+        assert (outputs / train.RUNS / "abcd-run_s1" / "model").is_dir()
+
+    def test_another_step_refuses_a_flag_that_it_does_not_have(self, inputs):
+        """Only train takes flags beyond its own."""
+        with pytest.raises(SystemExit):
+            main(["tokenizer", "train", "--corpus", CORPUS, "--learning_rate", "1"])
+
+
+class TestScoreRun:
+    """score on a run's folder: its training format, its leakage check, its scores folder."""
+
+    @pytest.fixture
+    def run(self, inputs, config, tmp_path):
+        """A trained run, and a benchmark named topmed at version 1."""
+        folder = inputs / "benchmarks" / "topmed"
+        folder.mkdir(parents=True)
+        targets = [
+            {
+                "target_property": f"abcd.{name}",
+                "target_type": "float",
+                "target_description": positive.split(": ", 1)[1],
+                "target_values": "",
+            }
+            for name, positive in (
+                (anchor.lower().replace(" ", "_"), positive)
+                for anchor, positive in TRAINING
+            )
+        ]
+        mappings = [
+            {
+                "source_study_id": "phs999999",
+                "source_table_id": "pht999999.v1",
+                "source_variable_id": "phv99999901.v1",
+                "source_variable_name": "SBP01",
+                "source_type": "float",
+                "source_description": "Systolic blood pressure",
+                "source_values": "",
+                "expected_target": ["abcd.systolic_blood_pressure"],
+            }
+        ]
+        benchmarks.write_benchmark(folder, "topmed", "1", targets, mappings, [], {})
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        return outputs / train.RUNS / "abcd-run_s0", outputs
+
+    def test_a_checked_benchmark_is_scored_into_the_run(self, run, inputs):
+        """A run whose corpus was checked against the benchmark is scored into its folder."""
+        folder, outputs = run
+        rows = scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+        assert rows[0]["format"] == "compact"
+        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+
+    def test_the_run_is_found_from_its_model_folder(self, run, inputs):
+        """The run's model folder also finds the run's record."""
+        folder, outputs = run
+        scoring.score(str(folder / "model"), ["topmed"], inputs, outputs, device="cpu")
+        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+
+    def test_the_run_is_found_from_dot_inside_its_model_folder(
+        self, run, inputs, monkeypatch
+    ):
+        """--model . inside the run's model folder finds the run's record too."""
+        folder, outputs = run
+        monkeypatch.chdir(folder / "model")
+        scoring.score(".", ["topmed"], inputs, outputs, device="cpu")
+        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+
+    def test_a_record_that_cannot_be_read_stops_scoring(self, run, inputs):
+        """A broken record stops scoring, rather than skip the run's leakage check."""
+        folder, outputs = run
+        (folder / "manifest.json").write_text("{")
+        with pytest.raises(ValueError, match="cannot be read"):
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
+    def test_a_model_that_differs_from_its_record_is_refused(self, run, inputs):
+        """A run's model must be the one that its record names."""
+        folder, outputs = run
+        with (folder / "model" / "model.safetensors").open("ab") as weights:
+            weights.write(b"abcd")
+        with pytest.raises(ValueError, match="differs from the run's record"):
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
+    def test_an_unchecked_benchmark_is_refused(self, run, inputs):
+        """A benchmark version that the corpus was not checked against stops scoring."""
+        folder, outputs = run
+        record = json.loads((folder / "manifest.json").read_text())
+        record["sources"][0]["benchmarks"] = [{"name": "topmed", "version": "0"}]
+        (folder / "manifest.json").write_text(json.dumps(record))
+        with pytest.raises(
+            ValueError, match="was not checked against benchmark topmed"
+        ):
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")

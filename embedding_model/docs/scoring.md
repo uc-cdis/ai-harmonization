@@ -42,7 +42,11 @@ Every source variable's rank is kept, in `per_variable.csv`.
 python -m embedding_model score --model uc-ctds/bge-large-en-v1.5-bio-mapping --benchmark topmed --format name_description
 ```
 
-`--model` is a Hugging Face model id or a model folder on disk. `--format` is
+`--model` is a Hugging Face model id, a model folder on disk, or the folder
+of a run that `train` wrote. A run is scored in its training format, and only
+on benchmarks that its corpus was checked against for leakage; see
+[Scoring a run](training.md#scoring-a-run). For any other model, scoring notes
+that its leakage is unknown. `--format` is
 the shape that the source and target texts are written in. Models are
 compared in the default shape, the one that this pipeline's models are trained
 in. A released model can also be scored in
@@ -101,9 +105,11 @@ keeps scoring on the CPU.
 
 ## Outputs
 
-The scores go to `embedding_model/outputs/scores/<model>/<benchmark>/<format>/`.
-`<format>` is the `--format` used, so a model scored in two formats keeps both
-scores. `<model>` is:
+The scores of a run go to the run's own folder, as
+`scores/<benchmark>/<format>/`. Those of any other model go to
+`embedding_model/outputs/scores/<model>/<benchmark>/<format>/`. `<format>` is
+the `--format` used, so a model scored in two formats keeps both scores.
+`<model>` is:
 
 - for a Hugging Face model, its owner and name:
   `scores/uc-ctds/StdElement-Mapper/topmed/stdelement/`;
@@ -134,5 +140,6 @@ It holds:
       that is, when a Python file of `ai_harmonization/` or `embedding_model/`
       was new or changed, or when `pyproject.toml` or `uv.lock` was changed.
       An uncommitted edit to any other file, such as a doc, leaves it false;
-  - the Python and [sentence-transformers](https://sbert.net) versions;
+  - `libraries`: the versions of Python and of the libraries, such as
+    [sentence-transformers](https://sbert.net);
   - the benchmark's version and file checksums, from its manifest.

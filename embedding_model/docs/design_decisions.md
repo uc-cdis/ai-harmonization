@@ -32,6 +32,7 @@ earlier text.
 - [Pairs](#pairs)
 - [Corpus](#corpus)
 - [Tokenizer](#tokenizer)
+- [Training](#training)
 - [References](#references)
 
 ## All steps
@@ -44,15 +45,15 @@ earlier text.
 sentence-transformers (`ai_harmonization/harmonization_approaches/embeddings.py`).
 It embeds texts with the model's `encode`. The model here is a static
 embedding table, trained from pairs of texts. Training needs a loop, a loss,
-batches, checkpoints and a saved format. Scoring needs ranks and metrics.
+batches, evaluation and a saved format. Scoring needs ranks and metrics.
 
 **Decision.** sentence-transformers is used wherever it does the job:
 
 - the model is a sentence-transformers model, with the library's static
-  embedding table, its `StaticEmbedding` module;
+  embedding table, `StaticEmbedding`;
 - the pairs take its column names, `anchor` and `positive`;
-- training will use its `SentenceTransformerTrainer`, losses and batch
-  samplers;
+- training uses its `SentenceTransformerTrainer`, its loss
+  `MultipleNegativesRankingLoss`, its batch sampler and its data collator;
 - scoring loads the model with it, and ranks with its
   `InformationRetrievalEvaluator`.
 
@@ -81,7 +82,7 @@ batches, checkpoints and a saved format. Scoring needs ranks and metrics.
 - Bad, because a new major version can change behaviour or move modules.
   Version 6 moves `sentence_transformers.models` to
   `sentence_transformers.sentence_transformer.modules`, for one. `uv.lock`
-  pins the version, and each score records it.
+  pins the version, and each score and each run records it.
 
 **Alternatives considered.**
 
@@ -800,6 +801,46 @@ before `demographic.race`.
   Two targets tied at places 2 and 3 would each be at 2.5. Every metric would
   then be computed in code of our own, not by the evaluator. And it changes no
   score on these benchmarks.
+
+### Scoring a run uses its corpus's leakage check
+
+**Described in:** [training.md](training.md#scoring-a-run).
+
+**Context.** `corpus build` checks the pairs against each benchmark built so
+far. The corpus's manifest lists those benchmarks, with their versions. A
+benchmark built later, or rebuilt as a new version, was not checked. A model
+trained on such a corpus may have learned that benchmark's mappings. A model
+trained elsewhere has no such record.
+
+**Decision.** A run's record copies its corpus's checked benchmarks. `score`
+refuses a benchmark whose name and version are not among them. A model
+without a run's record is still scored, with a note that its leakage is
+unknown.
+
+**Consequences.**
+
+- Good, because a run is never scored on a benchmark that its training data
+  may hold.
+- Good, because the record stays with the run. So the check still holds when
+  the corpus is rebuilt or deleted.
+- Bad, because a new version of a benchmark needs a new corpus and a new
+  run, even when its mappings did not change.
+- Bad, because a released model is scored without the check.
+
+**Alternatives considered.**
+
+- Checking the corpus's current manifest: a corpus rebuilt after the run
+  would describe pairs that the model never saw.
+- Refusing every model without a run's record: the released models could no
+  longer be scored on the same benchmarks.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a benchmark that the corpus was checked against is scored into the run's
+  folder;
+- a benchmark version that it was not checked against is refused.
 
 ## Sources
 
@@ -1901,6 +1942,295 @@ of `transformers` names them. Removing a token moves the id of every token after
 
 - `[PAD]` and `[UNK]` alone: a BERT model trained from scratch would need
   another tokenizer, with every id moved.
+
+## Training
+
+### Each run turns its pairs into token ids once, in memory
+
+**Described in:** [training.md](training.md#what-a-run-does).
+
+**Context.** By default, `StaticEmbedding` tokenizes a batch's texts in each
+training step, in the trainer's data collator. So every epoch encodes the
+same texts to the same ids again. The collator runs in the dataloader's
+workers, which are forked processes. The tokenizer's threads do not survive a
+fork, so each worker tokenizes on one thread. sentence-transformers cannot
+read ids made beforehand. Its data collator calls the `preprocess_fn` that it
+is given.
+
+**Decision.** Each run encodes its training and validation pairs once, before
+training, with `Dataset.map` of Hugging Face's
+[`datasets`](https://huggingface.co/docs/datasets). The ids have no special
+tokens, as `StaticEmbedding` encodes a text, and they stay in memory. The
+standard `SentenceTransformerDataCollator` takes `features` as its
+`preprocess_fn`. `features` builds, from the ids, the batch that
+`StaticEmbedding.preprocess` builds from the texts.
+
+**Consequences.**
+
+- Good, because the training steps do not wait for the tokenizer. The
+  encoding runs once, in the main process, on all the tokenizer's threads.
+- Good, because the ids cannot be stale. They come from the corpus and the
+  tokenizer that the run has just read and checked.
+- Good, because the code is small: one function of a few lines, and no
+  collator class. Hugging Face's course encodes a dataset the same way, with
+  `Dataset.map` before the `Trainer`
+  ([LLM Course, chapter 3.3](https://huggingface.co/learn/llm-course/chapter3/3)).
+- Bad, because each run encodes the pairs again, and holds its own copy of
+  the ids in memory. A series trains many runs at once, each with its copy.
+
+**Alternatives considered.**
+
+- Encoding in each training step, as `StaticEmbedding` does by default: every
+  epoch would encode the same texts again. The steps would also wait for the
+  dataloader's workers.
+- A folder of ids shared by every run of a corpus and a tokenizer: the pairs
+  would be encoded once for many runs. But the folder needs a lock for runs
+  that start together. It also needs a check that it still matches its corpus
+  and tokenizer, and a command that builds it.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- `features` on the ids gives what `StaticEmbedding.preprocess` gives on the
+  texts;
+- the data collator gives the same batch from the ids as from the texts.
+
+### A config in sections, with a flag for every setting
+
+**Described in:** [training.md](training.md#the-config).
+
+**Context.** A run has settings of its own: the corpus, the tokenizer, the
+architecture, its size and the loss's scale. The trainer has many more, in
+`SentenceTransformerTrainingArguments`. The `HfArgumentParser` of
+[`transformers`](https://huggingface.co/docs/transformers) makes a flag for
+every field of a dataclass. Its YAML reader takes one flat list of settings.
+PyYAML reads `1e-3` as text, since YAML 1.1 writes a number with a dot.
+
+**Decision.** A config has four sections: `data`, `model`, `loss` and
+`training`. `training` holds the trainer's arguments, under their own names.
+Each section's settings become the defaults of one `HfArgumentParser` over the
+four dataclasses. A flag then overrides any setting. A section or a setting
+that does not exist is refused.
+
+**Consequences.**
+
+- Good, because every setting of the trainer works without code of ours,
+  under the name that the trainer's documentation gives it.
+- Good, because a flag changes one setting for one run, without a new
+  config. The run's `config.yaml` records the final values.
+- Good, because argparse reads a default that is text by the setting's type.
+  So `1e-3` in a config becomes a number.
+- Good, because a later architecture's settings get a section of their own.
+  So a static model's config cannot carry them by mistake.
+- Bad, because the flags have no sections, so each name must be unique
+  across them. A test checks it.
+
+**Alternatives considered.**
+
+- `HfArgumentParser.parse_yaml_file`, the reader of Hugging Face's example
+  scripts: it takes a flat file, so the sections would be lost.
+- A flag of our own for each setting: each setting of the trainer would need
+  code of ours, under a name of ours.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a flag overrides the config, and the config overrides the defaults;
+- `1e-3` in a config becomes a number;
+- an unknown section or setting is refused;
+- no two sections share a setting's name.
+
+### The defaults follow Hugging Face's recipe for a static model
+
+**Described in:** [training.md](training.md#the-config).
+
+**Context.** The trainer's defaults are made for fine-tuning a pretrained
+transformer: a learning rate of 5e-5, batches of 8 and 3 epochs. A static
+table starts from random values. Hugging Face publishes a recipe that trains
+`StaticEmbedding` from scratch with MultipleNegativesRankingLoss. It also
+keeps a text from appearing twice in a batch. The loss would treat the second
+copy as a negative, a text that should not match.
+
+**Decision.** The defaults are the recipe's:
+
+- batches of 2,048 pairs;
+- a learning rate of 0.2, after a warmup over a tenth of the steps;
+- 1,024 dimensions.
+
+Where the recipe is silent, the library's default holds, as for the loss's
+scale. Three defaults differ: the number of epochs, random batches, and bf16,
+which stays off.
+
+**Consequences.**
+
+- Good, because the defaults follow standard practice: the recipe for this
+  very model ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)),
+  and the library's own defaults where the recipe says nothing.
+- Good, because the number of epochs fits the corpus. On the validation
+  pairs, MRR@10 levels off within a few epochs, so a longer run adds nothing.
+- Good, because random batches suit the corpus, and train faster.
+  [The star](#a-star-around-each-item) keeps an item's pairs apart, so a
+  random batch rarely holds a text twice. The recipe's sampler would remove
+  those few repeats, but slows each run.
+- Good, because the defaults work on every machine. Only a GPU that supports
+  bf16 can use it, so it stays off, as in the library, until a config turns
+  it on.
+- Bad, because a run on a GPU trains in 32 bits unless its config turns bf16
+  on.
+- Bad, because the recipe was made for general text, not for metadata. A
+  series may find better settings, and tests them as arms.
+- Bad, because the recipe's 1,024 dimensions come with `MatryoshkaLoss`, which
+  trains shorter embeddings too. Without it, a model here is used at its full
+  length.
+
+**Alternatives considered.**
+
+- The library's defaults: they are made for fine-tuning a pretrained model. A
+  learning rate of 5e-5 would barely move a random table.
+- The recipe's `NO_DUPLICATES` sampler: it removes a rare repeated text, but
+  slows each run. Its hashed form also forks processes from a process that
+  runs threads.
+- The recipe's single epoch: the recipe trains on far more pairs. Here the
+  validation pairs choose the number of epochs.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a config that names only its data trains at these defaults.
+
+### The model kept is the model at the last step
+
+**Described in:** [training.md](training.md#what-a-run-does).
+
+**Context.** The trainer can save checkpoints during a run and load the best
+of them at the end, by a validation metric. By default, it keeps the model at
+the last step. Its learning rate decays linearly to zero over the run. A
+series compares its runs by their validation metrics.
+
+**Decision.** A run keeps the model at the last step: `load_best_model_at_end`
+stays false, and no checkpoint is saved. The run records that model's
+validation metrics.
+
+**Consequences.**
+
+- Good, because the validation pairs are used once: to compare runs. Picking
+  the best of many evaluations within a run would favour a lucky one. The same
+  pairs would then compare it with other runs.
+- Good, because the last steps run at a learning rate near zero, so the model
+  changes little at the end.
+- Good, because nothing is saved during training, so a run writes only its
+  model.
+- Bad, because a run that peaks early keeps a later, worse model. The loss
+  curve shows it, and a series can then try fewer epochs.
+
+**Alternatives considered.**
+
+- The best checkpoint by validation loss: the choice would use the
+  validation pairs twice. And the loss measures the training objective, not
+  the ranking.
+- The best checkpoint by validation MRR@10: the choice would use the
+  validation pairs twice too.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a run writes the model at the last step, and no checkpoint.
+
+### Validation pairs are ranked, with MRR@10
+
+**Described in:** [training.md](training.md#what-a-run-does).
+
+**Context.** The validation loss measures MultipleNegativesRankingLoss on
+held-out pairs: an anchor's positive against the positives of its batch. The
+benchmarks measure a ranking: a source variable's expected targets among all
+the targets. sentence-transformers' `InformationRetrievalEvaluator` ranks a
+corpus for each query. It keeps each query's hits in Python lists, up to the
+largest cutoff asked for. Its default cutoff for MRR is 10.
+
+**Decision.** At each evaluation, each distinct validation anchor ranks every
+distinct validation positive. The evaluator gives MRR@10, and accuracy@1, @3,
+@5 and @10. The trainer logs them with the validation loss. The evaluator is
+built as `score` builds its own, with a cutoff of 10.
+
+**Consequences.**
+
+- Good, because a series can tune on a ranking, as the benchmarks score one,
+  without opening a benchmark.
+- Good, because every metric comes from the evaluator, with no code of our
+  own.
+- Bad, because MRR@10 counts a positive below the tenth rank as 0, while the
+  benchmarks' MRR counts every rank. So the two numbers do not compare.
+- Bad, because each evaluation encodes the validation texts again.
+
+**Alternatives considered.**
+
+- Full MRR, as `score` computes it: the evaluator would hold every positive
+  for every anchor in Python lists. That does not fit for a full corpus's
+  validation pairs.
+- The validation loss alone: it measures the training objective, not the
+  ranking that the model is used for.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a run records the validation loss, MRR@10 and accuracy@k at the last step;
+- the trainer's log holds MRR@10 at each evaluation.
+
+### A run trains on one GPU, the first one it sees
+
+**Described in:** [training.md](training.md#gpus-and-cpus).
+
+**Context.** With several GPUs, the `transformers` Trainer wraps the model in
+`nn.DataParallel`, which splits each input tensor between them.
+`StaticEmbedding` reads a batch as one flat tensor of ids, and the offsets
+where each text starts. Building the trainer's settings, `TrainingArguments`,
+picks the device and starts CUDA. Until then, PyTorch
+counts the visible GPUs with NVIDIA's management library, which reads
+`CUDA_VISIBLE_DEVICES` each time. Without that library, the CUDA driver
+counts them, and reads the list once.
+
+**Decision.** When a run sees several GPUs and `use_cpu` is off, it keeps the
+first one. Before it builds its training settings, it sets
+`CUDA_VISIBLE_DEVICES` to that GPU, for its own process. It names the visible
+GPUs, and says how to choose another. If the list is already fixed, the run
+stops, and asks for `CUDA_VISIBLE_DEVICES` to name one GPU.
+
+**Consequences.**
+
+- Good, because a run's batch, and so its loss's in-batch negatives, does not
+  depend on the number of GPUs.
+- Good, because a user changes nothing. Other processes keep their own
+  `CUDA_VISIBLE_DEVICES`.
+- Bad, because the first GPU may be busy with another process. The run does
+  not look for a free one; its message says how to choose another.
+
+**Alternatives considered.**
+
+- DataParallel, the trainer's default: the batch would grow with the number
+  of GPUs, and the flat ids and their offsets would be split apart.
+- Stopping, with a message to set `CUDA_VISIBLE_DEVICES`: a user would have
+  to change it, and change it back for other work.
+- Looking for a free GPU: "free" has no clear definition, and the run would
+  have to ask NVIDIA's management library before CUDA starts.
+- Setting the trainer's `_n_gpu` to 1: `transformers` does not document that
+  attribute, so a release could change it.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- with `CUDA_VISIBLE_DEVICES=2,3`, the run keeps GPU 2;
+- without a list, it keeps GPU 0;
+- one GPU changes nothing;
+- with `use_cpu`, every GPU stays visible;
+- reading a config builds no training settings;
+- several GPUs after CUDA has started stop the run;
+- a count that stays above one stops the run.
 
 ## References
 

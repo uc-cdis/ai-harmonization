@@ -56,9 +56,10 @@ of `pyproject.toml`, so installing `ai_harmonization` as a package leaves them
 out. With pip 25.1 or later, `pip install --group embedding-model` installs
 them.
 
-Everything runs on a CPU, model training included. A GPU matters for training,
-and training uses one if the machine has one. `--device cpu` keeps it on the
-CPU. The [quick start](#quick-start) examples train on a CPU in a few minutes.
+Everything runs on a CPU, model training included. A GPU matters for training.
+Training and scoring use a GPU if the machine has one. `train --use_cpu` and
+`score --device cpu` keep them on the CPU. The [quick start](#quick-start)
+examples train on a CPU in a few minutes.
 A model trained on all the sources takes minutes on a GPU or hours on a CPU,
 and a series of experiments trains many models.
 
@@ -81,7 +82,7 @@ root.
 `embedding_model/examples/` holds two files to start from. Each stands on its
 own:
 
-- `independent_run_example.yaml`: the configuration for one training run;
+- `run_example.yaml`: the config of one run, which trains one model;
 - `small_series_example.yaml`: a small series of experiments.
 
 Both use one benchmark, the [TOPMed benchmark](docs/benchmarks.md#topmed), and
@@ -99,12 +100,13 @@ python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
 python -m embedding_model corpus build --name example --source nhanes  # checked against the benchmarks built: here the TOPMed benchmark
 python -m embedding_model tokenizer train --corpus example --vocab-size 8000
-python -m embedding_model train --config embedding_model/examples/independent_run_example.yaml --seed 0
-python -m embedding_model score --run independent_run_example_s0 --benchmark topmed
+python -m embedding_model train --config embedding_model/examples/run_example.yaml --seed 0
+python -m embedding_model score --model embedding_model/outputs/runs/run_example_s0 --benchmark topmed
 ```
 
-A run is named after its configuration file and seed, so this one is
-`outputs/independent_runs/independent_run_example_s0/`.
+Each training is a run: one config, trained with one seed. A run is named
+after its config and its seed, so this one is `outputs/runs/run_example_s0/`.
+[docs/training.md](docs/training.md) says what a run's folder holds.
 
 ### Run a small series
 
@@ -121,7 +123,6 @@ python -m embedding_model pairs prepare --source nhanes
 python -m embedding_model corpus build --name example --source nhanes
 python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 
-python -m embedding_model cache build --corpus example
 python -m embedding_model experiment submit embedding_model/examples/small_series_example.yaml --local
 python -m embedding_model experiment status embedding_model/examples/small_series_example.yaml
 python -m embedding_model experiment report embedding_model/examples/small_series_example.yaml
@@ -188,13 +189,12 @@ rerun on its own.
 |---|---|---|---|
 | benchmarks | `benchmarks build --topmed` | builds the [TOPMed benchmark](docs/benchmarks.md#topmed) | `inputs/benchmarks/` |
 | | `benchmarks build --gdc` | builds the [GDC benchmark](docs/benchmarks.md#gdc) | `inputs/benchmarks/` |
-| | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
+| | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/<format>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/<source>/` |
 | | `corpus build --name <corpus> [--source <source> ...] [--validation-share <share>]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus> [--vocab-size <size>] [--min-frequency <n>] [--name <tokenizer>]` | learns the [tokenizer](docs/tokenizer.md)'s vocabulary from the corpus's training pairs | `inputs/tokenizers/<tokenizer>/` |
-| | `cache build --corpus <corpus>` *(optional)* | tokenizes the corpus once, before a series | `inputs/token_cache/` |
-| one model | `train --config <config.yaml> --seed <seed>` | trains one model on its own | `outputs/independent_runs/` |
+| one model | `train --config <config.yaml> --seed <seed>` | [trains](docs/training.md) one model, as one run | `outputs/runs/` |
 | a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one [SLURM](https://slurm.schedmd.com/) job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
 | | `experiment status <series.yaml>` | says which runs are done, running or missing | -- |
 | | `experiment report <series.yaml>` | builds tables and figures, with each comparison's verdict | `outputs/series/<series>/` |
@@ -204,11 +204,6 @@ rerun on its own.
 the comparisons to make.
 [examples/small_series_example.yaml](examples/small_series_example.yaml) is
 one.
-
-Training builds the token cache itself on first use if `cache build` has not
-run. `--no-token-cache` tokenizes inside each training step instead: the same
-model, more slowly. `cache build` is worth running before a series, so that
-many runs starting at once do not each wait for it.
 
 `corpus build` checks the pairs against every benchmark built so far, and drops
 those that would leak one ([docs/leakage.md](docs/leakage.md)). Each corpus
@@ -246,14 +241,13 @@ trained model as part of an approach.
 ## Inputs and outputs
 
 The steps that prepare data write under `embedding_model/inputs/`. Those
-steps are the benchmarks, sources, pairs, corpora, tokenizers and the token
-cache. Training runs read what they need from there. They write everything that
-they produce under `embedding_model/outputs/`: the model, its logs and its
+steps are the benchmarks, sources, pairs, corpora and tokenizers. Training
+runs read what they need from there. They write everything that
+they produce under `embedding_model/outputs/`: the model, its record and its
 scores. Both folders are gitignored.
 
-`--inputs DIR` and `--outputs DIR` set a different location for either one.
-That is useful for a full corpus's token cache, which can run to tens of
-gigabytes.
+`--inputs DIR` and `--outputs DIR` set a different location for either one,
+such as a larger disk.
 
 The large tables, such as a corpus's pairs, are [parquet](https://parquet.apache.org/) files. The benchmarks
 and the scores are CSV files. To look at a parquet file, read it with pandas.
@@ -263,8 +257,8 @@ Or open it in VS Code with an extension such as
 [docs/design_decisions.md](docs/design_decisions.md#large-tables-are-kept-as-parquet)
 says why the tables are parquet.
 
-A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer and a
-model's scores are each written whole. For example, `corpus build --name abcd`
+A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer, a
+training run and a model's scores are each written whole. For example, `corpus build --name abcd`
 first writes the new corpus into a hidden staging folder,
 `corpora/.abcd.x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
 complete does it replace `corpora/abcd/`. So a run that fails leaves the
@@ -290,15 +284,14 @@ inputs/
     pairs/<source>/              pairs.parquet: a source's pairs of texts; manifest.json, their manifest
     corpora/<corpus>/            pairs.parquet, the kept pairs with their split; dropped.parquet; manifest.json, the corpus's manifest
     tokenizers/<tokenizer>/      tokenizer.json; manifest.json, the tokenizer's manifest
-    token_cache/                 token ids, one folder per corpus and tokenizer
 outputs/
-    independent_runs/
-        <run>/                   a run trained on its own
-            config.yaml          every setting, so the run can be reproduced
-            train_log.txt
-            loss_curve.csv
+    runs/
+        <run>/                   one run, trained on its own
+            config.yaml          the run's settings, so the run can be repeated
+            manifest.json        the run's record: its corpus, tokenizer, validation metrics and versions
+            trainer_state.json   the trainer's log: the training loss and the validation metrics, step by step
             model/               the trained model, loadable with sentence-transformers
-            scores/<benchmark>/  metrics.csv and per_variable.csv: the metrics, and every source variable's rank
+            scores/<benchmark>/<format>/  metrics.csv and per_variable.csv: the metrics, and every source variable's rank
         ledger.csv               one row per run: its settings, validation loss and training time
         index.csv                one row per scoring: the run, the benchmark and the metrics
     series/<series>/

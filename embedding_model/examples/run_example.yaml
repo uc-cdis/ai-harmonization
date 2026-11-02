@@ -1,0 +1,6 @@
+# One run: a static model trained on the README's example corpus, NHANES alone,
+# at the code's defaults. It trains on a CPU in a few minutes.
+# docs/training.md lists every setting and its default.
+data:
+  corpus: example
+  tokenizer: example-8k

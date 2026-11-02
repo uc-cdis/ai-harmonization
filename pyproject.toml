@@ -101,6 +101,19 @@ embedding-model = [
     # of a graph of items and canonical texts). Its minimum version is the
     # first with wheels for Python 3.12, the project's lowest Python.
     "scipy>=1.11.2",
+    # embedding_model.train (the trainer's data collator, which takes a
+    # preprocess_fn, and the module paths of version 6)
+    "sentence-transformers>=6.0.0",
+    # embedding_model.train (the parser of a run's settings, and the seed) and
+    # embedding_model.provenance (the version that a run records). Its minimum
+    # version is the one that sentence-transformers 6 requires.
+    "transformers>=5.0.0",
+]
+# Optional, for training runs that log to Weights & Biases with
+# report_to: wandb. uv sync leaves it out; uv sync --group tracking installs it.
+tracking = [
+    # Below 0.31 for now: 0.31 depends on a beta release, cwevals 0.0.1b1.
+    "wandb>=0.30.0,<0.31",
 ]
 
 [tool.uv]

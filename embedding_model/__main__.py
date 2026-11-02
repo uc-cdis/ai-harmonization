@@ -12,6 +12,7 @@ from embedding_model import (
     sources,
     texts,
     tokenizer,
+    train,
 )
 
 PACKAGE = Path(__file__).resolve().parent
@@ -155,6 +156,29 @@ def main(argv=None):
         f" (default: {tokenizer.MIN_FREQUENCY})",
     )
 
+    train_step = steps.add_parser(
+        "train",
+        parents=[common, writes_outputs],
+        help="train one model on a corpus, from a config",
+        description=(
+            "Train one model on a corpus. Any setting of the config can also be"
+            " given as a flag, which overrides it, such as --learning_rate"
+            " 1.0e-2 or --use_cpu. docs/training.md lists the settings."
+        ),
+    )
+    train_step.add_argument(
+        "--config",
+        required=True,
+        type=Path,
+        help="the run's config, a YAML file. The run is named after it and the seed.",
+    )
+    train_step.add_argument(
+        "--seed",
+        required=True,
+        type=int,
+        help="the seed, which decides the starting weights and the order of the pairs",
+    )
+
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
@@ -163,7 +187,10 @@ def main(argv=None):
     score.add_argument(
         "--model",
         required=True,
-        help="a Hugging Face model id or a model folder on disk",
+        help=(
+            "a Hugging Face model id, a model folder on disk, or the folder of"
+            " a run that train wrote"
+        ),
     )
     score.add_argument(
         "--benchmark",
@@ -174,9 +201,11 @@ def main(argv=None):
     )
     score.add_argument(
         "--format",
-        default=texts.DEFAULT_FORMAT,
         choices=sorted(texts.FORMATS),
-        help="the shape of the source and target texts (default: %(default)s)",
+        help=(
+            "the shape of the source and target texts (default: a run's"
+            f" training format, and {texts.DEFAULT_FORMAT} for any other model)"
+        ),
     )
     score.add_argument(
         "--device",
@@ -189,7 +218,12 @@ def main(argv=None):
         help="texts encoded at a time (default: %(default)s)",
     )
 
-    args = parser.parse_args(argv)
+    # Only train takes more flags: the settings that override its config.
+    args, overrides = parser.parse_known_args(argv)
+    if overrides and args.step != "train":
+        parser.error(f"unrecognized arguments: {' '.join(overrides)}")
+    if args.step == "train":
+        return train.train(args.config, args.seed, overrides, args.inputs, args.outputs)
     if args.step == "score":
         try:
             scoring.score(

@@ -224,6 +224,54 @@ def manifest(
     }
 
 
+def read_tokenizer(inputs, name):
+    """A trained tokenizer and its manifest, checked against each other.
+
+    Four things are checked, in this order: the name is a tokenizer name, the
+    manifest exists and names this tokenizer, ``tokenizer.json`` has the
+    SHA-256 that the manifest records, and the file can be read.
+
+    Args:
+        inputs (Path): The inputs folder that the tokenizer was trained in.
+        name (str): The tokenizer's name.
+
+    Returns:
+        tuple[Tokenizer, dict]: The tokenizer and its manifest.
+
+    Raises:
+        FileNotFoundError: If no tokenizer of that name was trained there.
+        ValueError: If the name is not a tokenizer name, the manifest is
+            another tokenizer's or cannot be read, or ``tokenizer.json``
+            differs from it or cannot be read.
+    """
+    if not FOLDER_NAME.fullmatch(name):
+        raise ValueError(f"{name!r} is not a tokenizer name: use {FOLDER_NAME_RULE}")
+    folder = Path(inputs) / "tokenizers" / name
+    command = (
+        f"python -m embedding_model tokenizer train --name {name} --corpus <corpus>"
+    )
+    path = folder / "tokenizer.json"
+    if not path.exists():
+        raise FileNotFoundError(f"{path} was not written; run: {command}")
+    record = manifests.read(folder / "manifest.json", command, "tokenizer", name)
+    try:
+        checksum = record["files"]["tokenizer.json"]["sha256"]
+    except Exception as error:
+        raise ValueError(
+            f"{folder / 'manifest.json'} records no SHA-256 for tokenizer.json"
+            f" ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    if file_sha256(path) != checksum:
+        raise ValueError(f"{path} differs from its manifest; run: {command}")
+    try:
+        trained = Tokenizer.from_file(str(path))
+    except Exception as error:
+        raise ValueError(
+            f"{path} cannot be read ({type(error).__name__}: {error}); run: {command}"
+        ) from error
+    return trained, record
+
+
 def train(corpus, name, vocab_size, min_frequency, inputs):
     """Learn a corpus's vocabulary, and write the tokenizer with its manifest.
 

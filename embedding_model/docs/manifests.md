@@ -35,8 +35,8 @@ builds' own manifests record their inputs.
 
 Every manifest has these fields. A field that does not apply is left out:
 
-- `benchmark`, `source`, `corpus` or `tokenizer`: the build's name, under the
-  kind of build that it is;
+- `benchmark`, `source`, `corpus`, `tokenizer` or `run`: the build's name,
+  under the kind of build that it is;
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
 - `files`: each file's row count, and its `sha256`, the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the
@@ -68,6 +68,18 @@ Every manifest has these fields. A field that does not apply is left out:
 - `counts`: what the build counted, such as a benchmark's source variables,
   a source's items not open, the pairs by kind, or a corpus's dropped pairs.
   Counts are never compared, so a build with other counts still matches.
+
+A training run's manifest has four more fields:
+
+- `validation`: the model's validation metrics at the last step;
+- `device`: the device that trained the model;
+- `ai_harmonization`: the commit of the code, and whether it had uncommitted
+  changes;
+- `libraries`: the versions of Python and of the libraries.
+
+Its corpus's entry in `sources` also lists the benchmarks that the corpus was
+checked against for leakage. [training.md](training.md#what-a-run-writes)
+describes the run's manifest.
 
 ## Two checksums
 

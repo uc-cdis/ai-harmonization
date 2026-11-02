@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import pytest
 
-from embedding_model import pairs, sources
+from embedding_model import pairs, sources, texts
 from embedding_model.__main__ import main
 from embedding_model.manifests import file_sha256
 from embedding_model.pairs import (
@@ -1376,6 +1376,7 @@ class TestPrepare:
             }
         }
         assert written["counts"]["kind"] == {"name": 2}
+        assert written["settings"] == {"format": texts.DEFAULT_FORMAT}
         fetch = json.loads(
             (tmp_path / "sources" / "nhanes" / "manifest.json").read_text()
         )

@@ -239,7 +239,9 @@ def manifest(
     """The corpus's manifest, for ``manifest.json``.
 
     It has the fields of every manifest, and ``settings`` and ``counts``. Its
-    inputs are each source's pairs and each benchmark.
+    inputs are each source's pairs and each benchmark. ``settings`` holds the
+    leakage and split settings, and ``format``, the text format of the pairs,
+    which every source's pairs share.
 
     Args:
         name (str): The corpus's name.
@@ -297,6 +299,7 @@ def manifest(
             ),
         ],
         "settings": {
+            "format": pairs_manifests[0]["settings"]["format"],
             "min_overlap_words": leakage.MIN_OVERLAP_WORDS,
             "min_name_words": leakage.MIN_NAME_WORDS,
             "validation_share": validation_share,
@@ -394,6 +397,15 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
         frames.append(pairs)
         pairs_manifests.append(pairs_manifest)
         print(f"  {source:<7}{len(pairs):>10,} pairs")
+    formats = sorted({record["settings"]["format"] for record in pairs_manifests})
+    if len(formats) > 1:
+        print(
+            f"the sources' pairs are in different text formats, {', '.join(formats)};"
+            " prepare them again: python -m embedding_model pairs prepare"
+            f" --source {' '.join(sources)}",
+            file=sys.stderr,
+        )
+        return 1
     distinct, copy_sources = combine(frames)
     if distinct.empty:
         print(

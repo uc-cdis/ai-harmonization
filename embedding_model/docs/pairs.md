@@ -89,6 +89,8 @@ beside its pairs in the same folder. It has the fields that
   `content_sha256`;
 - `sources`: the fetch that the pairs come from, with its version and its
   tables' checksums;
+- `settings`: `format`, the [text format](scoring.md#running-score) that the
+  pairs' texts are written in;
 - `counts`:
   - the items, and the items not open;
   - the pairs by kind, term group and status;

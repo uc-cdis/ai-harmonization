@@ -36,6 +36,7 @@ from embedding_model.folders import staged
 from embedding_model.manifests import file_sha256, table_sha256
 from embedding_model.normalization import normalised
 from embedding_model.sources import read_source
+from embedding_model.texts import DEFAULT_FORMAT
 
 # The sources, in order. When a corpus combines them, a pair found in two
 # sources is kept in the first. CDISC is published as NCIt subsets, so NCIt
@@ -111,9 +112,10 @@ def ambiguous_texts(pairs):
 def manifest(name, pairs, pairs_file_sha256, counts, fetch):
     """The manifest of a source's pairs: what they were made from, and what they hold.
 
-    It has the fields of every manifest, and ``counts``. Its one input is the
-    source's fetch, with the fetch's own record of its tables. So pairs made
-    from another fetch can be told apart.
+    It has the fields of every manifest, and ``settings`` and ``counts``. Its
+    one input is the source's fetch, with the fetch's own record of its tables.
+    So pairs made from another fetch can be told apart. ``settings`` holds
+    ``format``, the text format that the pairs' texts are written in.
 
     Args:
         name (str): The source, as in READERS.
@@ -144,6 +146,7 @@ def manifest(name, pairs, pairs_file_sha256, counts, fetch):
                 "files": fetch["files"],
             }
         ],
+        "settings": {"format": DEFAULT_FORMAT},
         "counts": {
             **counts,
             "ambiguous_texts": ambiguous_texts(pairs),
@@ -218,8 +221,9 @@ def read_pairs_file(table, manifest, field, name, columns, command):
 def read_pairs(inputs, name):
     """A source's pairs and their manifest, checked against each other.
 
-    The manifest records the pairs' file and the fetch that they come from.
-    When that fetch is in the inputs folder, the pairs must come from it.
+    The manifest records the pairs' file, the fetch that they come from, and
+    the text format of their texts. When that fetch is in the inputs folder,
+    the pairs must come from it.
 
     Args:
         inputs (Path): The inputs folder that the pairs were prepared in.
@@ -231,8 +235,9 @@ def read_pairs(inputs, name):
     Raises:
         FileNotFoundError: If the source's pairs were not prepared there.
         ValueError: If the pairs, their manifest or the fetch's manifest cannot
-            be read, the manifest is another source's, the pairs lack a column
-            or differ from their manifest, or they come from another fetch.
+            be read, the manifest is another source's or records no text
+            format, the pairs lack a column or differ from their manifest, or
+            they come from another fetch.
     """
     folder = Path(inputs) / "pairs" / name
     manifest_path = folder / "manifest.json"
@@ -251,6 +256,13 @@ def read_pairs(inputs, name):
             f"{manifest_path} does not record the fetch of {name}"
             f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
+    if (
+        not isinstance(record.get("settings"), dict)
+        or "format" not in record["settings"]
+    ):
+        raise ValueError(
+            f"{manifest_path} records no text format for the pairs; run: {command}"
+        )
     if not fetch_path.exists():
         return pairs, record
     fetch_command = f"python -m embedding_model sources fetch --source {name}"

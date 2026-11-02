@@ -129,6 +129,9 @@ leaves the previous corpus as it was; see
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
   - `settings`:
+    - `format`: the text format of the pairs, which every source's pairs
+      share. `corpus build` refuses sources whose pairs are in different
+      formats;
     - `min_overlap_words`: the minimum number of words in a row that two
       texts share to match;
     - `min_name_words`: the minimum number of words of a name that can match

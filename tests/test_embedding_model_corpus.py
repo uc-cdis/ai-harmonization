@@ -6,7 +6,7 @@ import pathlib
 import pandas as pd
 import pytest
 
-from embedding_model import benchmarks, corpus, leakage
+from embedding_model import benchmarks, corpus, leakage, texts
 from embedding_model.__main__ import main
 from embedding_model.manifests import file_sha256
 from embedding_model.pairs import common, pairs_sha256
@@ -479,6 +479,33 @@ class TestBuild:
         path.write_text(json.dumps(record))
         assert corpus.build("abcd", ["ncit"], inputs) == 1
         assert "KeyError: 'version'" in capsys.readouterr().err
+
+    def test_a_pairs_manifest_without_a_text_format_is_refused(self, inputs, capsys):
+        """Pairs whose manifest names no text format ask for pairs prepare again."""
+        path = inputs / "pairs" / "ncit" / "manifest.json"
+        record = json.loads(path.read_text())
+        del record["settings"]
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "records no text format" in error
+        assert "pairs prepare --source ncit" in error
+
+    def test_sources_in_different_text_formats_are_refused(self, inputs, capsys):
+        """A corpus holds pairs of one text format, so mixed formats stop the build."""
+        path = inputs / "pairs" / "cdisc" / "manifest.json"
+        record = json.loads(path.read_text())
+        record["settings"]["format"] = "name_description"
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd", ["ncit", "cdisc"], inputs) == 1
+        assert "different text formats" in capsys.readouterr().err
+        assert not (inputs / "corpora" / "abcd").exists()
+
+    def test_the_manifest_records_the_pairs_text_format(self, inputs):
+        """The corpus's manifest copies the text format that its pairs share."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        _, record = corpus.read_corpus(inputs, "abcd-corpus")
+        assert record["settings"]["format"] == texts.DEFAULT_FORMAT
 
     def test_another_sources_manifest_is_refused(self, inputs, capsys):
         """A pairs manifest that names another source is not read as this one's."""

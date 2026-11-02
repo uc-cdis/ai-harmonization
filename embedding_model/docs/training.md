@@ -84,8 +84,8 @@ exist in the config is refused too.
 5. After each epoch, it evaluates the model on the validation pairs. The
    loss is computed on them as on the training pairs. Each validation anchor
    also ranks every validation positive, which gives MRR@10 and accuracy@k.
-   MRR@10 is MRR, as [The metrics](scoring.md#the-metrics) defines it, with
-   every rank below 10 counted as 0.
+   [The metrics](scoring.md#the-metrics) defines MRR@10. `score` reports it on
+   the benchmarks too.
 6. It keeps the model at the last step. Its validation metrics are those of
    the last evaluation. When the last step was not evaluated, the run
    evaluates the model once more.

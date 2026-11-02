@@ -34,14 +34,11 @@ from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
 from embedding_model.architectures import ARCHITECTURES
 from embedding_model.provenance import code_commit, library_versions
-from embedding_model.scoring import ACCURACY_AT_K, ranking_evaluator
+from embedding_model.scoring import ACCURACY_AT_K, MRR_CUTOFF, ranking_evaluator
 from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
 
 # Where the runs trained on their own are written, under the outputs folder.
 RUNS = "runs"
-# The last rank that the validation metrics count: MRR@10, the evaluator's
-# default cutoff.
-VALIDATION_CUTOFF = 10
 # The training settings whose defaults here differ from the library's: those
 # of Hugging Face's recipe for training a static model from scratch, where the
 # recipe sets them. The config overrides them.
@@ -496,7 +493,7 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
         *validation_texts(validation_pairs),
         batch_size=training.per_device_eval_batch_size,
         name="validation",
-        cutoff=VALIDATION_CUTOFF,
+        cutoff=MRR_CUTOFF,
     )
     trainer = SentenceTransformerTrainer(
         model=model,
@@ -569,13 +566,11 @@ def validation_metrics(evaluated):
     prefix = "eval_validation_cosine_"
     return {
         "loss": round(evaluated["eval_loss"], 4),
-        f"mrr@{VALIDATION_CUTOFF}": round(
-            evaluated[f"{prefix}mrr@{VALIDATION_CUTOFF}"], 4
-        ),
+        f"mrr@{MRR_CUTOFF}": round(evaluated[f"{prefix}mrr@{MRR_CUTOFF}"], 4),
         **{
             f"accuracy@{k}": round(evaluated[f"{prefix}accuracy@{k}"], 4)
             for k in ACCURACY_AT_K
-            if k <= VALIDATION_CUTOFF
+            if k <= MRR_CUTOFF
         },
     }
 

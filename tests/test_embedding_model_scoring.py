@@ -128,12 +128,30 @@ class TestRankTargets:
         assert ranked["2"]["top1_target"] in {"clinical.race", "demographic.race"}
         assert metrics == {
             "mrr": round((1 + 1 + 1 / 3) / 3, 4),
+            "mrr@10": round((1 + 1 + 1 / 3) / 3, 4),
             "accuracy@1": round(2 / 3, 4),
             "accuracy@3": 1.0,
             "accuracy@5": 1.0,
             "accuracy@10": 1.0,
             "median_rank": 1.0,
         }
+
+    def test_mrr_at_10_counts_a_rank_below_10_as_0(self, model):
+        """MRR counts every rank, and MRR@10 only the first ten.
+
+        The model puts eleven race targets before sex, so Gender's expected
+        target comes twelfth.
+        """
+        race_targets = {f"abcd.race_{number}": "Race" for number in range(11)}
+        metrics, ranked = scoring.rank_targets(
+            model,
+            {"0": "Gender"},
+            {**race_targets, "abcd.sex": "Sex"},
+            {"0": {"abcd.sex"}},
+        )
+        assert ranked["0"]["rank"] == 12
+        assert metrics["mrr"] == round(1 / 12, 4)
+        assert metrics["mrr@10"] == 0.0
 
     def test_a_query_prompt_is_not_added(self, model, inputs):
         """Sources are embedded as the approaches embed them, without a query prompt."""

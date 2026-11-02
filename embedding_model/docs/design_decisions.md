@@ -652,9 +652,10 @@ By default, [sentence-transformers](https://sbert.net)' evaluator reports:
 - the mean average precision at 100, MAP@100.
 
 **Decision.** `score` reports where each source variable's best-placed expected
-target lands, in three metrics:
+target lands, in four metrics:
 
-- MRR with no cut-off, in place of the evaluator's MRR@10;
+- MRR with no cut-off, as the main measure;
+- the evaluator's MRR@10, beside it;
 - accuracy@k at the evaluator's own cut-offs, 1, 3, 5 and 10;
 - the median rank, which `score` computes from the ranks that the evaluator
   writes.
@@ -669,6 +670,8 @@ target lands, in three metrics:
 - Good, because MRR without a cut-off counts every rank. A model that moves an
   expected target from rank 50 to rank 20 scores better. MRR@10 scores every
   rank below 10 as 0.
+- Good, because MRR@10 compares with the validation MRR@10 that training
+  logs.
 - Good, because accuracy@k is what a reviewer of the top k suggestions sees:
   whether an expected target is among them.
 - Good, because a few very low ranks do not move the median rank, as they
@@ -690,7 +693,8 @@ target lands, in three metrics:
 [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
 check that:
 
-- the ranks and the metrics are right on a fictional benchmark.
+- the ranks and the metrics are right on a fictional benchmark;
+- MRR@10 counts a rank below 10 as 0, and MRR counts it.
 
 ### Models are compared in one text format
 
@@ -2163,7 +2167,8 @@ built as `score` builds its own, with a cutoff of 10.
 - Good, because every metric comes from the evaluator, with no code of our
   own.
 - Bad, because MRR@10 counts a positive below the tenth rank as 0, while the
-  benchmarks' MRR counts every rank. So the two numbers do not compare.
+  benchmarks' main measure, MRR, counts every rank. `score` also reports
+  MRR@10, which compares.
 - Bad, because each evaluation encodes the validation texts again.
 
 **Alternatives considered.**

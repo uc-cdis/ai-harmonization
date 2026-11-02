@@ -27,7 +27,16 @@ from embedding_model.provenance import code_commit, library_versions, model_revi
 from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
 
 ACCURACY_AT_K = (1, 3, 5, 10)
-METRIC_COLUMNS = ["mrr", *[f"accuracy@{k}" for k in ACCURACY_AT_K], "median_rank"]
+# The cutoff of MRR@10, the evaluator's default. Training reports MRR@10 on
+# the validation pairs, and score reports it beside the full MRR, so the two
+# compare.
+MRR_CUTOFF = 10
+METRIC_COLUMNS = [
+    "mrr",
+    f"mrr@{MRR_CUTOFF}",
+    *[f"accuracy@{k}" for k in ACCURACY_AT_K],
+    "median_rank",
+]
 # sentence-transformers' own default, in encode() and in its
 # InformationRetrievalEvaluator.
 BATCH_SIZE = 32
@@ -113,9 +122,9 @@ def ranking_evaluator(
     """An InformationRetrievalEvaluator that ranks as the approaches rank.
 
     Every text of the corpus is ranked for each query, by cosine similarity.
-    Scoring ranks a benchmark's targets with it, and MRR is computed over the
-    whole ranking. Training ranks the validation pairs' positives, with a
-    cutoff: the evaluator keeps each query's hits in Python lists, so a whole
+    Scoring ranks a benchmark's targets with it. MRR is then computed over the
+    whole ranking, and MRR@10 beside it. Training ranks the validation pairs'
+    positives, with a cutoff: the evaluator keeps each query's hits in Python lists, so a whole
     ranking of tens of thousands of positives for each of tens of thousands of
     queries would not fit.
 
@@ -131,7 +140,7 @@ def ranking_evaluator(
             full ranking when it is given a folder.
         cutoff (int | None): The last rank that the metrics count: MRR@cutoff,
             and the evaluator's other metrics at most at the cutoff. None
-            counts the whole ranking.
+            counts the whole ranking, for MRR and MRR@10.
 
     Returns:
         InformationRetrievalEvaluator: The evaluator.
@@ -161,7 +170,7 @@ def ranking_evaluator(
         query_prompt=prompt,
         corpus_prompt=prompt,
         score_functions={"cosine": cos_sim},
-        mrr_at_k=[cutoff or len(corpus)],
+        mrr_at_k=[cutoff] if cutoff else sorted({MRR_CUTOFF, len(corpus)}),
         accuracy_at_k=[k for k in ACCURACY_AT_K if cutoff is None or k <= cutoff],
         **limits,
         batch_size=batch_size,
@@ -176,8 +185,8 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     """Rank every target for each source, and score the ranks.
 
     Targets are ranked by cosine similarity. The evaluator gives the results
-    two ways. It returns the averages in memory: MRR and accuracy@k over all
-    source variables. Its predictions file, written to a temporary folder,
+    two ways. It returns the averages in memory: MRR, MRR@10 and accuracy@k
+    over all source variables. Its predictions file, written to a temporary folder,
     holds each source variable's full ranking. Each source variable's rank and
     top-1 target are read from that file, and the folder is deleted.
 
@@ -223,6 +232,7 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     # ``cosine_mrr@<number of targets>``.
     metrics = {
         "mrr": round(float(scores[f"cosine_mrr@{len(target_texts)}"]), 4),
+        f"mrr@{MRR_CUTOFF}": round(float(scores[f"cosine_mrr@{MRR_CUTOFF}"]), 4),
         **{
             f"accuracy@{k}": round(float(scores[f"cosine_accuracy@{k}"]), 4)
             for k in ACCURACY_AT_K

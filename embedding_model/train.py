@@ -539,7 +539,8 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
     )
     # The variable is set on each path, not by default: an earlier run in the
     # same process, or the shell, may have set it otherwise.
-    if architecture.features is None:
+    features = getattr(architecture, "features", None)
+    if features is None:
         # The dataloader's workers tokenize, in forked processes. The
         # tokenizer's threads do not survive a fork, so a worker that uses
         # them can hang.
@@ -556,7 +557,7 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
         datasets = [
             token_ids(pairs, tokenizer) for pairs in (training_pairs, validation_pairs)
         ]
-        collator = SentenceTransformerDataCollator(preprocess_fn=architecture.features)
+        collator = SentenceTransformerDataCollator(preprocess_fn=features)
     trainer = SentenceTransformerTrainer(
         model=model,
         args=training,

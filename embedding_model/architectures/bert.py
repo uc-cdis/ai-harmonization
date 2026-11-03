@@ -13,8 +13,6 @@ from dataclasses import asdict, dataclass, field
 
 # The BERT paper pretrains at this rate (Devlin et al., 2019, Appendix A.2).
 LEARNING_RATE = 1e-4
-# None: the model's own preprocess tokenizes each batch of texts.
-features = None
 
 
 @functools.cache

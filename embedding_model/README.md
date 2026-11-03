@@ -178,6 +178,14 @@ negatives). It learns from pairs of texts that mean the same thing, such as:
 Each pair is pulled together, and pushed apart from every other text in its
 batch.
 
+The static embedding model is the default. A config can choose another
+architecture: `bert`, a transformer embedding model with BERT's architecture,
+trained from scratch in the same way. Its attention layers let a token's
+vector depend on the other tokens of the text. It is larger and slower than
+the static model.
+[docs/training.md](docs/training.md#architectures) lists the settings of
+both.
+
 ## The workflow
 
 Every step is a subcommand of one command, run from the repository root:

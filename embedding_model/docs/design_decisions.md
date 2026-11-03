@@ -1949,7 +1949,7 @@ of `transformers` names them. Removing a token moves the id of every token after
 
 ## Training
 
-### Each run turns its pairs into token ids once, in memory
+### A static run turns its pairs into token ids once, in memory
 
 **Described in:** [training.md](training.md#what-a-run-does).
 
@@ -1957,17 +1957,16 @@ of `transformers` names them. Removing a token moves the id of every token after
 training step, in the trainer's data collator. So every epoch encodes the
 same texts to the same ids again. The collator runs in the dataloader's
 workers, which are forked processes. The tokenizer's threads do not survive a
-fork, so each worker tokenizes on one thread. sentence-transformers cannot
-read ids made beforehand. Its data collator calls the `preprocess_fn` that it
-is given.
+fork, so each worker tokenizes on one thread. The `Transformer` module of
+sentence-transformers cuts, pads and masks each batch in its own `preprocess`.
 
-**Decision.** Each run encodes its training and validation pairs once, before
-training, with `Dataset.map` of Hugging Face's
+**Decision.** A static run encodes its training and validation pairs once,
+before training, with `Dataset.map` of Hugging Face's
 [`datasets`](https://huggingface.co/docs/datasets). The ids have no special
-tokens, as `StaticEmbedding` encodes a text, and they stay in memory. The
-standard `SentenceTransformerDataCollator` takes `features` as its
-`preprocess_fn`. `features` builds, from the ids, the batch that
-`StaticEmbedding.preprocess` builds from the texts.
+tokens, and they stay in memory. The standard
+`SentenceTransformerDataCollator` takes `features` as its `preprocess_fn`,
+which builds the batch from the ids. A BERT run trains on the texts, with its
+model's own `preprocess`.
 
 **Consequences.**
 
@@ -1979,6 +1978,10 @@ standard `SentenceTransformerDataCollator` takes `features` as its
   collator class. Hugging Face's course encodes a dataset the same way, with
   `Dataset.map` before the `Trainer`
   ([LLM Course, chapter 3.3](https://huggingface.co/learn/llm-course/chapter3/3)).
+- Good, because the pairs are encoded once only where tokenizing is a large
+  share of a step. A static model's step is a table lookup. A BERT step
+  spends most of its time in the model's layers. So a BERT keeps the
+  standard path, with no code of ours to cut and pad its texts.
 - Bad, because each run encodes the pairs again, and holds its own copy of
   the ids in memory. A series trains many runs at once, each with its copy.
 
@@ -1991,6 +1994,8 @@ standard `SentenceTransformerDataCollator` takes `features` as its
   would be encoded once for many runs. But the folder needs a lock for runs
   that start together. It also needs a check that it still matches its corpus
   and tokenizer, and a command that builds it.
+- Ids for a BERT too: its `features` would copy the cutting, the padding and
+  the attention mask of `Transformer.preprocess`, for a small gain.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
@@ -1998,7 +2003,8 @@ check that:
 
 - `features` on the ids gives what `StaticEmbedding.preprocess` gives on the
   texts;
-- the data collator gives the same batch from the ids as from the texts.
+- the data collator gives the same batch from the ids as from the texts;
+- a BERT run never turns its pairs into ids.
 
 ### A config in sections, with a flag for every setting
 
@@ -2011,10 +2017,10 @@ architecture, its size and the loss's scale. The trainer has many more, in
 every field of a dataclass. Its YAML reader takes one flat list of settings.
 PyYAML reads `1e-3` as text, since YAML 1.1 writes a number with a dot.
 
-**Decision.** A config has four sections: `data`, `model`, `loss` and
-`training`. `training` holds the trainer's arguments, under their own names.
-Each section's settings become the defaults of one `HfArgumentParser` over the
-four dataclasses. A flag then overrides any setting. A section or a setting
+**Decision.** A config has five sections: `data`, `model`, the architecture's
+own section, `loss` and `training`. `training` holds the trainer's arguments,
+under their own names. Each section's settings become the defaults of one
+`HfArgumentParser` over the sections' dataclasses. A flag then overrides any setting. A section or a setting
 that does not exist is refused.
 
 **Consequences.**
@@ -2025,8 +2031,9 @@ that does not exist is refused.
   config. The run's `config.yaml` records the final values.
 - Good, because argparse reads a default that is text by the setting's type.
   So `1e-3` in a config becomes a number.
-- Good, because a later architecture's settings get a section of their own.
-  So a static model's config cannot carry them by mistake.
+- Good, because each architecture's settings have a section of their own.
+  So a static model's config cannot carry BERT's by mistake
+  ([Each architecture's settings are its library's](#each-architectures-settings-are-its-librarys-in-a-section-of-their-own)).
 - Bad, because the flags have no sections, so each name must be unique
   across them. A test checks it.
 
@@ -2060,8 +2067,8 @@ copy as a negative, a text that should not match.
 **Decision.** The defaults are the recipe's:
 
 - batches of 2,048 pairs;
-- a learning rate of 0.2, after a warmup over a tenth of the steps;
-- 1,024 dimensions.
+- a warmup over a tenth of the steps;
+- for the static model, 1,024 dimensions and a learning rate of 0.2.
 
 Where the recipe is silent, the library's default holds, as for the loss's
 scale. Three defaults differ: the number of epochs, random batches, and bf16,
@@ -2069,6 +2076,9 @@ which stays off.
 
 **Consequences.**
 
+- Good, because a BERT trains with the same defaults, since they concern the
+  data and the loss. Only
+  [its learning rate](#each-architecture-has-its-own-learning-rate) differs.
 - Good, because the defaults follow standard practice: the recipe for this
   very model ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)),
   and the library's own defaults where the recipe says nothing.
@@ -2104,6 +2114,156 @@ which stays off.
 check that:
 
 - a config that names only its data trains at these defaults.
+
+### A second architecture: BERT, trained from scratch
+
+**Described in:** [training.md](training.md#bert-a-transformer-embedding-model-with-berts-architecture).
+
+**Context.** A static embedding model gives a token the same vector in every
+context. A transformer encoder lets each token's vector depend on the other
+tokens of the text. The BERT paper says: "BERT's model architecture is a
+multi-layer bidirectional Transformer encoder"
+([Devlin et al., 2019](https://doi.org/10.18653/v1/N19-1423)). With its
+`Transformer` and `Pooling` modules, sentence-transformers trains such an
+encoder with the same trainer and loss. A pretrained BERT learned
+from texts that the leakage check never sees.
+
+**Decision.** `architecture: bert` builds `BertModel` of
+[`transformers`](https://huggingface.co/docs/transformers) from random weights,
+followed by mean pooling. It trains on the same corpus and tokenizer, with the
+same loss, trainer and defaults, except its learning rate. No special token is
+added to a text, as for the static model.
+
+**Consequences.**
+
+- Good, because the corpus is the model's only training data, as for the
+  static model. So the leakage check covers all that the model learned from.
+- Good, because the trainer, the validation and `score` work unchanged. A
+  BERT run is a sentence-transformers model, which a plain
+  `SentenceTransformer` loads.
+- Good, because both architectures form a text's embedding the same way:
+  the average of its token vectors. So a comparison of the two measures only
+  what BERT's layers add.
+- Good, because the average, mean pooling, is the default of
+  sentence-transformers' `Pooling` and of Sentence-BERT
+  ([Reimers & Gurevych, 2019](https://doi.org/10.18653/v1/d19-1410)).
+- Bad, because a BERT is much larger and slower than a static model, to train
+  and to use.
+
+**Alternatives considered.**
+
+- A pretrained BERT, fine-tuned on the corpus: its pretraining texts are
+  outside the leakage check.
+- CLS pooling, as BERT's own classifiers use: a `[CLS]` token goes before
+  each text, and its output vector is the embedding. A static model cannot
+  pool this way: its `[CLS]` vector is the same for every text. So a BERT
+  would read other token ids than a static model, and form its embedding
+  another way.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a BERT trains on a CPU, and writes its run's folder;
+- two runs of one config and one seed give the same weights, on a CPU;
+- `score` ranks a benchmark with a BERT run.
+
+### Each architecture's settings are its library's, in a section of their own
+
+**Described in:** [training.md](training.md#architectures).
+
+**Context.** `StaticEmbedding` names its width `embedding_dim`.
+[`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig)
+names it `hidden_size`. Its documentation
+says that its defaults "will yield a similar configuration to that of the
+google-bert/bert-base-uncased" model: 12 layers of 768 dimensions. Google's
+release of smaller BERT models names BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
+`max_position_embeddings`, 512 in `BertConfig`. Attention needs memory that
+grows with the square of that length. `HfArgumentParser` cannot read
+`BertConfig` itself.
+
+**Decision.** Each architecture has a section named after it, under its
+library's names. `static` holds `embedding_dim`. `bert` holds eight fields of
+`BertConfig`. Its shape defaults to BERT-Small's, its length to 128 tokens,
+and its other settings to `BertConfig`'s defaults. The `model` section names
+the architecture. A config or a flag that gives another architecture's settings
+is refused.
+
+**Consequences.**
+
+- Good, because each setting has the name that its library's documentation
+  gives it.
+- Good, because BERT's default shape is a standard one: BERT-Small, from
+  Google's release ([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)).
+  Its feed-forward part is 4 times the width, as the BERT paper sets it.
+- Good, because the BERT paper pretrains with "sequence length of 128 for
+  90% of the steps" (Appendix A.2). At 128 tokens, BERT-Small trains at a
+  batch of 2,048 texts on one GPU.
+- Good, because BERT's other defaults are read from `BertConfig` itself, so
+  the code copies none of its numbers.
+- Good, because a static config cannot carry BERT's settings by mistake, and
+  a BERT config cannot carry the static width.
+- Bad, because BERT-Small is a guess at a size that suits a corpus of short
+  texts. A series tests other shapes as arms.
+- Bad, because a text longer than 128 tokens is cut, in training and in
+  scoring.
+
+**Alternatives considered.**
+
+- `BertConfig`'s own shape, BERT-base: 12 layers of 768 dimensions are large
+  and slow to train from scratch, at a batch of 2,048 texts.
+- `BertConfig`'s own length, 512 tokens: a batch of 2,048 texts padded to
+  512 does not fit on one GPU, even for BERT-Small.
+- One width for both, `embedding_dim`: its default of 1,024 does not divide
+  into BERT's 12 heads. The heads would then need a rule of our own.
+- Every field of `BertConfig`: many of them, such as `is_decoder`, do not
+  apply to an encoder trained here.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a BERT config reads its own section, at BERT-Small's shape, 128 tokens
+  and `BertConfig`'s other defaults;
+- a setting of the other architecture, in its section or as a flag, is
+  refused;
+- no two sections share a setting's name.
+
+### Each architecture has its own learning rate
+
+**Described in:** [training.md](training.md#architectures).
+
+**Context.** Hugging Face's recipe trains a static model at a learning rate of
+0.2 ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)). The BERT
+paper pretrains at 1e-4: "We use Adam with learning rate of 1e-4"
+([Devlin et al., 2019](https://doi.org/10.18653/v1/N19-1423), Appendix A.2).
+The trainer's default, 5e-5, is made for fine-tuning a pretrained model.
+
+**Decision.** The other training defaults are shared, since they concern the
+data and the loss. The learning rate is the architecture's own: 0.2 for
+`static`, and 1e-4 for `bert`. A config or a flag overrides it.
+
+**Consequences.**
+
+- Good, because each rate comes from a public source for its architecture.
+- Bad, because the BERT paper set its rate for pretraining with masked
+  language modelling, not for a contrastive loss. A series tests other rates
+  as arms.
+
+**Alternatives considered.**
+
+- One rate for both: the recipe's 0.2 is far above every rate of the BERT
+  paper, and 1e-4 would barely move a random table.
+- Other training defaults for each architecture too: the batch sets the loss's
+  in-batch negatives, and the validation pairs set the epochs, for both
+  architectures alike.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a static config trains at 0.2, and a BERT config at 1e-4;
+- a learning rate that a flag gives is kept.
 
 ### The model kept is the model at the last step
 
@@ -2256,6 +2416,13 @@ check that:
 > are Few-Shot Learners* (Version 4). arXiv.
 > https://doi.org/10.48550/ARXIV.2005.14165
 
+> Devlin, J., Chang, M.-W., Lee, K., & Toutanova, K. (2019). BERT:
+> Pre-training of Deep Bidirectional Transformers for Language
+> Understanding. *Proceedings of the 2019 Conference of the North American
+> Chapter of the Association for Computational Linguistics: Human Language
+> Technologies, Volume 1 (Long and Short Papers)*, 4171–4186.
+> https://doi.org/10.18653/v1/n19-1423
+
 > Dodge, J., Sap, M., Marasović, A., Agnew, W., Ilharco, G., Groeneveld, D.,
 > Mitchell, M., & Gardner, M. (2021). Documenting Large Webtext Corpora: A
 > Case Study on the Colossal Clean Crawled Corpus. *Proceedings of the 2021
@@ -2331,6 +2498,10 @@ check that:
 > *BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information
 > Retrieval Models* (Version 4). arXiv.
 > https://doi.org/10.48550/ARXIV.2104.08663
+
+> Turc, I., Chang, M.-W., Lee, K., & Toutanova, K. (2019). *Well-Read Students
+> Learn Better: On the Importance of Pre-training Compact Models* (Version 2).
+> arXiv. https://doi.org/10.48550/ARXIV.1908.08962
 
 > Tutubalina, E., Kadurin, A., & Miftahutdinov, Z. (2020). Fair Evaluation in
 > Concept Normalization: a Large-scale Comparative Analysis for BERT-based

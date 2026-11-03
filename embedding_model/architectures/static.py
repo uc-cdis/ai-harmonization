@@ -6,13 +6,27 @@ from the EmbeddingBag's random values, so the seed set before it is built
 decides where training starts.
 """
 
+from dataclasses import dataclass, field
+
+# Hugging Face's recipe for a static model trains at this rate.
+LEARNING_RATE = 0.2
+
+
+@dataclass
+class Settings:
+    """The static section: the length of each token's vector."""
+
+    embedding_dim: int = field(
+        default=1024, metadata={"help": "the length of each embedding"}
+    )
+
 
 def build(settings, tokenizer):
     """An untrained static model over a tokenizer's vocabulary.
 
     Args:
-        settings (ModelSettings): The model's settings; ``embedding_dim`` is
-            the length of each token's vector.
+        settings (Settings): The static section; ``embedding_dim`` is the
+            length of each token's vector.
         tokenizer (Tokenizer): The tokenizer, from ``tokenizer.read_tokenizer``.
 
     Returns:

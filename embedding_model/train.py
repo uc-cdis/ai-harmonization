@@ -4,13 +4,15 @@ Each training is a run: one config, trained with one seed. A run trains one
 model on a corpus's training pairs, with sentence-transformers' trainer, and
 evaluates it on the validation pairs. It takes four steps:
 
-1. It reads the config: a YAML file in four sections, ``data``, ``model``,
-   ``loss`` and ``training``. ``training`` holds sentence-transformers'
-   training arguments, under their own names. Any setting can also be given as
+1. It reads the config: a YAML file in five sections, ``data``, ``model``,
+   the architecture's own section, ``loss`` and ``training``.
+   ``training`` holds sentence-transformers' training arguments, under
+   their own names. Any setting can also be given as
    a flag, such as ``--learning_rate 1.0e-2``, which overrides the config.
 2. It reads the corpus and the tokenizer, each checked against its manifest.
-   It turns every text of the pairs into token ids once, before training, so
-   the training steps never wait for the tokenizer.
+   For a static model, it turns every text of the pairs into token ids once,
+   before training, so the training steps never wait for the tokenizer. A
+   BERT trains on the texts, and the trainer tokenizes each batch.
 3. It trains with MultipleNegativesRankingLoss. After each epoch, it
    evaluates the model on the validation pairs: their loss, and how it ranks
    them, as MRR@10 and accuracy@k.
@@ -41,12 +43,13 @@ from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
 RUNS = "runs"
 # The training settings whose defaults here differ from the library's: those
 # of Hugging Face's recipe for training a static model from scratch, where the
-# recipe sets them. The config overrides them.
+# recipe sets them. They concern the data and the loss, so every architecture
+# trains with them. Each architecture sets its own learning rate. The config
+# overrides them.
 TRAINING_DEFAULTS = {
     "num_train_epochs": 5,
     "per_device_train_batch_size": 2048,
     "per_device_eval_batch_size": 2048,
-    "learning_rate": 0.2,
     "warmup_steps": 0.1,
     "eval_strategy": "epoch",
     "logging_steps": 50,
@@ -69,14 +72,11 @@ class DataSettings:
 
 @dataclass
 class ModelSettings:
-    """The model section: the architecture and the length of its embeddings."""
+    """The model section: the architecture, whose own section holds its settings."""
 
     architecture: str = field(
         default="static",
         metadata={"help": "the architecture", "choices": list(ARCHITECTURES)},
-    )
-    embedding_dim: int = field(
-        default=1024, metadata={"help": "the length of each embedding"}
     )
 
 
@@ -96,6 +96,9 @@ class LossSettings:
 def sections():
     """The config's sections, in order, each with the dataclass of its settings.
 
+    Each architecture has a section of its own, named after it. A run reads
+    only its own architecture's section.
+
     Returns:
         dict[str, type]: Each section's dataclass, by the section's name.
     """
@@ -104,6 +107,7 @@ def sections():
     return {
         "data": DataSettings,
         "model": ModelSettings,
+        **{name: module.Settings for name, module in ARCHITECTURES.items()},
         "loss": LossSettings,
         "training": SentenceTransformerTrainingArguments,
     }
@@ -140,13 +144,15 @@ def read_config(path, seed, overrides=(), run_name=None):
     It only reads the values and checks them. apply_config then builds the
     settings from them.
 
-    HfArgumentParser has a flag for every setting of the four sections. Each
+    HfArgumentParser has a flag for every setting of every section. Each
     section's settings become the parser's defaults, and the flags given then
     override them. argparse reads a default that is text by the setting's
     type. So ``1e-3``, which YAML reads as text, becomes a number. A flag must
     be written in full: an abbreviation would change a setting that
     config.yaml then does not record. argparse checks a setting's choices
-    only for a flag, so the architecture is checked here too.
+    only for a flag, so the architecture is checked here too. A setting of
+    another architecture, in its section or as a flag, is refused. A learning
+    rate that neither the config nor a flag gives is the architecture's own.
 
     Args:
         path (Path): The config, a YAML file.
@@ -162,8 +168,9 @@ def read_config(path, seed, overrides=(), run_name=None):
 
     Raises:
         ValueError: If the config cannot be read, names a section, a
-            setting or an architecture that does not exist, or names no
-            corpus or no tokenizer, or if a flag is not a setting.
+            setting or an architecture that does not exist, names no
+            corpus or no tokenizer, or gives a setting of another
+            architecture, or if a flag is not a setting.
         argparse.ArgumentError: If a value does not fit its setting's type.
     """
     from transformers import HfArgumentParser
@@ -194,13 +201,20 @@ def read_config(path, seed, overrides=(), run_name=None):
             raise ValueError(f"{path}: the {section} section holds no settings")
         unknown = sorted(set(section_values) - setting_names[section])
         if unknown:
+            homes = [
+                f"{name} belongs in the {other} section"
+                for name in unknown
+                for other, names in setting_names.items()
+                if name in names
+            ]
             raise ValueError(
                 f"{path}: the {section} section has no setting {', '.join(unknown)}"
+                + "".join(f"; {home}" for home in homes)
             )
         config_values.update(section_values)
+    flags = flag_names(overrides, set().union(*setting_names.values()))
     training_given = (
-        set(config_sections.get("training") or {})
-        | flag_names(overrides, setting_names["training"])
+        set(config_sections.get("training") or {}) | flags
     ) & setting_names["training"]
 
     parser = HfArgumentParser(
@@ -218,11 +232,22 @@ def read_config(path, seed, overrides=(), run_name=None):
         raise ValueError(
             f"{path}: the data section must name the corpus and the tokenizer"
         )
-    if values["architecture"] not in ARCHITECTURES:
+    architecture = values["architecture"]
+    if architecture not in ARCHITECTURES:
         raise ValueError(
-            f"{path}: there is no architecture {values['architecture']!r}: the"
+            f"{path}: there is no architecture {architecture!r}: the"
             f" architectures are {', '.join(ARCHITECTURES)}"
         )
+    for other in set(ARCHITECTURES) - {architecture}:
+        other_flags = sorted(flags & setting_names[other])
+        if other in config_sections or other_flags:
+            where = f"--{other_flags[0]}" if other_flags else f"the {other} section"
+            raise ValueError(
+                f"{path}: {where} is for the {other} architecture, and this"
+                f" run's architecture is {architecture}"
+            )
+    if "learning_rate" not in training_given:
+        values["learning_rate"] = ARCHITECTURES[architecture].LEARNING_RATE
     return values, training_given
 
 
@@ -237,7 +262,8 @@ def apply_config(values):
         values (dict): Every setting's value, from read_config.
 
     Returns:
-        dict: Each section's settings, by the section's name.
+        dict: Each section's settings, by the section's name: the run's own
+            architecture's section, and not the others'.
 
     Raises:
         RuntimeError: If several GPUs are visible and the run cannot keep to
@@ -256,6 +282,7 @@ def apply_config(values):
             }
         )
         for section, settings_class in sections().items()
+        if section not in ARCHITECTURES or section == values["architecture"]
     }
 
 
@@ -390,6 +417,20 @@ def read_splits(inputs, corpus_name):
     return parts[TRAIN], parts[VALIDATION], corpus_manifest
 
 
+def pairs_dataset(pairs):
+    """The pairs' anchors and positives, as a dataset for the trainer.
+
+    Args:
+        pairs (pd.DataFrame): The pairs, with ``anchor`` and ``positive``.
+
+    Returns:
+        Dataset: ``anchor`` and ``positive``, each text as it is.
+    """
+    from datasets import Dataset
+
+    return Dataset.from_pandas(pairs[["anchor", "positive"]], preserve_index=False)
+
+
 def token_ids(pairs, tokenizer):
     """The pairs' anchors and positives as token ids, in a dataset for the trainer.
 
@@ -407,7 +448,6 @@ def token_ids(pairs, tokenizer):
     Returns:
         Dataset: ``anchor`` and ``positive``, each text's token ids.
     """
-    from datasets import Dataset
 
     def encode(batch):
         """One batch of texts, as token ids."""
@@ -421,8 +461,7 @@ def token_ids(pairs, tokenizer):
             for column in ("anchor", "positive")
         }
 
-    dataset = Dataset.from_pandas(pairs[["anchor", "positive"]], preserve_index=False)
-    return dataset.map(
+    return pairs_dataset(pairs).map(
         encode,
         batched=True,
         batch_size=BATCH_SIZE,
@@ -458,7 +497,9 @@ def validation_texts(pairs):
 def fit(settings, tokenizer, training_pairs, validation_pairs):
     """Build the model, train it, and evaluate it at the last step.
 
-    The pairs are turned into token ids first, once.
+    An architecture that reads token ids gets the pairs as ids, made once.
+    Another gets the texts, and its model's own ``preprocess`` tokenizes
+    each batch.
 
     Args:
         settings (dict): Each section's settings, from read_config.
@@ -483,11 +524,12 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
     from transformers import set_seed
 
     training = settings["training"]
-    architecture = ARCHITECTURES[settings["model"].architecture]
+    architecture_name = settings["model"].architecture
+    architecture = ARCHITECTURES[architecture_name]
     # The trainer sets the seed itself, but only after the model is built.
     # Setting it here first makes the seed decide the starting weights too.
     set_seed(training.seed)
-    model = architecture.build(settings["model"], tokenizer)
+    model = architecture.build(settings[architecture_name], tokenizer)
     evaluator = ranking_evaluator(
         model,
         *validation_texts(validation_pairs),
@@ -495,20 +537,35 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
         name="validation",
         cutoff=MRR_CUTOFF,
     )
+    # The variable is set on each path, not by default: an earlier run in the
+    # same process, or the shell, may have set it otherwise.
+    if architecture.features is None:
+        # The dataloader's workers tokenize, in forked processes. The
+        # tokenizer's threads do not survive a fork, so a worker that uses
+        # them can hang.
+        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        datasets = [
+            pairs_dataset(pairs) for pairs in (training_pairs, validation_pairs)
+        ]
+        collator = None
+    else:
+        # The ids are made on all the tokenizer's threads. The dataloader's
+        # workers then only gather them, so the threads are safe there, and
+        # the tokenizer gives no warning in each forked worker.
+        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        datasets = [
+            token_ids(pairs, tokenizer) for pairs in (training_pairs, validation_pairs)
+        ]
+        collator = SentenceTransformerDataCollator(preprocess_fn=architecture.features)
     trainer = SentenceTransformerTrainer(
         model=model,
         args=training,
-        train_dataset=token_ids(training_pairs, tokenizer),
-        eval_dataset=token_ids(validation_pairs, tokenizer),
+        train_dataset=datasets[0],
+        eval_dataset=datasets[1],
         loss=MultipleNegativesRankingLoss(model, scale=settings["loss"].scale),
         evaluator=evaluator,
-        data_collator=SentenceTransformerDataCollator(
-            preprocess_fn=architecture.features
-        ),
+        data_collator=collator,
     )
-    # The dataloader's workers only gather ids, so they never tokenize. Set,
-    # the variable stops the tokenizer's warning in each forked worker.
-    os.environ.setdefault("TOKENIZERS_PARALLELISM", "true")
     seconds = trainer.train().metrics["train_runtime"]
     evaluated = next(
         (
@@ -526,9 +583,10 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
 def recorded_config(settings, training_given):
     """The settings that the run's config.yaml records, by section.
 
-    Every setting of data, model and loss is recorded. Of training's settings,
-    those of TRAINING_DEFAULTS, those that the config or the flags gave, the
-    seed and bf16 are recorded. The others are the library's defaults, for
+    Every setting of data, model, the run's architecture and loss is
+    recorded. Of training's settings, those of TRAINING_DEFAULTS, those that
+    the config or the flags gave, the learning rate, the seed and bf16 are
+    recorded. The others are the library's defaults, for
     the version that the run's record names. The trainer's ``output_dir`` is
     the run's own, so it is left out. The training settings are written as
     ``TrainingArguments.to_dict`` gives them: an enum as its value, and a
@@ -543,13 +601,15 @@ def recorded_config(settings, training_given):
         dict: The config, in the sections that ``--config`` reads.
     """
     training_values = settings["training"].to_dict()
-    names = (set(TRAINING_DEFAULTS) | training_given | {"seed", "bf16"}) - {
-        "output_dir"
-    }
+    names = (
+        set(TRAINING_DEFAULTS) | training_given | {"learning_rate", "seed", "bf16"}
+    ) - {"output_dir"}
     return {
-        "data": asdict(settings["data"]),
-        "model": asdict(settings["model"]),
-        "loss": asdict(settings["loss"]),
+        **{
+            section: asdict(section_settings)
+            for section, section_settings in settings.items()
+            if section != "training"
+        },
         "training": {name: training_values[name] for name in sorted(names)},
     }
 

@@ -13,7 +13,7 @@ import yaml
 from embedding_model import benchmarks, corpus, scoring, texts, tokenizer, train
 from embedding_model.__main__ import main
 from embedding_model.manifests import file_sha256
-from embedding_model.architectures import static
+from embedding_model.architectures import bert, static
 from embedding_model.pairs import pairs_sha256
 from embedding_model.pairs.common import COLUMNS
 
@@ -42,7 +42,7 @@ TOKENIZER = "abcd-tokenizer"
 # Two epochs of three batches of four training pairs.
 CONFIG = {
     "data": {"corpus": CORPUS, "tokenizer": TOKENIZER},
-    "model": {"embedding_dim": 16},
+    "static": {"embedding_dim": 16},
     "training": {
         "num_train_epochs": 2,
         "per_device_train_batch_size": 4,
@@ -141,13 +141,44 @@ def trained_tokenizer(inputs):
     return tokenizer.read_tokenizer(inputs, TOKENIZER)[0]
 
 
+def write_benchmark(inputs):
+    """A fictional benchmark named topmed at version 1, over the training texts."""
+    folder = inputs / "benchmarks" / "topmed"
+    folder.mkdir(parents=True)
+    targets = [
+        {
+            "target_property": f"abcd.{name}",
+            "target_type": "float",
+            "target_description": positive.split(": ", 1)[1],
+            "target_values": "",
+        }
+        for name, positive in (
+            (anchor.lower().replace(" ", "_"), positive)
+            for anchor, positive in TRAINING
+        )
+    ]
+    mappings = [
+        {
+            "source_study_id": "phs999999",
+            "source_table_id": "pht999999.v1",
+            "source_variable_id": "phv99999901.v1",
+            "source_variable_name": "SBP01",
+            "source_type": "float",
+            "source_description": "Systolic blood pressure",
+            "source_values": "",
+            "expected_target": ["abcd.systolic_blood_pressure"],
+        }
+    ]
+    benchmarks.write_benchmark(folder, "topmed", "1", targets, mappings, [], {})
+
+
 class TestFeatures:
     """Token ids made before training give the batches that live tokenization gives."""
 
     def test_ids_give_what_staticembedding_preprocess_gives(self, inputs):
         """features() on the ids equals StaticEmbedding.preprocess() on the texts."""
         trained = trained_tokenizer(inputs)
-        model = static.build(train.ModelSettings(embedding_dim=8), trained)
+        model = static.build(static.Settings(embedding_dim=8), trained)
         texts = [anchor for anchor, _ in TRAINING]
         ids = [
             encoding.ids
@@ -166,7 +197,7 @@ class TestFeatures:
         )
 
         trained = trained_tokenizer(inputs)
-        model = static.build(train.ModelSettings(embedding_dim=8), trained)
+        model = static.build(static.Settings(embedding_dim=8), trained)
         pairs = pd.DataFrame(TRAINING, columns=["anchor", "positive"])
         ids = train.token_ids(pairs, trained)
         live = SentenceTransformerDataCollator(preprocess_fn=model.preprocess)
@@ -228,7 +259,7 @@ class TestConfig:
         assert training.num_train_epochs == 5
         sampler = training.batch_sampler
         assert getattr(sampler, "value", sampler) == "batch_sampler"
-        assert settings["model"].embedding_dim == 1024
+        assert settings["static"].embedding_dim == 1024
         assert settings["loss"].scale == 20.0
 
     def test_a_number_that_yaml_reads_as_text_becomes_a_number(self, tmp_path):
@@ -247,6 +278,10 @@ class TestConfig:
             ("abcd:\n  efgh: 1\n", "no section abcd"),
             ("model:\n  dimension: 8\n", "no setting dimension"),
             ("model: 8\n", "holds no settings"),
+            (
+                "model:\n  embedding_dim: 8\n",
+                "embedding_dim belongs in the static section",
+            ),
         ],
     )
     def test_an_unknown_section_or_setting_is_refused(self, tmp_path, text, message):
@@ -269,10 +304,81 @@ class TestConfig:
         """A value that does not fit its setting's type raises, rather than exiting the process."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
-            yaml.safe_dump({"data": CONFIG["data"], "model": {"embedding_dim": "abcd"}})
+            yaml.safe_dump(
+                {"data": CONFIG["data"], "static": {"embedding_dim": "abcd"}}
+            )
         )
         with pytest.raises(argparse.ArgumentError, match="embedding_dim"):
             train.read_config(path, 0)
+
+    def test_a_bert_config_reads_its_own_section(self, tmp_path):
+        """A BERT run reads the bert section, at BERT-Small's shape and BertConfig's other defaults."""
+        from transformers import BertConfig
+
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "data": CONFIG["data"],
+                    "model": {"architecture": "bert"},
+                    "bert": {"num_hidden_layers": 1},
+                }
+            )
+        )
+        values, _ = train.read_config(path, 0, ["--use_cpu"])
+        assert values["learning_rate"] == 1e-4
+        settings = train.apply_config(values)
+        assert "static" not in settings
+        assert settings["bert"].num_hidden_layers == 1
+        assert settings["bert"].hidden_size == 512
+        assert settings["bert"].max_position_embeddings == 128
+        assert settings["bert"].initializer_range == BertConfig().initializer_range
+
+    def test_a_width_that_the_heads_do_not_divide_is_refused(self, tmp_path):
+        """A BERT whose hidden_size the heads do not divide is refused when its settings are built."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump(
+                {
+                    "data": CONFIG["data"],
+                    "model": {"architecture": "bert"},
+                    "bert": {"hidden_size": 256, "num_attention_heads": 6},
+                }
+            )
+        )
+        values, _ = train.read_config(path, 0, ["--use_cpu"])
+        with pytest.raises(ValueError, match="not a multiple"):
+            train.apply_config(values)
+
+    def test_a_given_learning_rate_is_kept(self, config):
+        """The architecture's learning rate holds only when no config or flag gives one."""
+        values, _ = train.read_config(config, 0, ["--learning_rate", "1e-3"])
+        assert values["learning_rate"] == 1e-3
+
+    @pytest.mark.parametrize(
+        "sections, flags, message",
+        [
+            (
+                {"bert": {"num_hidden_layers": 1}},
+                [],
+                "the bert section is for the bert",
+            ),
+            ({}, ["--num_hidden_layers", "1"], "--num_hidden_layers is for the bert"),
+            (
+                {"model": {"architecture": "bert"}, "static": {"embedding_dim": 8}},
+                [],
+                "the static section is for the static",
+            ),
+        ],
+    )
+    def test_another_architectures_settings_are_refused(
+        self, tmp_path, sections, flags, message
+    ):
+        """A setting of another architecture, in its section or as a flag, is refused."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(yaml.safe_dump({"data": CONFIG["data"], **sections}))
+        with pytest.raises(ValueError, match=message):
+            train.read_config(path, 0, flags)
 
     def test_each_setting_lives_in_one_section(self):
         """No two sections share a setting's name, since each has one flag."""
@@ -323,7 +429,7 @@ class TestConfig:
         """Each section becomes its own settings, with the values read."""
         values, _ = train.read_config(config, 3, ["--use_cpu"])
         settings = train.apply_config(values)
-        assert list(settings) == ["data", "model", "loss", "training"]
+        assert list(settings) == ["data", "model", "static", "loss", "training"]
         assert settings["data"].corpus == CORPUS
         assert settings["training"].seed == 3
         assert settings["training"].device.type == "cpu"
@@ -423,7 +529,7 @@ class TestTrain:
             run / "model" / "model.safetensors"
         )
         recorded = yaml.safe_load((run / "config.yaml").read_text())
-        assert list(recorded) == ["data", "model", "loss", "training"]
+        assert list(recorded) == ["data", "model", "static", "loss", "training"]
         assert recorded["training"]["seed"] == 0
         assert "output_dir" not in recorded["training"]
         logged = json.loads((run / "trainer_state.json").read_text())["log_history"]
@@ -590,33 +696,7 @@ class TestScoreRun:
     @pytest.fixture
     def run(self, inputs, config, tmp_path):
         """A trained run, and a benchmark named topmed at version 1."""
-        folder = inputs / "benchmarks" / "topmed"
-        folder.mkdir(parents=True)
-        targets = [
-            {
-                "target_property": f"abcd.{name}",
-                "target_type": "float",
-                "target_description": positive.split(": ", 1)[1],
-                "target_values": "",
-            }
-            for name, positive in (
-                (anchor.lower().replace(" ", "_"), positive)
-                for anchor, positive in TRAINING
-            )
-        ]
-        mappings = [
-            {
-                "source_study_id": "phs999999",
-                "source_table_id": "pht999999.v1",
-                "source_variable_id": "phv99999901.v1",
-                "source_variable_name": "SBP01",
-                "source_type": "float",
-                "source_description": "Systolic blood pressure",
-                "source_values": "",
-                "expected_target": ["abcd.systolic_blood_pressure"],
-            }
-        ]
-        benchmarks.write_benchmark(folder, "topmed", "1", targets, mappings, [], {})
+        write_benchmark(inputs)
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
         return outputs / train.RUNS / "abcd-run_s0", outputs
@@ -668,3 +748,86 @@ class TestScoreRun:
             ValueError, match="was not checked against benchmark topmed"
         ):
             scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
+
+# The smallest BERT that trains on a CPU in seconds: one layer of 32 dimensions.
+BERT_CONFIG = {
+    **{section: values for section, values in CONFIG.items() if section != "static"},
+    "model": {"architecture": "bert"},
+    "bert": {
+        "hidden_size": 32,
+        "num_hidden_layers": 1,
+        "num_attention_heads": 2,
+        "intermediate_size": 64,
+        "max_position_embeddings": 64,
+    },
+}
+
+
+class TestBert:
+    """A transformer embedding model with BERT's architecture, trained from scratch on a CPU."""
+
+    @pytest.fixture
+    def bert_config(self, tmp_path):
+        """The BERT run's config, as a YAML file named abcd-bert.yaml."""
+        path = tmp_path / "abcd-bert.yaml"
+        path.write_text(yaml.safe_dump(BERT_CONFIG))
+        return path
+
+    def test_a_bert_run_writes_its_folder(
+        self, inputs, bert_config, tmp_path, monkeypatch
+    ):
+        """BERT trains on the texts: a BERT body with mean pooling, recorded as architecture bert."""
+        from sentence_transformers import SentenceTransformer
+
+        monkeypatch.setattr(
+            train, "token_ids", lambda *args: pytest.fail("BERT trains on texts")
+        )
+        outputs = tmp_path / "outputs"
+        assert train.train(bert_config, 0, [], inputs, outputs) == 0
+        run = outputs / train.RUNS / "abcd-bert_s0"
+        record = json.loads((run / "manifest.json").read_text())
+        assert record["settings"]["architecture"] == "bert"
+        recorded = yaml.safe_load((run / "config.yaml").read_text())
+        assert list(recorded) == ["data", "model", "bert", "loss", "training"]
+        assert recorded["training"]["learning_rate"] == 1e-4
+        model = SentenceTransformer(str(run / "model"), device="cpu")
+        assert [type(module).__name__ for module in model] == ["Transformer", "Pooling"]
+        assert model.encode(["Body weight"]).shape == (1, 32)
+
+    def test_a_bert_model_card_looks_up_nothing_on_the_hub(self, inputs):
+        """The model card does not look up the temporary folder's path on the Hub."""
+        settings = bert.Settings(**BERT_CONFIG["bert"])
+        model = bert.build(settings, trained_tokenizer(inputs))
+        assert model.model_card_data.local_files_only
+
+    def test_each_run_sets_the_tokenizers_threads(
+        self, inputs, config, bert_config, tmp_path, monkeypatch
+    ):
+        """A BERT run turns the threads off and a static run on, whatever was set before."""
+        monkeypatch.setenv("TOKENIZERS_PARALLELISM", "true")
+        assert train.train(bert_config, 0, [], inputs, tmp_path / "bert") == 0
+        assert os.environ["TOKENIZERS_PARALLELISM"] == "false"
+        assert train.train(config, 0, [], inputs, tmp_path / "static") == 0
+        assert os.environ["TOKENIZERS_PARALLELISM"] == "true"
+
+    def test_a_bert_run_trains_the_same_model_again(
+        self, inputs, bert_config, tmp_path
+    ):
+        """Two BERT runs of one config and one seed, on a CPU, give the same weights."""
+        weights = "runs/abcd-bert_s0/model/model.safetensors"
+        for outputs in ("first", "second"):
+            assert train.train(bert_config, 0, [], inputs, tmp_path / outputs) == 0
+        assert file_sha256(tmp_path / "first" / weights) == file_sha256(
+            tmp_path / "second" / weights
+        )
+
+    def test_a_bert_run_is_scored(self, inputs, bert_config, tmp_path):
+        """score loads a BERT run with a plain SentenceTransformer, and ranks its benchmark."""
+        write_benchmark(inputs)
+        outputs = tmp_path / "outputs"
+        assert train.train(bert_config, 0, [], inputs, outputs) == 0
+        run = outputs / train.RUNS / "abcd-bert_s0"
+        rows = scoring.score(str(run), ["topmed"], inputs, outputs, device="cpu")
+        assert rows[0]["n"] == 1
+        assert (run / "scores" / "topmed" / "compact" / "metrics.csv").exists()

@@ -21,30 +21,33 @@ rules below.
 
 ## The config
 
-A config has four sections. Each setting has a default, so a config names only
+A config has five sections. Each setting has a default, so a config names only
 the corpus, the tokenizer and what it changes:
 
 ```yaml
 data:
   corpus: example
   tokenizer: example-8k
-model:
+static:
   embedding_dim: 512
 training:
   num_train_epochs: 10
 ```
 
-This config trains a smaller model than the default, for longer.
+This config trains a smaller static model than the default, for longer.
 
-The first three sections hold the settings of this pipeline:
+The sections `data`, `model` and `loss` hold the settings of this pipeline:
 
 | section | setting | what it sets | default here | the library's default |
 |---|---|---|---|---|
 | `data` | `corpus` | the [corpus](corpus.md) to train on, by its name | none: required | — |
 | `data` | `tokenizer` | the [tokenizer](tokenizer.md), by its name | none: required | — |
-| `model` | `architecture` | the architecture | `static` | — |
-| `model` | `embedding_dim` | the length of each embedding | 1024 | none: `StaticEmbedding` requires it |
+| `model` | `architecture` | the [architecture](#architectures): `static` or `bert` | `static` | — |
 | `loss` | `scale` | the factor that multiplies the similarities before the softmax of [MultipleNegativesRankingLoss](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss) | 20 | 20 |
+
+The architecture's own section, `static` or `bert`, holds the model's
+settings. [Architectures](#architectures) lists them. A run reads only its
+own architecture's section, and a config with the other one's is refused.
 
 The `training` section takes any field of
 [`SentenceTransformerTrainingArguments`](https://sbert.net/docs/package_reference/sentence_transformer/training_args.html),
@@ -57,7 +60,7 @@ changed, most of them to those of Hugging Face's
 | `num_train_epochs` | 5 | 3 |
 | `per_device_train_batch_size` | 2048 | 8 |
 | `per_device_eval_batch_size` | 2048 | 8 |
-| `learning_rate` | 0.2 | 5e-5 |
+| `learning_rate` | the architecture's: 0.2 for `static`, 1e-4 for `bert` | 5e-5 |
 | `warmup_steps` | 0.1, a share of the steps | 0 |
 | `eval_strategy` | `epoch`: after each epoch | `no` |
 | `logging_steps` | 50 | 500 |
@@ -71,12 +74,77 @@ is not a setting is refused. A flag must be written in full, such as
 `--learning_rate`, not `--learning`. A section or a setting that does not
 exist in the config is refused too.
 
+## Architectures
+
+`architecture`, in the `model` section, chooses one of two models. Both are
+sentence-transformers models. Both train with the same loss, the same trainer
+and the same defaults, except the learning rate.
+
+### `static`: a static embedding model
+
+The default. The model is a table that holds one vector per token. A text's
+embedding is the average of its tokens' vectors, as sentence-transformers'
+`StaticEmbedding` computes it. Its learning rate is 0.2, the rate of Hugging
+Face's [recipe for static models](https://huggingface.co/blog/static-embeddings).
+
+| setting | what it sets | default here | the library's default |
+|---|---|---|---|
+| `embedding_dim` | the length of each token's vector, and of the embedding | 1024 | none: `StaticEmbedding` requires it |
+
+### `bert`: a transformer embedding model with BERT's architecture
+
+The model is a BERT body, as `BertModel` of
+[transformers](https://huggingface.co/docs/transformers) builds it, trained
+from scratch. It starts from random weights, not from a pretrained BERT. Its
+attention layers let each token's vector depend on the other tokens of the
+text. Mean pooling over the token vectors gives the text's embedding. Its
+learning rate is 1e-4, the rate at which the BERT paper
+([Devlin et al., 2019](https://doi.org/10.18653/v1/N19-1423)) pretrains.
+
+```yaml
+data:
+  corpus: example
+  tokenizer: example-8k
+model:
+  architecture: bert
+bert:
+  hidden_size: 256
+  num_hidden_layers: 2
+  num_attention_heads: 4
+  intermediate_size: 1024
+```
+
+This config trains a BERT of 2 layers and 256 dimensions.
+
+The `bert` section takes these settings of
+[`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig),
+under its own names. The shape's defaults are BERT-Small's, from Google's
+[release of smaller BERT models](https://github.com/google-research/bert).
+A text is cut at 128 tokens, the length at which the BERT paper pretrains for
+most of its steps. The other defaults are `BertConfig`'s:
+
+| setting | what it sets | default |
+|---|---|---|
+| `hidden_size` | the length of each token's vector, and of the embedding | 512 |
+| `num_hidden_layers` | the number of transformer layers | 4 |
+| `num_attention_heads` | the attention heads of each layer; their number must divide `hidden_size` | 8 |
+| `intermediate_size` | the size of each layer's feed-forward part | 2048 |
+| `hidden_dropout_prob` | the dropout on the embeddings and on each layer's output | 0.1 |
+| `attention_probs_dropout_prob` | the dropout on the attention weights | 0.1 |
+| `max_position_embeddings` | the longest text, in tokens; a longer text is cut | 128 |
+| `initializer_range` | the standard deviation of the random starting weights | 0.02 |
+
+The vocabulary is the tokenizer's. No special token is added to a text, as
+for a static model.
+
 ## What a run does
 
 1. It reads the corpus and the tokenizer, each checked against its manifest.
-2. It turns the texts of every training and validation pair into token ids,
-   once, without special tokens. The ids stay in memory. They are the ids that
-   the model would get from the texts itself, so the model trains the same.
+2. For a static model, it turns the texts of every training and validation
+   pair into token ids, once, without special tokens. The ids stay in memory.
+   They are the ids that the model would get from the texts itself, so the
+   model trains the same. A BERT trains on the texts: the trainer tokenizes
+   each batch.
 3. It sets the seed, then builds the model. So the seed decides the model's
    starting weights and the order of the pairs.
 4. It trains with MultipleNegativesRankingLoss: in each batch, an anchor's
@@ -150,8 +218,9 @@ the previous run of that name as it was; see
 ### `model/`
 
 The model at the last step, as sentence-transformers saves it.
-`SentenceTransformer("<run>/model")` loads it. The table is in
-`model.safetensors`, and the tokenizer in `tokenizer.json`. `README.md` is the
+`SentenceTransformer("<run>/model")` loads it. The weights are in
+`model.safetensors`: a static model's table, or a BERT's layers. The tokenizer
+is in `tokenizer.json`. `README.md` is the
 model card that sentence-transformers writes.
 
 To compare two runs' models, compare `model.safetensors`. The model card and
@@ -161,8 +230,9 @@ library versions. So they differ even between two runs of one config.
 ### `config.yaml`
 
 The run's settings, in the config's sections. It records every setting of
-`data`, `model` and `loss`. Of `training`, it records the settings that the
-config or the flags gave, the changed defaults above, the seed and `bf16`.
+`data`, `model`, the architecture's section and `loss`. Of `training`, it
+records the settings that the config or the flags gave, the changed defaults
+above, the learning rate, the seed and `bf16`.
 The other settings are the library's defaults.
 
 So `config.yaml` trains the same model again, with the same seed. A run is
@@ -174,6 +244,11 @@ python -m embedding_model train --config run_example_again.yaml --seed 0
 ```
 
 This trains the run `run_example_again_s0`, next to `run_example_s0`.
+
+On a CPU, the two models are the same, byte for byte. On a GPU,
+`full_determinism: true` makes them the same too. Without it, a GPU may add
+up its numbers in another order on each run. A model trained on a CPU and
+one trained on a GPU differ slightly, for the same reason.
 
 ### `manifest.json`
 

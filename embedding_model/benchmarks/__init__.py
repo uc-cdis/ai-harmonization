@@ -10,7 +10,7 @@ beside the manifest of its build:
 
 The files carry third-party text, so they are built from their published
 inputs rather than redistributed. A manifest committed under ``manifests/``
-pins those inputs, such as a commit, a record or a release. It also records the
+pins those inputs, such as a commit, a record or a release. It also holds the
 SHA-256 of every file built from them. So a rebuild either matches it or names
 what differs.
 """
@@ -121,7 +121,7 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
 def read_benchmark(inputs, name):
     """A built benchmark: its targets, its mappings and its manifest.
 
-    Each file must have the SHA-256 that its manifest records. So scores made
+    Each file must have the SHA-256 that its manifest holds. So scores made
     from the files can name exactly what was scored. Each file is read once,
     and the bytes checked are the bytes parsed. A warning is printed when the
     build's version is not the version committed under ``manifests/``.
@@ -164,7 +164,7 @@ def read_benchmark(inputs, name):
     changed = [path.name for path in paths if sha256(data[path]) != recorded[path.name]]
     if changed:
         raise ValueError(
-            f"{manifest_path.name} records another SHA-256 for"
+            f"{manifest_path.name} holds another SHA-256 for"
             f" {', '.join(changed)}; run: {command}"
         )
     targets, mappings = (

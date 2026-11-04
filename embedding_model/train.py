@@ -373,7 +373,7 @@ def device_name(training):
         training (SentenceTransformerTrainingArguments): The training settings.
 
     Returns:
-        str: The device, as the run's manifest records it.
+        str: The device, as the run's manifest holds it.
     """
     if training.device.type != "cuda":
         return training.device.type
@@ -420,7 +420,7 @@ def read_splits(inputs, corpus_name):
 
     Raises:
         FileNotFoundError: If no corpus of that name was built.
-        ValueError: If the corpus cannot be read, records no text format of
+        ValueError: If the corpus cannot be read, holds no text format of
             FORMATS for its pairs, or has no pairs of a split.
     """
     pairs, corpus_manifest = read_corpus(inputs, corpus_name)
@@ -603,7 +603,7 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
 
 
 def recorded_config(settings, training_given):
-    """The settings that the run's config.yaml records, by section.
+    """The settings that the run's config.yaml holds, by section.
 
     Every setting of data, model, the run's architecture and loss is
     recorded. Of training's settings, those of TRAINING_DEFAULTS, those that
@@ -673,7 +673,7 @@ def run_manifest(
 
     It names the corpus and the tokenizer with their checksums, and the
     benchmarks that the corpus was checked against for leakage. ``score``
-    reads them. It also records the text format of the pairs, from the
+    reads them. It also holds the text format of the pairs, from the
     corpus's manifest, the device, the code's commit and the libraries'
     versions.
 
@@ -788,7 +788,7 @@ def train(config, seed, overrides, inputs, outputs):
         print(note)
 
     # Read before training, so that a change to the checkout during a long run
-    # does not change the commit that the run records.
+    # does not change the commit that the run writes.
     commit = code_commit()
     destination = Path(outputs) / RUNS / run_name
     with staged(destination) as built:

@@ -85,7 +85,7 @@ DEFAULT_FORMAT = "compact"
 
 
 def recorded_format(manifest, manifest_path, next_step):
-    """The text format that a manifest records for its texts, one of FORMATS.
+    """The text format that a manifest holds for its texts, one of FORMATS.
 
     The pairs, a corpus and a run each record the format in ``settings``.
 
@@ -100,18 +100,18 @@ def recorded_format(manifest, manifest_path, next_step):
         str: The format's name.
 
     Raises:
-        ValueError: If the manifest records no format, or one that is not in
+        ValueError: If the manifest holds no format, or one that is not in
             FORMATS.
     """
     settings = manifest.get("settings")
     text_format = settings.get("format") if isinstance(settings, dict) else None
     if text_format is None:
         raise ValueError(
-            f"{manifest_path} records no text format for its texts; {next_step}"
+            f"{manifest_path} holds no text format for its texts; {next_step}"
         )
     if not isinstance(text_format, str) or text_format not in FORMATS:
         raise ValueError(
-            f"{manifest_path} records the text format {text_format!r}, which is"
+            f"{manifest_path} holds the text format {text_format!r}, which is"
             f" not one of {', '.join(FORMATS)}; {next_step}"
         )
     return text_format

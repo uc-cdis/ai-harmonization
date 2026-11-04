@@ -655,7 +655,7 @@ class TestTrain:
         write_corpus(inputs, corpus_rows(), text_format=None)
         assert train.train(config, 0, [], inputs, tmp_path / "outputs") == 1
         error = capsys.readouterr().err
-        assert "records no text format" in error
+        assert "holds no text format" in error
         assert f"corpus build --name {CORPUS}" in error
 
     def test_a_missing_tokenizer_names_the_command(self, inputs, tmp_path, capsys):

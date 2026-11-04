@@ -229,7 +229,7 @@ def read_tokenizer(inputs, name):
 
     Four things are checked, in this order: the name is a tokenizer name, the
     manifest exists and names this tokenizer, ``tokenizer.json`` has the
-    SHA-256 that the manifest records, and the file can be read.
+    SHA-256 that the manifest holds, and the file can be read.
 
     Args:
         inputs (Path): The inputs folder that the tokenizer was trained in.

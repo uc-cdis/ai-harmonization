@@ -26,7 +26,7 @@ GROUND_TRUTH = "GDC-SM ground truth"
 ZENODO_FILE = "https://zenodo.org/records/{record}/files/{name}?download=1"
 GDC_DICTIONARY = "https://api.gdc.cancer.gov/v0/submission/_dictionary/_all"
 GDC_STATUS = "https://api.gdc.cancer.gov/status"
-# The status's fields that the manifest records as the dictionary's version.
+# The status's fields that the manifest holds as the dictionary's version.
 STATUS_FIELDS = ("data_release", "tag", "commit")
 # Entries the API serves beside the nodes: the JSON meta-schema and the root.
 NOT_NODES = {"metaschema", "root"}
@@ -405,7 +405,7 @@ def build(downloads, manifest):
     between builds. The GDC API serves only the current dictionary, so the
     kept copy is the only copy of the dictionary that the manifest pins. The
     API's status, which names the data release, is kept with it, as
-    ``kept_dictionary`` says. The manifest records the dictionary's SHA-256,
+    ``kept_dictionary`` says. The manifest holds the dictionary's SHA-256,
     so a build on a changed dictionary shows as a different benchmark.
 
     Args:

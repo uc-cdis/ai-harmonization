@@ -203,7 +203,7 @@ class TestCheckFile:
     def test_a_file_that_the_manifest_does_not_record_is_refused(self, written):
         """A manifest without the file's SHA-256 names the file."""
         path, _ = written
-        with pytest.raises(ValueError, match="records no SHA-256 for abcd-table"):
+        with pytest.raises(ValueError, match="holds no SHA-256 for abcd-table"):
             self.check(path, {"files": {}})
 
 

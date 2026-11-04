@@ -497,8 +497,8 @@ class TestBuild:
     @pytest.mark.parametrize(
         "settings, message",
         [
-            (None, "records no text format"),
-            ({"format": None}, "records no text format"),
+            (None, "holds no text format"),
+            ({"format": None}, "holds no text format"),
             ({"format": ["compact"]}, "which is not one of compact"),
             ({"format": "abcd-format"}, "which is not one of compact"),
         ],

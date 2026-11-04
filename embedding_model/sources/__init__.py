@@ -6,7 +6,7 @@ needs no network. Its tables are written as parquet files under
 ``<inputs>/sources/<source>/``, beside the manifest of the fetch.
 
 A manifest committed under ``manifests/`` pins the release that each source is
-read from, as the benchmarks' manifests do. It also records the SHA-256 of
+read from, as the benchmarks' manifests do. It also holds the SHA-256 of
 every table's content. A new fetch either matches it or names what differs; see
 ``embedding_model.manifests``.
 
@@ -78,7 +78,7 @@ def write_source(directory, name, version, tables, sources, counts):
 def read_source(inputs, name):
     """A fetched source's tables and the manifest of its fetch.
 
-    Each table's file must have the ``sha256`` that its manifest records, so
+    Each table's file must have the ``sha256`` that its manifest holds, so
     it is unchanged since its fetch wrote it. A warning is printed when the
     fetch's version is not the version committed under ``manifests/``.
 

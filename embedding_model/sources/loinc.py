@@ -1,7 +1,7 @@
 """LOINC: codes and their names, question texts, answer lists and replacements.
 
 A release is pinned by its version, such as ``2.83``, and by the MD5 that the
-manifest records for it. The release zip needs a free loinc.org account. With
+manifest holds for it. The release zip needs a free loinc.org account. With
 ``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, it is downloaded through LOINC's
 API. Without them, it can be placed by hand in the downloads folder.
 

@@ -2,13 +2,13 @@
 
 Benchmarks and sources each keep a committed manifest per build, under their
 own ``manifests/`` folder. It pins what the build is made from, such as a
-commit, a release or a record, and records the SHA-256 of every file built.
+commit, a release or a record, and holds the SHA-256 of every file built.
 A new build writes its own manifest, and the two are compared. A build that
 matches is kept. A build that differs is kept only when accepted as a new
 version. A version committed in git never changes.
 ``embedding_model/docs/manifests.md`` describes the fields and the rules.
 
-The module also computes the checksums that a manifest records:
+The module also computes the checksums that a manifest holds:
 
 - a file's ``sha256``, by ``file_sha256`` for a file on disk, or by ``sha256``
   for bytes in memory. Both give the same value for the same bytes;
@@ -66,7 +66,7 @@ def file_sha256(path):
 
     It gives the same value as ``sha256`` of the file's bytes, but it never
     holds the whole file in memory. So it suits a large file, such as a
-    release zip or a corpus's pairs. A manifest records it as a file's
+    release zip or a corpus's pairs. A manifest holds it as a file's
     ``sha256``.
 
     Args:
@@ -132,7 +132,7 @@ def schema_line(frame):
 def table_sha256(frame):
     """The SHA-256 of a table's content: its schema line, then its rows as CSV.
 
-    A manifest records it as a table's ``content_sha256``. The content is hashed
+    A manifest holds it as a table's ``content_sha256``. The content is hashed
     rather than the parquet file, whose bytes depend on the library that wrote
     it. The schema line keeps the types that CSV loses, so ``True`` and the
     text ``"True"`` give different checksums. A missing value is written as
@@ -366,9 +366,9 @@ def read(path, command, field, name):
 
 
 def check_file(path, manifest, manifest_path, command):
-    """Check that a file exists, and has the SHA-256 that its manifest records.
+    """Check that a file exists, and has the SHA-256 that its manifest holds.
 
-    The manifest records each file under its name, in ``files``. So a file
+    The manifest lists each file under its name, in ``files``. So a file
     that differs from it has changed since its step wrote it.
 
     Args:
@@ -380,7 +380,7 @@ def check_file(path, manifest, manifest_path, command):
 
     Raises:
         FileNotFoundError: If the file is missing.
-        ValueError: If the manifest records no SHA-256 for the file, or the
+        ValueError: If the manifest holds no SHA-256 for the file, or the
             file differs from it.
     """
     if not path.exists():
@@ -389,7 +389,7 @@ def check_file(path, manifest, manifest_path, command):
         checksum = manifest["files"][path.name]["sha256"]
     except Exception as error:
         raise ValueError(
-            f"{manifest_path} records no SHA-256 for {path.name}"
+            f"{manifest_path} holds no SHA-256 for {path.name}"
             f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
     if file_sha256(path) != checksum:

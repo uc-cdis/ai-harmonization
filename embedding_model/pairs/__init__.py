@@ -161,7 +161,7 @@ def read_pairs_file(table, manifest, field, name, columns, command):
     """A table of pairs that a step wrote, and its manifest, checked against each other.
 
     ``pairs prepare`` and ``corpus build`` each write a table of pairs, and a
-    manifest that names it and records its checksums. Five things are checked,
+    manifest that names it and holds its checksums. Five things are checked,
     in this order:
 
     1. the manifest exists and can be read;
@@ -211,7 +211,7 @@ def read_pairs_file(table, manifest, field, name, columns, command):
 def read_pairs(inputs, name):
     """A source's pairs and their manifest, checked against each other.
 
-    The manifest records the pairs' file, the fetch that they come from, and
+    The manifest holds the pairs' file, the fetch that they come from, and
     the text format of their texts. When that fetch is in the inputs folder,
     the pairs must come from it.
 
@@ -225,7 +225,7 @@ def read_pairs(inputs, name):
     Raises:
         FileNotFoundError: If the source's pairs were not prepared there.
         ValueError: If the pairs, their manifest or the fetch's manifest cannot
-            be read, the manifest is another source's or records no text
+            be read, the manifest is another source's or holds no text
             format of FORMATS, the pairs lack a column or differ from their
             manifest, or they come from another fetch.
     """

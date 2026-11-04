@@ -2025,8 +2025,10 @@ that does not exist is refused.
 
 **Consequences.**
 
-- Good, because every setting of the trainer works without code of ours,
-  under the name that the trainer's documentation gives it.
+- Good, because the trainer's settings work without code of ours, under the
+  names that the trainer's documentation gives them. A run
+  [refuses](#a-run-refuses-the-trainers-prompts-and-router_mapping) two of
+  them: `prompts` and `router_mapping`.
 - Good, because a flag changes one setting for one run, without a new
   config. The run's `config.yaml` records the final values.
 - Good, because argparse reads a default that is text by the setting's type.
@@ -2052,6 +2054,56 @@ check that:
 - `1e-3` in a config becomes a number;
 - an unknown section or setting is refused;
 - no two sections share a setting's name.
+
+### A run refuses the trainer's prompts and router_mapping
+
+**Described in:** [training.md](training.md#the-config).
+
+**Context.** Two of the trainer's settings go to its data collator. `prompts`
+puts a text before a column's texts. `router_mapping` sends each column to
+one side of a `Router` module. The trainer uses both in training only, and
+does not save the prompts as the model's own. The approaches embed the source
+through `embed_query` and the targets through `embed_documents`. Both make
+the same `encode` call: it adds only the default prompt, and takes the
+default route.
+
+**Decision.** For now, `read_config` refuses `prompts` and `router_mapping`,
+in the config or as a flag, before training starts. The message names the
+setting and the reason.
+
+**Consequences.**
+
+- Good, because a model is trained the way that the approaches use it. A
+  prompt or a route that they do not add would train the model one way and
+  use it another.
+- Good, because both sides are entries of data dictionaries, written in one
+  format. Sentence-BERT embeds the two texts that it compares with one
+  encoder, without a prompt
+  ([Reimers & Gurevych, 2019](https://doi.org/10.18653/v1/d19-1410)).
+- Good, because a config that sets either fails at once, with the reason,
+  before any training.
+- Bad, because neither is tested. A prompt or a Router branch for each side
+  could teach a model the two roles: a source variable and a target
+  property. A test needs the approaches to pass the side: `encode_query` in
+  `embed_query`, and `encode_document` in `embed_documents`.
+
+**Alternatives considered.**
+
+- Passing both settings, for both architectures: a run could save the
+  prompts as the model's own. But the approaches would add only its default
+  prompt, one text on both sides. A prompt or a route for each side needs
+  the approaches to call sentence-transformers' `encode_query` and
+  `encode_document`, in place of `encode`. A static run would also need its
+  prompt as token ids. A route would also need a `Router` module around the
+  architecture's modules, with a branch for each side.
+- Passing them for BERT only: the approaches would still add no prompt or
+  route for each side, as above. The two architectures would also differ in
+  what a config can set.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that `prompts` and `router_mapping` are refused, in the config and as a
+flag.
 
 ### The defaults follow Hugging Face's recipe for a static model
 

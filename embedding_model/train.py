@@ -56,6 +56,18 @@ TRAINING_DEFAULTS = {
     "save_strategy": "no",
     "dataloader_num_workers": 4,
 }
+# The training settings that a run refuses for now, with the reason. The
+# approaches of ai-harmonization embed both sides with the same encode call, in
+# embed_query and embed_documents. It adds only the model's default prompt and
+# takes a Router's default route, so a prompt or a route for each side would
+# be lost in use.
+REFUSED_TRAINING = {
+    "prompts": (
+        "the approaches embed both sides with the same encode call, which adds"
+        " no prompt for each side"
+    ),
+    "router_mapping": "it needs a model built with a Router module, not added yet",
+}
 
 
 @dataclass
@@ -151,8 +163,9 @@ def read_config(path, seed, overrides=(), run_name=None):
     be written in full: an abbreviation would change a setting that
     config.yaml then does not record. argparse checks a setting's choices
     only for a flag, so the architecture is checked here too. A setting of
-    another architecture, in its section or as a flag, is refused. A learning
-    rate that neither the config nor a flag gives is the architecture's own.
+    another architecture, in its section or as a flag, is refused, and so is
+    a setting of REFUSED_TRAINING. A learning rate that neither the config nor
+    a flag gives is the architecture's own.
 
     Args:
         path (Path): The config, a YAML file.
@@ -170,7 +183,8 @@ def read_config(path, seed, overrides=(), run_name=None):
         ValueError: If the config cannot be read, names a section, a
             setting or an architecture that does not exist, names no
             corpus or no tokenizer, or gives a setting of another
-            architecture, or if a flag is not a setting.
+            architecture or of REFUSED_TRAINING, or if a flag is not a
+            setting.
         argparse.ArgumentError: If a value does not fit its setting's type.
     """
     from transformers import HfArgumentParser
@@ -216,6 +230,12 @@ def read_config(path, seed, overrides=(), run_name=None):
     training_given = (
         set(config_sections.get("training") or {}) | flags
     ) & setting_names["training"]
+    refused = sorted(training_given & set(REFUSED_TRAINING))
+    if refused:
+        raise ValueError(
+            f"{path}: the {refused[0]} setting cannot be used:"
+            f" {REFUSED_TRAINING[refused[0]]}"
+        )
 
     parser = HfArgumentParser(
         list(section_classes.values()),

@@ -40,7 +40,7 @@ def build(settings, tokenizer):
     )
 
 
-def features(token_ids, prompt=None, **kwargs):
+def features(token_ids, **kwargs):
     """The batch that StaticEmbedding reads, built from token ids.
 
     The trainer's data collator calls this function on each batch, in place
@@ -54,27 +54,16 @@ def features(token_ids, prompt=None, **kwargs):
     Args:
         token_ids (list[list[int]]): Each text's token ids, without special
             tokens.
-        prompt (str | None): The prompt that the trainer's ``prompts``
-            setting gives these texts, or None when a config sets no prompts.
-            A prompt is text, so it cannot be put before ids, and it is
-            refused.
-        **kwargs: The collator's other arguments, such as ``task``, which a
-            static model does not use.
+        **kwargs: The collator's other arguments, ``prompt`` and ``task``. A
+            run refuses the ``prompts`` setting, so the prompt is None, and a
+            static model has no task.
 
     Returns:
         dict[str, torch.Tensor]: ``input_ids`` and ``offsets``.
-
-    Raises:
-        ValueError: If a prompt is given.
     """
     import numpy as np
     import torch
 
-    if prompt:
-        raise ValueError(
-            "the prompts setting cannot be used: a run trains on token ids, and"
-            " a prompt is text"
-        )
     lengths = [len(ids) for ids in token_ids]
     return {
         "input_ids": torch.tensor(

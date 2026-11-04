@@ -51,7 +51,9 @@ own architecture's section, and a config with the other one's is refused.
 
 The `training` section takes any field of
 [`SentenceTransformerTrainingArguments`](https://sbert.net/docs/package_reference/sentence_transformer/training_args.html),
-the trainer's own settings, under its own name. Some of their defaults are
+the trainer's own settings, under its own name. A run
+[refuses](design_decisions.md#a-run-refuses-the-trainers-prompts-and-router_mapping)
+two of them: `prompts` and `router_mapping`. Some of their defaults are
 changed, most of them to those of Hugging Face's
 [recipe for static models](https://huggingface.co/blog/static-embeddings):
 

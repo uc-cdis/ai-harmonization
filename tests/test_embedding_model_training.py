@@ -224,11 +224,6 @@ class TestFeatures:
             "Quetelet index": {"Body mass index"},
         }
 
-    def test_a_prompt_is_refused(self):
-        """A prompt is text, so it cannot be added to token ids."""
-        with pytest.raises(ValueError, match="prompt"):
-            static.features([[1, 2]], prompt="query: ")
-
 
 class TestConfig:
     """The config's sections, the defaults under them and the flags over them."""
@@ -290,6 +285,27 @@ class TestConfig:
         path.write_text(text)
         with pytest.raises(ValueError, match=message):
             train.read_config(path, 0)
+
+    @pytest.mark.parametrize(
+        "training, overrides, message",
+        [
+            ({"prompts": {"anchor": "query: "}}, [], "prompts setting cannot be used"),
+            ({}, ["--prompts", "query: "], "prompts setting cannot be used"),
+            (
+                {"router_mapping": {"anchor": "query"}},
+                [],
+                "router_mapping setting cannot be used",
+            ),
+        ],
+    )
+    def test_a_setting_that_a_run_cannot_honour_is_refused(
+        self, tmp_path, training, overrides, message
+    ):
+        """prompts and router_mapping are refused, in the config or as a flag, before training."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
+        with pytest.raises(ValueError, match=message):
+            train.read_config(path, 0, overrides)
 
     def test_an_unknown_architecture_is_refused(self, tmp_path):
         """argparse checks choices only for a flag, so read_config checks a config's architecture."""

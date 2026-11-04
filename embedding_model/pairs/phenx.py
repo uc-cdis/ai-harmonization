@@ -15,8 +15,12 @@ import re
 from collections import defaultdict
 
 from embedding_model.pairs.common import Item, Text, clean, is_name, joined_studies
+from embedding_model.sources.common import report_new
 
+# PhenX's map levels. Only a comparable mapping gives texts; a related one is
+# a looser link. A new level is printed, and its mappings are not used.
 COMPARABLE = "comparable"
+RELATED = "related"
 # A code in a value list: a number or a range, as in "9 = Refused", "None = 0"
 # or "1 - 7 = times", or else one short token, as in "? = unknown".
 NUMBER = re.compile(r"^\(?-?\d+(?:\.\d+)?(?:\s*-\s*\d+(?:\.\d+)?)?\)?$")
@@ -125,6 +129,7 @@ def items(tables):
     variables = tables["variables"]
     used = variables[variables.protocol_visible == "1"]
     mappings = tables["mappings"]
+    report_new(mappings.map_level, {COMPARABLE, RELATED}, "map_level", "not used")
     mapped = study_texts(mappings[mappings.map_level == COMPARABLE])
     source_items = []
     for row in used.itertuples():

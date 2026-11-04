@@ -1247,7 +1247,7 @@ class TestNhanes:
 class TestPhenx:
     """PhenX's variables and their dbGaP mappings."""
 
-    def test_variables(self):
+    def test_variables(self, capsys):
         """Visible variables only, closed ones marked; comparable mappings with their studies."""
         tables = {
             "variables": table(
@@ -1260,14 +1260,28 @@ class TestPhenx:
                 open=[True, True, False],
             ),
             "mappings": table(
-                variable_id=["1", "1", "1"],
-                gap_study_accession=["phs999999", "phs999998", "phs999997"],
-                gap_variable_name=["ABCD", "ABCD", "EFGH"],
-                gap_variable_desc=["Abcd answer", "Abcd answer", "Efgh answer"],
-                map_level=["comparable", "comparable", "related"],
+                variable_id=["1", "1", "1", "1"],
+                gap_study_accession=[
+                    "phs999999",
+                    "phs999998",
+                    "phs999997",
+                    "phs999996",
+                ],
+                gap_variable_name=["ABCD", "ABCD", "EFGH", "IJKL"],
+                gap_variable_desc=[
+                    "Abcd answer",
+                    "Abcd answer",
+                    "Efgh answer",
+                    "Ijkl answer",
+                ],
+                map_level=["comparable", "comparable", "related", "abcd-level"],
             ),
         }
         variable, closed = phenx.items(tables)
+        assert (
+            "new value of map_level: 'abcd-level' on 1 items; not used"
+            in capsys.readouterr().out
+        )
         assert (variable.open, closed.open) == (True, False)
         assert (variable.canonical, variable.type, variable.lists) == (
             "How abcd?",

@@ -460,7 +460,8 @@ does not name is read as current, and `pairs prepare` prints it.
   PhenX maps to it with the `map_level` `comparable`: its
   `gap_variable_name` and its `gap_variable_desc`. Each keeps its studies,
   from `gap_study_accession`, in `study`. Mappings that are only `related` are
-  left out.
+  left out. A `map_level` not seen before is printed, so that someone can
+  review it, and its mappings are left out too.
 - **Description:** none.
 - **Values:** the labels of `variable_values`, without their codes. So
   `1 = Never` and `Never = 1` both give the value `Never`. The type is the

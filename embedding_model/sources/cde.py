@@ -13,7 +13,7 @@ import json
 import pandas as pd
 
 from embedding_model.download import downloaded, fetch, modified
-from embedding_model.sources.common import open_where
+from embedding_model.sources.common import open_count, open_where
 from embedding_model.manifests import file_sha256
 
 EXPORT = "NIH CDE Repository export"
@@ -197,7 +197,7 @@ def fetch_source(downloads, manifest):
         "elements": len(element_table),
         "not_open": int((~element_table.open).sum()),
     }
-    print(f"  {counts['elements']:,} elements, {counts['not_open']:,} not open")
+    print(f"  {open_count(element_table.open, 'elements')}")
     source = {
         "role": "service",
         "name": EXPORT,

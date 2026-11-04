@@ -21,6 +21,7 @@ import pandas as pd
 
 from embedding_model.download import downloaded, fetch
 from embedding_model.manifests import file_digest, file_sha256, pinned
+from embedding_model.sources.common import open_count
 
 RELEASE = "LOINC release"
 METADATA = "https://loinc.regenstrief.org/api/v1/Loinc?version={version}"
@@ -315,7 +316,7 @@ def fetch_source(downloads, manifest):
     tables = read_release(path)
     codes = tables["codes"]
     counts = {"codes": len(codes), "not_open": int((~codes.open).sum())}
-    print(f"  {counts['codes']:,} codes, {counts['not_open']:,} not open")
+    print(f"  {open_count(codes.open, 'codes')}")
     sources = [
         {
             "role": "release",

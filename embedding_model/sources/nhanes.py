@@ -19,7 +19,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 
 from embedding_model.download import downloaded, keep, modified
-from embedding_model.sources.common import open_where
+from embedding_model.sources.common import open_count, open_where
 from embedding_model.manifests import sha256
 
 VARIABLE_LIST = (
@@ -327,10 +327,11 @@ def fetch_source(downloads, manifest):
         "data_files": len(files),
         "data_files_without_codebook": len(missing),
     }
+    print(f"  {open_count(variables.open, 'variables')}")
     print(
-        f"  {counts['variables']:,} variables in {counts['data_files']:,} data "
-        f"files; {counts['data_files_without_codebook']:,} data files without a "
-        "public codebook"
+        f"  {counts['data_files']:,} data files;"
+        f" {counts['data_files_without_codebook']:,} data files without a public"
+        " codebook"
     )
     sources.append(
         {

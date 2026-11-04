@@ -770,6 +770,23 @@ class TestCadsr:
         assert tables["values"].meaning.unique().tolist() == ["Low"]
         assert tables["values"].end_date.unique().tolist() == ["2020-01-01"]
 
+    def test_a_fetch_counts_every_closed_element_as_not_open(self, tmp_path, capsys):
+        """A proprietary and a new kind of document both count as not open."""
+        xml = (
+            "<DataElementsList>"
+            + cadsr_element("9999901", "1")
+            + cadsr_element("9999902", "1", [(cadsr.PROPRIETARY, "Ask Abcd.")])
+            + cadsr_element("9999903", "1", [("Abcd Note", "efgh")])
+            + "</DataElementsList>"
+        )
+        day = "2099-01-01"
+        with zipfile.ZipFile(tmp_path / f"releasedCDEsXML-OD.zip.{day}", "w") as bundle:
+            bundle.writestr("cde_xml_1.xml", xml)
+        cadsr.fetch_source(
+            tmp_path, {"sources": [{"name": cadsr.SNAPSHOT, "version": day}]}
+        )
+        assert "3 elements: 1 open, 2 not open" in capsys.readouterr().out
+
     def test_versions_compare_as_decimal_numbers(self):
         """Version 2.4 is later than 2.31, as caDSR stores versions as numbers."""
         xml = (
@@ -901,6 +918,7 @@ class TestNhanes:
         assert counts["data_files_without_codebook"] == 1
         printed = capsys.readouterr().out
         assert "new value of Use Constraints: 'Abcd Only' on 1 items" in printed
+        assert "2 variables: 1 open, 1 not open" in printed
         assert "1 data files without a public codebook" in printed
         assert tables["variables"].set_index("name").open.to_dict() == {
             "ABCDXYZ": True,

@@ -15,7 +15,7 @@ import pandas as pd
 
 from embedding_model.download import downloaded, modified
 from embedding_model.manifests import file_sha256, pinned
-from embedding_model.sources.common import open_where
+from embedding_model.sources.common import open_count, open_where
 
 EXPORT = "PhenX database export"
 EXPORT_URL = "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip"
@@ -278,10 +278,7 @@ def fetch_source(downloads, manifest):
         )
     variables = tables["variables"]
     counts = {"variables": len(variables), "not_open": int((~variables.open).sum())}
-    print(
-        f"  {release}: {counts['variables']:,} variables, "
-        f"{counts['variables'] - counts['not_open']:,} open"
-    )
+    print(f"  {release}: {open_count(variables.open, 'variables')}")
     sources = [
         {
             "role": "service",

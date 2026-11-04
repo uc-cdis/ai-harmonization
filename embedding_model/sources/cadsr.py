@@ -15,7 +15,7 @@ from defusedxml.ElementTree import iterparse
 
 from embedding_model.download import downloaded
 from embedding_model.manifests import file_sha256, pinned
-from embedding_model.sources.common import open_where
+from embedding_model.sources.common import open_count, open_where
 
 SNAPSHOT = "caDSR released data elements"
 ARCHIVE = (
@@ -254,7 +254,7 @@ def fetch_source(downloads, manifest):
     tables = read_snapshot(path)
     elements = tables["elements"]
     counts = {"elements": len(elements), "not_open": int((~elements.open).sum())}
-    print(f"  {counts['elements']:,} elements, {counts['not_open']:,} proprietary")
+    print(f"  {open_count(elements.open, 'elements')}")
     sources = [
         {
             "role": "release",

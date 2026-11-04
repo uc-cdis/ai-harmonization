@@ -2,6 +2,7 @@
 
 ``report_new`` prints the values of a field that a reader does not know yet.
 ``open_where`` says which items a restriction field allows to be used.
+``open_count`` says how many items a fetch read, and how many are open.
 """
 
 
@@ -38,3 +39,20 @@ def open_where(values, allowed, closed, field):
     """
     report_new(values, allowed | closed, field, "not used")
     return values.isin(allowed)
+
+
+def open_count(is_open, noun):
+    """How many items there are, and how many of them are open and not open.
+
+    Args:
+        is_open (pd.Series): Whether each item is open.
+        noun (str): What the items are, such as ``elements``.
+
+    Returns:
+        str: The count, such as ``3 elements: 1 open, 2 not open``.
+    """
+    opened = int(is_open.sum())
+    return (
+        f"{len(is_open):,} {noun}: {opened:,} open,"
+        f" {len(is_open) - opened:,} not open"
+    )

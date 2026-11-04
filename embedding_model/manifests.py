@@ -151,11 +151,13 @@ def table_sha256(frame):
     """
     # A backslash in a text is written twice, as PostgreSQL writes one, so the
     # text "\N" cannot read like MISSING. Only the text columns that hold a
-    # backslash are copied, to keep a large table's memory low.
+    # backslash are copied, to keep a large table's memory low. infer_dtype
+    # finds a text column by its values. is_string_dtype would count a column
+    # of True and None as text too, since that column has the object dtype.
     escaped = {
         name: frame[name].str.replace("\\", "\\\\", regex=False)
-        for name, kind in frame.dtypes.items()
-        if pd.api.types.is_string_dtype(kind)
+        for name in frame.columns
+        if pd.api.types.infer_dtype(frame[name], skipna=True) == "string"
         and frame[name].str.contains("\\", regex=False).any()
     }
     frame = frame.assign(**escaped) if escaped else frame

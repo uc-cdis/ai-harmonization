@@ -1258,6 +1258,15 @@ class TestWriteAndRead:
         marker_text = pd.DataFrame({"label": ["Mild", "\\N"]})
         assert manifests.table_sha256(missing) != manifests.table_sha256(marker_text)
 
+    @pytest.mark.parametrize("values", [[True, None], [1, None]])
+    def test_a_column_of_objects_that_are_not_texts_has_a_checksum(self, values):
+        """pandas holds True or 1 beside None as objects; the checksum still reads them."""
+        held_as_objects = pd.DataFrame({"open": pd.Series(values, dtype=object)})
+        as_text = pd.DataFrame({"open": [str(values[0]), None]})
+        assert manifests.table_sha256(held_as_objects) != manifests.table_sha256(
+            as_text
+        )
+
     def test_an_empty_column_has_one_checksum(self):
         """An empty column's checksum does not depend on how pandas holds it."""
         held_as_objects = pd.DataFrame({"label": pd.Series([], dtype=object)})

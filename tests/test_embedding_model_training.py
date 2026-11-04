@@ -62,7 +62,7 @@ def pair(anchor, positive, split):
     row.update(
         anchor=anchor,
         positive=positive,
-        source="abcd",
+        source="abcd-source",
         kind="name_description",
         anchor_values=[],
         positive_values=[],
@@ -295,9 +295,11 @@ class TestConfig:
         """argparse checks choices only for a flag, so read_config checks a config's architecture."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
-            yaml.safe_dump({"data": CONFIG["data"], "model": {"architecture": "abcd"}})
+            yaml.safe_dump(
+                {"data": CONFIG["data"], "model": {"architecture": "abcd-architecture"}}
+            )
         )
-        with pytest.raises(ValueError, match="no architecture 'abcd'"):
+        with pytest.raises(ValueError, match="no architecture 'abcd-architecture'"):
             train.read_config(path, 0)
 
     def test_a_value_of_the_wrong_type_raises_an_error(self, tmp_path):

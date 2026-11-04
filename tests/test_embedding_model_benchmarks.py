@@ -811,19 +811,19 @@ class TestWriteBenchmark:
         """Both files are written with their columns, and the manifest describes them."""
         manifest = benchmarks.write_benchmark(
             tmp_path,
-            "abcd",
+            "abcd-benchmark",
             "1",
             targets_of([mapping("AGE", ["a.age"])]),
             [mapping("AGE", ["a.age"])],
             [PIN],
             {"source_variables": 1},
         )
-        with open(tmp_path / "abcd_mappings.csv", newline="") as handle:
+        with open(tmp_path / "abcd-benchmark_mappings.csv", newline="") as handle:
             assert next(csv.reader(handle)) == benchmarks.MAPPING_COLUMNS
-        assert manifest["files"]["abcd_mappings.csv"]["rows"] == 1
-        assert manifest["files"]["abcd_targets.csv"]["sha256"] == manifests.sha256(
-            (tmp_path / "abcd_targets.csv").read_bytes()
-        )
+        assert manifest["files"]["abcd-benchmark_mappings.csv"]["rows"] == 1
+        assert manifest["files"]["abcd-benchmark_targets.csv"][
+            "sha256"
+        ] == manifests.sha256((tmp_path / "abcd-benchmark_targets.csv").read_bytes())
         assert manifest["counts"] == {"source_variables": 1}
         assert json.loads((tmp_path / "manifest.json").read_text()) == manifest
 
@@ -832,7 +832,13 @@ class TestWriteBenchmark:
         targets = targets_of([mapping("AGE", ["a.age"])]) * 2
         with pytest.raises(ValueError, match="list a property twice: \\['a.age'\\]"):
             benchmarks.write_benchmark(
-                tmp_path, "abcd", "1", targets, [mapping("AGE", ["a.age"])], [PIN], {}
+                tmp_path,
+                "abcd-benchmark",
+                "1",
+                targets,
+                [mapping("AGE", ["a.age"])],
+                [PIN],
+                {},
             )
         assert list(tmp_path.iterdir()) == []
 
@@ -842,7 +848,7 @@ class TestWriteBenchmark:
         with pytest.raises(ValueError, match="z.missing"):
             benchmarks.write_benchmark(
                 tmp_path,
-                "abcd",
+                "abcd-benchmark",
                 "1",
                 targets_of([mapping("AGE", ["a.age"])]),
                 mappings,
@@ -855,7 +861,13 @@ class TestWriteBenchmark:
         """An expected_target given as a string, not a list, is a TypeError."""
         with pytest.raises(TypeError, match="list of target keys"):
             benchmarks.write_benchmark(
-                tmp_path, "abcd", "1", [TARGET], [mapping("AGE", "a.age")], [PIN], {}
+                tmp_path,
+                "abcd-benchmark",
+                "1",
+                [TARGET],
+                [mapping("AGE", "a.age")],
+                [PIN],
+                {},
             )
 
 
@@ -864,12 +876,12 @@ class TestReadBenchmark:
 
     @pytest.fixture
     def written(self, tmp_path):
-        """A benchmark named abcd, written into a temp inputs folder."""
-        folder = tmp_path / "benchmarks" / "abcd"
+        """A benchmark named abcd-benchmark, written into a temp inputs folder."""
+        folder = tmp_path / "benchmarks" / "abcd-benchmark"
         folder.mkdir(parents=True)
         mappings = [mapping("RACE", ["b.race", "a.race"])]
         return benchmarks.write_benchmark(
-            folder, "abcd", "1", targets_of(mappings), mappings, [PIN], {}
+            folder, "abcd-benchmark", "1", targets_of(mappings), mappings, [PIN], {}
         )
 
     def test_an_unbuilt_benchmark_names_the_build_command(self, tmp_path):
@@ -879,7 +891,9 @@ class TestReadBenchmark:
 
     def test_reads_what_was_written(self, written, tmp_path):
         """The files read back as strings, with several expected targets sorted and joined by ;."""
-        targets, mappings, manifest = benchmarks.read_benchmark(tmp_path, "abcd")
+        targets, mappings, manifest = benchmarks.read_benchmark(
+            tmp_path, "abcd-benchmark"
+        )
         assert len(targets) == 2
         assert mappings.loc[0, "expected_target"] == "a.race;b.race"
         assert mappings.loc[0, "source_values"] == ""
@@ -887,18 +901,22 @@ class TestReadBenchmark:
 
     def test_a_corrupt_manifest_names_the_rebuild(self, written, tmp_path):
         """A manifest that is not JSON is named, with the rebuild command."""
-        (tmp_path / "benchmarks" / "abcd" / "manifest.json").write_text("")
-        with pytest.raises(ValueError, match="abcd/manifest.json cannot be read"):
-            benchmarks.read_benchmark(tmp_path, "abcd")
+        (tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json").write_text("")
+        with pytest.raises(
+            ValueError, match="abcd-benchmark/manifest.json cannot be read"
+        ):
+            benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_a_version_not_committed_is_a_warning(
         self, written, monkeypatch, capsys, tmp_path
     ):
         """A build whose version is not the committed version is read, with a warning."""
         (tmp_path / "manifests").mkdir()
-        (tmp_path / "manifests" / "abcd.json").write_text(json.dumps({"version": "2"}))
+        (tmp_path / "manifests" / "abcd-benchmark.json").write_text(
+            json.dumps({"version": "2"})
+        )
         monkeypatch.setattr(benchmarks, "MANIFESTS", tmp_path / "manifests")
-        benchmarks.read_benchmark(tmp_path, "abcd")
+        benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
         assert "is version 1, and the committed manifest is version 2" in (
             capsys.readouterr().err
         )
@@ -906,41 +924,43 @@ class TestReadBenchmark:
     def test_a_changed_file_is_refused(self, written, tmp_path):
         """A file whose SHA-256 differs from the manifest is named, with the rebuild command."""
         with open(
-            tmp_path / "benchmarks" / "abcd" / "abcd_mappings.csv", "a"
+            tmp_path / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_mappings.csv",
+            "a",
         ) as handle:
             handle.write(",,,,,,,\n")
         with pytest.raises(
-            ValueError, match="SHA-256 for abcd_mappings.csv; run: .*build --abcd"
+            ValueError,
+            match="SHA-256 for abcd-benchmark_mappings.csv; run: .*build --abcd-benchmark",
         ):
-            benchmarks.read_benchmark(tmp_path, "abcd")
+            benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_another_benchmarks_manifest_is_refused(self, written, tmp_path):
         """A manifest that names another benchmark is not read as this one's."""
-        path = tmp_path / "benchmarks" / "abcd" / "manifest.json"
-        path.write_text(json.dumps({**written, "benchmark": "efgh"}))
-        with pytest.raises(ValueError, match="manifest of benchmark 'efgh'"):
-            benchmarks.read_benchmark(tmp_path, "abcd")
+        path = tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json"
+        path.write_text(json.dumps({**written, "benchmark": "efgh-benchmark"}))
+        with pytest.raises(ValueError, match="manifest of benchmark 'efgh-benchmark'"):
+            benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_a_manifest_without_its_files_names_the_rebuild(self, written, tmp_path):
         """A manifest that records no files is an error with the build command."""
-        path = tmp_path / "benchmarks" / "abcd" / "manifest.json"
+        path = tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json"
         path.write_text(json.dumps({**written, "files": {}}))
-        with pytest.raises(ValueError, match="KeyError.*run: .*build --abcd"):
-            benchmarks.read_benchmark(tmp_path, "abcd")
+        with pytest.raises(ValueError, match="KeyError.*run: .*build --abcd-benchmark"):
+            benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_files_with_other_columns_are_refused(self, written, tmp_path):
         """Files whose columns are not those of benchmarks build are not read."""
-        path = tmp_path / "benchmarks" / "abcd" / "abcd_targets.csv"
+        path = tmp_path / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_targets.csv"
         path.write_text("target_property,target_type\nabcd.efgh,string\n")
         record = {**written}
-        record["files"]["abcd_targets.csv"]["sha256"] = manifests.sha256(
+        record["files"]["abcd-benchmark_targets.csv"]["sha256"] = manifests.sha256(
             path.read_bytes()
         )
-        (tmp_path / "benchmarks" / "abcd" / "manifest.json").write_text(
+        (tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json").write_text(
             json.dumps(record)
         )
         with pytest.raises(ValueError, match="do not have the columns"):
-            benchmarks.read_benchmark(tmp_path, "abcd")
+            benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
 
 class TestBuild:

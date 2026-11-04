@@ -70,8 +70,10 @@ class TestCompact:
     def test_only_the_first_12_values_are_written(self):
         """The values are cut to the first 12, as the formatters cut them."""
         values = [f"v{number}" for number in range(MAX_VALUES_IN_PROMPT + 3)]
-        written = texts.property_text(texts.compact, "", "abcd", "string", "", values)
-        assert written == "abcd (string) Values: " + " | ".join(
+        written = texts.property_text(
+            texts.compact, "", "abcd_property", "string", "", values
+        )
+        assert written == "abcd_property (string) Values: " + " | ".join(
             values[:MAX_VALUES_IN_PROMPT]
         )
 

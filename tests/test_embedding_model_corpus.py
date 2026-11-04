@@ -106,7 +106,7 @@ class TestLeakage:
     def audited(self):
         """The audit of the planted and the innocent pairs, in that order."""
         pairs = pd.DataFrame(PLANTED + INNOCENT)
-        return leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        return leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
 
     def test_each_planted_leak_is_dropped_and_nothing_else(self, audited):
         """Every planted leak is dropped, with its finding, and no innocent pair is."""
@@ -138,7 +138,7 @@ class TestLeakage:
         """A source name equal to its target's name, on one side only, is shared vocabulary."""
         mappings = MAPPINGS.assign(source_variable_name=["abcd_index", "efgh_level"])
         pairs = pd.DataFrame([pair("Abcd Index", "Wxyz")])
-        assert leakage.audit(pairs, {"abcd": (TARGETS, mappings)})[0].empty
+        assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
 
     def test_a_one_word_name_matches_only_an_equal_text(self, monkeypatch):
         """A one-word name is not matched by its words, even beside a description match."""
@@ -146,9 +146,9 @@ class TestLeakage:
         pairs = pd.DataFrame(
             [pair("Abcd Efgh", "Ijkl", positive_description=LONG_DESCRIPTION)]
         )
-        assert leakage.audit(pairs, {"abcd": (TARGETS, mappings)})[0].empty
+        assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
         monkeypatch.setattr(leakage, "MIN_NAME_WORDS", 1)
-        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, mappings)})
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})
         assert findings.fields.tolist() == [
             "anchor name >= source name, positive description = target description"
         ]
@@ -158,7 +158,7 @@ class TestLeakage:
         name = "abcd efgh ijkl mnop qrst uvwx yzab cdef ghij"
         mappings = MAPPINGS.assign(source_variable_name=[name, "efgh_level"])
         pairs = pd.DataFrame([pair(name.rsplit(" ", 1)[0], "Abcd Index")])
-        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, mappings)})
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})
         assert findings.fields.tolist() == [
             "anchor name ~ source name, positive name = target name"
         ]
@@ -177,7 +177,7 @@ class TestLeakage:
                 pair("efgh_level", "Efgh", item="C999902"),
             ]
         )
-        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
         assert findings.pair.tolist() == [0, 1]
         assert findings.fields.tolist()[1] == (
             "twin of: anchor name = source name,"
@@ -189,26 +189,30 @@ class TestLeakage:
         """One pair can leak two benchmarks, and each one gets its finding."""
         pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index")])
         findings, _ = leakage.audit(
-            pairs, {"abcd": (TARGETS, MAPPINGS), "efgh": (TARGETS, MAPPINGS)}
+            pairs,
+            {
+                "abcd-benchmark": (TARGETS, MAPPINGS),
+                "efgh-benchmark": (TARGETS, MAPPINGS),
+            },
         )
-        assert findings.benchmark.tolist() == ["abcd", "efgh"]
+        assert findings.benchmark.tolist() == ["abcd-benchmark", "efgh-benchmark"]
         assert findings.pair.tolist() == [0, 0]
 
     def test_an_answer_key_comes_before_a_benchmark_study(self):
         """A pair that is an answer key and from a benchmark's study has one finding."""
         pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index", study="phs999902")])
-        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
         assert findings.finding.tolist() == [leakage.ANSWER_KEY]
 
     def test_accents_and_case_do_not_hide_an_answer_key(self):
         """A pair whose texts differ from a benchmark's only by accents and case is an answer key."""
         pairs = pd.DataFrame([pair("Ábcd Scöre", "ABCD INDEX")])
-        findings, _ = leakage.audit(pairs, {"abcd": (TARGETS, MAPPINGS)})
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
         assert findings.finding.tolist() == [leakage.ANSWER_KEY]
 
     def test_shared_vocabulary_is_reported(self, audited):
         """Benchmark texts in the kept pairs are counted, not dropped."""
-        shared = audited[1]["abcd"]
+        shared = audited[1]["abcd-benchmark"]
         assert shared["rows_with_shared_source"] == 2
         assert shared["rows_with_shared_target"] == 2
         assert {item["text"] for item in shared["most_common"]} == {
@@ -241,7 +245,7 @@ class TestLeakage:
                 )
             ]
         )
-        benchmark = {"abcd": (TARGETS, MAPPINGS)}
+        benchmark = {"abcd-benchmark": (TARGETS, MAPPINGS)}
         assert leakage.audit(pairs, benchmark)[0].empty
         monkeypatch.setattr(leakage, "MIN_OVERLAP_WORDS", 5)
         findings, _ = leakage.audit(pairs, benchmark)
@@ -258,7 +262,7 @@ class TestLeakage:
         targets = TARGETS.assign(
             target_property=["node1.sub.abcd_index", *TARGETS.target_property[1:]]
         )
-        sources, expected = leakage.benchmark_texts("abcd", targets, mappings)
+        sources, expected = leakage.benchmark_texts("abcd-benchmark", targets, mappings)
         assert "abcd efgh score" in set(sources.text_key)
         assert "abcd index" in set(expected.text_key)
 
@@ -291,15 +295,21 @@ def write_pairs(inputs, source, rows):
 @pytest.fixture
 def inputs(tmp_path, monkeypatch):
     """An inputs folder with the fictional benchmark and two sources' pairs."""
-    monkeypatch.setattr(corpus.benchmarks, "BUILDERS", {"abcd": None})
+    monkeypatch.setattr(corpus.benchmarks, "BUILDERS", {"abcd-benchmark": None})
     targets = TARGETS.to_dict("records")
     mappings = [
         {**row, "expected_target": row["expected_target"].split(";")}
         for row in MAPPINGS.to_dict("records")
     ]
-    (tmp_path / "benchmarks" / "abcd").mkdir(parents=True)
+    (tmp_path / "benchmarks" / "abcd-benchmark").mkdir(parents=True)
     benchmarks.write_benchmark(
-        tmp_path / "benchmarks" / "abcd", "abcd", "1", targets, mappings, [], {}
+        tmp_path / "benchmarks" / "abcd-benchmark",
+        "abcd-benchmark",
+        "1",
+        targets,
+        mappings,
+        [],
+        {},
     )
     duplicate = pair("Wxyz", "Wxyz Abcd")
     write_pairs(tmp_path, "ncit", PLANTED[:3] + [duplicate, pair("Stuv", "Stuv Abcd")])
@@ -345,7 +355,9 @@ class TestBuild:
             corpus.VALIDATION: int((kept.split == corpus.VALIDATION).sum()),
         }
         assert written["counts"]["duplicates_by_source"] == {"cdisc": 1}
-        assert written["counts"]["leakage_findings"]["by_benchmark"] == {"abcd": 3}
+        assert written["counts"]["leakage_findings"]["by_benchmark"] == {
+            "abcd-benchmark": 3
+        }
         assert written["files"]["pairs.parquet"] == {
             "rows": 3,
             "sha256": file_sha256(folder / "pairs.parquet"),
@@ -359,37 +371,39 @@ class TestBuild:
         assert [(entry["role"], entry["name"]) for entry in written["sources"]] == [
             ("pairs", "ncit"),
             ("pairs", "cdisc"),
-            ("benchmark", "abcd"),
+            ("benchmark", "abcd-benchmark"),
         ]
         assert written["settings"]["validation_share"] == corpus.VALIDATION_SHARE
         assert written["settings"]["min_name_words"] == leakage.MIN_NAME_WORDS
         read, record = corpus.read_corpus(inputs, "abcd-corpus")
         assert read.equals(kept) and record == written
         printed = capsys.readouterr().out
-        assert "checked against: abcd v1" in printed
+        assert "checked against: abcd-benchmark v1" in printed
         assert "3 pairs dropped for leakage (findings: answer_key 3)" in printed
 
     def test_a_rebuild_replaces_the_previous_corpus(self, inputs, capsys):
         """A second build of one name replaces the first, and leaves no work folder."""
-        assert corpus.build("abcd", ["ncit"], inputs) == 0
-        assert corpus.build("abcd", ["cdisc"], inputs) == 0
-        kept = pd.read_parquet(inputs / "corpora" / "abcd" / "pairs.parquet")
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
+        assert corpus.build("abcd-corpus", ["cdisc"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
         assert set(kept.source) == {"cdisc"}
-        assert [path.name for path in (inputs / "corpora").iterdir()] == ["abcd"]
+        assert [path.name for path in (inputs / "corpora").iterdir()] == ["abcd-corpus"]
         assert "0 pairs dropped for leakage\n" in capsys.readouterr().out
 
     def test_sources_combine_in_their_own_order_whatever_the_order_named(self, inputs):
         """Sources named in another order still combine in READERS' order."""
-        assert corpus.build("abcd", ["cdisc", "ncit"], inputs) == 0
-        kept = pd.read_parquet(inputs / "corpora" / "abcd" / "pairs.parquet")
+        assert corpus.build("abcd-corpus", ["cdisc", "ncit"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
         assert kept.set_index("anchor_name").source["Wxyz"] == "ncit"
 
     def test_a_copy_gives_its_study_to_the_pair_kept(self, inputs, capsys):
         """A later source's copy with a benchmark study gets the kept pair dropped."""
         write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd"), pair("Stuv", "Stuv")])
         write_pairs(inputs, "phenx", [pair("Wxyz", "Wxyz Abcd", study="phs999902")])
-        assert corpus.build("abcd", ["ncit", "phenx"], inputs) == 0
-        dropped = pd.read_parquet(inputs / "corpora" / "abcd" / "dropped.parquet")
+        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 0
+        dropped = pd.read_parquet(
+            inputs / "corpora" / "abcd-corpus" / "dropped.parquet"
+        )
         assert dropped[["source", "finding", "study"]].values.tolist() == [
             ["ncit", leakage.BENCHMARK_STUDY, "phs999902"]
         ]
@@ -398,8 +412,8 @@ class TestBuild:
         """Copies in two sources give the pair kept both of their studies."""
         write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd", study="phs999555")])
         write_pairs(inputs, "phenx", [pair("Wxyz", "Wxyz Abcd", study="phs999444")])
-        assert corpus.build("abcd", ["ncit", "phenx"], inputs) == 0
-        kept = pd.read_parquet(inputs / "corpora" / "abcd" / "pairs.parquet")
+        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
         assert kept[["source", "study"]].values.tolist() == [
             ["ncit", "phs999444|phs999555"]
         ]
@@ -408,9 +422,9 @@ class TestBuild:
         """read_corpus refuses a bad name, a missing corpus, and changed pairs."""
         assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
         with pytest.raises(ValueError, match="not a corpus name"):
-            corpus.read_corpus(inputs, "../abcd")
-        with pytest.raises(FileNotFoundError, match="corpus build --name efgh"):
-            corpus.read_corpus(inputs, "efgh")
+            corpus.read_corpus(inputs, "../abcd-corpus")
+        with pytest.raises(FileNotFoundError, match="corpus build --name efgh-corpus"):
+            corpus.read_corpus(inputs, "efgh-corpus")
         path = inputs / "corpora" / "abcd-corpus" / "pairs.parquet"
         pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
         with pytest.raises(ValueError, match="differs from its manifest"):
@@ -425,9 +439,9 @@ class TestBuild:
         with pytest.raises(ValueError, match="corpus build --name abcd-corpus"):
             corpus.read_corpus(inputs, "abcd-corpus")
         (folder / "manifest.json").write_text(
-            record.replace('"corpus": "abcd-corpus"', '"corpus": "efgh"')
+            record.replace('"corpus": "abcd-corpus"', '"corpus": "efgh-corpus"')
         )
-        with pytest.raises(ValueError, match="the manifest of corpus 'efgh'"):
+        with pytest.raises(ValueError, match="the manifest of corpus 'efgh-corpus'"):
             corpus.read_corpus(inputs, "abcd-corpus")
         pairs = pd.read_parquet(folder / "pairs.parquet").drop(columns="split")
         pairs.to_parquet(folder / "pairs.parquet", index=False)
@@ -446,7 +460,7 @@ class TestBuild:
 
     def test_a_failed_swap_puts_the_previous_corpus_back(self, inputs, monkeypatch):
         """When the new corpus cannot move into place, the previous one stays."""
-        assert corpus.build("abcd", ["ncit"], inputs) == 0
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
         rename, calls = pathlib.Path.rename, []
 
         def failing(self, target):
@@ -458,9 +472,9 @@ class TestBuild:
 
         monkeypatch.setattr(pathlib.Path, "rename", failing)
         with pytest.raises(OSError):
-            corpus.build("abcd", ["cdisc"], inputs)
+            corpus.build("abcd-corpus", ["cdisc"], inputs)
         monkeypatch.setattr(pathlib.Path, "rename", rename)
-        kept = pd.read_parquet(inputs / "corpora" / "abcd" / "pairs.parquet")
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
         assert set(kept.source) == {"ncit"}
 
     def test_a_manifest_without_a_field_names_the_command(self, inputs, capsys):
@@ -469,7 +483,7 @@ class TestBuild:
         record = json.loads(path.read_text())
         del record["files"]
         path.write_text(json.dumps(record))
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
         assert "KeyError: 'files'" in error
         assert "pairs prepare --source ncit" in error
@@ -477,7 +491,7 @@ class TestBuild:
         record = json.loads(path.read_text())
         del record["sources"][0]["version"]
         path.write_text(json.dumps(record))
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "KeyError: 'version'" in capsys.readouterr().err
 
     def test_a_pairs_manifest_without_a_text_format_is_refused(self, inputs, capsys):
@@ -486,7 +500,7 @@ class TestBuild:
         record = json.loads(path.read_text())
         del record["settings"]
         path.write_text(json.dumps(record))
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
         assert "records no text format" in error
         assert "pairs prepare --source ncit" in error
@@ -497,9 +511,9 @@ class TestBuild:
         record = json.loads(path.read_text())
         record["settings"]["format"] = "name_description"
         path.write_text(json.dumps(record))
-        assert corpus.build("abcd", ["ncit", "cdisc"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 1
         assert "different text formats" in capsys.readouterr().err
-        assert not (inputs / "corpora" / "abcd").exists()
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
 
     def test_the_manifest_records_the_pairs_text_format(self, inputs):
         """The corpus's manifest copies the text format that its pairs share."""
@@ -513,27 +527,27 @@ class TestBuild:
         (manifests / "ncit" / "manifest.json").write_text(
             (manifests / "cdisc" / "manifest.json").read_text()
         )
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "the manifest of source 'cdisc'" in capsys.readouterr().err
 
     def test_sources_without_pairs_build_no_corpus(self, inputs, capsys):
         """Sources that hold no pairs are reported, and no corpus is written."""
         write_pairs(inputs, "ncit", pd.DataFrame([pair()]).iloc[:0])
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "no pairs in ncit" in capsys.readouterr().err
-        assert not (inputs / "corpora" / "abcd").exists()
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
 
     def test_a_corpus_that_would_be_empty_is_not_written(self, inputs, capsys):
         """When leakage prevention drops every pair, no corpus is written."""
         write_pairs(inputs, "ncit", PLANTED[:3])
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "dropped all 3 pairs" in capsys.readouterr().err
-        assert not (inputs / "corpora" / "abcd").exists()
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
 
     def test_pairs_that_cannot_be_read_name_the_source(self, inputs, capsys):
         """A broken pairs file names its source and the command that remakes it."""
         (inputs / "pairs" / "ncit" / "manifest.json").write_text("")
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
         assert "ncit/manifest.json cannot be read" in error
         assert "pairs prepare --source ncit" in error
@@ -541,7 +555,7 @@ class TestBuild:
     def test_a_missing_pairs_manifest_is_named(self, inputs, capsys):
         """Pairs without their manifest name the manifest, not the pairs."""
         (inputs / "pairs" / "ncit" / "manifest.json").unlink()
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
         assert "ncit/manifest.json is missing" in error
         assert "pairs prepare --source ncit" in error
@@ -554,7 +568,7 @@ class TestBuild:
         record = json.loads((inputs / "pairs" / "ncit" / "manifest.json").read_text())
         record["files"]["pairs.parquet"]["sha256"] = file_sha256(path)
         (inputs / "pairs" / "ncit" / "manifest.json").write_text(json.dumps(record))
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "does not have the columns" in capsys.readouterr().err
 
     def test_pairs_are_checked_against_the_fetch_in_the_inputs(self, inputs, capsys):
@@ -562,10 +576,10 @@ class TestBuild:
         fetch = inputs / "sources" / "ncit" / "manifest.json"
         fetch.parent.mkdir(parents=True)
         fetch.write_text(json.dumps({"source": "ncit", "files": {}}))
-        assert corpus.build("abcd", ["ncit"], inputs) == 0
-        files = {"abcd.parquet": {"rows": 1, "content_sha256": "abcd"}}
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
+        files = {"abcd-table.parquet": {"rows": 1, "content_sha256": "abcd"}}
         fetch.write_text(json.dumps({"source": "ncit", "files": files}))
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "come from another fetch" in capsys.readouterr().err
 
     def test_a_fetch_that_cannot_be_read_names_its_command(self, inputs, capsys):
@@ -573,7 +587,7 @@ class TestBuild:
         fetch = inputs / "sources" / "ncit" / "manifest.json"
         fetch.parent.mkdir(parents=True)
         fetch.write_text("")
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "sources fetch --source ncit" in capsys.readouterr().err
 
     def test_the_split_follows_a_fixed_hash_of_the_group(self):
@@ -666,57 +680,59 @@ class TestBuild:
         self, inputs, capsys, share
     ):
         """A share that is not a whole number of buckets is refused before any work."""
-        assert corpus.build("abcd", ["ncit"], inputs, share) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs, share) == 1
         assert "in steps of 0.001" in capsys.readouterr().err
         assert not (inputs / "corpora").exists()
 
     def test_the_manifest_records_the_validation_share(self, inputs):
         """A corpus built with another share records that share."""
-        assert corpus.build("abcd", ["ncit", "cdisc"], inputs, 0.5) == 0
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs, 0.5) == 0
         written = json.loads(
-            (inputs / "corpora" / "abcd" / "manifest.json").read_text()
+            (inputs / "corpora" / "abcd-corpus" / "manifest.json").read_text()
         )
         assert written["settings"]["validation_share"] == 0.5
 
     def test_no_benchmark_built_stops_the_build(self, tmp_path, capsys):
         """Without a benchmark, the corpus cannot be checked, so it is not built."""
-        assert corpus.build("abcd", ["ncit"], tmp_path) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], tmp_path) == 1
         assert "benchmarks build" in capsys.readouterr().err
         assert not (tmp_path / "corpora").exists()
 
     def test_a_benchmark_with_a_file_missing_stops_the_build(self, inputs, capsys):
         """A built benchmark that cannot be read is an error, not skipped."""
-        (inputs / "benchmarks" / "abcd" / "abcd_targets.csv").unlink()
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        (
+            inputs / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_targets.csv"
+        ).unlink()
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "a benchmark cannot be read" in capsys.readouterr().err
 
     def test_a_source_not_prepared_names_the_command(self, inputs, capsys):
         """A source with no pairs stops the build and names the command that makes them."""
-        assert corpus.build("abcd", ["ncit", "phenx"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 1
         assert "pairs prepare --source phenx" in capsys.readouterr().err
 
     def test_an_unknown_source_is_named(self, inputs, capsys):
         """A source that is not one of READERS is named, not skipped."""
-        assert corpus.build("abcd", ["ncit", "abcd"], inputs) == 1
-        assert "unknown: ['abcd']" in capsys.readouterr().err
+        assert corpus.build("abcd-corpus", ["ncit", "abcd-source"], inputs) == 1
+        assert "unknown: ['abcd-source']" in capsys.readouterr().err
 
     def test_pairs_changed_since_their_manifest_are_refused(self, inputs, capsys):
         """Pairs whose content differs from their manifest's checksum are not read."""
         path = inputs / "pairs" / "ncit" / "pairs.parquet"
         pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "differs from its manifest" in capsys.readouterr().err
 
     def test_pairs_are_checked_by_the_bytes_of_their_file(self, inputs, capsys):
         """The same table written again with other bytes is not the file that was written."""
         path = inputs / "pairs" / "ncit" / "pairs.parquet"
         pd.read_parquet(path).to_parquet(path, index=False, compression="gzip")
-        assert corpus.build("abcd", ["ncit"], inputs) == 1
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "differs from its manifest" in capsys.readouterr().err
 
     def test_a_name_that_is_not_a_folder_name_is_refused(self, inputs, capsys):
         """A corpus name must be a plain folder name."""
-        assert corpus.build("../abcd", ["ncit"], inputs) == 1
+        assert corpus.build("../abcd-corpus", ["ncit"], inputs) == 1
         assert "not a corpus name" in capsys.readouterr().err
 
     def test_the_command(self, inputs):
@@ -727,9 +743,9 @@ class TestBuild:
             "--inputs",
             str(inputs),
             "--name",
-            "abcd",
+            "abcd-corpus",
             "--source",
             "ncit",
         ]
         assert main(argv) == 0
-        assert (inputs / "corpora" / "abcd" / "manifest.json").exists()
+        assert (inputs / "corpora" / "abcd-corpus" / "manifest.json").exists()

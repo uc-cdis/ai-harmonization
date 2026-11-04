@@ -175,8 +175,8 @@ class TestRankTargets:
             {key: prompt + text for key, text in target_texts.items()},
             expected,
         )
-        model.prompts = {"abcd": prompt}
-        model.default_prompt_name = "abcd"
+        model.prompts = {"abcd-prompt": prompt}
+        model.default_prompt_name = "abcd-prompt"
         assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
 
     def test_targets_are_ranked_by_cosine(self, model):
@@ -413,7 +413,7 @@ class TestCommandLine:
             [
                 "score",
                 "--model",
-                "abcd",
+                "abcd-model",
                 "--benchmark",
                 "gdc",
                 "--inputs",
@@ -448,5 +448,5 @@ class TestCommandLine:
     def test_score_needs_a_known_benchmark(self):
         """An unknown benchmark is a usage error."""
         with pytest.raises(SystemExit) as raised:
-            main(["score", "--model", "abcd", "--benchmark", "abcd"])
+            main(["score", "--model", "abcd-model", "--benchmark", "abcd-benchmark"])
         assert raised.value.code == 2

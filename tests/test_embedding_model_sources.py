@@ -1155,7 +1155,7 @@ class TestCommon:
     def test_a_new_value_is_closed_and_reported(self, capsys):
         """A value in neither list is not open, and is printed with its count."""
         found = common.open_where(
-            pd.Series(["yes", "no", "maybe", "maybe"]), {"yes"}, {"no"}, "abcd"
+            pd.Series(["yes", "no", "maybe", "maybe"]), {"yes"}, {"no"}, "abcd_field"
         )
         assert found.tolist() == [True, False, False, False]
         printed = capsys.readouterr().out
@@ -1171,10 +1171,10 @@ class TestWriteAndRead:
 
     def test_round_trip_and_content_hash(self, tmp_path):
         """Tables written as parquet read back, checked by their content's SHA-256."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         manifest = sources.write_source(
-            directory, "abcd", "1", {"items": TABLE}, [], {"items": 3}
+            directory, "abcd-source", "1", {"items": TABLE}, [], {"items": 3}
         )
         assert manifest["counts"] == {"items": 3}
         assert manifest["files"]["items.parquet"][
@@ -1183,7 +1183,7 @@ class TestWriteAndRead:
         assert manifest["files"]["items.parquet"]["sha256"] == manifests.file_sha256(
             directory / "items.parquet"
         )
-        tables, read = sources.read_source(tmp_path, "abcd")
+        tables, read = sources.read_source(tmp_path, "abcd-source")
         pd.testing.assert_frame_equal(tables["items"], TABLE)
         assert read == manifest
 
@@ -1192,10 +1192,10 @@ class TestWriteAndRead:
         table = pd.DataFrame(
             {"label": ["None", "N/A", "NA", ""], "open": [True, False, True, False]}
         )
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"values": table}, [], {})
-        tables, _ = sources.read_source(tmp_path, "abcd")
+        sources.write_source(directory, "abcd-source", "1", {"values": table}, [], {})
+        tables, _ = sources.read_source(tmp_path, "abcd-source")
         pd.testing.assert_frame_equal(tables["values"], table)
 
     def test_a_table_checksum_does_not_depend_on_the_system(self, monkeypatch):
@@ -1268,21 +1268,21 @@ class TestWriteAndRead:
 
     def test_a_changed_table_is_refused(self, tmp_path):
         """A table whose content changed since its fetch is refused."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
         TABLE.head(1).to_parquet(directory / "items.parquet", index=False)
         with pytest.raises(ValueError, match="items.parquet"):
-            sources.read_source(tmp_path, "abcd")
+            sources.read_source(tmp_path, "abcd-source")
 
     def test_a_rewritten_table_file_is_refused(self, tmp_path):
         """A table written again, with the same content but other bytes, is refused."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
         TABLE.to_parquet(directory / "items.parquet", index=False, compression="gzip")
         with pytest.raises(ValueError, match="items.parquet differs from its manifest"):
-            sources.read_source(tmp_path, "abcd")
+            sources.read_source(tmp_path, "abcd-source")
 
     def test_another_version_than_committed_is_a_warning(
         self, monkeypatch, capsys, tmp_path
@@ -1290,52 +1290,59 @@ class TestWriteAndRead:
         """A fetch whose version is not the committed version is read, with a warning."""
         folder = tmp_path / "manifests"
         folder.mkdir()
-        (folder / "abcd.json").write_text(json.dumps({"version": "2"}))
+        (folder / "abcd-source.json").write_text(json.dumps({"version": "2"}))
         monkeypatch.setattr(sources, "MANIFESTS", folder)
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
-        sources.read_source(tmp_path, "abcd")
+        sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
+        sources.read_source(tmp_path, "abcd-source")
         assert "is version 1, and the committed manifest is version 2" in (
             capsys.readouterr().err
         )
 
     def test_an_unfetched_source_names_the_command(self, tmp_path):
         """Reading a source never fetched says how to fetch it."""
-        with pytest.raises(FileNotFoundError, match="sources fetch --source abcd"):
-            sources.read_source(tmp_path, "abcd")
+        with pytest.raises(
+            FileNotFoundError, match="sources fetch --source abcd-source"
+        ):
+            sources.read_source(tmp_path, "abcd-source")
 
     def test_a_missing_table_names_the_command(self, tmp_path):
         """A table that the manifest lists but that is gone is named, with the fetch."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
         (directory / "items.parquet").unlink()
         with pytest.raises(
-            FileNotFoundError, match="items.parquet is missing; run: .*--source abcd"
+            FileNotFoundError,
+            match="items.parquet is missing; run: .*--source abcd-source",
         ):
-            sources.read_source(tmp_path, "abcd")
+            sources.read_source(tmp_path, "abcd-source")
 
     def test_another_sources_manifest_is_refused(self, tmp_path):
         """A manifest that names another source is not read as this one's."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        written = sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
-        (directory / "manifest.json").write_text(
-            json.dumps({**written, "source": "efgh"})
+        written = sources.write_source(
+            directory, "abcd-source", "1", {"items": TABLE}, [], {}
         )
-        with pytest.raises(ValueError, match="manifest of source 'efgh'"):
-            sources.read_source(tmp_path, "abcd")
+        (directory / "manifest.json").write_text(
+            json.dumps({**written, "source": "efgh-source"})
+        )
+        with pytest.raises(ValueError, match="manifest of source 'efgh-source'"):
+            sources.read_source(tmp_path, "abcd-source")
 
     def test_a_manifest_without_its_files_names_the_command(self, tmp_path):
         """A manifest that records no files is an error with the fetch command."""
-        directory = tmp_path / "sources" / "abcd"
+        directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
-        written = sources.write_source(directory, "abcd", "1", {"items": TABLE}, [], {})
+        written = sources.write_source(
+            directory, "abcd-source", "1", {"items": TABLE}, [], {}
+        )
         del written["files"]
         (directory / "manifest.json").write_text(json.dumps(written))
-        with pytest.raises(ValueError, match="KeyError.*run: .*--source abcd"):
-            sources.read_source(tmp_path, "abcd")
+        with pytest.raises(ValueError, match="KeyError.*run: .*--source abcd-source"):
+            sources.read_source(tmp_path, "abcd-source")
 
 
 def fictional_source():
@@ -1354,10 +1361,10 @@ class TestFetch:
 
     @pytest.fixture
     def folder(self, monkeypatch, tmp_path):
-        """Pins-only manifests for two fictional sources, abcd and efgh."""
+        """Pins-only manifests for two fictional sources, abcd-source and efgh-source."""
         folder = tmp_path / "manifests"
         folder.mkdir()
-        for name in ("abcd", "efgh"):
+        for name in ("abcd-source", "efgh-source"):
             pin = {"role": "release", "name": f"{name} release", "version": "1"}
             (folder / f"{name}.json").write_text(
                 json.dumps({"version": "1", "files": {}, "sources": [pin]})
@@ -1368,21 +1375,21 @@ class TestFetch:
 
     def test_a_first_fetch_needs_accepting(self, folder, monkeypatch, tmp_path):
         """Against a pins-only manifest, a fetch differs until accepted, then matches."""
-        monkeypatch.setitem(sources.FETCHERS, "abcd", fictional_source())
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", fictional_source())
         inputs = tmp_path / "inputs"
-        assert sources.fetch(["abcd"], inputs) == 1
-        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
-        assert (inputs / "sources" / "abcd" / "items.parquet").exists()
-        assert sources.fetch(["abcd"], inputs) == 0
+        assert sources.fetch(["abcd-source"], inputs) == 1
+        assert sources.fetch(["abcd-source"], inputs, update_manifest=True) == 0
+        assert (inputs / "sources" / "abcd-source" / "items.parquet").exists()
+        assert sources.fetch(["abcd-source"], inputs) == 0
 
     def test_a_refused_fetch_keeps_the_working_folder(
         self, folder, monkeypatch, tmp_path
     ):
         """A fetch that differs, without --update-manifest, leaves the working folder."""
-        monkeypatch.setitem(sources.FETCHERS, "abcd", fictional_source())
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", fictional_source())
         inputs = tmp_path / "inputs"
-        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
-        working = inputs / "sources" / "abcd"
+        assert sources.fetch(["abcd-source"], inputs, update_manifest=True) == 0
+        working = inputs / "sources" / "abcd-source"
         before = {path.name: path.read_bytes() for path in working.iterdir()}
         changed = MagicMock()
         changed.fetch_source.side_effect = lambda downloads, manifest: (
@@ -1390,10 +1397,10 @@ class TestFetch:
             manifest["sources"],
             {},
         )
-        monkeypatch.setitem(sources.FETCHERS, "abcd", changed)
-        assert sources.fetch(["abcd"], inputs) == 1
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", changed)
+        assert sources.fetch(["abcd-source"], inputs) == 1
         assert {path.name: path.read_bytes() for path in working.iterdir()} == before
-        assert [path.name for path in working.parent.iterdir()] == ["abcd"]
+        assert [path.name for path in working.parent.iterdir()] == ["abcd-source"]
 
     def test_a_table_that_a_new_version_drops_is_gone(
         self, folder, monkeypatch, tmp_path
@@ -1405,27 +1412,31 @@ class TestFetch:
             manifest["sources"],
             {},
         )
-        monkeypatch.setitem(sources.FETCHERS, "abcd", two)
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", two)
         inputs = tmp_path / "inputs"
-        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
-        monkeypatch.setitem(sources.FETCHERS, "abcd", fictional_source())
-        assert sources.fetch(["abcd"], inputs, update_manifest=True) == 0
-        assert not (inputs / "sources" / "abcd" / "extra.parquet").exists()
+        assert sources.fetch(["abcd-source"], inputs, update_manifest=True) == 0
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", fictional_source())
+        assert sources.fetch(["abcd-source"], inputs, update_manifest=True) == 0
+        assert not (inputs / "sources" / "abcd-source" / "extra.parquet").exists()
 
     def test_a_failing_source_does_not_stop_the_others(
         self, folder, monkeypatch, capsys, tmp_path
     ):
         """A source that cannot be fetched is reported, and the next one is still fetched."""
         broken = MagicMock()
-        broken.fetch_source.side_effect = FileNotFoundError("no abcd download")
-        monkeypatch.setitem(sources.FETCHERS, "abcd", broken)
-        monkeypatch.setitem(sources.FETCHERS, "efgh", fictional_source())
+        broken.fetch_source.side_effect = FileNotFoundError("no abcd-source download")
+        monkeypatch.setitem(sources.FETCHERS, "abcd-source", broken)
+        monkeypatch.setitem(sources.FETCHERS, "efgh-source", fictional_source())
         inputs = tmp_path / "inputs"
-        assert sources.fetch(["abcd", "efgh"], inputs, update_manifest=True) == 1
-        assert "abcd not fetched: FileNotFoundError: no abcd download" in (
-            capsys.readouterr().err
+        assert (
+            sources.fetch(["abcd-source", "efgh-source"], inputs, update_manifest=True)
+            == 1
         )
-        assert (inputs / "sources" / "efgh" / "items.parquet").exists()
+        assert (
+            "abcd-source not fetched: FileNotFoundError: no abcd-source download"
+            in (capsys.readouterr().err)
+        )
+        assert (inputs / "sources" / "efgh-source" / "items.parquet").exists()
 
 
 # An SPDX license expression of one license: an id from the SPDX list, a
@@ -1451,7 +1462,7 @@ class TestCommandLine:
     def test_an_unknown_source_is_an_error(self):
         """`sources fetch --source` accepts only the sources there are."""
         with pytest.raises(SystemExit):
-            main(["sources", "fetch", "--source", "abcd"])
+            main(["sources", "fetch", "--source", "abcd-source"])
 
     def test_a_source_that_cannot_be_fetched_is_reported(
         self, monkeypatch, capsys, tmp_path

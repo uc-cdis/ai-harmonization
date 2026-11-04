@@ -30,7 +30,7 @@ def pair(anchor, positive, split):
     row.update(
         anchor=anchor,
         positive=positive,
-        source="abcd",
+        source="abcd-source",
         kind="name",
         anchor_values=[],
         positive_values=[],
@@ -66,8 +66,8 @@ def corpus_rows():
 
 @pytest.fixture
 def inputs(tmp_path):
-    """An inputs folder with the fictional corpus ``abcd``."""
-    write_corpus(tmp_path, "abcd", corpus_rows())
+    """An inputs folder with the fictional corpus ``abcd-corpus``."""
+    write_corpus(tmp_path, "abcd-corpus", corpus_rows())
     return tmp_path
 
 
@@ -141,9 +141,9 @@ class TestTokenizer:
 
     def test_default_names(self):
         """A default name is the corpus and the size, in thousands when it can be."""
-        assert tokenizer.default_name("abcd", 16_000) == "abcd-16k"
-        assert tokenizer.default_name("abcd", 8_000) == "abcd-8k"
-        assert tokenizer.default_name("abcd", 12_500) == "abcd-12500"
+        assert tokenizer.default_name("abcd-corpus", 16_000) == "abcd-corpus-16k"
+        assert tokenizer.default_name("abcd-corpus", 8_000) == "abcd-corpus-8k"
+        assert tokenizer.default_name("abcd-corpus", 12_500) == "abcd-corpus-12500"
 
 
 class TestTrain:
@@ -151,14 +151,14 @@ class TestTrain:
 
     def test_the_tokenizer_and_its_manifest(self, inputs, capsys):
         """The tokenizer is written with a manifest of its corpus, settings and counts."""
-        assert tokenizer.train("abcd", None, 100, 2, inputs) == 0
-        folder = inputs / "tokenizers" / "abcd-100"
+        assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
+        folder = inputs / "tokenizers" / "abcd-corpus-100"
         trained = Tokenizer.from_file(str(folder / "tokenizer.json"))
         written = json.loads((folder / "manifest.json").read_text())
         corpus_manifest = json.loads(
-            (inputs / "corpora" / "abcd" / "manifest.json").read_text()
+            (inputs / "corpora" / "abcd-corpus" / "manifest.json").read_text()
         )
-        assert written["tokenizer"] == "abcd-100"
+        assert written["tokenizer"] == "abcd-corpus-100"
         assert written["files"] == {
             "tokenizer.json": {
                 "sha256": sha256((folder / "tokenizer.json").read_bytes())
@@ -167,7 +167,7 @@ class TestTrain:
         assert written["sources"] == [
             {
                 "role": "corpus",
-                "name": "abcd",
+                "name": "abcd-corpus",
                 "files": {"pairs.parquet": corpus_manifest["files"]["pairs.parquet"]},
             }
         ]
@@ -186,67 +186,78 @@ class TestTrain:
 
     def test_only_training_texts_shape_the_vocabulary(self, inputs):
         """A validation pair's letters are not in the vocabulary."""
-        assert tokenizer.train("abcd", None, 100, 2, inputs) == 0
+        assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
         trained = Tokenizer.from_file(
-            str(inputs / "tokenizers" / "abcd-100" / "tokenizer.json")
+            str(inputs / "tokenizers" / "abcd-corpus-100" / "tokenizer.json")
         )
         assert trained.token_to_id("q") is None
         assert set(trained.encode("qwkz").tokens) == {tokenizer.UNKNOWN}
 
     def test_a_retrain_replaces_the_previous_tokenizer(self, inputs):
         """A second training of one name replaces the first, and leaves no work folder."""
-        assert tokenizer.train("abcd", "abcd-tok", 100, 2, inputs) == 0
-        assert tokenizer.train("abcd", "abcd-tok", 100, 3, inputs) == 0
+        assert tokenizer.train("abcd-corpus", "abcd-tokenizer", 100, 2, inputs) == 0
+        assert tokenizer.train("abcd-corpus", "abcd-tokenizer", 100, 3, inputs) == 0
         written = json.loads(
-            (inputs / "tokenizers" / "abcd-tok" / "manifest.json").read_text()
+            (inputs / "tokenizers" / "abcd-tokenizer" / "manifest.json").read_text()
         )
         assert written["settings"]["min_frequency"] == 3
-        assert [path.name for path in (inputs / "tokenizers").iterdir()] == ["abcd-tok"]
+        assert [path.name for path in (inputs / "tokenizers").iterdir()] == [
+            "abcd-tokenizer"
+        ]
 
     def test_a_missing_corpus_names_the_command(self, tmp_path, capsys):
         """A corpus that was not built stops the training, with the command to build it."""
-        assert tokenizer.train("abcd", None, 100, 2, tmp_path) == 1
-        assert "corpus build --name abcd" in capsys.readouterr().err
+        assert tokenizer.train("abcd-corpus", None, 100, 2, tmp_path) == 1
+        assert "corpus build --name abcd-corpus" in capsys.readouterr().err
 
     def test_a_corpus_without_training_pairs_is_refused(self, tmp_path, capsys):
         """A corpus of validation pairs only gives no tokenizer."""
         write_corpus(
-            tmp_path, "abcd", [pair(*texts, corpus.VALIDATION) for texts in VALIDATION]
+            tmp_path,
+            "abcd-corpus",
+            [pair(*texts, corpus.VALIDATION) for texts in VALIDATION],
         )
-        assert tokenizer.train("abcd", None, 100, 2, tmp_path) == 1
+        assert tokenizer.train("abcd-corpus", None, 100, 2, tmp_path) == 1
         assert "has no training pairs" in capsys.readouterr().err
-        assert not (tmp_path / "tokenizers" / "abcd-100").exists()
+        assert not (tmp_path / "tokenizers" / "abcd-corpus-100").exists()
 
     def test_a_setting_out_of_range_is_refused(self, inputs, capsys):
         """A vocabulary of no more than the special tokens, or a frequency of 0."""
-        assert tokenizer.train("abcd", None, 5, 2, inputs) == 1
-        assert tokenizer.train("abcd", None, 100, 0, inputs) == 1
+        assert tokenizer.train("abcd-corpus", None, 5, 2, inputs) == 1
+        assert tokenizer.train("abcd-corpus", None, 100, 0, inputs) == 1
         error = capsys.readouterr().err
         assert "--vocab-size must be above 5" in error
         assert "--min-frequency must be at least 1" in error
 
     def test_fewer_tokens_than_asked_for_are_noted(self, inputs, capsys):
         """A small corpus that cannot fill the vocabulary says so."""
-        assert tokenizer.train("abcd", None, 10_000, 2, inputs) == 0
+        assert tokenizer.train("abcd-corpus", None, 10_000, 2, inputs) == 0
         assert "fewer than the 10,000 asked for" in capsys.readouterr().out
 
     def test_a_name_that_is_not_a_folder_name_is_refused(self, inputs, capsys):
         """A tokenizer's and a corpus's names must be plain folder names."""
-        assert tokenizer.train("abcd", "../abcd", 100, 2, inputs) == 1
+        assert tokenizer.train("abcd-corpus", "../abcd-tokenizer", 100, 2, inputs) == 1
         assert "not a tokenizer name" in capsys.readouterr().err
-        assert tokenizer.train("../abcd", None, 100, 2, inputs) == 1
-        assert "'../abcd' is not a corpus name: use letters, digits" in (
+        assert tokenizer.train("../abcd-corpus", None, 100, 2, inputs) == 1
+        assert "'../abcd-corpus' is not a corpus name: use letters, digits" in (
             capsys.readouterr().err
         )
-        assert tokenizer.train("abcd", "", 100, 2, inputs) == 1
+        assert tokenizer.train("abcd-corpus", "", 100, 2, inputs) == 1
         assert "'' is not a tokenizer name" in capsys.readouterr().err
 
     def test_the_command(self, inputs):
         """``tokenizer train`` trains a tokenizer from the corpus named."""
-        argv = ["tokenizer", "train", "--inputs", str(inputs), "--corpus", "abcd"]
+        argv = [
+            "tokenizer",
+            "train",
+            "--inputs",
+            str(inputs),
+            "--corpus",
+            "abcd-corpus",
+        ]
         assert main([*argv, "--vocab-size", "100", "--min-frequency", "3"]) == 0
         written = json.loads(
-            (inputs / "tokenizers" / "abcd-100" / "manifest.json").read_text()
+            (inputs / "tokenizers" / "abcd-corpus-100" / "manifest.json").read_text()
         )
         assert written["settings"]["vocab_size"] == 100
         assert written["settings"]["min_frequency"] == 3

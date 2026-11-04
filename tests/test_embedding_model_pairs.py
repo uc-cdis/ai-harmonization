@@ -35,7 +35,7 @@ def table(**columns):
 
 def made(items):
     """The pairs that ``star`` makes, as (kind, anchor name, positive name) rows."""
-    found, _ = common.star(items, source="abcd")
+    found, _ = common.star(items, source="abcd-source")
     return list(zip(found.kind, found.anchor_name, found.positive_name))
 
 
@@ -280,7 +280,7 @@ class TestNamesAndTypes:
                 Text("height", "dbGaP variable name", study="phs999997|phs999998"),
             ],
         )
-        found, _ = common.star([item], source="abcd")
+        found, _ = common.star([item], source="abcd-source")
         assert found.study.tolist() == ["phs999997|phs999998|phs999999"]
 
     def test_pairs_that_the_tokenizer_cannot_tell_apart_are_kept_once(self):
@@ -349,7 +349,7 @@ class TestStar:
         """An item with no other name pairs its canonical with its description alone."""
         found, _ = common.star(
             [Item(id="abcd1", canonical="Abcd", description="An abcd.", type="Number")],
-            source="abcd",
+            source="abcd-source",
         )
         row = found.iloc[0]
         assert (row.kind, row.anchor, row.positive) == (
@@ -366,7 +366,7 @@ class TestStar:
             lists=[("Has_Abcd_Value", ["b", "a"]), ("Has_Efgh_Value", ["c"])],
             texts=[Text("AB", "AB")],
         )
-        found, _ = common.star([item], source="abcd")
+        found, _ = common.star([item], source="abcd-source")
         assert found.value_list.tolist() == ["Has_Abcd_Value", "Has_Efgh_Value"]
         assert found.positive.tolist() == [
             "Abcd (string/encoded) Values: b | a",
@@ -386,9 +386,9 @@ class TestStar:
                 Text("Is it abcd?", "Question Text", question=True, study="phs999999")
             ],
         )
-        row = common.star([item], source="abcd")[0].iloc[1]
+        row = common.star([item], source="abcd-source")[0].iloc[1]
         assert row[common.COLUMNS[2:]].to_dict() == {
-            "source": "abcd",
+            "source": "abcd-source",
             "kind": "name_description",
             "item": "abcd1",
             "term_type": "Question Text",
@@ -419,7 +419,7 @@ class TestStar:
             id="abcd2", canonical="Older", status=RETIRED, replaced_by=["abcd3"]
         )
         current = Item(id="abcd3", canonical="New abcd", description="An abcd.")
-        found, _ = common.star([retired, between, current], source="abcd")
+        found, _ = common.star([retired, between, current], source="abcd-source")
         old = found[found.anchor_name.isin(["Old abcd", "OA"])]
         assert set(old.positive_name) == {"New abcd"}
         assert set(old.status) == {RETIRED}
@@ -500,7 +500,7 @@ class TestStar:
                 Item(id="abcd2", canonical="Efgh", texts=[Text("other", "SY")]),
                 Item(id="abcd3", canonical="Ijkl", texts=[Text("Mnop", "SY")]),
             ],
-            source="abcd",
+            source="abcd-source",
         )
         assert pairs.ambiguous_texts(found) == 1
 
@@ -543,7 +543,7 @@ class TestStar:
             ),
             Item(id="abcd2", canonical="Abcd", texts=[Text("AB", "SY")]),
         ]
-        found, _ = common.star(items, source="abcd")
+        found, _ = common.star(items, source="abcd-source")
         assert found[found.anchor_name == "AB"].status.tolist() == [CURRENT]
 
     def test_a_duplicate_keeps_the_studies_of_every_copy(self):
@@ -556,7 +556,7 @@ class TestStar:
             )
             for number, study in ((1, "phs999998"), (2, "phs999997"))
         ]
-        found, counts = common.star(items, source="abcd")
+        found, counts = common.star(items, source="abcd-source")
         assert found.study.tolist() == ["phs999997|phs999998"]
         assert counts["duplicates_removed"] == 1
 
@@ -669,7 +669,7 @@ class TestStar:
                     id="abcd1", canonical="Abcd", texts=[Text("AB", "AB")], status=DRAFT
                 )
             ],
-            source="abcd",
+            source="abcd-source",
         )
         assert found.status.tolist() == [DRAFT]
 
@@ -680,7 +680,7 @@ class TestStar:
             Item(id="abcd2", canonical="Abcd", texts=[Text("AB", "SY")]),
             Item(id="abcd3", canonical="Efgh", texts=[Text("EF", "AB")], open=False),
         ]
-        found, counts = common.star(items, source="abcd")
+        found, counts = common.star(items, source="abcd-source")
         assert found.item.tolist() == ["abcd1"]
         assert counts == {"items": 3, "items_not_open": 1, "duplicates_removed": 1}
 

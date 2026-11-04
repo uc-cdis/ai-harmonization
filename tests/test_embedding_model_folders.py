@@ -37,46 +37,46 @@ class TestStaged:
 
     def test_a_finished_block_replaces_the_previous_folder(self, tmp_path):
         """The new folder takes the previous one's place, and no staging folder is left."""
-        destination = tmp_path / "abcd"
+        destination = tmp_path / "abcd-folder"
         write_folder(destination, "previous")
         with staged(destination) as built:
             (built / "file.txt").write_text("new")
         assert (destination / "file.txt").read_text() == "new"
-        assert [path.name for path in tmp_path.iterdir()] == ["abcd"]
+        assert [path.name for path in tmp_path.iterdir()] == ["abcd-folder"]
 
     def test_a_block_that_raises_keeps_the_previous_folder(self, tmp_path):
         """A step that fails leaves the previous folder as it was, and no staging folder."""
-        destination = tmp_path / "abcd"
+        destination = tmp_path / "abcd-folder"
         write_folder(destination, "previous")
         with pytest.raises(ValueError):
             with staged(destination) as built:
                 (built / "file.txt").write_text("new")
                 raise ValueError("the step failed")
         assert (destination / "file.txt").read_text() == "previous"
-        assert [path.name for path in tmp_path.iterdir()] == ["abcd"]
+        assert [path.name for path in tmp_path.iterdir()] == ["abcd-folder"]
 
     def test_a_failed_move_puts_the_previous_folder_back(self, tmp_path, monkeypatch):
         """When the new folder cannot move into place, the previous one is put back."""
-        destination = tmp_path / "abcd"
+        destination = tmp_path / "abcd-folder"
         write_folder(destination, "previous")
         fail_renames(monkeypatch, {2})
         with pytest.raises(OSError):
             with staged(destination) as built:
                 (built / "file.txt").write_text("new")
         assert (destination / "file.txt").read_text() == "previous"
-        assert [path.name for path in tmp_path.iterdir()] == ["abcd"]
+        assert [path.name for path in tmp_path.iterdir()] == ["abcd-folder"]
 
     def test_a_previous_folder_that_cannot_be_put_back_is_kept(
         self, tmp_path, monkeypatch, capsys
     ):
         """When putting the previous folder back fails too, it is kept and named."""
-        destination = tmp_path / "abcd"
+        destination = tmp_path / "abcd-folder"
         write_folder(destination, "previous")
         fail_renames(monkeypatch, {2, 3})
         with pytest.raises(OSError):
             with staged(destination) as built:
                 (built / "file.txt").write_text("new")
-        (staging,) = tmp_path.glob(".abcd.*")
+        (staging,) = tmp_path.glob(".abcd-folder.*")
         assert (staging / ".previous" / "file.txt").read_text() == "previous"
         error = capsys.readouterr().err
         assert f"It is kept in {staging / '.previous'}" in error
@@ -86,9 +86,9 @@ class TestStaged:
         self, tmp_path, capsys
     ):
         """The next run says that a stopped run's half-written folder can be deleted."""
-        left = tmp_path / ".abcd.k1ll3d"
-        write_folder(left / "abcd", "half written")
-        with staged(tmp_path / "abcd") as built:
+        left = tmp_path / ".abcd-folder.k1ll3d"
+        write_folder(left / "abcd-folder", "half written")
+        with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("new")
         assert capsys.readouterr().err == (
             f"warning: {left} is left from a run that was stopped. Nothing in it"
@@ -100,25 +100,25 @@ class TestStaged:
         self, tmp_path, capsys
     ):
         """The warning says to move back a previous folder that a stopped swap left."""
-        left = tmp_path / ".abcd.k1ll3d"
-        write_folder(left / "abcd", "new")
+        left = tmp_path / ".abcd-folder.k1ll3d"
+        write_folder(left / "abcd-folder", "new")
         write_folder(left / ".previous", "previous")
-        destination = tmp_path / "abcd"
+        destination = tmp_path / "abcd-folder"
         with staged(destination) as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
             f"warning: {left} is left from a run that was stopped. It holds the"
-            f" previous abcd, in {left / '.previous'}. If this run fails, move it"
+            f" previous abcd-folder, in {left / '.previous'}. If this run fails, move it"
             f" back to {destination}. Otherwise delete {left}.\n"
         )
         assert (left / ".previous" / "file.txt").read_text() == "previous"
 
     def test_a_previous_folder_already_replaced_can_be_deleted(self, tmp_path, capsys):
         """A run stopped after both renames left only a replaced folder, which can be deleted."""
-        left = tmp_path / ".abcd.k1ll3d"
+        left = tmp_path / ".abcd-folder.k1ll3d"
         write_folder(left / ".previous", "previous")
-        write_folder(tmp_path / "abcd", "new")
-        with staged(tmp_path / "abcd") as built:
+        write_folder(tmp_path / "abcd-folder", "new")
+        with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
             f"warning: {left} is left from a run that was stopped. Nothing in it"
@@ -128,8 +128,8 @@ class TestStaged:
     def test_the_staging_folder_of_a_longer_name_is_not_warned_about(
         self, tmp_path, capsys
     ):
-        """A run of abcd says nothing about the staging folder of abcd.v2."""
-        write_folder(tmp_path / ".abcd.v2.k1ll3d" / ".previous", "previous")
-        with staged(tmp_path / "abcd") as built:
+        """A run of abcd-folder says nothing about the staging folder of abcd-folder.v2."""
+        write_folder(tmp_path / ".abcd-folder.v2.k1ll3d" / ".previous", "previous")
+        with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("new")
         assert capsys.readouterr().err == ""

@@ -300,6 +300,7 @@ It scores the run in its training format, unless `--format` names another. It
 refuses a benchmark, by name and version, that the run's corpus was not
 checked against for leakage. The model may have learned that benchmark's
 mappings. It also refuses a model whose files differ from the run's record.
-The scores go to the run's own folder, as
+A record that cannot be read, or lacks a field that scoring reads, is refused
+too. The scores go to the run's own folder, as
 `scores/<benchmark>/<format>/`. [scoring.md](scoring.md) describes the
 scores.

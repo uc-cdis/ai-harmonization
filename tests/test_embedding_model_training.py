@@ -748,6 +748,24 @@ class TestScoreRun:
         with pytest.raises(ValueError, match="cannot be read"):
             scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
 
+    @pytest.mark.parametrize(
+        "field", ["not an object", "run", "files", "sources", "settings"]
+    )
+    def test_a_record_without_a_field_that_scoring_reads_stops_scoring(
+        self, run, inputs, field
+    ):
+        """A record that is not an object, or lacks a field, stops scoring, rather than skip the leakage check."""
+        folder, outputs = run
+        path = folder / "manifest.json"
+        if field == "not an object":
+            path.write_text("[]")
+        else:
+            record = json.loads(path.read_text())
+            del record[field]
+            path.write_text(json.dumps(record))
+        with pytest.raises(ValueError, match="is not a run's record"):
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
     def test_a_model_that_differs_from_its_record_is_refused(self, run, inputs):
         """A run's model must be the one that its record names."""
         folder, outputs = run

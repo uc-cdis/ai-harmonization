@@ -40,6 +40,9 @@ METRIC_COLUMNS = [
 # sentence-transformers' own default, in encode() and in its
 # InformationRetrievalEvaluator.
 BATCH_SIZE = 32
+# The fields of a run's record that scoring reads: the run's name, its model's
+# checksums, its corpus's leakage check, and its text format.
+RUN_FIELDS = ("run", "files", "sources", "settings")
 
 
 def split_values(cell):
@@ -333,7 +336,8 @@ def run_record(model):
 
     ``train`` writes a run's folder with its record, ``manifest.json``, beside
     the model's folder, ``model/``. Either folder finds the record. The path is
-    resolved first, so ``.`` inside ``model/`` finds it too.
+    resolved first, so ``.`` inside ``model/`` finds it too. A folder that
+    holds both is a run, so its record must hold every one of RUN_FIELDS.
 
     Args:
         model (str): A Hugging Face model id, a model folder or a run folder.
@@ -343,9 +347,9 @@ def run_record(model):
             when ``model`` is not a run of ``train``.
 
     Raises:
-        ValueError: If the folder holds a run's record that cannot be read.
-            Scoring then stops, rather than scoring the run without its
-            leakage check.
+        ValueError: If the folder holds a record that cannot be read, or that
+            lacks one of RUN_FIELDS. Scoring then stops, rather than scoring
+            the run without its leakage check.
     """
     folder = Path(model)
     if not folder.is_dir():
@@ -362,8 +366,17 @@ def run_record(model):
             f"{path} cannot be read ({type(error).__name__}: {error}), so the"
             " run's leakage check cannot be read either"
         ) from error
-    if not isinstance(record, dict) or "run" not in record:
-        return None
+    missing = [
+        field
+        for field in RUN_FIELDS
+        if not isinstance(record, dict) or field not in record
+    ]
+    if missing:
+        raise ValueError(
+            f"{path} is not a run's record: it has no {', '.join(missing)}. So the"
+            " run's leakage check cannot be read. Train the run again from its"
+            " config.yaml"
+        )
     return run, record
 
 
@@ -378,7 +391,7 @@ def check_run_files(run_folder, record):
     Raises:
         ValueError: If a file is missing or differs from the record.
     """
-    for name, entry in record.get("files", {}).items():
+    for name, entry in record["files"].items():
         path = run_folder / name
         if not path.exists() or file_sha256(path) != entry.get("sha256"):
             raise ValueError(

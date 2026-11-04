@@ -367,7 +367,8 @@ def kept_dictionary(downloads):
             dictionary's file.
 
     Raises:
-        ValueError: If the status lacks one of STATUS_FIELDS.
+        ValueError: If a response is not JSON, or the status lacks one of
+            STATUS_FIELDS.
     """
     files = {
         GDC_STATUS: downloads / "dictionary" / "status.json",
@@ -375,8 +376,16 @@ def kept_dictionary(downloads):
     }
     if not all(path.exists() for path in files.values()):
         served = {url: fetch(url) for url in files}
+        for url, data in served.items():
+            try:
+                json.loads(data)
+            except Exception as error:
+                raise ValueError(
+                    f"{url} returned something other than JSON"
+                    f" ({type(error).__name__}: {error}). Nothing was kept; try"
+                    " again later."
+                ) from error
         status = json.loads(served[GDC_STATUS])
-        json.loads(served[GDC_DICTIONARY])
         missing = [field for field in STATUS_FIELDS if field not in status]
         if missing:
             raise ValueError(

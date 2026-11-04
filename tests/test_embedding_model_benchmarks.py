@@ -290,6 +290,24 @@ class TestBuilders:
             gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
         assert not (tmp_path / "dictionary").exists()
 
+    @pytest.mark.parametrize("broken", [gdc.GDC_STATUS, gdc.GDC_DICTIONARY])
+    def test_gdc_keeps_nothing_when_a_response_is_not_json(
+        self, monkeypatch, tmp_path, broken
+    ):
+        """A response that is not JSON is named by its URL, and neither file is kept."""
+        served = {
+            gdc.GDC_STATUS: self.status("Data Release 99.0"),
+            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
+        }
+        served[broken] = b"<html><body>Service unavailable</body></html>"
+        self.serve_gdc(monkeypatch, served)
+        with pytest.raises(
+            ValueError, match="returned something other than JSON"
+        ) as raised:
+            gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
+        assert broken in str(raised.value)
+        assert not (tmp_path / "dictionary").exists()
+
     @pytest.mark.parametrize("builder", [topmed, gdc])
     def test_a_missing_pin_is_named(self, builder, tmp_path):
         """A manifest without the builder's pinned source fails with the source named."""

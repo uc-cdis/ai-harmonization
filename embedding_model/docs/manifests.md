@@ -15,10 +15,10 @@ Each benchmark and each source has a manifest committed in git:
 - `embedding_model/sources/manifests/<source>.json`.
 
 It pins what the build is made from, such as a commit of a benchmark's
-documentation or a release of a source. It records each input that the build
+documentation or a release of a source. It lists each input that the build
 reads, by its version, its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) or both. A version can be a commit or a
 release, and a SHA-256 is that of a downloaded file, such as a zip. It also
-records each file that the build makes, with its row count and SHA-256. The
+lists each file that the build makes, with its row count and SHA-256. The
 code reads its pins from this file. So the code says how to build, and the
 manifest says from which inputs.
 
@@ -51,7 +51,7 @@ Every manifest has these fields. A field that does not apply is left out:
   - `version`: a release, tag or commit, where the input has one;
   - `fetched`: the date, for an input that serves only its current state;
   - `files`: for an input with several files, such as a fetch, each file as
-    the input's own manifest records it;
+    the input's own manifest holds it;
   - `sha256`, where known;
   - `license`: the input's license, in the format of SPDX, the
     [System Package Data Exchange](https://spdx.dev/): an
@@ -86,8 +86,9 @@ describes the run's manifest.
 A checksum answers one of two questions:
 
 - **Do two builds hold the same data?** A new build is compared with its
-  committed manifest, on any machine and with any library version. A table
-  kept as [parquet](https://parquet.apache.org/) is compared by its row count and its `content_sha256`. The
+  committed manifest, on any machine. A table kept as
+  [parquet](https://parquet.apache.org/) is compared by its row count and its
+  `content_sha256`, which does not depend on how the file was written. The
   bytes of a parquet file depend on the library that wrote it, so its
   `sha256` is recorded but not compared. Any other file is compared by its
   row count and its `sha256`.
@@ -122,7 +123,7 @@ that:
 
 - the manifest and the files exist, and the manifest can be read;
 - the manifest names the input asked for, such as the source `ncit`;
-- each file has the `sha256` that the manifest records;
+- each file has the `sha256` that the manifest holds;
 - the pairs, a corpus's pairs and a benchmark's files have the columns that
   their step writes;
 - the pairs, a corpus and a run record the text format of their texts, one
@@ -148,7 +149,7 @@ make a new version of it:
    raised `version`. The build reads such an input's kept copy, so first move
    that copy aside, as the input's section in benchmarks.md or sources.md says.
 2. Build again with `--update-manifest`, as `benchmarks build` or
-   `sources fetch`. It records the new checksums in the committed manifest.
+   `sources fetch`. It writes the new checksums into the committed manifest.
 3. Commit the manifest.
 
 A version committed in git never changes. So the build asks the local git

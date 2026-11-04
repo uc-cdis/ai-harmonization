@@ -22,7 +22,7 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 | [NHANES](#nhanes) | a US health survey's variables: their questions and value labels | the variable-list and codebook pages | their current state, kept after the first fetch |
 | [PhenX](#phenx) | standard study measures' variables, and their mappings to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
-The manifest records the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every file read, and a new fetch is
+The manifest holds the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every file read, and a new fetch is
 compared with it. [design_decisions.md](design_decisions.md#sources) gives the
 reasons for the fetch's rules.
 
@@ -101,9 +101,10 @@ The tables link by the concept's `code`. A value's `value_code`, a
 concept's `parents` and a `replacement_code` are concept codes too.
 
 Retired and obsolete concepts are kept, with their status. The history file
-records what happened to each one. A merge record names the concept that a
-retired concept was merged into: its replacement, in `replacement_code`. A
-retire record names the concept's old parent instead, as EVS's
+holds a record for many of them, but not for all. A merge record names the
+concept that a retired concept was merged into: its replacement, in
+`replacement_code`. A retire record names the concept's old parent instead,
+as EVS's
 [ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt) says, so it gives no replacement.
 
 Reading NCIt takes a few minutes and several gigabytes of memory.
@@ -198,7 +199,7 @@ year, and loinc.org lists them. To use a newer one, write its number as the
 release's `version`, and delete the release's `md5`: the old checksum belongs
 to the old release. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. The fetch
-records the new release's MD5.
+writes the new release's MD5 into it.
 
 [licenses.md](licenses.md#loinc) gives its license and reference.
 

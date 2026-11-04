@@ -21,10 +21,11 @@ with made-up ids:
 | `Body Weight` | `body`, `weight` | 812, 1407 |
 | `body weight` | `body`, `weight` | 812, 1407 |
 | `body_weight` | `body`, `_`, `weight` | 812, 63, 1407 |
-| `heartrate` | `heart`, `rate` | 955, 2031 |
+| `bodyweight` | `body`, `weight` | 812, 1407 |
 
 The first two texts get the same ids, so the model cannot tell them apart.
-The last one is cut into two tokens when `heartrate` is not a token itself.
+The last one is cut into the same two tokens when `bodyweight` is not a token
+itself, so it gets the same ids too.
 
 [design_decisions.md](design_decisions.md#tokenizer) gives the reasons for the
 tokenizer's settings.
@@ -37,7 +38,7 @@ It cuts a text into tokens in three steps:
 |---|---|---|
 | 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
 | 2. split | splits at whitespace and at every punctuation character, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
-| 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `heartrate` -> `heart`, `rate`, if `heartrate` is not a token itself |
+| 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `bodyweight` -> `body`, `weight`, if `bodyweight` is not a token itself |
 
 The same rules run at two times:
 
@@ -123,10 +124,11 @@ The vocabulary size is the main setting of a tokenizer:
 
 The default is 16,000 tokens. A small corpus, such as the README's example,
 uses 8,000. To choose between sizes, train a model on each and compare their
-scores on a benchmark.
+MRR@10 on the validation pairs. Each run writes it in its
+[`manifest.json`](training.md#manifestjson).
 
 A small corpus can give fewer tokens than asked for. `tokenizer train` then
-prints a note, and the manifest records the size that was reached.
+prints a note, and the manifest holds the size that was reached.
 
 ## Special tokens
 
@@ -203,7 +205,7 @@ The tokenizer's manifest, with the fields that
   `tokenizer.json` itself holds the rules;
 - `counts`: the training texts, the tokens learned, and the diagnostics.
 
-The corpus's pairs must have the checksum that the corpus's manifest records.
+The corpus's pairs must have the checksum that the corpus's manifest holds.
 Otherwise the training stops, and asks for the corpus to be built again.
 
 ## Names

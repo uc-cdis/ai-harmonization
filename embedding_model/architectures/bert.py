@@ -53,8 +53,8 @@ class Settings:
     attention heads. The feed-forward part is 4 times the width, as the BERT
     paper sets it. A text is cut at 128 tokens, the length at which the BERT
     paper pretrains for most of its steps. A batch is padded to its longest
-    text, and attention needs memory that grows with the square of that
-    length. The other defaults are BertConfig's.
+    text, and the BERT paper notes that "attention is quadratic to the
+    sequence length". The other defaults are BertConfig's.
     """
 
     hidden_size: int = field(

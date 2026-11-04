@@ -214,8 +214,8 @@ the comparisons to make.
 one.
 
 `corpus build` checks the pairs against every benchmark built so far, and drops
-those that would leak one ([docs/leakage.md](docs/leakage.md)). Each corpus
-records which benchmarks its pairs were checked against. Scoring on a benchmark
+those that would leak one ([docs/leakage.md](docs/leakage.md)). Each corpus's
+manifest lists the benchmarks that its pairs were checked against. Scoring on a benchmark
 refuses a model whose corpus was not checked against that benchmark for
 leakage.
 
@@ -274,12 +274,13 @@ previous corpus as it was.
 [docs/design_decisions.md](docs/design_decisions.md#each-output-folder-is-written-whole)
 says why the steps write their outputs this way.
 
-A run that is stopped, by its user or by a time limit, cannot delete its
-staging folder. The next run of `corpus build --name abcd` then prints a
-warning with that folder's path. The warning says what to do with the folder.
-Usually nothing in it is needed, so you delete it. A run can also stop while it
-swaps the two folders. Then the staging folder holds the previous corpus, and
-the warning says how to move it back.
+A run that is stopped with Ctrl-C deletes its staging folder. A run that is
+killed, such as by `scancel` or a time limit, cannot. The next run of
+`corpus build --name abcd` then prints a warning with that folder's path. The
+warning says what to do with the folder. Usually nothing in it is needed, so
+you delete it. A run can also be killed while it swaps the two folders. Then
+the staging folder holds the previous corpus, and the warning says how to move
+it back.
 
 ```
 inputs/

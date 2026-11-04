@@ -54,20 +54,21 @@ The `training` section takes any field of
 the trainer's own settings, under its own name. A run
 [refuses](design_decisions.md#a-run-refuses-the-trainers-prompts-and-router_mapping)
 two of them: `prompts` and `router_mapping`. Some of their defaults are
-changed, most of them to those of Hugging Face's
-[recipe for static models](https://huggingface.co/blog/static-embeddings):
+changed. Some come from Hugging Face's
+[recipe for static models](https://huggingface.co/blog/static-embeddings), and
+the others are this pipeline's own:
 
-| setting | default here | the library's default |
-|---|---|---|
-| `num_train_epochs` | 5 | 3 |
-| `per_device_train_batch_size` | 2048 | 8 |
-| `per_device_eval_batch_size` | 2048 | 8 |
-| `learning_rate` | the architecture's: 0.2 for `static`, 1e-4 for `bert` | 5e-5 |
-| `warmup_steps` | 0.1, a share of the steps | 0 |
-| `eval_strategy` | `epoch`: after each epoch | `no` |
-| `logging_steps` | 50 | 500 |
-| `save_strategy` | `no` | `steps` |
-| `dataloader_num_workers` | 4 | 0 |
+| setting | default here | from | the library's default |
+|---|---|---|---|
+| `num_train_epochs` | 5 | here; the recipe trains 1 | 3 |
+| `per_device_train_batch_size` | 2048 | the recipe | 8 |
+| `per_device_eval_batch_size` | 2048 | the recipe | 8 |
+| `learning_rate` | the architecture's: 0.2 for `static`, 1e-4 for `bert` | the recipe for `static`, [BERT's paper](#bert-a-transformer-embedding-model-with-berts-architecture) for `bert` | 5e-5 |
+| `warmup_steps` | 0.1, a share of the steps | the recipe | 0 |
+| `eval_strategy` | `epoch`: after each epoch | here; the recipe evaluates every 250 steps | `no` |
+| `logging_steps` | 50 | here; the recipe logs every 250 steps | 500 |
+| `save_strategy` | `no` | here; the recipe saves every 250 steps | `steps` |
+| `dataloader_num_workers` | 4 | here | 0 |
 
 Every setting of every section is also a flag, named after it:
 `--learning_rate 1e-2`, `--embedding_dim 128` or `--use_cpu`. A flag
@@ -207,8 +208,9 @@ Set up W&B as its [quickstart](https://docs.coreweave.com/products/wandb/quickst
 says: an account, an API key, and `wandb login`. The trainer then logs to the
 project that `WANDB_PROJECT` names, as
 [W&B's Hugging Face page](https://docs.coreweave.com/guides/integrations/huggingface/)
-shows, and to the project `huggingface` without it. W&B shows each run under
-its name, such as `run_example_s0`.
+shows. Without it, sentence-transformers' trainer sets the project
+`sentence-transformers`. W&B shows each run under its name, such as
+`run_example_s0`.
 
 ## What a run writes
 
@@ -225,15 +227,16 @@ The model at the last step, as sentence-transformers saves it.
 is in `tokenizer.json`. `README.md` is the
 model card that sentence-transformers writes.
 
-To compare two runs' models, compare `model.safetensors`. The model card and
-`config_sentence_transformers.json` also record the training time and the
-library versions. So they differ even between two runs of one config.
+To compare two runs' models, compare `model.safetensors`. The model card also
+holds the training time, so it differs even between two runs of one config.
+`config_sentence_transformers.json` holds the library versions, so it
+differs only between two environments.
 
 ### `config.yaml`
 
-The run's settings, in the config's sections. It records every setting of
+The run's settings, in the config's sections. It holds every setting of
 `data`, `model`, the architecture's section and `loss`. Of `training`, it
-records the settings that the config or the flags gave, the changed defaults
+holds the settings that the config or the flags gave, the changed defaults
 above, the learning rate, the seed and `bf16`.
 The other settings are the library's defaults.
 

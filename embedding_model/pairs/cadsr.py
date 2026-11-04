@@ -154,9 +154,10 @@ NAME_TYPES = {
     "VM Alt Name",
     "XML Tag",
 }
-# The alternate-name types that hold no name for the element: contexts, ids,
-# model paths, table names and mixed text, such as the USED_BY context "ABTC"
-# or the UML Class:UML Attr "Patient:race". A type in neither list is new.
+# The alternate-name types that are not used as names: contexts, ids, model
+# paths, table names and mixed text. Examples are the USED_BY context "ABTC",
+# the UML Class:UML Attr "Patient:race", and "Measure Alt Name", which mixes
+# score names with ids. A type in neither list is new.
 OTHER_TYPES = {
     "3.1 VM Name",
     "ABBREVIATION",

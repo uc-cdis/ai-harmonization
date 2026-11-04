@@ -136,7 +136,7 @@ class TestRankTargets:
             "median_rank": 1.0,
         }
 
-    def test_mrr_at_10_counts_a_rank_below_10_as_0(self, model):
+    def test_mrr_at_10_counts_a_rank_past_10_as_0(self, model):
         """MRR counts every rank, and MRR@10 only the first ten.
 
         The model puts eleven race targets before sex, so Gender's expected

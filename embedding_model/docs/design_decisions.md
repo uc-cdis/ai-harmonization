@@ -82,7 +82,7 @@ batches, evaluation and a saved format. Scoring needs ranks and metrics.
 - Bad, because a new major version can change behaviour or move modules.
   Version 6 moves `sentence_transformers.models` to
   `sentence_transformers.sentence_transformer.modules`, for one. `uv.lock`
-  pins the version, and each score and each run records it.
+  pins the version, and each score and each run writes it.
 
 **Alternatives considered.**
 
@@ -109,7 +109,7 @@ the [GDC benchmark](benchmarks.md#gdc), serve only their current state. That
 state can change without notice.
 
 **Decision.** Each benchmark and source has a committed manifest.
-It pins each input by its version or its SHA-256, and records each file
+It pins each input by its version or its SHA-256, and lists each file
 built, with its checksum. A build that differs is refused, and the previous
 build's files are kept. An intended change becomes a
 [new version](manifests.md#making-a-new-version) of the benchmark or the
@@ -158,7 +158,7 @@ source. Downloads are kept for later builds.
 check that:
 
 - a build that differs is refused without `--update-manifest`;
-- with `--update-manifest`, a build under an uncommitted version records its
+- with `--update-manifest`, a build under an uncommitted version writes its
   checksums;
 - a build that differs is refused when git cannot say which version is
   committed;
@@ -170,7 +170,7 @@ check that:
 [licenses.md](licenses.md).
 
 **Context.** Each input has a license, and some have terms of their own. A
-manifest records each input's license, for tools and for people. One license
+manifest holds each input's license, for tools and for people. One license
 can be spelled in several ways, and license pages move.
 
 **Decision.** Each input's `license` is an
@@ -186,7 +186,7 @@ SPDX is the System Package Data Exchange. A license on SPDX's
 - Good, because SPDX is the standard way to name a license so that tools can
   read it. It is the ISO/IEC 5962:2021 standard, and Python's package
   metadata uses it too ([PEP 639](https://peps.python.org/pep-0639/)).
-- Good, because a manifest records only the id, not the address of the
+- Good, because a manifest holds only the id, not the address of the
   terms. Each address is written once, in licenses.md. So when a license page
   moves, one link in licenses.md changes, and no manifest does.
 - Good, because `NONE` is SPDX's own value for no license. It is not a
@@ -276,7 +276,7 @@ check that:
 - a run that raises keeps the previous folder;
 - a failed move puts the previous folder back;
 - a previous folder that cannot be put back is kept, and the warning names it;
-- a staging folder that a stopped run left is warned about;
+- a staging folder that a killed run left is warned about;
 - the warning says whether to delete that folder or to move the previous
   folder back;
 - the staging folder of a longer name, such as `abcd.v2`, is not warned about.
@@ -367,7 +367,7 @@ file depend on the libraries that wrote it. The file stores each column's
 the text `"True"` alike, and a missing value like an empty text. Hashing a
 large table's content takes far longer than hashing the file's bytes.
 
-**Decision.** A manifest records each file's `sha256`, the SHA-256 of its
+**Decision.** A manifest holds each file's `sha256`, the SHA-256 of its
 bytes. A parquet table also gets `content_sha256`: the SHA-256 of a line
 with the column names and Arrow types, then the rows as CSV. No CSV file is
 written. Builds compare parquet tables by `content_sha256`, and other
@@ -551,7 +551,7 @@ The GDC benchmark will change: its next version also changes the source texts.
 **Decision.** The GDC benchmark's build reads the dictionary that the GDC API
 serves. The first build saves it, with the API's
 [status](https://api.gdc.cancer.gov/status), in `downloads/gdc/dictionary/`,
-and later builds read that copy. The manifest records the status's data
+and later builds read that copy. The manifest holds the status's data
 release and the SHA-256 of the dictionary's content. A build on a changed
 dictionary is refused until a new version is made.
 
@@ -610,8 +610,9 @@ check that:
 adds a model's `query` and `document` prompts instead. It also ranks by the
 similarity function that the model's config names, such as `dot`.
 
-**Decision.** `score` embeds both sides as `model.encode()` does, and ranks by
-cosine similarity, whatever the model's config names.
+**Decision.** `score` embeds both sides with the model's default prompt
+only, as `model.encode()` does. It ranks by cosine similarity, whatever the
+model's config names.
 
 **Consequences.**
 
@@ -622,6 +623,11 @@ cosine similarity, whatever the model's config names.
   made elsewhere.
 - Bad, because a model made for the dot product, or for its own prompts, can
   score lower here than in its own setting.
+- Bad, because a model with a `Router` module would still have its two sides
+  routed apart. The evaluator embeds them with `encode_query` and
+  `encode_document`, and the approaches' `encode` takes the default route. No
+  architecture here has a `Router`, so only a model made elsewhere can have
+  one.
 
 **Alternatives considered.**
 
@@ -642,12 +648,12 @@ check that:
 **Described in:** [scoring.md](scoring.md#the-metrics).
 
 **Context.** A reviewer harmonizes a source variable by choosing its target
-from the suggestions. One expected target near the top is what the reviewer
-needs. In both benchmarks, many source variables have several expected targets.
-By default, [sentence-transformers](https://sbert.net)' evaluator reports:
+from the suggestions, and needs one expected target near the top. In both
+benchmarks, many source variables have several expected targets. By default,
+[sentence-transformers](https://sbert.net)' evaluator reports:
 
 - the mean reciprocal rank at 10, MRR@10;
-- the normalized discounted cumulative gain at 10, nDCG@10, as its main score;
+- nDCG@10, the normalized discounted cumulative gain, as its main score;
 - accuracy, precision and recall at 1, 3, 5 and 10;
 - the mean average precision at 100, MAP@100.
 
@@ -669,7 +675,7 @@ target lands, in four metrics:
   recall, MAP and nDCG count every expected target.
 - Good, because MRR without a cut-off counts every rank. A model that moves an
   expected target from rank 50 to rank 20 scores better. MRR@10 scores every
-  rank below 10 as 0.
+  rank past 10 as 0.
 - Good, because MRR@10 compares with the validation MRR@10 that training
   logs.
 - Good, because accuracy@k is what a reviewer of the top k suggestions sees:
@@ -694,7 +700,7 @@ target lands, in four metrics:
 check that:
 
 - the ranks and the metrics are right on a fictional benchmark;
-- MRR@10 counts a rank below 10 as 0, and MRR counts it.
+- MRR@10 counts a rank past 10 as 0, and MRR counts it.
 
 ### Models are compared in one text format
 
@@ -872,7 +878,8 @@ the item, and the fetch prints it for review.
   decisions on permission rather than exclusion"
   ([Saltzer & Schroeder, 1975](https://doi.org/10.1109/proc.1975.9939)).
 - Good, because the fetch keeps every item, closed ones too, and marks each in
-  its `open` column. So a later change of verdict needs no new fetch.
+  its `open` column. So a later change of verdict needs no new download: a
+  new fetch reads the kept files again, and writes the new `open` column.
 - Bad, because a harmless new value closes items until its source's
   allow-list is updated.
 
@@ -1107,7 +1114,7 @@ with the canonical "Body Mass Index". They are never paired with each other.
   many synonyms does not outweigh the rest of the corpus.
 - Good, because an item has few pairs, so two of them rarely share a batch.
   So an item's texts rarely work against each other as in-batch negatives.
-- Good, because each pair records what it is made of. A training run can
+- Good, because each pair is marked with what it is made of. A training run can
   choose pairs by these marks:
   - `kind`, such as `name_to_description`, whose positive is a description
     alone;
@@ -1273,11 +1280,11 @@ LOINC, whose marks are its columns, the fetch prints a new column.
 **Context.** LOINC links answer lists to its codes, each link with a type:
 `NORMATIVE`, `PREFERRED` or `EXAMPLE`. A list linked without a panel is the
 code's default list. Many of the codes with a default list have an
-`EXAMPLE` list. Values show what a variable records. Leakage
+`EXAMPLE` list. Values show what a variable holds. Leakage
 prevention never compares values.
 
 **Decision.** A LOINC code's values are its default answer list, of any link
-type: `NORMATIVE`, `PREFERRED` or `EXAMPLE`. `value_list` records the type, as
+type: `NORMATIVE`, `PREFERRED` or `EXAMPLE`. `value_list` holds the type, as
 in `LL9999-1 (EXAMPLE)`.
 
 **Consequences.**
@@ -1335,8 +1342,8 @@ or the canonical, is used once.
   once, before the split, so it lands on one side.
 - Good, because the steps cannot disagree. `normalization.py` holds the one
   normaliser that the duplicate rule, leakage prevention and the tokenizer
-  share. When the tokenizer reads two texts as one text, the duplicate rule
-  and leakage prevention do too.
+  share. When the tokenizer normalises two texts to one text, the duplicate
+  rule and leakage prevention treat them as one text too.
 - Good, because `body_weight` stays an anchor of the canonical `Body Weight`.
   A study's variable names are written that way, and the pair teaches the
   model to read them.
@@ -1363,7 +1370,7 @@ or the canonical, is used once.
 
 **Confirmation.** The tests check that:
 
-- pairs that the tokenizer cannot tell apart are kept once
+- pairs whose texts the tokenizer normalises to the same texts are kept once
   ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
 - a duplicate keeps the studies of every copy
   ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
@@ -1758,7 +1765,7 @@ library gives.
 - Good, because none of the tokenizer's algorithms is our own code. Hugging
   Face maintains the library.
 - Bad, because the library's defaults decide part of the result.
-  `tokenizer train` sets each setting that matters, and the manifest records
+  `tokenizer train` sets each setting that matters, and the manifest holds
   the library's version.
 - Bad, because `tokenizers` 1.0 cannot yet train or save a tokenizer from
   Python, in its first release candidate. So the project requires a version
@@ -2030,7 +2037,7 @@ that does not exist is refused.
   [refuses](#a-run-refuses-the-trainers-prompts-and-router_mapping) two of
   them: `prompts` and `router_mapping`.
 - Good, because a flag changes one setting for one run, without a new
-  config. The run's `config.yaml` records the final values.
+  config. The run's `config.yaml` holds the final values.
 - Good, because argparse reads a default that is text by the setting's type.
   So `1e-3` in a config becomes a number.
 - Good, because each architecture's settings have a section of their own.
@@ -2105,44 +2112,56 @@ setting and the reason.
 check that `prompts` and `router_mapping` are refused, in the config and as a
 flag.
 
-### The defaults follow Hugging Face's recipe for a static model
+### The defaults start from Hugging Face's recipe for a static model
 
 **Described in:** [training.md](training.md#the-config).
 
 **Context.** The trainer's defaults are made for fine-tuning a pretrained
 transformer: a learning rate of 5e-5, batches of 8 and 3 epochs. A static
 table starts from random values. Hugging Face publishes a recipe that trains
-`StaticEmbedding` from scratch with MultipleNegativesRankingLoss. It also
-keeps a text from appearing twice in a batch. The loss would treat the second
-copy as a negative, a text that should not match.
+`StaticEmbedding` from scratch with MultipleNegativesRankingLoss. The recipe
+trains one epoch on far more pairs, in bf16, with `MatryoshkaLoss`. It
+evaluates, logs and saves every 250 steps.
 
-**Decision.** The defaults are the recipe's:
+**Decision.** The defaults take from the recipe:
 
-- batches of 2,048 pairs;
-- a warmup over a tenth of the steps;
-- for the static model, 1,024 dimensions and a learning rate of 0.2.
+- batches of 2,048 pairs, and its warmup;
+- the static model's 1,024 dimensions and learning rate of 0.2.
 
-Where the recipe is silent, the library's default holds, as for the loss's
-scale. Three defaults differ: the number of epochs, random batches, and bf16,
-which stays off.
+The others are this pipeline's own:
+
+- five epochs, in random batches;
+- an evaluation each epoch, a log every 50 steps, no checkpoint;
+- four data loader workers.
 
 **Consequences.**
 
-- Good, because a BERT trains with the same defaults, since they concern the
-  data and the loss. Only
+- Good, because the recipe is standard practice for this very model
+  ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)).
+- Good, because every architecture shares these defaults, since none of
+  them depends on the model. Only
   [its learning rate](#each-architecture-has-its-own-learning-rate) differs.
-- Good, because the defaults follow standard practice: the recipe for this
-  very model ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)),
-  and the library's own defaults where the recipe says nothing.
-- Good, because the number of epochs fits the corpus. On the validation
-  pairs, MRR@10 levels off within a few epochs, so a longer run adds nothing.
+- Good, because an evaluation after each epoch gives the validation curve one
+  point per epoch. Each evaluation ranks all the validation pairs, so it is
+  not repeated within an epoch.
+- Good, because a log every 50 steps gives the loss curve many points in a
+  run of a few epochs.
+- Good, because four data loader workers build the next batches while the
+  model trains on the current one, as
+  [PyTorch's multi-process loading](https://docs.pytorch.org/docs/stable/data.html#multi-process-data-loading)
+  does.
+- Good, because no checkpoint is needed:
+  [the model kept is the model at the last step](#the-model-kept-is-the-model-at-the-last-step).
 - Good, because random batches suit the corpus, and train faster.
   [The star](#a-star-around-each-item) keeps an item's pairs apart, so a
-  random batch rarely holds a text twice. The recipe's sampler would remove
-  those few repeats, but slows each run.
+  random batch rarely holds a text twice.
 - Good, because the defaults work on every machine. Only a GPU that supports
   bf16 can use it, so it stays off, as in the library, until a config turns
   it on.
+- Bad, because five epochs is a starting point, not a measured choice. The
+  validation curve in the run's
+  [`trainer_state.json`](training.md#trainer_statejson) shows whether a corpus
+  needs more, and a series tunes the number.
 - Bad, because a run on a GPU trains in 32 bits unless its config turns bf16
   on.
 - Bad, because the recipe was made for general text, not for metadata. A
@@ -2155,11 +2174,17 @@ which stays off.
 
 - The library's defaults: they are made for fine-tuning a pretrained model. A
   learning rate of 5e-5 would barely move a random table.
-- The recipe's `NO_DUPLICATES` sampler: it removes a rare repeated text, but
-  slows each run. Its hashed form also forks processes from a process that
-  runs threads.
-- The recipe's single epoch: the recipe trains on far more pairs. Here the
-  validation pairs choose the number of epochs.
+- The recipe's `NO_DUPLICATES` sampler: it keeps a text from appearing twice
+  in a batch. The loss would treat the second copy as a negative, a text that
+  should not match. Here it removes a rare repeat, but slows each run. Its
+  hashed form also forks processes from a process that runs threads.
+- The recipe's single epoch: the recipe trains on far more pairs.
+- The recipe's bf16: only a GPU that supports it can use it. A config turns
+  it on.
+- The recipe's `MatryoshkaLoss`: it also trains shorter embeddings, and a
+  model here is used at its full length.
+- The recipe's evaluation, logging and checkpoints every 250 steps: they
+  suit one long epoch, and a run here keeps no checkpoint.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
@@ -2230,8 +2255,8 @@ names it `hidden_size`. Its documentation
 says that its defaults "will yield a similar configuration to that of the
 google-bert/bert-base-uncased" model: 12 layers of 768 dimensions. Google's
 release of smaller BERT models names BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
-`max_position_embeddings`, 512 in `BertConfig`. Attention needs memory that
-grows with the square of that length. `HfArgumentParser` cannot read
+`max_position_embeddings`, 512 in `BertConfig`. The BERT paper notes that
+"attention is quadratic to the sequence length". `HfArgumentParser` cannot read
 `BertConfig` itself.
 
 **Decision.** Each architecture has a section named after it, under its
@@ -2250,7 +2275,7 @@ is refused.
   Its feed-forward part is 4 times the width, as the BERT paper sets it.
 - Good, because the BERT paper pretrains with "sequence length of 128 for
   90% of the steps" (Appendix A.2). At 128 tokens, BERT-Small trains at a
-  batch of 2,048 texts on one GPU.
+  batch of 2,048 pairs on one GPU.
 - Good, because BERT's other defaults are read from `BertConfig` itself, so
   the code copies none of its numbers.
 - Good, because a static config cannot carry BERT's settings by mistake, and
@@ -2263,11 +2288,12 @@ is refused.
 **Alternatives considered.**
 
 - `BertConfig`'s own shape, BERT-base: 12 layers of 768 dimensions are large
-  and slow to train from scratch, at a batch of 2,048 texts.
-- `BertConfig`'s own length, 512 tokens: a batch of 2,048 texts padded to
+  and slow to train from scratch, at a batch of 2,048 pairs.
+- `BertConfig`'s own length, 512 tokens: a batch of 2,048 pairs padded to
   512 does not fit on one GPU, even for BERT-Small.
-- One width for both, `embedding_dim`: its default of 1,024 does not divide
-  into BERT's 12 heads. The heads would then need a rule of our own.
+- One width for both, `embedding_dim`: BERT's width would not have its
+  library's name, `hidden_size`. Its default of 1,024 would also give BERT
+  twice BERT-Small's width.
 - Every field of `BertConfig`: many of them, such as `is_decoder`, do not
   apply to an encoder trained here.
 
@@ -2327,7 +2353,7 @@ the last step. Its learning rate decays linearly to zero over the run. A
 series compares its runs by their validation metrics.
 
 **Decision.** A run keeps the model at the last step: `load_best_model_at_end`
-stays false, and no checkpoint is saved. The run records that model's
+stays false, and no checkpoint is saved. The run writes that model's
 validation metrics.
 
 **Consequences.**
@@ -2395,7 +2421,7 @@ built as `score` builds its own, with a cutoff of 10.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a run records the validation loss, MRR@10 and accuracy@k at the last step;
+- a run writes the validation loss, MRR@10 and accuracy@k at the last step;
 - the trainer's log holds MRR@10 at each evaluation.
 
 ### A run trains on one GPU, the first one it sees

@@ -82,24 +82,24 @@ class TestStaged:
         assert f"It is kept in {staging / '.previous'}" in error
         assert f"Move it back to {destination}." in error
 
-    def test_a_staging_folder_left_by_a_stopped_run_is_warned_about(
+    def test_a_staging_folder_left_by_a_killed_run_is_warned_about(
         self, tmp_path, capsys
     ):
-        """The next run says that a stopped run's half-written folder can be deleted."""
+        """The next run says that a killed run's half-written folder can be deleted."""
         left = tmp_path / ".abcd-folder.k1ll3d"
         write_folder(left / "abcd-folder", "half written")
         with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("new")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was stopped. Nothing in it"
+            f"warning: {left} is left from a run that was killed. Nothing in it"
             " is needed, so delete it.\n"
         )
         assert left.exists()
 
-    def test_a_previous_folder_left_by_a_stopped_swap_is_warned_about(
+    def test_a_previous_folder_left_by_a_killed_swap_is_warned_about(
         self, tmp_path, capsys
     ):
-        """The warning says to move back a previous folder that a stopped swap left."""
+        """The warning says to move back a previous folder that a killed swap left."""
         left = tmp_path / ".abcd-folder.k1ll3d"
         write_folder(left / "abcd-folder", "new")
         write_folder(left / ".previous", "previous")
@@ -107,21 +107,21 @@ class TestStaged:
         with staged(destination) as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was stopped. It holds the"
+            f"warning: {left} is left from a run that was killed. It holds the"
             f" previous abcd-folder, in {left / '.previous'}. If this run fails, move it"
             f" back to {destination}. Otherwise delete {left}.\n"
         )
         assert (left / ".previous" / "file.txt").read_text() == "previous"
 
     def test_a_previous_folder_already_replaced_can_be_deleted(self, tmp_path, capsys):
-        """A run stopped after both renames left only a replaced folder, which can be deleted."""
+        """A run killed after both renames left only a replaced folder, which can be deleted."""
         left = tmp_path / ".abcd-folder.k1ll3d"
         write_folder(left / ".previous", "previous")
         write_folder(tmp_path / "abcd-folder", "new")
         with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was stopped. Nothing in it"
+            f"warning: {left} is left from a run that was killed. Nothing in it"
             " is needed, so delete it.\n"
         )
 

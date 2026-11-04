@@ -95,9 +95,9 @@ embedding-model = [
     # vocabulary, trained and saved). Below 1.0 for now: the Python bindings
     # of its first release candidate cannot yet train or save a tokenizer.
     "tokenizers>=0.23.2,<1.0.0",
-    # embedding_model.scoring (the commit of a cached Hugging Face model, for
-    # the scores' config). Its minimum version is the one that
-    # sentence-transformers 5.1.2, the lowest version allowed, requires.
+    # embedding_model.provenance (the commit of a cached Hugging Face model,
+    # for the scores' config). sentence-transformers 6 requires a later
+    # version, so its own requirement sets the minimum.
     "huggingface-hub>=0.20.0",
     # embedding_model.corpus (the split's groups, as the connected components
     # of a graph of items and canonical texts). Its minimum version is the

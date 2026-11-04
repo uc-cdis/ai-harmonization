@@ -42,11 +42,12 @@ from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
 
 # Where the runs trained on their own are written, under the outputs folder.
 RUNS = "runs"
-# The training settings whose defaults here differ from the library's: those
-# of Hugging Face's recipe for training a static model from scratch, where the
-# recipe sets them. They concern the data and the loss, so every architecture
-# trains with them. Each architecture sets its own learning rate. The config
-# overrides them.
+# The training settings whose defaults here differ from the library's. The
+# batch sizes and the warmup are those of Hugging Face's recipe for training a
+# static model from scratch. The others are this pipeline's own, as
+# design_decisions.md says. These defaults are shared by every architecture,
+# since none of them depends on the model. Each architecture sets its own
+# learning rate. The config overrides them.
 TRAINING_DEFAULTS = {
     "num_train_epochs": 5,
     "per_device_train_batch_size": 2048,

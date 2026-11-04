@@ -258,7 +258,7 @@ text that they build. These properties are not targets:
 
 The GDC API serves only the current dictionary. So the first build keeps it in
 `downloads/gdc/dictionary/`, with the API's status, which names the data
-release. Later builds read that copy. The manifest records the data release
+release. Later builds read that copy. The manifest holds the data release
 and the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the dictionary's content, with keys sorted.
 
 To build from a newer dictionary, move `downloads/gdc/dictionary/` aside, for

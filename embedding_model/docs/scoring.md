@@ -24,7 +24,7 @@ From those ranks:
 - **MRR**, mean reciprocal rank: the average of 1 / rank. An expected target
   at the top counts fully, second counts half, and so on. MRR is one number with
   no cut-off.
-- **MRR@10**: MRR with every rank below 10 counted as 0. Training reports it
+- **MRR@10**: MRR with every rank past 10 counted as 0. Training reports it
   on the validation pairs.
 - **accuracy@k**, for k of 1, 3, 5 and 10: how often an expected target is
   among the first k. It is what someone reviewing the top k suggestions sees.
@@ -61,7 +61,7 @@ it needs a Hugging Face login with access to it.
 model once and scores it on both.
 
 `score` checks each benchmark file against the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) that its manifest
-records. A file that differs stops scoring, and the error gives the command
+holds. A file that differs stops scoring, and the error gives the command
 that rebuilds it. A build whose version is not the version committed under
 `embedding_model/benchmarks/manifests/` is scored, with a warning.
 

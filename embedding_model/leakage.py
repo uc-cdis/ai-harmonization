@@ -40,9 +40,9 @@ two kinds:
   ``vitals.weight``. Then the pair ``Weight`` -> ``Body Weight`` is an answer
   key: its positive matches the source variable, and its anchor matches the
   expected target. A pair with the same item, anchor and canonical as an
-  answer key goes with it: each anchor gives a ``name`` pair and a
-  ``name_description`` pair, and often only the second holds the description
-  that matches.
+  answer key goes with it: an anchor gives a ``name`` pair, and a
+  ``name_description`` pair when the canonical has a description. Often only
+  the second holds the description that matches.
 - ``benchmark_study``, the study rule: the pair's ``study`` holds the source
   study of a benchmark row. For example, a benchmark row comes from the study
   ``phs999901``. Then every pair made from a dbGaP variable of ``phs999901``
@@ -388,10 +388,10 @@ def answer_keys(sides, source_texts, target_texts):
 def answer_key_twins(pairs, answer_key_findings):
     """The pairs with the same item, anchor and canonical as an answer key.
 
-    An anchor gives a ``name`` pair and a ``name_description`` pair. The
-    second holds the canonical's description, which can match the target
-    while the first matches nothing. Kept, the first would still pair the
-    source's text with the canonical of the answer key.
+    An anchor gives a ``name`` pair, and a ``name_description`` pair when its
+    canonical has a description. The second holds that description, which can
+    match the target while the first matches nothing. Kept, the first would
+    still pair the source's text with the canonical of the answer key.
 
     Args:
         pairs (pd.DataFrame): The combined pairs.

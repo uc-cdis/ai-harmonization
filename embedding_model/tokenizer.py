@@ -1,4 +1,4 @@
-"""Tokenizers: the vocabulary that a static model's table is built on.
+"""Tokenizers: the vocabulary that a model's token ids come from.
 
 ``tokenizer train`` learns a vocabulary from a corpus's training pairs and
 writes one tokenizer under ``<inputs>/tokenizers/<name>/``: ``tokenizer.json``,

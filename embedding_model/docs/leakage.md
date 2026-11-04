@@ -134,8 +134,9 @@ So the pair is an answer key. Two limits keep general vocabulary:
 
 ### An answer key's twin
 
-Each anchor gives two pairs: a `name` pair, with the canonical alone, and a
-`name_description` pair, with the canonical and its description. Often only
+An anchor gives two pairs when its canonical has a description. The `name`
+pair holds the canonical alone, and the `name_description` pair holds the
+canonical and its description. Often only
 the second matches a benchmark row, by its description. A pair with the same
 item, anchor and canonical as an answer key is dropped with it, for the same
 benchmark row. In `dropped.parquet`, its `fields` are its answer key's, after
@@ -172,7 +173,7 @@ A benchmark text can also occur in a pair without a finding. For example,
 that benchmark row. That is not leakage: the pair is kept, and the manifest
 counts the text as shared vocabulary.
 
-## What a build records
+## What a build writes
 
 Each dropped pair has a row in `dropped.parquet`, with its finding. The
 corpus's manifest counts the findings and the shared vocabulary.

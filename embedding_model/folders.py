@@ -4,10 +4,11 @@ Each is one folder under the inputs folder, named by the user. A step writes it
 inside ``staged``, which moves it into place only once the step has written it
 all. So a failed step leaves the previous folder of that name as it was.
 
-A run that is stopped, by its user or by a time limit, cannot clean up. It
-leaves its hidden staging folder, ``.<name>.<random>/``, next to the folder
-that it writes. When it was stopped while it swapped the two folders, the
-staging folder holds them both, and the previous folder is its ``.previous``.
+A run that is stopped with Ctrl-C deletes its staging folder. A run that is
+killed, such as by ``scancel`` or a time limit, cannot clean up. It leaves its
+hidden staging folder, ``.<name>.<random>/``, next to the folder that it
+writes. When it was killed while it swapped the two folders, the staging
+folder holds them both, and the previous folder is its ``.previous``.
 The next run of the step warns about each staging folder that is left, prints
 its path and says what to do with it.
 """
@@ -57,21 +58,21 @@ def replace(built, destination, staging):
 
 
 def left_warning(left, destination):
-    """The warning about a staging folder that a stopped run left.
+    """The warning about a staging folder that a killed run left.
 
     The staging folder holds the previous folder, as ``.previous``, when the
-    run was stopped between the two renames of ``replace``. The destination is
+    run was killed between the two renames of ``replace``. The destination is
     then missing, and ``.previous`` is the only copy of it. Otherwise nothing
     in the staging folder is needed.
 
     Args:
         left (Path): The staging folder.
-        destination (Path): The folder that the stopped run wrote.
+        destination (Path): The folder that the killed run wrote.
 
     Returns:
         str: The warning, which says what to do with the staging folder.
     """
-    warning = f"warning: {left} is left from a run that was stopped."
+    warning = f"warning: {left} is left from a run that was killed."
     previous = left / PREVIOUS
     if previous.exists() and not destination.exists():
         return (

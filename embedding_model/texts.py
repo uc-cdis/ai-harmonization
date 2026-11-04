@@ -21,8 +21,8 @@ def stdelement(node, prop):
     """A property in the shape of StdElement-Mapper's NCIt training pairs.
 
     Its model card shows ``name: ... | description: ... | values: a; b``, with
-    no node and no type. The model is private, so its card needs access too. This format scores the model in the shape of its
-    training pairs.
+    no node and no type. The model is private, so its card needs access too.
+    This format scores the model in the shape of its training pairs.
 
     It is not in ai_harmonization.formatters: the approaches read a target's
     node.property back from its text, and this shape has no node.

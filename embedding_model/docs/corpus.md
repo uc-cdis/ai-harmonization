@@ -18,7 +18,7 @@ The split sees only the pairs that leakage prevention keeps. The later steps
 train the tokenizer on the training pairs alone.
 
 `corpus build` prints how many pairs each step keeps and drops, and the
-corpus's manifest records the counts. They depend on the sources and the
+corpus's manifest holds the counts. They depend on the sources and the
 benchmarks of the build.
 [design_decisions.md](design_decisions.md#corpus) gives the reasons for the
 rules below.
@@ -39,7 +39,7 @@ The build stops, and writes no corpus, when:
 
 The sources are read in the order that the
 [table in pairs.md](pairs.md#each-source) lists. Each source's pairs must have
-the checksum that their manifest records. When the source's fetch is in the
+the checksum that their manifest holds. When the source's fetch is in the
 inputs folder, the pairs must come from that fetch. The manifest must also
 record the text format of the pairs, one of the formats that
 [scoring.md](scoring.md#running-score) lists. All the sources' pairs must be
@@ -77,10 +77,9 @@ with all their pairs. Two items are in one group when they share:
   [leakage prevention](leakage.md#how-two-texts-match) compares texts: the text
   after the tokenizer's normalisation, with case folded and punctuation turned
   into spaces. [Each source](pairs.md#each-source) lists each source's canonical.
-  For example, an NCIt concept's canonical is `Inverted Urothelial Papilloma`,
-  and an ontology term's is `inverted urothelial-papilloma`. Compared this
-  way, they are one text. A canonical made of punctuation alone links
-  nothing.
+  For example, one item's canonical is `Body Weight`, and another's is
+  `body-weight`. Compared this way, they are one text. A canonical made of
+  punctuation alone links nothing.
 
 The links carry over. For example, item A shares a text with item B, and B
 shares a code with C. Then A, B and C are one group. So the same concept never

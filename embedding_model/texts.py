@@ -84,6 +84,39 @@ FORMATS = {
 DEFAULT_FORMAT = "compact"
 
 
+def recorded_format(manifest, manifest_path, next_step):
+    """The text format that a manifest records for its texts, one of FORMATS.
+
+    The pairs, a corpus and a run each record the format in ``settings``.
+
+    Args:
+        manifest (dict): The manifest.
+        manifest_path (Path): Where it is, for the message.
+        next_step (str): What to do when the format is missing or unknown,
+            for the message, such as ``run: python -m embedding_model pairs
+            prepare --source ncit``.
+
+    Returns:
+        str: The format's name.
+
+    Raises:
+        ValueError: If the manifest records no format, or one that is not in
+            FORMATS.
+    """
+    settings = manifest.get("settings")
+    text_format = settings.get("format") if isinstance(settings, dict) else None
+    if text_format is None:
+        raise ValueError(
+            f"{manifest_path} records no text format for its texts; {next_step}"
+        )
+    if not isinstance(text_format, str) or text_format not in FORMATS:
+        raise ValueError(
+            f"{manifest_path} records the text format {text_format!r}, which is"
+            f" not one of {', '.join(FORMATS)}; {next_step}"
+        )
+    return text_format
+
+
 def property_text(formatter, node, name, type_, description, values):
     """The text of a target property or a source property/variable, by a formatter.
 

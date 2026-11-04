@@ -23,9 +23,15 @@ benchmarks of the build.
 [design_decisions.md](design_decisions.md#corpus) gives the reasons for the
 rules below.
 
-The build stops, and writes no corpus, in three cases:
+The build stops, and writes no corpus, when:
 
-- no benchmark is built, so the pairs cannot be checked for leakage;
+- the name is not a folder name, or a source is not one of the sources;
+- `--validation-share` is not between 0.001 and 0.999, in steps of 0.001, as
+  [The split](#the-split) describes;
+- a benchmark cannot be read, or no benchmark is built, so the pairs cannot
+  be checked for leakage;
+- a source's pairs cannot be used, as
+  [Combining the sources](#combining-the-sources) describes;
 - the sources named hold no pairs;
 - leakage prevention drops every pair.
 
@@ -34,7 +40,11 @@ The build stops, and writes no corpus, in three cases:
 The sources are read in the order that the
 [table in pairs.md](pairs.md#each-source) lists. Each source's pairs must have
 the checksum that their manifest records. When the source's fetch is in the
-inputs folder, the pairs must come from that fetch. A pair that copies an
+inputs folder, the pairs must come from that fetch. The manifest must also
+record the text format of the pairs, one of the formats that
+[scoring.md](scoring.md#running-score) lists. All the sources' pairs must be
+in one format. The build names each source whose pairs fail a check, with the
+command that prepares them again, and then stops. A pair that copies an
 earlier source's pair is kept once, in the earlier source. Two pairs are
 copies when the tokenizer
 [normalises](tokenizer.md#step-1-normalize) their texts to the same two texts.
@@ -129,9 +139,7 @@ leaves the previous corpus as it was; see
   - `sources`: each source's pairs, with the source's version and the pairs'
     checksum, and each benchmark, with its version and its files' checksums;
   - `settings`:
-    - `format`: the text format of the pairs, which every source's pairs
-      share. `corpus build` refuses sources whose pairs are in different
-      formats;
+    - `format`: the text format that every source's pairs share;
     - `min_overlap_words`: the minimum number of words in a row that two
       texts share to match;
     - `min_name_words`: the minimum number of words of a name that can match

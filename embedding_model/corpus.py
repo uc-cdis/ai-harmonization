@@ -21,6 +21,7 @@ last corpus of that name only once it is complete.
 """
 
 import hashlib
+import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -45,6 +46,33 @@ BUCKETS = 1000
 CONCEPT_CODES = {"ncit", "cdisc"}
 TRAIN = "train"
 VALIDATION = "validation"
+
+
+def build_command(folder):
+    """The command that builds a corpus again, with the sources and share it had.
+
+    The corpus's manifest gives its sources and validation share, so the
+    command builds the same corpus. When the manifest cannot be read, the
+    command names the corpus alone, with the defaults.
+
+    Args:
+        folder (Path): The corpus's folder, named after the corpus.
+
+    Returns:
+        str: The command.
+    """
+    command = f"python -m embedding_model corpus build --name {folder.name}"
+    try:
+        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+        sources = [
+            source["name"]
+            for source in manifest["sources"]
+            if source["role"] == "pairs"
+        ]
+        share = manifest["settings"]["validation_share"]
+    except Exception:
+        return command
+    return f"{command} --source {' '.join(sources)} --validation-share {share}"
 
 
 def read_corpus(inputs, name):
@@ -73,7 +101,7 @@ def read_corpus(inputs, name):
         "corpus",
         name,
         [*COLUMNS, "split"],
-        f"python -m embedding_model corpus build --name {name}",
+        build_command(folder),
     )
 
 
@@ -387,22 +415,32 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
             for benchmark, (_, _, record) in benchmark_builds.items()
         )
     )
-    frames, pairs_manifests = [], []
+    frames, pairs_manifests, failed = [], [], []
     for source in [source for source in READERS if source in sources]:
         try:
             pairs, pairs_manifest = read_pairs(inputs, source)
         except Exception as error:
             print(error, file=sys.stderr)
-            return 1
+            failed.append(source)
+            continue
         frames.append(pairs)
         pairs_manifests.append(pairs_manifest)
         print(f"  {source:<7}{len(pairs):>10,} pairs")
-    formats = sorted({record["settings"]["format"] for record in pairs_manifests})
-    if len(formats) > 1:
+    if failed:
         print(
-            f"the sources' pairs are in different text formats, {', '.join(formats)};"
-            " prepare them again: python -m embedding_model pairs prepare"
-            f" --source {' '.join(sources)}",
+            f"the pairs of {', '.join(failed)} cannot be used, as said above",
+            file=sys.stderr,
+        )
+        return 1
+    formats = {
+        record["source"]: record["settings"]["format"] for record in pairs_manifests
+    }
+    if len(set(formats.values())) > 1:
+        print(
+            "the sources' pairs are in different text formats: "
+            + ", ".join(f"{source} {formats[source]}" for source in formats)
+            + "; prepare them again: python -m embedding_model pairs prepare"
+            f" --source {' '.join(formats)}",
             file=sys.stderr,
         )
         return 1

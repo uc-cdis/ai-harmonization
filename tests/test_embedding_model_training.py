@@ -766,6 +766,15 @@ class TestScoreRun:
         with pytest.raises(ValueError, match="is not a run's record"):
             scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
 
+    def test_a_record_with_an_unknown_text_format_stops_scoring(self, run, inputs):
+        """A run's text format must be one of FORMATS, rather than fail on lookup."""
+        folder, outputs = run
+        record = json.loads((folder / "manifest.json").read_text())
+        record["settings"]["format"] = "abcd-format"
+        (folder / "manifest.json").write_text(json.dumps(record))
+        with pytest.raises(ValueError, match="which is not one of compact"):
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
     def test_a_model_that_differs_from_its_record_is_refused(self, run, inputs):
         """A run's model must be the one that its record names."""
         folder, outputs = run

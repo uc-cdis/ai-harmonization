@@ -31,12 +31,13 @@ from pathlib import Path
 import yaml
 
 from embedding_model import manifests
-from embedding_model.corpus import TRAIN, VALIDATION, read_corpus
+from embedding_model.corpus import TRAIN, VALIDATION, build_command, read_corpus
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
 from embedding_model.architectures import ARCHITECTURES
 from embedding_model.provenance import code_commit, library_versions
 from embedding_model.scoring import ACCURACY_AT_K, MRR_CUTOFF, ranking_evaluator
+from embedding_model.texts import recorded_format
 from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
 
 # Where the runs trained on their own are written, under the outputs folder.
@@ -418,15 +419,14 @@ def read_splits(inputs, corpus_name):
 
     Raises:
         FileNotFoundError: If no corpus of that name was built.
-        ValueError: If the corpus cannot be read, records no text format for
-            its pairs, or has no pairs of a split.
+        ValueError: If the corpus cannot be read, records no text format of
+            FORMATS for its pairs, or has no pairs of a split.
     """
     pairs, corpus_manifest = read_corpus(inputs, corpus_name)
-    if corpus_manifest.get("settings", {}).get("format") is None:
-        raise ValueError(
-            f"corpus {corpus_name!r} records no text format for its pairs; run:"
-            f" python -m embedding_model corpus build --name {corpus_name}"
-        )
+    folder = Path(inputs) / "corpora" / corpus_name
+    recorded_format(
+        corpus_manifest, folder / "manifest.json", f"run: {build_command(folder)}"
+    )
     parts = {split: pairs[pairs.split == split] for split in (TRAIN, VALIDATION)}
     for split, part in parts.items():
         if part.empty:

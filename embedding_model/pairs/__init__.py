@@ -36,7 +36,7 @@ from embedding_model.folders import staged
 from embedding_model.manifests import file_sha256, table_sha256
 from embedding_model.normalization import normalised
 from embedding_model.sources import read_source
-from embedding_model.texts import DEFAULT_FORMAT
+from embedding_model.texts import DEFAULT_FORMAT, recorded_format
 
 # The sources, in order. When a corpus combines them, a pair found in two
 # sources is kept in the first. CDISC is published as NCIt subsets, so NCIt
@@ -226,8 +226,8 @@ def read_pairs(inputs, name):
         FileNotFoundError: If the source's pairs were not prepared there.
         ValueError: If the pairs, their manifest or the fetch's manifest cannot
             be read, the manifest is another source's or records no text
-            format, the pairs lack a column or differ from their manifest, or
-            they come from another fetch.
+            format of FORMATS, the pairs lack a column or differ from their
+            manifest, or they come from another fetch.
     """
     folder = Path(inputs) / "pairs" / name
     manifest_path = folder / "manifest.json"
@@ -246,13 +246,7 @@ def read_pairs(inputs, name):
             f"{manifest_path} does not record the fetch of {name}"
             f" ({type(error).__name__}: {error}); run: {command}"
         ) from error
-    if (
-        not isinstance(record.get("settings"), dict)
-        or "format" not in record["settings"]
-    ):
-        raise ValueError(
-            f"{manifest_path} records no text format for the pairs; run: {command}"
-        )
+    recorded_format(record, manifest_path, f"run: {command}")
     if not fetch_path.exists():
         return pairs, record
     fetch_command = f"python -m embedding_model sources fetch --source {name}"

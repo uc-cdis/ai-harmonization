@@ -494,15 +494,29 @@ class TestBuild:
         assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "KeyError: 'version'" in capsys.readouterr().err
 
-    def test_a_pairs_manifest_without_a_text_format_is_refused(self, inputs, capsys):
-        """Pairs whose manifest names no text format ask for pairs prepare again."""
+    @pytest.mark.parametrize(
+        "settings, message",
+        [
+            (None, "records no text format"),
+            ({"format": None}, "records no text format"),
+            ({"format": ["compact"]}, "which is not one of compact"),
+            ({"format": "abcd-format"}, "which is not one of compact"),
+        ],
+    )
+    def test_a_pairs_manifest_without_a_known_text_format_is_refused(
+        self, inputs, capsys, settings, message
+    ):
+        """Pairs whose manifest names no format of FORMATS ask for pairs prepare again."""
         path = inputs / "pairs" / "ncit" / "manifest.json"
         record = json.loads(path.read_text())
-        del record["settings"]
+        if settings is None:
+            del record["settings"]
+        else:
+            record["settings"] = settings
         path.write_text(json.dumps(record))
         assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         error = capsys.readouterr().err
-        assert "records no text format" in error
+        assert message in error
         assert "pairs prepare --source ncit" in error
 
     def test_sources_in_different_text_formats_are_refused(self, inputs, capsys):
@@ -512,14 +526,32 @@ class TestBuild:
         record["settings"]["format"] = "name_description"
         path.write_text(json.dumps(record))
         assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 1
-        assert "different text formats" in capsys.readouterr().err
+        error = capsys.readouterr().err
+        assert "different text formats: ncit compact, cdisc name_description" in error
         assert not (inputs / "corpora" / "abcd-corpus").exists()
 
     def test_the_manifest_records_the_pairs_text_format(self, inputs):
         """The corpus's manifest copies the text format that its pairs share."""
+        other = next(name for name in texts.FORMATS if name != texts.DEFAULT_FORMAT)
+        for source in ("ncit", "cdisc"):
+            path = inputs / "pairs" / source / "manifest.json"
+            record = json.loads(path.read_text())
+            record["settings"]["format"] = other
+            path.write_text(json.dumps(record))
         assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
         _, record = corpus.read_corpus(inputs, "abcd-corpus")
-        assert record["settings"]["format"] == texts.DEFAULT_FORMAT
+        assert record["settings"]["format"] == other
+
+    def test_the_build_command_gives_the_corpus_sources_and_share(self, inputs):
+        """The command that builds a corpus again names the sources and share it had."""
+        assert corpus.build("abcd-corpus", ["cdisc"], inputs) == 0
+        folder = inputs / "corpora" / "abcd-corpus"
+        command = "python -m embedding_model corpus build --name abcd-corpus"
+        assert corpus.build_command(folder) == (
+            f"{command} --source cdisc --validation-share {corpus.VALIDATION_SHARE}"
+        )
+        (folder / "manifest.json").unlink()
+        assert corpus.build_command(folder) == command
 
     def test_another_sources_manifest_is_refused(self, inputs, capsys):
         """A pairs manifest that names another source is not read as this one's."""
@@ -706,10 +738,13 @@ class TestBuild:
         assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
         assert "a benchmark cannot be read" in capsys.readouterr().err
 
-    def test_a_source_not_prepared_names_the_command(self, inputs, capsys):
-        """A source with no pairs stops the build and names the command that makes them."""
-        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 1
-        assert "pairs prepare --source phenx" in capsys.readouterr().err
+    def test_every_source_not_prepared_names_its_command(self, inputs, capsys):
+        """Each source with no pairs is named with its command, not only the first."""
+        assert corpus.build("abcd-corpus", ["ncit", "nhanes", "phenx"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "pairs prepare --source nhanes" in error
+        assert "pairs prepare --source phenx" in error
+        assert "the pairs of nhanes, phenx cannot be used" in error
 
     def test_an_unknown_source_is_named(self, inputs, capsys):
         """A source that is not one of READERS is named, not skipped."""

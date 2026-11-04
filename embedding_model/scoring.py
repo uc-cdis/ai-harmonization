@@ -24,7 +24,12 @@ from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
 from embedding_model.folders import staged
 from embedding_model.manifests import file_sha256
 from embedding_model.provenance import code_commit, library_versions, model_revision
-from embedding_model.texts import DEFAULT_FORMAT, FORMATS, property_text
+from embedding_model.texts import (
+    DEFAULT_FORMAT,
+    FORMATS,
+    property_text,
+    recorded_format,
+)
 
 ACCURACY_AT_K = (1, 3, 5, 10)
 # The cutoff of MRR@10, the evaluator's default. Training reports MRR@10 on
@@ -485,7 +490,12 @@ def score(
         model_path = model
     else:
         run_folder, record = run
-        text_format = text_format or record["settings"]["format"]
+        trained_format = recorded_format(
+            record,
+            run_folder / "manifest.json",
+            "train the run again from its config.yaml",
+        )
+        text_format = text_format or trained_format
         checked = checked_benchmarks(record)
         for name, (_, _, manifest) in built.items():
             if (name, manifest["version"]) not in checked:

@@ -124,7 +124,9 @@ that:
 - the manifest names the input asked for, such as the source `ncit`;
 - each file has the `sha256` that the manifest records;
 - the pairs, a corpus's pairs and a benchmark's files have the columns that
-  their step writes.
+  their step writes;
+- the pairs, a corpus and a run record the text format of their texts, one
+  of those that [scoring.md](scoring.md#running-score) lists.
 
 If a check fails, the step stops. Its message names the file and the
 command that writes it again, such as `run: python -m embedding_model

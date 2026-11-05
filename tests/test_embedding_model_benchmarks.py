@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from ai_harmonization.formatters import MAX_VALUES_IN_PROMPT, VALUE_SEPARATOR
+from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model import benchmarks, download, manifests
 from embedding_model.__main__ import main
 from embedding_model.benchmarks import gdc, topmed
@@ -733,8 +733,10 @@ class TestGdcMappingRows:
         {"target_property": key}
         for key in (
             "case.primary_site",
+            "clinical.gender",
             "clinical.race",
             "demographic.race",
+            "demographic.sex_at_birth",
             "project.primary_site",
         )
     ]
@@ -753,7 +755,7 @@ class TestGdcMappingRows:
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian", "White", None]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["clinical.race", "demographic.race"]
-        assert row["source_type"] == "string"
+        assert row["source_type"] == "string/encoded"
         assert row["source_description"] == ""
         assert row["source_values"] == f"Asian{VALUE_SEPARATOR}White"
 
@@ -775,22 +777,12 @@ class TestGdcMappingRows:
             "demographic.race",
         ]
 
-    def test_integers_with_blanks_read_as_integers(self):
-        """An integer column with a blank keeps integer values, 64 rather than 64.0."""
-        truth = {"Abcd": ground_truth([("Age", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Age": [64, None, 58]})}
+    def test_gender_is_also_expected_as_sex_at_birth(self):
+        """A variable mapped to gender also expects the demographic node's sex at birth."""
+        truth = {"Abcd": ground_truth([("Sex", "gender")])}
+        tables = {"Abcd": pd.DataFrame({"Sex": ["Female", "Male"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
-        assert row["source_values"] == f"64{VALUE_SEPARATOR}58"
-
-    def test_numeric_column_keeps_every_value(self):
-        """A numeric column is a number, and every distinct value is kept."""
-        truth = {"Abcd": ground_truth([("Age", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Age": range(MAX_VALUES_IN_PROMPT + 5)})}
-        (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
-        assert row["source_type"] == "number"
-        assert (
-            len(row["source_values"].split(VALUE_SEPARATOR)) == MAX_VALUES_IN_PROMPT + 5
-        )
+        assert row["expected_target"] == ["clinical.gender", "demographic.sex_at_birth"]
 
     def test_target_not_in_the_dictionary_drops_the_mapping(self, capsys):
         """A published mapping to a target the dictionary does not carry is dropped, and named."""
@@ -805,6 +797,33 @@ class TestGdcMappingRows:
         tables = {"Abcd": pd.DataFrame({"Race": ["Asian"]})}
         with pytest.raises(ValueError, match="Abcd: Missing"):
             gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
+
+
+class TestColumnTypeAndValues:
+    """A GDC source column's type and values."""
+
+    def test_a_column_of_whole_numbers_is_an_integer_without_values(self):
+        """A numeric column of whole numbers, blanks included, is an integer with no values."""
+        column = pd.Series([64, None, 58])
+        assert gdc.column_type_and_values(column) == ("integer", [])
+
+    def test_a_column_of_fractions_is_a_float(self):
+        """A numeric column with a fraction is a float with no values."""
+        column = pd.Series([0.85, 0.9])
+        assert gdc.column_type_and_values(column) == ("float", [])
+
+    def test_a_column_mostly_of_numbers_is_a_number(self):
+        """A text column whose values are mostly numbers is a number."""
+        column = pd.Series(["64", "unknown", "58", None])
+        assert gdc.column_type_and_values(column) == ("integer", [])
+
+    def test_a_column_of_categories_lists_the_most_frequent_first(self):
+        """A column of categories is string/encoded, most frequent first; ties keep the table's order."""
+        column = pd.Series(["White", "Asian", None, "Asian", "Black"])
+        assert gdc.column_type_and_values(column) == (
+            "string/encoded",
+            ["Asian", "White", "Black"],
+        )
 
 
 def mapping(name, targets):

@@ -84,9 +84,9 @@ for is left empty.
 | `source_table_id` | the table that holds the variable | its dbGaP table, at the version cited: `pht005002.v1` | the paper, named as in GDC-SM: `Clark` |
 | `source_variable_id` | the variable's own identifier | its dbGaP variable, at the version cited: `phv00252986.v1` | empty: GDC-SM gives none |
 | `source_variable_name` | the variable's name in its table | `cac_agatston_score` | `Race` |
-| `source_type` | the variable's type, in the source's own words | `float`; also `integer`, `string` or `string/encoded` | `string`; also `number`, from the table's column |
+| `source_type` | the variable's type, in the source's own words | `float`; also `integer`, `string` or `string/encoded` | `string/encoded`; also `integer` or `float`, from the table's column |
 | `source_description` | the variable's description | from its data dictionary: "Coronary artery calcification score" | empty: GDC-SM describes no variable |
-| `source_values` | the variable's values, joined by ` \| ` | the value labels that its data dictionary declares | the distinct values in the paper's table |
+| `source_values` | the variable's values, joined by ` \| ` | the value labels that its data dictionary declares | the categories in the paper's table, the most frequent first; empty for a column of numbers |
 | `expected_target` | the targets that the experts mapped the variable to, joined by `;` | `atherosclerosis.cac_score_1` | `clinical.race;demographic.race` |
 
 The examples are one row of each benchmark.
@@ -233,6 +233,18 @@ It is built from three published inputs:
   [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary), GDC's dictionary on
   GitHub, pinned by its commit.
 
+A variable's type and values come from its column in the paper's table. It
+is typed as a dbGaP variable is, by `ai_harmonization.dbgap`:
+
+- a column of numbers is an `integer` or a `float`, with no values. A column
+  whose values are mostly numbers counts as numbers too, such as ages with a
+  few `unknown`.
+- any other column is `string/encoded`, as a dbGaP variable with value codes
+  is. Its values are listed most frequent first.
+
+For example, a column `Smoking` of `Never`, `Current`, `Never` and `Former`
+is `string/encoded`, with the values `Never | Current | Former`.
+
 The ground truth names each property without its node. Each node that
 carries the property gives an expected target, as
 [Which targets a variable maps to](#which-targets-a-variable-maps-to) says.
@@ -282,6 +294,12 @@ name another meaning, that node's property is not an expected target:
 | `project.primary_site` | describes the project, not a patient's tumor site |
 | `project.disease_type` | describes the project, not a patient's disease |
 | `portion.weight` | a sample portion's weight in milligrams, not a patient's |
+
+One property has a second name in the dictionary. GDC-SM maps the papers'
+sex or gender columns, of male and female, to `gender`, which only the
+`clinical` node carries. The demographic node records a patient's sex at
+birth with the same values, so `demographic.sex_at_birth` is an expected
+target too.
 
 The GDC benchmark built by
 `jupyter/harmonization_real_benchmark_creation_gdc.ipynb`

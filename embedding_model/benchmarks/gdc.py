@@ -20,6 +20,7 @@ import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT4
 
+from ai_harmonization.dbgap import resolve_variable_type
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
@@ -51,6 +52,11 @@ NOT_NODES = {"root"}
 # the project, not a patient. A portion's weight is a sample portion's weight
 # in milligrams, not a patient's weight.
 NOT_EXPECTED = {"project.primary_site", "project.disease_type", "portion.weight"}
+# The ground truth's names that the dictionary also records under another name.
+# GDC-SM maps the papers' sex or gender columns, which hold male or female, to
+# gender. The dictionary records a patient's sex at birth in the demographic
+# node, with the same values.
+ALSO_EXPECTED = {"gender": ["demographic.sex_at_birth"]}
 
 # Each paper's dbGaP study, DOI and license, by its name in GDC-SM. A paper's
 # patients are the cases of one GDC project, and each project is one dbGaP
@@ -279,13 +285,46 @@ def read_source_table(spreadsheet, sheet, paper):
     return pd.read_csv(io.StringIO(table.to_csv(index=False)))
 
 
+def column_type_and_values(column):
+    """A source column's type and values, typed as a dbGaP study variable is.
+
+    GDC-SM declares no type, so the type is calculated from the column and
+    given to ``resolve_variable_type``, as dbGaP's calculated type is. A
+    column of numbers is an ``integer`` or a ``float``, without values: its
+    values are measurements, not categories. A column counts as numbers when
+    more than half of its values are numbers, so a few values such as
+    ``unknown`` do not make it a column of categories. Any other column is
+    ``string/encoded``, as a variable with value codes is. Its values are
+    listed most frequent first, so a formatter that shows only some shows the
+    most common ones. Values that are equally frequent keep their order in the
+    table.
+
+    Args:
+        column (pd.Series): The column, as read_source_table gives it.
+
+    Returns:
+        tuple[str, list[str]]: The type and the values.
+    """
+    non_missing = column.dropna()
+    numbers = pd.to_numeric(non_missing, errors="coerce").dropna()
+    if pd.api.types.is_numeric_dtype(column) or len(numbers) > len(non_missing) / 2:
+        calculated = "integer" if (numbers % 1 == 0).all() else "decimal"
+        return resolve_variable_type(calculated, None, has_codes=False), []
+    text = non_missing.astype(str)
+    counts = text.groupby(text, sort=False).size()
+    values = list(counts.sort_values(ascending=False, kind="stable").index)
+    return resolve_variable_type("string", None, has_codes=True), values
+
+
 def mapping_rows(truth, tables, targets, papers):
     """One row per source variable, with every target that the experts mapped it to.
 
-    A variable keeps every distinct value that its column holds. The prompt
-    formatters cap how many they show. A published mapping is left out and
-    named when the dictionary does not carry its property, since a new
-    dictionary can drop or rename a property.
+    A variable's type and values come from its column, as
+    column_type_and_values gives them. The expected targets are the property
+    that the experts named, in each node that carries it, and the properties
+    of ALSO_EXPECTED. A published mapping is left out and named when the
+    dictionary does not carry its property, since a new dictionary can drop or
+    rename a property.
 
     Args:
         truth (dict[str, pd.DataFrame]): The ground truth, from
@@ -302,11 +341,10 @@ def mapping_rows(truth, tables, targets, papers):
     Raises:
         ValueError: If a mapped variable is not a column of its paper's table.
     """
+    properties = {target["target_property"] for target in targets}
     nodes_by_property = {}
-    for target in targets:
-        key = target["target_property"]
-        if key not in NOT_EXPECTED:
-            nodes_by_property.setdefault(key.split(".", 1)[1], []).append(key)
+    for key in sorted(properties - NOT_EXPECTED):
+        nodes_by_property.setdefault(key.split(".", 1)[1], []).append(key)
 
     variables, missing, dropped = {}, [], []
     for paper, published in sorted(truth.items()):
@@ -318,22 +356,17 @@ def mapping_rows(truth, tables, targets, papers):
             if source not in table.columns:
                 missing.append(f"{paper}: {source}")
                 continue
-            keys = nodes_by_property.get(target, [])
+            keys = nodes_by_property.get(target, []) + [
+                key for key in ALSO_EXPECTED.get(target, []) if key in properties
+            ]
             if not keys:
                 dropped.append(f"{paper}: {source} -> {target}")
                 continue
             if (paper, source) not in variables:
-                column = table[source]
+                kind, values = column_type_and_values(table[source])
                 variables[(paper, source)] = {
-                    "type": (
-                        "number" if pd.api.types.is_numeric_dtype(column) else "string"
-                    ),
-                    # convert_dtypes keeps an integer column with blanks integer,
-                    # so its values read 64, not 64.0.
-                    "values": [
-                        str(value)
-                        for value in column.convert_dtypes().dropna().unique()
-                    ],
+                    "type": kind,
+                    "values": values,
                     "keys": set(),
                 }
             variables[(paper, source)]["keys"].update(keys)

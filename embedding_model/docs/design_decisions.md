@@ -491,37 +491,38 @@ check that:
 - an expected target missing from the targets is refused;
 - a target listed twice is refused.
 
-### In the GDC benchmark, a variable maps to its property in every node that carries it
+### In the GDC benchmark, a variable maps to every property that means what the experts named
 
 **Described in:**
 [benchmarks.md](benchmarks.md#which-targets-a-variable-maps-to).
 
 **Context.** The [GDC benchmark](benchmarks.md#gdc) starts from the mappings of
-GDC-SM, the GDC Schema Matching Benchmark
-([Santos et al., 2025](https://doi.org/10.5281/zenodo.14963588)). Its ground
-truth names a property without its node, such as `race`. The targets are
-`node.property`, as the harmonization approaches build them. Several nodes of
-the GDC data dictionary can carry a property of the same name, such as
+GDC-SM ([Santos et al., 2025](https://doi.org/10.5281/zenodo.14963588)). Its
+ground truth names a property without its node, such as `race`. Several nodes
+of the GDC data dictionary can carry a property of that name, such as
 `clinical.race` and `demographic.race`. Three nodes give the name another
-meaning: `project.primary_site`, `project.disease_type` and `portion.weight`.
+meaning. GDC-SM maps columns of male and female to `gender`, in `clinical`.
+`demographic.sex_at_birth` has the same values.
 
 **Decision.** Each node whose property of that name means the same thing
 gives an expected target. The three properties of another meaning are not
-expected targets. So one mapping of GDC-SM can give several expected
-targets, one from each of these nodes.
+expected targets. `demographic.sex_at_birth` is expected beside `gender`.
 
 **Consequences.**
 
 - Good, because the experts named a property, not a node. A model that ranks
   `clinical.race` or `demographic.race` first has found what they meant, and
   either counts.
+- Good, because a model that ranks `demographic.sex_at_birth` first for a
+  column of male and female counts as right.
 - Good, because each variable counts once in a score, however many expected
   targets it has.
 - Bad, because a variable with several expected targets has more chances:
   only its best-placed one counts.
-- Bad, because the three properties of another meaning were found by hand.
-  The code leaves them out by a fixed list, `NOT_EXPECTED` in
-  `benchmarks/gdc.py`. A new dictionary may need the list reviewed.
+- Bad, because the three properties of another meaning, and the second name
+  of `gender`, were found by hand. The code keeps them in two fixed lists,
+  `NOT_EXPECTED` and `ALSO_EXPECTED` in `benchmarks/gdc.py`. A new dictionary
+  may need both reviewed.
 
 **Alternatives considered.**
 
@@ -537,7 +538,8 @@ targets, one from each of these nodes.
 check that:
 
 - a property that two nodes carry is expected in both;
-- a node that gives the property another meaning is left out.
+- a node that gives the property another meaning is left out;
+- a variable mapped to `gender` also expects `demographic.sex_at_birth`.
 
 ## Scoring
 

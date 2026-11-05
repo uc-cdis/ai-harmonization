@@ -263,7 +263,9 @@ An element's `registration_status` says whether it is current, such as
 
 Some elements carry a copyright notice among their properties, such as
 [LOINC](#loinc)'s. Whether an element is open depends on its `copyrightStatus` and
-`noRenderAllowed`, not on its properties.
+`noRenderAllowed`, not on its properties. `no_render_allowed` holds `true` or
+`false`, as the export writes it, or nothing where the export leaves it out.
+Only `false` is open.
 
 **Newer releases.** The repository serves only its current state, so there is
 no release to pin. The fetch keeps the export in

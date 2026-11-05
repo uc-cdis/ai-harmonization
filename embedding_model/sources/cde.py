@@ -22,6 +22,11 @@ SEARCH = "https://cde.nlm.nih.gov/server/de/search"
 # and not open until decided.
 OPEN_COPYRIGHT = {"Public domain, free to use"}
 CLOSED_COPYRIGHT = set()
+# An element may be shown only when its noRenderAllowed is false. The field
+# is true on an element that may not be shown. Where it is missing, it does
+# not allow showing, so the element is closed.
+OPEN_NO_RENDER_ALLOWED = {"false"}
+CLOSED_NO_RENDER_ALLOWED = {"true", ""}
 # The terms of use, as an SPDX license expression. The terms are in
 # embedding_model/docs/licenses.md, which CITATION points to.
 LICENSE = "LicenseRef-NLM-Web-Policies"
@@ -71,7 +76,8 @@ def read_export(elements):
     """The export's elements, names, definitions, ids, values and properties.
 
     An element is open when its ``copyrightStatus`` is public domain and its
-    ``noRenderAllowed`` is not true.
+    ``noRenderAllowed`` is false. An element without ``noRenderAllowed`` is
+    closed.
 
     Args:
         elements (list[dict]): The export's records.
@@ -93,6 +99,7 @@ def read_export(elements):
         tiny = element["tinyId"]
         state = element.get("registrationState") or {}
         domain = element.get("valueDomain") or {}
+        no_render_allowed = element.get("noRenderAllowed")
         rows["elements"].append(
             {
                 "tiny_id": tiny,
@@ -100,7 +107,9 @@ def read_export(elements):
                 "registration_status": state.get("registrationStatus", ""),
                 "administrative_status": state.get("administrativeStatus", ""),
                 "copyright_status": element.get("copyrightStatus") or "",
-                "no_render_allowed": bool(element.get("noRenderAllowed")),
+                "no_render_allowed": (
+                    "" if no_render_allowed is None else str(no_render_allowed).lower()
+                ),
                 "datatype": domain.get("datatype", ""),
             }
         )
@@ -148,14 +157,16 @@ def read_export(elements):
             )
     tables = {table: pd.DataFrame(table_rows) for table, table_rows in rows.items()}
     element_table = tables["elements"]
-    element_table["open"] = (
-        open_where(
-            element_table.copyright_status,
-            OPEN_COPYRIGHT,
-            CLOSED_COPYRIGHT,
-            "copyrightStatus",
-        )
-        & ~element_table.no_render_allowed
+    element_table["open"] = open_where(
+        element_table.copyright_status,
+        OPEN_COPYRIGHT,
+        CLOSED_COPYRIGHT,
+        "copyrightStatus",
+    ) & open_where(
+        element_table.no_render_allowed,
+        OPEN_NO_RENDER_ALLOWED,
+        CLOSED_NO_RENDER_ALLOWED,
+        "noRenderAllowed",
     )
     keys = {
         "elements": ["tiny_id"],

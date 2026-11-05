@@ -661,18 +661,29 @@ class TestCde:
     """The NIH CDE export's tables, restriction fields and count check."""
 
     def test_tables_and_the_allow_list(self, capsys):
-        """Only a public-domain, renderable element is open; a new status is reported."""
+        """Only a public-domain element with noRenderAllowed false is open; a new status is reported."""
+        unmarked = cde_element("abcd4")
+        del unmarked["noRenderAllowed"]
         tables = cde.read_export(
             [
                 cde_element("abcd1"),
                 cde_element("abcd2", no_render_allowed=True),
                 cde_element("abcd3", copyright_status="Abcd copyright"),
+                unmarked,
             ]
         )
-        assert tables["elements"].set_index("tiny_id").open.to_dict() == {
+        elements = tables["elements"].set_index("tiny_id")
+        assert elements.open.to_dict() == {
             "abcd1": True,
             "abcd2": False,
             "abcd3": False,
+            "abcd4": False,
+        }
+        assert elements.no_render_allowed.to_dict() == {
+            "abcd1": "false",
+            "abcd2": "true",
+            "abcd3": "false",
+            "abcd4": "",
         }
         assert "Abcd copyright" in capsys.readouterr().out
         designations = tables["designations"]

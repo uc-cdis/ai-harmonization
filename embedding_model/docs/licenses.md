@@ -221,7 +221,7 @@ state that U.S. government works on its sites "may be freely used or reproduced
 without permission in the U.S.". Content contributed by others may be
 copyrighted. Each element's `copyrightStatus` and `noRenderAllowed` say which:
 an element is open when its status is "Public domain, free to use" and
-`noRenderAllowed` is not true.
+`noRenderAllowed` is false. An element without `noRenderAllowed` is closed.
 
 **SPDX:** `LicenseRef-NLM-Web-Policies`.
 
@@ -306,7 +306,7 @@ the fetch has not seen before closes it too.
 |---|---|---|
 | [NCIt](sources.md#ncit), [ontologies](sources.md#ontologies), [CDISC](sources.md#cdisc) | none per item | always: the source's license covers every item |
 | LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
-| [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is not true |
+| [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is false. Without `noRenderAllowed`, it is closed. |
 | caDSR | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission" |
 | [NHANES](sources.md#nhanes) | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
 | [PhenX](sources.md#phenx) | the protocol's availability | it is "Available" |

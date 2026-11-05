@@ -92,8 +92,8 @@ embedding-model = [
     "pyarrow>=14.0.0",
     # embedding_model.normalization (the text cleaning of BERT's tokenizer, and
     # the tokenizer's normaliser) and embedding_model.tokenizer (the BPE
-    # vocabulary, trained and saved). Below 1.0 for now: the Python bindings
-    # of its first release candidate cannot yet train or save a tokenizer.
+    # vocabulary, trained and saved). Below 1.0 for now: 1.0 is a new major
+    # version, and the pipeline is tested on 0.23.
     "tokenizers>=0.23.2,<1.0.0",
     # embedding_model.provenance (the commit of a cached Hugging Face model,
     # for the scores' config). sentence-transformers 6 requires a later

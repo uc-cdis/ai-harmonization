@@ -821,13 +821,15 @@ before `demographic.race`.
 **Described in:** [training.md](training.md#scoring-a-run).
 
 **Context.** `corpus build` checks the pairs against each benchmark built so
-far. The corpus's manifest lists those benchmarks, with their versions. A
-benchmark built later, or rebuilt as a new version, was not checked. A model
+far. The corpus's manifest lists those benchmarks, with their versions and
+their files' checksums. A benchmark built later, or rebuilt with other files,
+was not checked. A model
 trained on such a corpus may have learned that benchmark's mappings. A model
 trained elsewhere has no such record.
 
-**Decision.** A run's record copies its corpus's checked benchmarks. `score`
-refuses a benchmark whose name and version are not among them. A model
+**Decision.** A run's record copies its corpus's checked benchmarks, with
+their files' checksums. `score` refuses a benchmark that is not among them,
+or whose files differ, as `manifests.differences` compares them. A model
 without a run's record is still scored, with a note that its leakage is
 unknown.
 
@@ -837,8 +839,10 @@ unknown.
   may hold.
 - Good, because the record stays with the run. So the check still holds when
   the corpus is rebuilt or deleted.
-- Bad, because a new version of a benchmark needs a new corpus and a new
-  run, even when its mappings did not change.
+- Good, because a benchmark rebuilt under a version not yet committed, with
+  other mappings, is refused too. Its version alone would pass.
+- Good, because a new version whose files did not change needs no new corpus
+  and no new run. A version is a build's name, not its content.
 - Bad, because a released model is scored without the check.
 
 **Alternatives considered.**
@@ -854,7 +858,9 @@ check that:
 
 - a benchmark that the corpus was checked against is scored into the run's
   folder;
-- a benchmark version that it was not checked against is refused.
+- a benchmark that it was not checked against is refused;
+- another build of a checked benchmark is refused;
+- a new version with the same files is scored.
 
 ## Sources
 

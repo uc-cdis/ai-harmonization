@@ -200,7 +200,8 @@ def identities(manifest):
     SHA-256, or by its version where it has none.
 
     Args:
-        manifest (dict): A manifest.
+        manifest (dict): A manifest, or only its ``files``, as in
+            ``{"files": ...}``.
 
     Returns:
         dict: One entry per file, by name, and per source, by role and name.
@@ -213,7 +214,7 @@ def identities(manifest):
         **{
             f"{source['role']} {source['name']!r}": source.get("sha256")
             or source.get("version")
-            for source in manifest["sources"]
+            for source in manifest.get("sources", [])
         },
     }
 

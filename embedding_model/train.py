@@ -720,7 +720,11 @@ def run_manifest(
                 "name": settings["data"].corpus,
                 "files": {"pairs.parquet": corpus_manifest["files"]["pairs.parquet"]},
                 "benchmarks": [
-                    {"name": source["name"], "version": source["version"]}
+                    {
+                        "name": source["name"],
+                        "version": source["version"],
+                        "files": source.get("files", {}),
+                    }
                     for source in corpus_manifest.get("sources", [])
                     if source.get("role") == "benchmark"
                 ],

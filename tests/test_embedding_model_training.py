@@ -142,7 +142,11 @@ def trained_tokenizer(inputs):
 
 
 def write_benchmark(inputs):
-    """A fictional benchmark named topmed at version 1, over the training texts."""
+    """A fictional benchmark named topmed at version 1, over the training texts.
+
+    The corpus's manifest then records the benchmark's files, as ``corpus
+    build`` does for each benchmark that it checks.
+    """
     folder = inputs / "benchmarks" / "topmed"
     folder.mkdir(parents=True)
     targets = [
@@ -169,7 +173,15 @@ def write_benchmark(inputs):
             "expected_target": ["abcd.systolic_blood_pressure"],
         }
     ]
-    benchmarks.write_benchmark(folder, "topmed", "1", targets, mappings, [], {})
+    manifest = benchmarks.write_benchmark(
+        folder, "topmed", "1", targets, mappings, [], {}
+    )
+    corpus_path = inputs / "corpora" / CORPUS / "manifest.json"
+    record = json.loads(corpus_path.read_text())
+    for source in record["sources"]:
+        if source["role"] == "benchmark" and source["name"] == "topmed":
+            source["files"] = manifest["files"]
+    corpus_path.write_text(json.dumps(record))
 
 
 class TestFeatures:
@@ -548,7 +560,18 @@ class TestTrain:
                                              "accuracy@10"}  # fmt: skip
         corpus_source = record["sources"][0]
         assert corpus_source["name"] == CORPUS
-        assert corpus_source["benchmarks"] == [{"name": "topmed", "version": "1"}]
+        corpus_record = json.loads(
+            (inputs / "corpora" / CORPUS / "manifest.json").read_text()
+        )
+        assert corpus_source["benchmarks"] == [
+            {
+                "name": source["name"],
+                "version": source["version"],
+                "files": source["files"],
+            }
+            for source in corpus_record["sources"]
+            if source["role"] == "benchmark"
+        ]
         assert record["files"]["model/model.safetensors"]["sha256"] == file_sha256(
             run / "model" / "model.safetensors"
         )
@@ -790,15 +813,41 @@ class TestScoreRun:
             scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
 
     def test_an_unchecked_benchmark_is_refused(self, run, inputs):
-        """A benchmark version that the corpus was not checked against stops scoring."""
+        """A benchmark that the corpus was not checked against stops scoring."""
         folder, outputs = run
         record = json.loads((folder / "manifest.json").read_text())
-        record["sources"][0]["benchmarks"] = [{"name": "topmed", "version": "0"}]
+        record["sources"][0]["benchmarks"] = []
         (folder / "manifest.json").write_text(json.dumps(record))
         with pytest.raises(
             ValueError, match="was not checked against benchmark topmed"
         ):
             scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+
+    def test_a_new_version_with_the_same_files_is_scored(self, run, inputs):
+        """The check compares the benchmark's files, so its version alone does not matter."""
+        folder, outputs = run
+        record = json.loads((folder / "manifest.json").read_text())
+        record["sources"][0]["benchmarks"][0]["version"] = "0"
+        (folder / "manifest.json").write_text(json.dumps(record))
+        scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+
+    def test_another_build_of_a_checked_version_is_refused(self, run, inputs):
+        """A benchmark rebuilt with other files stops scoring, under the same version too."""
+        folder, outputs = run
+        built = inputs / "benchmarks" / "topmed"
+        mappings = built / "topmed_mappings.csv"
+        mappings.write_text(
+            mappings.read_text().replace("Systolic blood pressure", "Abcd pressure")
+        )
+        manifest = json.loads((built / "manifest.json").read_text())
+        manifest["files"]["topmed_mappings.csv"]["sha256"] = file_sha256(mappings)
+        (built / "manifest.json").write_text(json.dumps(manifest))
+        with pytest.raises(
+            ValueError, match="this build of benchmark topmed"
+        ) as raised:
+            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+        assert f"corpus build --name {CORPUS}" in str(raised.value)
 
 
 # The smallest BERT that trains on a CPU in seconds: one layer of 32 dimensions.

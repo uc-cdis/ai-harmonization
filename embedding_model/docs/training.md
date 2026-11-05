@@ -266,7 +266,7 @@ The run's manifest, with the fields that
 - `files`: each file of `model/`, with its SHA-256;
 - `sources`: the corpus and the tokenizer, with their checksums. The corpus's
   entry lists the benchmarks that the corpus was checked against for
-  [leakage](leakage.md), with their versions;
+  [leakage](leakage.md), with their versions and their files' checksums;
 - `settings`: the architecture, and `format`, the text format of the pairs,
   from the corpus's manifest;
 - `counts`: the training and validation pairs, the steps, the epochs and the
@@ -303,10 +303,12 @@ python -m embedding_model score --model embedding_model/outputs/runs/run_example
 ```
 
 It scores the run in its training format, unless `--format` names another. It
-refuses a benchmark, by name and version, that the run's corpus was not
-checked against for leakage. The model may have learned that benchmark's
-mappings. It also refuses a model whose files differ from the run's record.
-A record that cannot be read, or lacks a field that scoring reads, is refused
-too. The scores go to the run's own folder, as
+refuses a benchmark that the run's corpus was not checked against for
+leakage, by its name and its files' checksums. The model may have learned
+that benchmark's mappings. A new version whose files did not change passes.
+The message gives the `corpus build` command that checks the corpus again.
+It also refuses a model whose files differ from the run's record. A record
+that cannot be read, or lacks a field that scoring reads, is refused too.
+The scores go to the run's own folder, as
 `scores/<benchmark>/<format>/`. [scoring.md](scoring.md) describes the
 scores.

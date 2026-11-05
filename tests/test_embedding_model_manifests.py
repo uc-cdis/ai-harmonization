@@ -30,6 +30,16 @@ class TestIdentities:
             "source text 'Abcd release'": "v1",
         }
 
+    def test_files_alone_are_compared_by_their_identities(self):
+        """Two sets of files without sources differ only where a file does."""
+        files = {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "aa"}}
+        changed = {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "bb"}}
+        assert manifests.differences({"files": files}, {"files": files}) == []
+        assert manifests.differences({"files": files}, {"files": changed}) == [
+            "abcd-benchmark_mappings.csv: {'rows': 1, 'sha256': 'aa'} ->"
+            " {'rows': 1, 'sha256': 'bb'}"
+        ]
+
 
 class TestDifferences:
     """Which changes between two manifests count as differences."""

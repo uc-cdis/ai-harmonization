@@ -21,8 +21,9 @@ import yaml
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model.benchmarks import TARGET_SEPARATOR, read_benchmark
+from embedding_model.corpus import build_command
 from embedding_model.folders import staged
-from embedding_model.manifests import file_sha256
+from embedding_model.manifests import differences, file_sha256
 from embedding_model.provenance import code_commit, library_versions, model_revision
 from embedding_model.texts import (
     DEFAULT_FORMAT,
@@ -392,16 +393,17 @@ def check_run_files(run_folder, record):
 
 
 def checked_benchmarks(record):
-    """The benchmarks that a run's corpus was checked against, with their versions.
+    """The benchmarks that a run's corpus was checked against, by name.
 
     Args:
         record (dict): The run's record.
 
     Returns:
-        set[tuple[str, str]]: Each benchmark's name and version.
+        dict[str, dict]: Each benchmark's entry: its version and its files,
+            each with its checksums.
     """
     return {
-        (benchmark["name"], benchmark["version"])
+        benchmark["name"]: benchmark
         for source in record.get("sources", [])
         if source.get("role") == "corpus"
         for benchmark in source.get("benchmarks", [])
@@ -483,14 +485,29 @@ def score(
         )
         text_format = text_format or trained_format
         checked = checked_benchmarks(record)
+        corpus_name = next(
+            source["name"]
+            for source in record["sources"]
+            if source.get("role") == "corpus"
+        )
+        rebuild = build_command(Path(inputs) / "corpora" / corpus_name)
         for name, (_, _, manifest) in built.items():
-            if (name, manifest["version"]) not in checked:
-                raise ValueError(
-                    f"the corpus of run {record['run']} was not checked against"
-                    f" benchmark {name} version {manifest['version']} for"
-                    " leakage, so the model may have learned its mappings."
-                    " Build the corpus after the benchmark, and train again"
+            if name not in checked:
+                unchecked = f"benchmark {name}"
+            else:
+                changed = differences(
+                    {"files": checked[name].get("files", {})},
+                    {"files": manifest["files"]},
                 )
+                if not changed:
+                    continue
+                unchecked = f"this build of benchmark {name} ({'; '.join(changed)})"
+            raise ValueError(
+                f"the corpus of run {record['run']} was not checked against"
+                f" {unchecked} for leakage, so the model may have learned its"
+                f" mappings. Build the corpus again, after the benchmark:"
+                f" {rebuild}. Then train again"
+            )
         check_run_files(run_folder, record)
         model, model_path = str(run_folder), str(run_folder / "model")
     texts = {

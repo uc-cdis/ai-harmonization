@@ -313,7 +313,7 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
     try:
         pairs, corpus_manifest = read_corpus(inputs, corpus)
     except Exception as error:
-        print(error, file=sys.stderr)
+        print(f"{type(error).__name__}: {error}", file=sys.stderr)
         return 1
     texts = training_texts(pairs)
     # The pairs are not needed past this point. Freeing them lowers the peak

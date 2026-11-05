@@ -420,7 +420,7 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
         try:
             pairs, pairs_manifest = read_pairs(inputs, source)
         except Exception as error:
-            print(error, file=sys.stderr)
+            print(f"  {source}: {type(error).__name__}: {error}", file=sys.stderr)
             failed.append(source)
             continue
         frames.append(pairs)

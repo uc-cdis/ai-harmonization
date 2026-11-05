@@ -788,7 +788,7 @@ def train(config, seed, overrides, inputs, outputs):
         tokenizer, tokenizer_manifest = read_tokenizer(inputs, values["tokenizer"])
         settings = apply_config(values)
     except Exception as error:
-        print(error, file=sys.stderr)
+        print(f"{type(error).__name__}: {error}", file=sys.stderr)
         return 1
 
     data, training = settings["data"], settings["training"]

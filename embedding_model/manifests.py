@@ -48,7 +48,9 @@ def file_digest(path, algorithm):
 
     The file is read piece by piece, so even a large file is never in memory
     whole. ``file_sha256`` uses it for SHA-256. LOINC's fetch uses it for MD5,
-    the checksum that LOINC publishes for each release.
+    the checksum that LOINC publishes for each release. A checksum here checks
+    a file, not a secret, so the hash is made with ``usedforsecurity=False``.
+    An OpenSSL in FIPS mode refuses MD5 without it.
 
     Args:
         path (Path): The file.
@@ -58,7 +60,9 @@ def file_digest(path, algorithm):
         str: The checksum, as hex.
     """
     with open(path, "rb") as stream:
-        return hashlib.file_digest(stream, algorithm).hexdigest()
+        return hashlib.file_digest(
+            stream, lambda: hashlib.new(algorithm, usedforsecurity=False)
+        ).hexdigest()
 
 
 def file_sha256(path):

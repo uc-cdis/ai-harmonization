@@ -609,12 +609,23 @@ class TestStar:
             "F361. Abcd medicine",
         ]
 
-    def test_a_text_that_differs_only_by_an_item_number_is_the_canonical(self):
-        """A text equal to the canonical but for a form's item number is skipped."""
+    def test_a_question_that_differs_only_by_an_item_number_is_the_canonical(self):
+        """A question equal to the canonical but for a form's item number is skipped."""
         item = Item(
-            id="abcd1", canonical="Is it abcd?", texts=[Text("Q2. Is it abcd?", "SY")]
+            id="abcd1",
+            canonical="Is it abcd?",
+            texts=[Text("Q2. Is it abcd?", "Question Text", question=True)],
         )
         assert made([item]) == []
+
+    def test_a_name_with_an_item_number_is_paired_with_the_canonical(self):
+        """A text that is not a question keeps its number, so it differs from the canonical."""
+        item = Item(
+            id="abcd1",
+            canonical="Abcd medicine",
+            texts=[Text("F361. Abcd medicine", "dbGaP variable description")],
+        )
+        assert made([item]) == [("name", "F361. Abcd medicine", "Abcd medicine")]
 
     def test_empty_template_headings_go_from_a_description(self):
         """A template's headings with nothing after them leave a description."""

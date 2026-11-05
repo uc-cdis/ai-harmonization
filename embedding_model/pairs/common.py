@@ -586,15 +586,16 @@ def normalised_text(text):
 def distinct(texts, canonical):
     """The texts that are names, each once, without texts equal to the canonical.
 
-    Texts are compared as the tokenizer normalises them, as copies are, and
-    without a form's item number. So ``Q2. Abcd?`` equals ``Abcd?``, and
+    Texts are compared as the tokenizer normalises them, as copies are. So
     ``ABCD`` equals ``abcd``, but ``abcd_efgh`` and ``abcd efgh`` differ, as
-    their tokens do. Equal texts become one text. It keeps the first spelling
-    and the studies of all of them.
+    their tokens do. A question has lost its form's item number in
+    ``worded``, and other texts keep theirs. So ``F361. Abcd`` differs from
+    ``Abcd``. Equal texts become one text. It keeps the first spelling and the
+    studies of all of them.
     """
-    by_key, canonical_key = {}, normalised_text(without_item_number(canonical))
+    by_key, canonical_key = {}, normalised_text(canonical)
     for text in texts:
-        text_key = normalised_text(without_item_number(text.text))
+        text_key = normalised_text(text.text)
         if text_key and text_key != canonical_key and is_name(text.text):
             first = by_key.setdefault(text_key, text)
             if text.study and text.study != first.study:

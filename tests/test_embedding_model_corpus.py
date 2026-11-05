@@ -164,7 +164,7 @@ class TestLeakage:
         ]
 
     def test_an_answer_keys_twin_goes_with_it(self):
-        """The pair with an answer key's item, anchor and canonical is dropped too."""
+        """A pair whose names read as an answer key's is dropped too, from any item or source."""
         pairs = pd.DataFrame(
             [
                 pair(
@@ -174,16 +174,64 @@ class TestLeakage:
                     positive_description="The efgh value",
                 ),
                 pair("efgh_level", "Efgh"),
-                pair("efgh_level", "Efgh", item="C999902"),
+                pair("EFGH-level", "efgh.", source="cadsr", item="999902"),
+                pair("efgh_level", "Ijkl"),
             ]
         )
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
-        assert findings.pair.tolist() == [0, 1]
-        assert findings.fields.tolist()[1] == (
-            "twin of: anchor name = source name,"
-            " positive description = target description"
+        assert findings.pair.tolist() == [0, 1, 2]
+        assert (
+            findings.fields.tolist()[1:]
+            == [
+                "twin of: anchor name = source name,"
+                " positive description = target description"
+            ]
+            * 2
         )
-        assert findings.target_property.tolist() == ["node2.efgh_value"] * 2
+        assert findings.target_property.tolist() == ["node2.efgh_value"] * 3
+
+    def test_a_twin_of_one_benchmark_and_answer_key_of_another_has_both(self):
+        """A pair that is one benchmark's twin and another's answer key gets a finding for each."""
+        targets = pd.concat(
+            [
+                TARGETS,
+                pd.DataFrame(
+                    {
+                        "target_property": ["node5.efgh"],
+                        "target_type": ["string"],
+                        "target_description": ["An efgh"],
+                        "target_values": [""],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        mappings = MAPPINGS.assign(expected_target=["node1.abcd_index", "node5.efgh"])
+        pairs = pd.DataFrame(
+            [
+                pair(
+                    "efgh_level",
+                    "Efgh",
+                    kind="name_description",
+                    positive_description="The efgh value",
+                ),
+                pair("efgh_level", "Efgh"),
+            ]
+        )
+        findings, _ = leakage.audit(
+            pairs,
+            {
+                "abcd-benchmark": (TARGETS, MAPPINGS),
+                "efgh-benchmark": (targets, mappings),
+            },
+        )
+        assert findings[findings.pair == 1].set_index("benchmark").fields.to_dict() == {
+            "abcd-benchmark": (
+                "twin of: anchor name = source name,"
+                " positive description = target description"
+            ),
+            "efgh-benchmark": "anchor name = source name, positive name = target name",
+        }
 
     def test_a_pair_that_leaks_two_benchmarks_has_a_finding_for_each(self):
         """One pair can leak two benchmarks, and each one gets its finding."""

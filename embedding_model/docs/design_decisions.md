@@ -1587,7 +1587,7 @@ A word such as `age` occurs in many pairs and in many benchmark rows.
 
 - it is an answer key: its sides match a source variable and one of its
   expected targets;
-- it is an answer key's twin, with the same item, anchor and canonical;
+- it is an answer key's twin, with the same names;
 - it comes from a dbGaP variable of a benchmark's study.
 
 A benchmark text on one side only is shared vocabulary: the pair is kept.
@@ -1619,6 +1619,7 @@ A benchmark text on one side only is shared vocabulary: the pair is kept.
 plant leaks of each kind. They check that:
 
 - each planted leak is dropped, and nothing else;
+- an answer key's twin is dropped from any item or source, by its names;
 - an answer key comes before a benchmark study;
 - shared vocabulary is reported.
 

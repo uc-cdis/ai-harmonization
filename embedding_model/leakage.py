@@ -385,36 +385,48 @@ def answer_keys(sides, source_texts, target_texts):
     ]
 
 
-def answer_key_twins(pairs, answer_key_findings):
-    """The pairs with the same item, anchor and canonical as an answer key.
+def answer_key_twins(sides, answer_key_findings):
+    """The pairs whose anchor and positive names read as an answer key's do.
 
     An anchor gives a ``name`` pair, and a ``name_description`` pair when its
     canonical has a description. The second holds that description, which can
     match the target while the first matches nothing. Kept, the first would
-    still pair the source's text with the canonical of the answer key.
+    still pair the source's text with the canonical of the answer key. The
+    names are compared by their ``text_key``, as the model reads them. So a
+    pair of another item or source that reads the same is a twin too.
 
     Args:
-        pairs (pd.DataFrame): The combined pairs.
+        sides (pd.DataFrame): The pairs' side texts, from ``side_text_keys``.
         answer_key_findings (pd.DataFrame): The answer keys, from
             ``answer_keys``.
 
     Returns:
-        pd.DataFrame: The twins that are not answer keys themselves, in the
-            columns of ``answer_keys``. A twin's ``fields`` are its answer
-            key's, after TWIN, such as ``twin of: anchor name = source name,
-            positive description = target description``.
+        pd.DataFrame: The twins, in the columns of ``answer_keys``, except a
+            pair that is an answer key of the same benchmark. A twin's
+            ``fields`` are its answer key's, after TWIN, such as ``twin of:
+            anchor name = source name, positive description = target
+            description``.
     """
-    identity = ["source", "item", "anchor_name", "positive_name"]
-    identities = pairs[identity].assign(pair=pairs.index)
-    twins = (
-        answer_key_findings.merge(identities, on="pair")
-        .drop(columns="pair")
-        .merge(identities, on=identity)
+    names = (
+        sides[sides.side_field == "name"]
+        .pivot(index="pair", columns="side", values="text_key")
+        .dropna()
+        .reset_index()
     )
-    twins = twins[~twins.pair.isin(answer_key_findings.pair)]
-    return twins.assign(fields=TWIN + twins.fields).drop_duplicates(
-        ["pair", "benchmark"]
-    )[list(answer_key_findings.columns)]
+    identity = list(SIDES)
+    twins = (
+        answer_key_findings.merge(names, on="pair")
+        .drop(columns="pair")
+        .merge(names, on=identity)
+    )
+    finding = ["pair", "benchmark"]
+    is_answer_key = twins.merge(
+        answer_key_findings[finding], on=finding, how="left", indicator="found"
+    ).found.eq("both")
+    twins = twins[~is_answer_key.to_numpy()]
+    return twins.assign(fields=TWIN + twins.fields).drop_duplicates(finding)[
+        list(answer_key_findings.columns)
+    ]
 
 
 def study_matches(pairs, studies):
@@ -509,7 +521,7 @@ def audit(pairs, benchmarks):
     findings = pd.concat(
         [
             answer_key_findings.assign(finding=ANSWER_KEY),
-            answer_key_twins(pairs, answer_key_findings).assign(finding=ANSWER_KEY),
+            answer_key_twins(sides, answer_key_findings).assign(finding=ANSWER_KEY),
             study_matches(pairs, studies).assign(finding=BENCHMARK_STUDY),
         ],
         ignore_index=True,

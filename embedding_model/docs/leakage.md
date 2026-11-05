@@ -137,10 +137,12 @@ So the pair is an answer key. Two limits keep general vocabulary:
 An anchor gives two pairs when its canonical has a description. The `name`
 pair holds the canonical alone, and the `name_description` pair holds the
 canonical and its description. Often only
-the second matches a benchmark row, by its description. A pair with the same
-item, anchor and canonical as an answer key is dropped with it, for the same
-benchmark row. In `dropped.parquet`, its `fields` are its answer key's, after
-`twin of: `. For example:
+the second matches a benchmark row, by its description. A pair whose anchor
+name and positive name read as an answer key's is its twin. The twin is
+dropped with the answer key, for the same benchmark row. The names are
+compared by their `text_key`, as the model reads them, so a pair of another
+item or source can be a twin too. In `dropped.parquet`, a twin's `fields` are
+its answer key's, after `twin of: `. For example:
 
 ```
 twin of: anchor name = source name, positive description = target description

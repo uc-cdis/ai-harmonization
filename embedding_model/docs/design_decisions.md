@@ -43,14 +43,15 @@ earlier text.
 
 **Context.** ai-harmonization's embedding approach loads a model with
 sentence-transformers (`ai_harmonization/harmonization_approaches/embeddings.py`).
-It embeds texts with the model's `encode`. The model here is a static
-embedding table, trained from pairs of texts. Training needs a loop, a loss,
-batches, evaluation and a saved format. Scoring needs ranks and metrics.
+It embeds texts with the model's `encode`. The models here are a static
+embedding table and a transformer with BERT's architecture, each trained from
+pairs of texts. Training needs a loop, a loss, batches, evaluation and a saved
+format. Scoring needs ranks and metrics.
 
 **Decision.** sentence-transformers is used wherever it does the job:
 
-- the model is a sentence-transformers model, with the library's static
-  embedding table, `StaticEmbedding`;
+- the model is a sentence-transformers model, built from `StaticEmbedding`
+  or `Transformer`;
 - the pairs take its column names, `anchor` and `positive`;
 - training uses its `SentenceTransformerTrainer`, its loss
   `MultipleNegativesRankingLoss`, its batch sampler and its data collator;
@@ -290,9 +291,10 @@ check that:
 **Context.** The source, pairs and corpus tables are large tables of text. Some
 of their columns hold lists, or true and false. Many of their texts are real
 labels that look like missing values, such as `None` in the list
-`Mild | Moderate | Severe | None`, or `N/A`. Training will read the corpus with
-Hugging Face's [`datasets`](https://huggingface.co/docs/datasets). The
-benchmark and score tables are small, and people open them to check them.
+`Mild | Moderate | Severe | None`, or `N/A`. Training hands the pairs to the
+trainer as a [`datasets`](https://huggingface.co/docs/datasets) `Dataset`.
+The benchmark and score tables are small, and people open them to check
+them.
 
 **Decision.** The source, pairs and corpus tables are written as parquet, by
 pandas with [pyarrow](https://arrow.apache.org/docs/python/). The benchmark and
@@ -310,9 +312,6 @@ empty text.
 - Good, because parquet stores a table by column, and compresses each
   column. pandas compresses with snappy by default. So a large table takes
   less space than as CSV, and it is read without parsing text.
-- Good, because `datasets` reads parquet directly, with `Dataset.from_parquet`.
-  [sentence-transformers](https://sbert.net)' trainer takes a
-  `datasets.Dataset`.
 - Good, because parquet is a common standard. In data analytics, Parquet and
   [ORC](https://orc.apache.org/) are the most widely adopted open-source
   columnar formats
@@ -339,8 +338,11 @@ empty text.
   take more space.
 - [JSON Lines](https://jsonlines.org/): it keeps lists, booleans and texts. But
   it is not compressed, and every read parses each row as text.
-- ORC, the other widely adopted columnar format: pandas writes it, but
-  `datasets` has no reader for it.
+- ORC, the other widely adopted columnar format: pandas reads and writes it
+  too. Hugging Face's Hub keeps datasets as parquet, so parquet is what its
+  tools expect.
+- Arrow IPC (Feather): it keeps types too, and pandas reads it. The same
+  holds for it: Hugging Face's tools expect parquet.
 - Reading a benchmark table with pandas' defaults: each empty cell would
   become `NaN`. So would a cell that holds only a text such as `None` or
   `N/A`, such as a value list with that one label. A column whose cells are
@@ -1130,8 +1132,9 @@ with the canonical "Body Mass Index". They are never paired with each other.
   many synonyms does not outweigh the rest of the corpus.
 - Good, because an item has few pairs, so two of them rarely share a batch.
   So an item's texts rarely work against each other as in-batch negatives.
-- Good, because each pair is marked with what it is made of. A training run can
-  choose pairs by these marks:
+- Good, because each pair is marked with what it is made of. So a later
+  series can choose pairs by these marks, though `train` reads none of them
+  yet:
   - `kind`, such as `name_to_description`, whose positive is a description
     alone;
   - `term_group`: an [expansion](pairs.md#expansions-and-paraphrases) of a
@@ -1952,24 +1955,29 @@ check that:
 [sentence-transformers](https://sbert.net)' `StaticEmbedding` turns padding
 off, and pools each text's tokens as they are. A
 [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
-model also needs `[PAD]`, `[CLS]`, `[SEP]` and `[MASK]`, and `BertTokenizer`
-of `transformers` names them. Removing a token moves the id of every token after it.
+model pads its batches, so it needs `[PAD]`. `BertTokenizer` of `transformers`
+also names `[CLS]`, `[SEP]` and `[MASK]`, which BERT's own pretraining uses.
+Removing a token moves the id of every token after it.
 
 **Decision.** Every tokenizer has `[PAD]`, `[UNK]`, `[CLS]`, `[SEP]` and
 `[MASK]`, with the first five ids.
 
 **Consequences.**
 
-- Good, because a BERT model trained from scratch can use every vocabulary.
+- Good, because one vocabulary serves both architectures. A later BERT
+  setting that needs `[CLS]`, `[SEP]` or `[MASK]`, such as masked-language
+  pretraining, finds them in place.
 - Bad, because a static model carries four rows that it never uses.
+- Bad, because the BERT here uses only `[PAD]`. It adds no `[CLS]` or `[SEP]`
+  to a text, and trains no masked tokens.
 - Bad, because the `[UNK]` row never trains. Every character of the training
   texts is in the vocabulary, so `[UNK]` never occurs in them, and its row
   keeps its random start.
 
 **Alternatives considered.**
 
-- `[PAD]` and `[UNK]` alone: a BERT model trained from scratch would need
-  another tokenizer, with every id moved.
+- `[PAD]` and `[UNK]` alone: a later BERT setting that needs `[CLS]`,
+  `[SEP]` or `[MASK]` would need another tokenizer, with every id moved.
 
 ## Training
 

@@ -1,11 +1,11 @@
 {
   "benchmark": "topmed",
-  "version": "2",
-  "built": "2026-10-14",
+  "version": "3",
+  "built": "2026-11-05",
   "files": {
     "topmed_mappings.csv": {
-      "rows": 1162,
-      "sha256": "32dd3f6e2554cbe8a35d9239073008ae7a589a228c40356856cfca812a69bd20"
+      "rows": 1068,
+      "sha256": "31bf8ff20c4b99db54cca9c864ed2483bc869bace1e61ea5044e47706d0c1efc"
     },
     "topmed_targets.csv": {
       "rows": 148,
@@ -300,6 +300,13 @@
       "version": "phs001412.v1.p1",
       "license": "NONE",
       "citation": "embedding_model/docs/licenses.md#topmed"
+    },
+    {
+      "role": "corrections",
+      "name": "TOPMed mapping corrections",
+      "location": "embedding_model/benchmarks/manifests/topmed_corrections.csv",
+      "sha256": "55b15bea862a0fb4d0aec3264e68c04454e624211ba9e88a349e35c968e9a593",
+      "license": "Apache-2.0"
     }
   ],
   "counts": {
@@ -307,7 +314,7 @@
     "targets": 148,
     "component_references": 1180,
     "dbgap_releases": 35,
-    "source_variables": 1162,
-    "mapped_to_an_age": 63
+    "source_variables": 1068,
+    "mapped_to_an_age": 122
   }
 }

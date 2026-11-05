@@ -1,12 +1,12 @@
 {
   "source": "cde",
-  "version": "2",
-  "fetched": "2026-10-22",
+  "version": "3",
+  "fetched": "2026-11-05",
   "files": {
     "elements.parquet": {
       "rows": 40736,
-      "sha256": "f8d6331cd06dbccaa21c4e72e747f4f65dcf4dbc4bf491735e954fa104dbf38d",
-      "content_sha256": "f29bbdef249dfe7076c52d27884026ce141863090a405afcd6bfbe5a08bb1fca"
+      "sha256": "9e746feb095ebc2888c308a44505dc72acdb7fc3e5162f44713b328d122f243e",
+      "content_sha256": "b10363f94b23586edf646fe8d10c36a7414d90c4b4c99de4a5479433beb43346"
     },
     "designations.parquet": {
       "rows": 72278,
@@ -47,6 +47,6 @@
   ],
   "counts": {
     "elements": 40736,
-    "not_open": 326
+    "not_open": 618
   }
 }

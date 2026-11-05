@@ -296,12 +296,17 @@ class TestConfig:
                 [],
                 "router_mapping setting cannot be used",
             ),
+            (
+                {"load_best_model_at_end": True},
+                [],
+                "load_best_model_at_end setting cannot be used",
+            ),
         ],
     )
     def test_a_setting_that_a_run_cannot_honour_is_refused(
         self, tmp_path, training, overrides, message
     ):
-        """prompts and router_mapping are refused, in the config or as a flag, before training."""
+        """Each setting of REFUSED_TRAINING is refused, in the config or as a flag, before training."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
         with pytest.raises(ValueError, match=message):

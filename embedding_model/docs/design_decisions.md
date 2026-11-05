@@ -2352,9 +2352,9 @@ of them at the end, by a validation metric. By default, it keeps the model at
 the last step. Its learning rate decays linearly to zero over the run. A
 series compares its runs by their validation metrics.
 
-**Decision.** A run keeps the model at the last step: `load_best_model_at_end`
-stays false, and no checkpoint is saved. The run writes that model's
-validation metrics.
+**Decision.** A run keeps the model at the last step: a config that sets
+`load_best_model_at_end` is refused, and no checkpoint is saved. The run
+writes that model's validation metrics.
 
 **Consequences.**
 
@@ -2380,7 +2380,8 @@ validation metrics.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a run writes the model at the last step, and no checkpoint.
+- a run writes the model at the last step, and no checkpoint;
+- a config that sets `load_best_model_at_end` is refused.
 
 ### Validation pairs are ranked, with MRR@10
 

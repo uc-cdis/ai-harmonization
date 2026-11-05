@@ -100,23 +100,6 @@ def benchmark_texts(targets, mappings, text_format):
     return source_texts, target_texts, expected
 
 
-def evaluator_class():
-    """The InformationRetrievalEvaluator of the installed sentence-transformers.
-
-    Version 6 and later 5.x releases, such as 5.4, keep it in
-    ``sentence_transformers.sentence_transformer.evaluation``. Earlier 5.x
-    releases, such as 5.1, keep it in ``sentence_transformers.evaluation``.
-    Version 6 still accepts that path, with a deprecation warning.
-    """
-    try:
-        from sentence_transformers.sentence_transformer.evaluation import (
-            InformationRetrievalEvaluator,
-        )
-    except ImportError:
-        from sentence_transformers.evaluation import InformationRetrievalEvaluator
-    return InformationRetrievalEvaluator
-
-
 def ranking_evaluator(
     model,
     queries,
@@ -159,6 +142,9 @@ def ranking_evaluator(
     #
     # The approaches rank by cosine similarity, even when a model's config
     # names another similarity function. So the evaluator ranks by cosine too.
+    from sentence_transformers.sentence_transformer.evaluation import (
+        InformationRetrievalEvaluator,
+    )
     from sentence_transformers.util import cos_sim
 
     prompt = model.prompts.get(model.default_prompt_name, "")
@@ -171,7 +157,7 @@ def ranking_evaluator(
             "ndcg_at_k": [cutoff],
             "map_at_k": [cutoff],
         }
-    return evaluator_class()(
+    return InformationRetrievalEvaluator(
         queries=queries,
         corpus=corpus,
         relevant_docs=relevant,

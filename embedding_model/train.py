@@ -62,13 +62,17 @@ TRAINING_DEFAULTS = {
 # approaches of ai-harmonization embed both sides with the same encode call, in
 # embed_query and embed_documents. It adds only the model's default prompt and
 # takes a Router's default route, so a prompt or a route for each side would
-# be lost in use.
+# be lost in use. A run keeps the model at the last step, so it loads no
+# checkpoint.
 REFUSED_TRAINING = {
     "prompts": (
         "the approaches embed both sides with the same encode call, which adds"
         " no prompt for each side"
     ),
     "router_mapping": "it needs a model built with a Router module, not added yet",
+    "load_best_model_at_end": (
+        "a run keeps the model at the last step, and saves no checkpoint"
+    ),
 }
 
 

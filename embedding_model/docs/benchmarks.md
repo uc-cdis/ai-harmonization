@@ -181,7 +181,8 @@ cites two variables of table `pht005002.v1` in dbGaP study `phs000956.v2`
 - `phv00252987.v1`, `cac_score_age` ("Age when CAC score was obtained"), maps
   to `atherosclerosis.age_at_cac_score_1`.
 
-The rule is deterministic, and a few variables get a debatable label:
+The rule is deterministic. Still, many variables get a debatable label. Most
+of them are inputs that a unit's function uses, not the measure itself:
 
 - Dates that feed the age map to the phenotype, for example "DATE OF TEST,
   NUMBER OF DAYS SINCE EXAM 1" and "CT scan date". Helpers that the function

@@ -858,22 +858,26 @@ check that:
 
 ## Sources
 
-### Restriction fields are read as allow-lists
+### An item is open only when its value is known to allow use
 
 **Described in:** [licenses.md](licenses.md#restricted-items).
 
-**Context.** Some sources mark the items that may not be used.
-[LOINC](sources.md#loinc) marks them by a copyright notice, and
-[NIH CDE](sources.md#nih-cde) by a copyright status and by `noRenderAllowed`.
-[caDSR](sources.md#cadsr) marks them by a Proprietary Measure Permission, one
-kind of an element's reference documents. The other kinds are mostly texts
-about the element. A source can add a new restriction value, or a new kind of document,
-at any time.
+**Context.** Some sources mark the items that may not be used:
 
-**Decision.** An item is open only when its source's restriction field holds
-a value known to allow use. For caDSR, the field is the element's reference
-documents, and each must be of a kind known to allow use. A new value closes
-the item, and the fetch prints it for review.
+- [LOINC](sources.md#loinc), by a copyright notice, in free text;
+- [NIH CDE](sources.md#nih-cde), by a copyright status and by
+  `noRenderAllowed`;
+- [caDSR](sources.md#cadsr), by a Proprietary Measure Permission, one kind of
+  an element's reference documents;
+- [NHANES](sources.md#nhanes), by a data file's use constraints;
+- [PhenX](sources.md#phenx), by a protocol's availability.
+
+A source can add a new value, or a new kind of document, at any time.
+
+**Decision.** An item is open only when its restriction field holds a value
+known to allow use, for caDSR in each of its documents. A new value closes
+the item, and the fetch prints it for review. A LOINC notice is free text, so
+any notice closes its item, without a print.
 
 **Consequences.**
 
@@ -903,7 +907,9 @@ check that:
 - a new value is read as closed, and reported;
 - LOINC's notices close items;
 - NIH CDE's allow-list closes items;
-- a caDSR element with a proprietary or a new kind of document is closed.
+- a caDSR element with a proprietary or a new kind of document is closed;
+- a new NHANES use constraint closes its variables;
+- a PhenX protocol that is not available closes its variables.
 
 ### Two readers of our own: OWL files and PhenX's export
 
@@ -1233,11 +1239,11 @@ check that:
 **Context.** Sources mark what each text of an item is. Only some marks mean
 the same thing as the item:
 
-- NCIt's term types, such as `SY` for a synonym or `AD` for a grammar form;
+- NCIt's term types, such as `SY`, a synonym, or `AD`, a grammar form;
 - the ontologies' synonym scopes, such as `EXACT` or `RELATED`;
 - caDSR's alternate-name types, which also mark ids and table names;
-- NIH CDE's designation tags, which also mark instructions for a form;
-- LOINC's fields: LOINC says that consumer names are not synonyms.
+- NIH CDE's designation tags, which also mark a form's instructions;
+- LOINC's fields: its consumer names are not synonyms.
 
 **Decision.** Each reader keeps an allow-list of the marks that mean the same
 thing as the canonical. A text is an anchor only when its mark is on that list.
@@ -1250,9 +1256,10 @@ LOINC, whose marks are its columns, the fetch prints a new column.
   ids and related or broader names stay out.
 - Good, because every reader follows one rule. NIH CDE holds copies of LOINC's
   consumer names, and its tags mark them. So they stay out, as in LOINC.
-- Good, because a new mark stays out until someone reviews it, as a new
-  restriction value does in
-  [Restriction fields are read as allow-lists](#restriction-fields-are-read-as-allow-lists).
+- Good, because a new mark stays out until someone reviews it. A new
+  restriction value does the same, as
+  [An item is open only when its value is known to allow use](#an-item-is-open-only-when-its-value-is-known-to-allow-use)
+  says.
 - Bad, because a new mark of names also stays out until its allow-list is
   updated.
 

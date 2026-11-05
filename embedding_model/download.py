@@ -26,9 +26,8 @@ RETRIES = Retry(
     allowed_methods=None,
 )
 # A server can answer with a page of its own, such as a bot check, and still
-# report success. So an HTML answer is not the file, unless the file is kept
-# as an HTML page, under one of HTML_SUFFIXES.
-HTML_START = (b"<!doctype html", b"<html")
+# report success. So a response whose Content-Type is HTML is not the file,
+# unless the file is kept as an HTML page, under one of HTML_SUFFIXES.
 HTML_SUFFIXES = (".html", ".htm")
 
 
@@ -67,7 +66,7 @@ def session():
     return client
 
 
-def fetch(url, json=None, auth=None):
+def fetch(url, json=None, auth=None, html_ok=False):
     """Download a URL, retrying as RETRIES says.
 
     Args:
@@ -76,6 +75,8 @@ def fetch(url, json=None, auth=None):
             is a GET.
         auth (tuple[str, str] | None): A user name and password, sent as
             HTTP Basic authentication.
+        html_ok (bool): Whether an HTML page is what is asked for, as for a
+            folder listing.
 
     Returns:
         bytes: The response body.
@@ -84,6 +85,8 @@ def fetch(url, json=None, auth=None):
         requests.RequestException: If the server cannot be reached, or
             answers with an error status. A busy server's status, 429, 500,
             502, 503 or 504, raises only once the retries are spent.
+        ValueError: If the response's Content-Type is HTML and ``html_ok``
+            is false.
     """
     client = session()
     if json is None:
@@ -91,6 +94,11 @@ def fetch(url, json=None, auth=None):
     else:
         response = client.post(url, json=json, auth=auth, timeout=TIMEOUT_SECONDS)
     response.raise_for_status()
+    if not html_ok and "text/html" in response.headers.get("Content-Type", ""):
+        raise ValueError(
+            f"{url} returned an HTML page, not the file. Nothing was kept; try"
+            " again later."
+        )
     return response.content
 
 
@@ -115,19 +123,13 @@ def downloaded(url, path, json=None, auth=None, check=None):
     Raises:
         requests.RequestException: As in ``fetch``.
         ValueError: If the server answers with an HTML page for a file not
-            kept under one of HTML_SUFFIXES. Nothing is kept, so the next
-            build tries again.
+            kept under one of HTML_SUFFIXES, as in ``fetch``. Nothing is kept,
+            so the next build tries again.
         Exception: Whatever ``check`` raises.
     """
     path = Path(path)
     if not path.exists():
-        data = fetch(url, json=json, auth=auth)
-        start = data.lstrip()[:15].lower()
-        if path.suffix not in HTML_SUFFIXES and start.startswith(HTML_START):
-            raise ValueError(
-                f"{url} answered with an HTML page, not the file. Nothing was "
-                "kept; try again later."
-            )
+        data = fetch(url, json=json, auth=auth, html_ok=path.suffix in HTML_SUFFIXES)
         if check is not None:
             check(data)
         keep(path, data)

@@ -48,8 +48,9 @@ joins them with `|`.
 
 Each source's main table has an `open` column, set from the source's
 restriction field (see [Restricted items](licenses.md#restricted-items)). It is
-`true` when the item may be used, and `false` when its restriction field
-restricts it. A table without `open` takes it from the item that it links to.
+`true` when the item may be used. It is `false` when its restriction field
+restricts it, or has no value. A table without `open` takes it from the item
+that it links to.
 
 Each source has a manifest committed as
 `embedding_model/sources/manifests/<source>.json`. It pins the release that the
@@ -359,6 +360,10 @@ variable by `variable_id`. A replacement names two protocol `id`s.
 
 A protocol that PhenX replaced by a newer one is hidden: its `visible` is
 `0`, and `replacements` names the protocol that replaced it.
+
+Some variables belong to a protocol that is not in `protocols`, such as one
+of the COVID-19 library's. Such a variable has no availability, so it is not
+open. The fetch prints how many there are.
 
 **Newer releases.** The export's address serves only PhenX's latest release,
 and the export names it, such as `Ver 49.0`. The fetch keeps the export in

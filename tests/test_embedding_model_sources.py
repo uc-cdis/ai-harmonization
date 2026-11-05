@@ -1126,10 +1126,14 @@ class TestPhenx:
         )
         assert tables["release"].name.tolist() == ["Ver 9.2"]
 
-    def test_export_tables_availability_and_release(self):
-        """A variable is open when its protocol is Available; the latest release is kept."""
+    def test_export_tables_availability_and_release(self, capsys):
+        """A variable is open when its protocol is Available; one of an unlisted protocol is not, and counted."""
         dump = phenx.read_dump(io.BytesIO(DUMP.encode()), phenx.TABLES)
         tables = phenx.read_export(dump)
+        assert (
+            "1 variables are not open: their 1 protocols are missing from the"
+            " export's protocol table" in capsys.readouterr().out
+        )
         variables = tables["variables"].set_index("name")
         assert variables.open.to_dict() == {
             "PX1_Abcd": True,

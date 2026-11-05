@@ -199,7 +199,18 @@ def read_export(dump):
             "comment2",
             "version_num",
         ]
-    ].merge(
+    ]
+    # A variable whose protocol is not in protocols, such as one of the
+    # COVID-19 library's, has no availability. So it is not open, and the count
+    # is printed for review.
+    unlisted = variables[~variables.protocol_id.isin(protocols.id)]
+    if not unlisted.empty:
+        print(
+            f"  {len(unlisted):,} variables are not open: their"
+            f" {unlisted.protocol_id.nunique():,} protocols are missing from the"
+            " export's protocol table, so they have no availability"
+        )
+    variables = variables.merge(
         protocols[["id", "visible", "availability", "open"]].rename(
             columns={"id": "protocol_id", "visible": "protocol_visible"}
         ),

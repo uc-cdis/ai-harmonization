@@ -273,7 +273,8 @@ permission"
 **License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq) states that
 most of its protocols are freely available, and a small share have limited
 availability. Each protocol's `availability` says which: only "Available" is
-open.
+open. A variable whose protocol is not in `protocols`, such as one of the
+COVID-19 library's, has no availability, so it is not open.
 
 **SPDX:** `LicenseRef-PhenX`.
 
@@ -309,4 +310,4 @@ the fetch has not seen before closes it too.
 | [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is false. Without `noRenderAllowed`, it is closed. |
 | caDSR | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission" |
 | [NHANES](sources.md#nhanes) | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
-| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available" |
+| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available". A variable whose protocol has none is closed. |

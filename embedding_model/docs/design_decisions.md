@@ -760,11 +760,15 @@ text starts at its name, in every format, as
   give a model.
 - Bad, because the targets keep their node, as the approaches write them,
   while the training texts have no node on either side.
+- Bad, because variables of one name in several tables of a study read the
+  same, while their targets differ by table. A model that reads only the text
+  cannot rank every one's targets first.
 
 **Alternatives considered.**
 
 - The node, as the approaches write it: `pht999999.v1.body_weight (float):
-  ...`.
+  ...`. The table's id would tell such variables apart, but it does not say
+  which exam each one belongs to.
 
 **Confirmation.** The tests in
 [test_embedding_model_texts.py](../../tests/test_embedding_model_texts.py)

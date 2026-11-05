@@ -199,6 +199,8 @@ The rule is deterministic, and a few variables get a debatable label:
   its targets. Many rows have more than one target.
 - A variable can be cited from more than one release. Then the text of the
   latest release cited is used.
+- Variables of one name in several tables of a study, such as each exam's
+  `AGE`, read the same. Each maps to the targets of its own exam.
 
 Each variable's type comes from its table's variable report.
 `ai_harmonization.dbgap` reads it as it reads any study's, so the benchmark

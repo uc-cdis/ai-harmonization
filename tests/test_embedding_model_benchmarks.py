@@ -189,6 +189,9 @@ class TestBuilders:
             return archive
 
         monkeypatch.setattr(topmed, "github_archive", fake_archive)
+        corrections = tmp_path / "corrections.csv"
+        corrections.write_text(CORRECTION_HEADER, encoding="utf-8")
+        monkeypatch.setattr(topmed, "CORRECTIONS", corrections)
         monkeypatch.setattr(
             topmed,
             "resolve_components",
@@ -202,7 +205,8 @@ class TestBuilders:
         targets, mappings, sources, counts = topmed.build(tmp_path, {"sources": [pin]})
         assert fetched == [("https://github.com/abcd/docs", "abcd1234", tmp_path)]
         assert [row["expected_target"] for row in mappings] == [["demographic.sex_1"]]
-        assert sources == [pin]
+        assert sources[0] == pin
+        assert sources[-1]["role"] == "corrections"
         assert counts["source_variables"] == len(mappings) == 1
         assert counts["targets"] == len(targets)
 
@@ -509,6 +513,121 @@ CASE_SCHEMA = {
         },
     },
 }
+
+
+CORRECTION_HEADER = (
+    "target,unit,source_variable_id,source_variable_name,action,use,reason\n"
+)
+
+
+def correction(action, variable, target, use="selects records"):
+    """A row of the TOPMed corrections file, for a fictional unit."""
+    return {
+        "target": target,
+        "unit": "ABCD",
+        "source_variable_id": variable,
+        "source_variable_name": "abcd_var",
+        "action": action,
+        "use": use,
+        "reason": "The unit's reason.",
+    }
+
+
+class TestCorrections:
+    """The reviewed corrections to the TOPMed mappings that the age rule gives."""
+
+    TARGETS = [
+        {"target_property": key}
+        for key in ("abcd.age_at_score_1", "abcd.score_1", "abcd.subcohort_1")
+    ]
+
+    def rows(self):
+        """Two mapping rows: a day count linked to a score, and a variable with two links."""
+        return [
+            {
+                "source_variable_id": "phv99999901.v1",
+                "expected_target": ["abcd.score_1"],
+            },
+            {
+                "source_variable_id": "phv99999902.v1",
+                "expected_target": ["abcd.score_1", "abcd.subcohort_1"],
+            },
+        ]
+
+    def test_an_excluded_mapping_is_removed_and_an_empty_row_dropped(self):
+        """An exclude removes one mapping; a row with no target left is dropped."""
+        corrections = [
+            correction("exclude", "phv99999901.v1", "abcd.score_1", "times the event"),
+            correction("exclude", "phv99999902.v1", "abcd.subcohort_1"),
+        ]
+        rows = topmed.apply_corrections(self.rows(), corrections, self.TARGETS)
+        assert rows == [
+            {
+                "source_variable_id": "phv99999902.v1",
+                "expected_target": ["abcd.score_1"],
+            }
+        ]
+
+    def test_an_added_mapping_moves_a_day_count_to_the_age(self):
+        """An exclude and an add move a variable from its indicator to its age."""
+        corrections = [
+            correction("exclude", "phv99999901.v1", "abcd.score_1", "times the event"),
+            correction(
+                "add", "phv99999901.v1", "abcd.age_at_score_1", "computes the age"
+            ),
+        ]
+        rows = topmed.apply_corrections(self.rows(), corrections, self.TARGETS)
+        assert rows[0]["expected_target"] == ["abcd.age_at_score_1"]
+
+    @pytest.mark.parametrize(
+        "action, variable, target",
+        [
+            ("exclude", "phv99999901.v1", "abcd.subcohort_1"),
+            ("add", "phv99999901.v1", "abcd.other_1"),
+            ("add", "phv99999901.v1", "abcd.score_1"),
+            ("add", "phv99999909.v1", "abcd.age_at_score_1"),
+        ],
+    )
+    def test_a_correction_that_does_not_match_fails(self, action, variable, target):
+        """A mapping not given, an unknown target or variable, or a mapping given already fails, named."""
+        with pytest.raises(ValueError, match=f"{action} {variable} -> {target}"):
+            topmed.apply_corrections(
+                self.rows(), [correction(action, variable, target)], self.TARGETS
+            )
+
+    def test_an_unknown_use_is_refused(self, tmp_path):
+        """A row whose use is not one of CORRECTION_USES fails, named."""
+        path = tmp_path / "corrections.csv"
+        path.write_text(
+            CORRECTION_HEADER
+            + "abcd.score_1,ABCD,phv99999901.v1,abcd_var,exclude,helper,Why.\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="phv99999901.v1 -> abcd.score_1"):
+            topmed.read_corrections(path)
+
+    def test_the_committed_corrections_are_sorted_and_complete(self):
+        """The committed file reads, holds each mapping once, explains each row and keeps its order."""
+        rows = topmed.read_corrections(topmed.CORRECTIONS)
+        mappings = [(row["source_variable_id"], row["target"]) for row in rows]
+        assert len(mappings) == len(set(mappings))
+        assert all(row["reason"] for row in rows)
+        assert all(
+            ".age_at_" in row["target"] or row["target"].endswith("_age_1")
+            for row in rows
+            if row["action"] == "add"
+        )
+        order = [
+            (
+                row["target"].replace(".age_at_", "."),
+                row["unit"],
+                topmed.CORRECTION_ACTIONS.index(row["action"]),
+                row["source_variable_name"],
+                row["target"],
+            )
+            for row in rows
+        ]
+        assert order == sorted(order)
 
 
 class TestReadDictionary:

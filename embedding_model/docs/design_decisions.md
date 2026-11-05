@@ -541,6 +541,60 @@ check that:
 - a node that gives the property another meaning is left out;
 - a variable mapped to `gender` also expects `demographic.sex_at_birth`.
 
+### The TOPMed benchmark's mappings are corrected by a reviewed list
+
+**Described in:** [benchmarks.md](benchmarks.md#corrections).
+
+**Context.** For each harmonization unit, the TOPMed documentation cites every
+dbGaP variable that the unit's function reads. Some of them only select
+records, check another value or time an event. Some units set a target to one
+value for every subject. The documentation does not say which variable gives
+the phenotype and which the age. And a variable's description does not say
+what the function does with it.
+
+**Decision.** The build applies a committed list of corrections to the
+mappings that the [age rule](benchmarks.md#which-target-a-variable-maps-to)
+gives. Each one excludes a mapping, or adds the age that the unit computes
+from the variable. It names the unit, the variable's use and a reason. A
+mapping stays when the target records the variable's value, or the unit
+computes it.
+
+**Consequences.**
+
+- Good, because each expected target is one whose value the variable
+  carries. A consent group does not count as right for race.
+- Good, because each correction names its unit and its reason, so a reader
+  can check it in that unit's function.
+- Good, because a correction that does not match the documentation fails
+  the build. A newer commit cannot leave a stale one in place.
+- Bad, because the corrections come from reading each unit's function by
+  hand. A newer commit of the documentation needs them reviewed.
+- Bad, because some corrections rest on a judgment that could go the other
+  way. A variable can decide which subjects get a value, while another
+  variable gives the value. For example, "Prior VT" only drops the controls
+  who had a VTE before, and the case status comes from the case-control
+  status. The list excludes such a variable, and its reason says where the
+  value comes from.
+
+**Alternatives considered.**
+
+- Every cited variable as an expected target: a model would count as right
+  for ranking race first for a consent group.
+- A rule on the description's words, such as "date" or "days": it would
+  move "Weight at index date" to the age. A description can say when a value
+  was measured.
+- A rule read from the functions' code: the functions are R, written in many
+  styles, and their data flow cannot be traced reliably.
+
+**Confirmation.** The tests in
+[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
+check that:
+
+- an excluded mapping is removed, and a row with no target left is dropped;
+- an exclude and an add move a day count from its indicator to its age;
+- a correction that the documentation does not match fails, and is named;
+- the committed list reads, holds each mapping once and keeps its order.
+
 ## Scoring
 
 ### A model is scored as the approaches use it

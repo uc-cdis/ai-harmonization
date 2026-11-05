@@ -1,5 +1,6 @@
 """Tests for the embedding model's scoring: texts, ranks, metrics and outputs."""
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -91,15 +92,23 @@ MAPPINGS = [
 ]
 
 
+def manifest_version(name):
+    """The version of a benchmark's committed manifest, which a test build takes."""
+    committed = benchmarks.MANIFESTS / f"{name}.json"
+    return json.loads(committed.read_text(encoding="utf-8"))["version"]
+
+
 def built(tmp_path, mappings, name="topmed"):
-    """A benchmark built from TARGETS and the mappings given.
+    """A benchmark built from TARGETS and the mappings given, at its committed version.
 
     Returns:
         Path: The inputs folder it was built into.
     """
     folder = tmp_path / "inputs" / "benchmarks" / name
     folder.mkdir(parents=True, exist_ok=True)
-    benchmarks.write_benchmark(folder, name, "1", TARGETS, mappings, [], {})
+    benchmarks.write_benchmark(
+        folder, name, manifest_version(name), TARGETS, mappings, [], {}
+    )
     return tmp_path / "inputs"
 
 
@@ -221,12 +230,12 @@ class TestScore:
         metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
         assert metrics.loc[0, "mrr"] == row["mrr"]
         assert (metrics.loc[0, "n"], metrics.loc[0, "targets"]) == (3, 4)
-        assert metrics.loc[0, "benchmark_version"] == "1"
+        assert metrics.loc[0, "benchmark_version"] == manifest_version("topmed")
         per_variable = pd.read_csv(folder / "per_variable.csv")
         assert list(per_variable["rank"]) == [1, 1, 3]
         assert list(per_variable["source_variable_name"]) == ["AGE01", "RACE", "GENDER"]
         config = yaml.safe_load((folder / "config.yaml").read_text())
-        assert config["benchmark_manifest"]["version"] == "1"
+        assert config["benchmark_manifest"]["version"] == manifest_version("topmed")
         assert config["benchmark_manifest"]["files"]["topmed_mappings.csv"]["sha256"]
         assert config["format"] == texts.DEFAULT_FORMAT
         assert config["device"] == "cpu"

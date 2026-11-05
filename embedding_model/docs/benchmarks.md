@@ -181,18 +181,46 @@ cites two variables of table `pht005002.v1` in dbGaP study `phs000956.v2`
 - `phv00252987.v1`, `cac_score_age` ("Age when CAC score was obtained"), maps
   to `atherosclerosis.age_at_cac_score_1`.
 
-The rule is deterministic. Still, many variables get a debatable label. Most
-of them are inputs that a unit's function uses, not the measure itself:
+The rule reads only the description. The [corrections](#corrections) fix the
+mappings that it gets wrong. They also leave out the variables that do not
+carry the target's value.
 
-- Dates that feed the age map to the phenotype, for example "DATE OF TEST,
-  NUMBER OF DAYS SINCE EXAM 1" and "CT scan date". Helpers that the function
-  uses map to the phenotype too, such as a cohort identifier or an attendance
-  flag.
-- In the incident and prior event variables, the event, its date and the
-  follow-up dates feed both the status and the age at event. They map to the
-  phenotype.
-- An age that is itself the measure maps to the age, for example "Age when
-  first smoked cigarettes" for ever smoker.
+### Corrections
+
+The documentation cites every variable that a unit's function reads. Some of
+them do not carry the target's value. A consent group selects the subjects,
+and the days to an event give the event's age, not the event. So the build
+corrects the mappings that the rule gives, by a reviewed list beside the
+manifest:
+[`topmed_corrections.csv`](../benchmarks/manifests/topmed_corrections.csv).
+
+A mapping is kept when the target records the variable's value, or when the
+unit's function computes the target from the variable. Each row of the list
+names a target, the harmonization unit, the variable, an action, how the unit
+uses the variable, and a reason:
+
+- `exclude` removes a mapping. Its `use` is one of `selects records`,
+  `times the event`, `checks another value`, `records another concept` or
+  `not used`.
+- `add` maps a variable to the age that its unit computes from it. Its `use`
+  is `computes the age`.
+
+For example, the JHS unit of `race_us_1` cites one variable, `CONSENT`. Its
+function drops the subjects without consent, and sets the race to "Black" for
+every subject. The WHI unit of `angina_incident_1` computes the age at the
+angina from `ANGINADY`, the days from enrollment to the angina:
+
+| target | unit | variable | action | use | reason |
+|---|---|---|---|---|---|
+| `demographic.race_us_1` | JHS | `phv00124546.v3`, `CONSENT` | exclude | selects records | Only drops the subjects without consent. The unit sets `race_us` to "Black" for every subject. |
+| `atherosclerosis_events_incident.angina_incident_1` | WHI | `phv00193146.v3`, `ANGINADY` | exclude | times the event | Gives the age at the event, not the event itself. The indicator comes from `ANGINA`. |
+| `atherosclerosis_events_incident.age_at_angina_incident_1` | WHI | `phv00193146.v3`, `ANGINADY` | add | computes the age | The unit computes this age from it. |
+
+A row whose targets are all excluded is dropped. `CONSENT` keeps no target,
+so it is not a row.
+
+A correction that does not match the documentation fails the build, and the
+build names it.
 
 ### One row per variable
 
@@ -212,7 +240,8 @@ repository has a newer commit, write it as the documentation's `version`. Then
 make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. Each dbGaP
 release comes from the documentation's citations, so it changes only with the
-documentation.
+documentation. A newer commit can change the units, so review the corrections
+against it. The build names each correction that does not match.
 
 [licenses.md](licenses.md#topmed) gives its license and reference.
 

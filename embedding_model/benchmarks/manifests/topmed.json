@@ -1,6 +1,6 @@
 {
   "benchmark": "topmed",
-  "version": "1",
+  "version": "2",
   "built": "2026-10-14",
   "files": {
     "topmed_mappings.csv": {

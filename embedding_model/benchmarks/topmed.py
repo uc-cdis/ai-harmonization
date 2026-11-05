@@ -18,18 +18,34 @@ component variable maps to the age when its dbGaP description says "age", and
 to the phenotype otherwise.
 """
 
+import csv
 import io
 import json
 import re
 import tarfile
+from pathlib import Path
 
 from ai_harmonization.dbgap import map_dbgap_type, parse_dbgap_table
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model import manifests
 from embedding_model.download import cached, downloaded, github_archive
+from embedding_model.manifests import sha256
 
 # The manifest source that pins the documentation, by its commit.
 DOCUMENTATION = "TOPMed DCC harmonized phenotype documentation"
+# The reviewed corrections to the mappings that the age rule gives, committed
+# beside the manifest. Each row excludes a mapping or adds one to an age.
+CORRECTIONS = Path(__file__).resolve().parent / "manifests" / "topmed_corrections.csv"
+CORRECTION_ACTIONS = ("exclude", "add")
+# How the unit uses the variable, as each correction says.
+CORRECTION_USES = (
+    "selects records",
+    "times the event",
+    "checks another value",
+    "records another concept",
+    "not used",
+    "computes the age",
+)
 DOCUMENTATION_FOLDER = "harmonized-variable-documentation"
 DBGAP = "https://ftp.ncbi.nlm.nih.gov/dbgap/studies"
 REFERENCE = re.compile(r"(phs\d+)\.v(\d+)\.(pht\d+)\.v(\d+)\.(phv\d+)")
@@ -301,6 +317,86 @@ def mapping_rows(variables, resolved):
     )
 
 
+def read_corrections(path):
+    """The reviewed corrections to the benchmark's mappings.
+
+    Args:
+        path (Path): The corrections file, a CSV with ``target``, ``unit``,
+            ``source_variable_id``, ``source_variable_name``, ``action``,
+            ``use`` and ``reason``.
+
+    Returns:
+        list[dict]: The rows, each with every column.
+
+    Raises:
+        ValueError: If a row's action is not one of CORRECTION_ACTIONS, or its
+            use not one of CORRECTION_USES.
+    """
+    with open(path, newline="", encoding="utf-8") as file:
+        corrections = list(csv.DictReader(file))
+    unknown = [
+        f"{row['source_variable_id']} -> {row['target']}: {row['action']!r}, {row['use']!r}"
+        for row in corrections
+        if row["action"] not in CORRECTION_ACTIONS or row["use"] not in CORRECTION_USES
+    ]
+    if unknown:
+        raise ValueError(
+            f"{path.name}: rows with an unknown action or use: " + "; ".join(unknown)
+        )
+    return corrections
+
+
+def apply_corrections(rows, corrections, targets):
+    """The mapping rows with the reviewed corrections applied.
+
+    An ``exclude`` removes a variable's mapping to a target, and an ``add``
+    gives it one. A row whose targets are all excluded is dropped.
+
+    Args:
+        rows (list[dict]): From mapping_rows.
+        corrections (list[dict]): From read_corrections.
+        targets (list[dict]): From target_rows.
+
+    Returns:
+        list[dict]: The rows that keep a target, in their order.
+
+    Raises:
+        ValueError: Naming each correction that does not match the
+            documentation: an excluded mapping that it does not give, or an
+            added mapping to a variable or a target that it does not have, or
+            that it gives already.
+    """
+    expected = {row["source_variable_id"]: set(row["expected_target"]) for row in rows}
+    properties = {target["target_property"] for target in targets}
+    stale = []
+    for correction in corrections:
+        mapped = expected.get(correction["source_variable_id"])
+        target = correction["target"]
+        if correction["action"] == "exclude" and mapped and target in mapped:
+            mapped.remove(target)
+        elif (
+            correction["action"] == "add"
+            and mapped is not None
+            and target in properties
+            and target not in mapped
+        ):
+            mapped.add(target)
+        else:
+            stale.append(
+                f"{correction['action']} {correction['source_variable_id']} -> {target}"
+            )
+    if stale:
+        raise ValueError(
+            f"{len(stale)} corrections do not match the documentation; review "
+            f"{CORRECTIONS.name}: " + "; ".join(stale[:12])
+        )
+    return [
+        {**row, "expected_target": sorted(expected[row["source_variable_id"]])}
+        for row in rows
+        if expected[row["source_variable_id"]]
+    ]
+
+
 def build(downloads, manifest):
     """Build the TOPMed benchmark from the inputs that its manifest pins.
 
@@ -321,7 +417,10 @@ def build(downloads, manifest):
     references = {ref for variable in variables for ref in variable["components"]}
     resolved, dbgap_sources = resolve_components(references, downloads / "dbgap")
     targets = target_rows(variables)
-    mappings = mapping_rows(variables, resolved)
+    corrections = read_corrections(CORRECTIONS)
+    mappings = apply_corrections(
+        mapping_rows(variables, resolved), corrections, targets
+    )
     counts = {
         "harmonized_variables": len(variables),
         "targets": len(targets),
@@ -337,6 +436,14 @@ def build(downloads, manifest):
         f"{counts['targets']} targets; {counts['component_references']:,} "
         f"component references in {counts['dbgap_releases']} dbGaP releases; "
         f"{counts['source_variables']:,} source variables, "
-        f"{counts['mapped_to_an_age']:,} of them mapped to an age"
+        f"{counts['mapped_to_an_age']:,} of them mapped to an age, after "
+        f"{len(corrections)} corrections"
     )
-    return targets, mappings, [documentation, *dbgap_sources], counts
+    correction_source = {
+        "role": "corrections",
+        "name": "TOPMed mapping corrections",
+        "location": f"embedding_model/benchmarks/manifests/{CORRECTIONS.name}",
+        "sha256": sha256(CORRECTIONS.read_bytes()),
+        "license": "Apache-2.0",
+    }
+    return targets, mappings, [documentation, *dbgap_sources, correction_source], counts

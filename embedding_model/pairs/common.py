@@ -579,7 +579,7 @@ def joined_studies(studies):
 
 
 def normalised_text(text):
-    """A text as the tokenizer normalises it, to compare two texts as the model reads them."""
+    """A text as the tokenizer normalises it, as the model reads it."""
     return TOKENIZER_NORMALIZER.normalize_str(text)
 
 

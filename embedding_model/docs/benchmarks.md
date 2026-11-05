@@ -149,10 +149,10 @@ for each phenotype. For most of them, it also has a column for the age at
 which the phenotype was measured: `cac_score_1` beside `age_at_cac_score_1`. Each
 column is a target, written `node.property` with the dataset as the node:
 
-- the phenotype, `atherosclerosis.cac_score_1` (78 targets), with the type,
+- the phenotype, `atherosclerosis.cac_score_1`, with the type,
   description and values of its documentation file (`data_type`,
   `description`, `encoded_values`);
-- the age, `atherosclerosis.age_at_cac_score_1` (70 targets), described "age
+- the age, `atherosclerosis.age_at_cac_score_1`, described "age
   at measurement of cac_score_1 (years)", as the [BioData Catalyst](https://biodatacatalyst.nhlbi.nih.gov/) data model
   describes the same properties.
 

@@ -116,9 +116,9 @@ def ranking_evaluator(
     Every text of the corpus is ranked for each query, by cosine similarity.
     Scoring ranks a benchmark's targets with it. MRR is then computed over the
     whole ranking, and MRR@10 beside it. Training ranks the validation pairs'
-    positives, with a cutoff: the evaluator keeps each query's hits in Python lists, so a whole
-    ranking of tens of thousands of positives for each of tens of thousands of
-    queries would not fit.
+    positives, with a cutoff: the evaluator keeps each query's hits in Python
+    lists, so a whole ranking of tens of thousands of positives for each of
+    tens of thousands of queries would not fit.
 
     Args:
         model (SentenceTransformer): The model, for its default prompt.

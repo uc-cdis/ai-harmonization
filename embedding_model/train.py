@@ -1,4 +1,4 @@
-"""Train one model: ``python -m embedding_model train --config <config.yaml> --seed <seed>``.
+"""Train one model: ``train --config <config.yaml> --seed <seed>``.
 
 Each training is a run: one config, trained with one seed. A run trains one
 model on a corpus's training pairs, with sentence-transformers' trainer, and

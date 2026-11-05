@@ -283,7 +283,7 @@ class TestConfig:
     @pytest.mark.parametrize(
         "text, message",
         [
-            ("abcd:\n  efgh: 1\n", "no section abcd"),
+            ("abcd_section:\n  efgh_setting: 1\n", "no section abcd_section"),
             ("model:\n  dimension: 8\n", "no setting dimension"),
             ("model: 8\n", "holds no settings"),
             (
@@ -432,9 +432,9 @@ class TestConfig:
         values, _ = train.read_config(config, 0, run_name="abcd-run_s0")
         assert values["run_name"] == "abcd-run_s0"
         values, _ = train.read_config(
-            config, 0, ["--run_name", "efgh"], run_name="abcd-run_s0"
+            config, 0, ["--run_name", "efgh-run"], run_name="abcd-run_s0"
         )
-        assert values["run_name"] == "efgh"
+        assert values["run_name"] == "efgh-run"
 
     def test_an_abbreviated_flag_is_refused(self, config):
         """--learning is not read as --learning_rate, which config.yaml would not record."""
@@ -656,7 +656,7 @@ class TestTrain:
             train,
             "code_commit",
             lambda: {
-                "commit": "efgh" if trained else "abcd",
+                "commit": "abcd456" if trained else "abcd123",
                 "uncommitted_changes": False,
             },
         )
@@ -665,7 +665,7 @@ class TestTrain:
         record = json.loads(
             (outputs / train.RUNS / "abcd-run_s0" / "manifest.json").read_text()
         )
-        assert record["ai_harmonization"]["commit"] == "abcd"
+        assert record["ai_harmonization"]["commit"] == "abcd123"
 
     def test_the_run_records_its_corpus_text_format(self, inputs, config, tmp_path):
         """The run copies the text format from the corpus's manifest."""
@@ -691,10 +691,12 @@ class TestTrain:
         """A tokenizer that was not trained stops the run, and the message says how to train it."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
-            yaml.safe_dump({**CONFIG, "data": {"corpus": CORPUS, "tokenizer": "efgh"}})
+            yaml.safe_dump(
+                {**CONFIG, "data": {"corpus": CORPUS, "tokenizer": "efgh-tokenizer"}}
+            )
         )
         assert train.train(path, 0, [], inputs, tmp_path / "outputs") == 1
-        assert "tokenizer train --name efgh" in capsys.readouterr().err
+        assert "tokenizer train --name efgh-tokenizer" in capsys.readouterr().err
 
     def test_a_tokenizer_from_another_corpus_is_noted(self):
         """The note names the corpus that the tokenizer learned its vocabulary from."""

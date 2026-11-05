@@ -8,8 +8,8 @@ no pairs.
 
 The description is the concept's first definition. A ``DEFINITION`` comes
 before an ``ALT_DEFINITION``, and NCI's definition before another source's.
-The other definitions are paired with it. NCIt can end a definition with its source, such as "(NCI)", and this
-source is removed.
+The other definitions are paired with it. NCIt can end a definition with its
+source, such as "(NCI)", and this source is removed.
 
 A concept with value lists gives its pairs once for each distinct list. NCIt
 gives the values no order, so they are sorted by name.

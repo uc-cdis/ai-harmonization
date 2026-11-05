@@ -182,7 +182,10 @@ def main(argv=None):
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
-        help="score a model on benchmarks: each source variable's rank, MRR and accuracy@k",
+        help=(
+            "score a model on benchmarks: each source variable's rank, MRR and"
+            " accuracy@k"
+        ),
     )
     score.add_argument(
         "--model",

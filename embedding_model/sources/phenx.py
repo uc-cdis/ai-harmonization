@@ -18,7 +18,10 @@ from embedding_model.manifests import file_sha256, pinned
 from embedding_model.sources.common import open_count, open_where
 
 EXPORT = "PhenX database export"
-EXPORT_URL = "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/Phenx_DB.zip"
+EXPORT_URL = (
+    "https://www.phenxtoolkit.org/toolkit_content/documents/data_dictionary/"
+    "Phenx_DB.zip"
+)
 DUMP = "phenx.sql"
 # The terms of use, as an SPDX license expression. The terms are in
 # embedding_model/docs/licenses.md, which CITATION points to.

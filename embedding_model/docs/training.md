@@ -157,6 +157,7 @@ for a static model.
 5. After each epoch, it evaluates the model on the validation pairs. The
    loss is computed on them as on the training pairs. Each validation anchor
    also ranks every validation positive, which gives MRR@10 and accuracy@k.
+   Two texts that the tokenizer normalises to one text count as one.
    [The metrics](scoring.md#the-metrics) defines MRR@10. `score` reports it on
    the benchmarks too.
 6. It keeps the model at the last step. Its validation metrics are those of

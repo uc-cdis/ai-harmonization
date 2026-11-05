@@ -34,6 +34,7 @@ from embedding_model import manifests
 from embedding_model.corpus import TRAIN, VALIDATION, build_command, read_corpus
 from embedding_model.folders import FOLDER_NAME, FOLDER_NAME_RULE, staged
 from embedding_model.manifests import file_sha256
+from embedding_model.normalization import normalised
 from embedding_model.architectures import ARCHITECTURES
 from embedding_model.provenance import code_commit, library_versions
 from embedding_model.scoring import ACCURACY_AT_K, MRR_CUTOFF, ranking_evaluator
@@ -502,8 +503,12 @@ def validation_texts(pairs):
     three dicts: the queries, the corpus and each query's relevant documents,
     by id. The anchors are the queries, and the positives are the corpus. An
     anchor's relevant documents are the positives that it is paired with.
-    Each text is also its own id. So a text that repeats in the pairs is one
-    query, or one text of the corpus.
+
+    A text's id is the text as the tokenizer normalises it, so ``BMI`` and
+    ``bmi`` are one query, as they are one text to the model. Its first
+    spelling is kept. A text that repeats in the pairs is one query, or one
+    text of the corpus, and the query's relevant documents are those of every
+    spelling.
 
     Args:
         pairs (pd.DataFrame): The validation pairs, with ``anchor`` and
@@ -513,10 +518,13 @@ def validation_texts(pairs):
         tuple[dict, dict, dict]: The queries, the corpus and the relevant
             documents.
     """
-    anchors = {text: text for text in pairs.anchor}
-    positives = {text: text for text in pairs.positive}
-    relevant = pairs.groupby("anchor").positive.agg(set).to_dict()
-    return anchors, positives, relevant
+    keyed = pairs.assign(
+        anchor_key=normalised(pairs.anchor), positive_key=normalised(pairs.positive)
+    )
+    anchors = keyed.drop_duplicates("anchor_key").set_index("anchor_key").anchor
+    positives = keyed.drop_duplicates("positive_key").set_index("positive_key")
+    relevant = keyed.groupby("anchor_key").positive_key.agg(set).to_dict()
+    return anchors.to_dict(), positives.positive.to_dict(), relevant
 
 
 def fit(settings, tokenizer, training_pairs, validation_pairs):

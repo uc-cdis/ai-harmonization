@@ -209,19 +209,20 @@ class TestFeatures:
             assert torch.equal(found[key], expected[key])
 
     def test_the_validation_pairs_become_the_evaluators_texts(self):
-        """A repeated text is one entry; an anchor's positives are all relevant."""
+        """A text the tokenizer reads as another is one entry; an anchor's positives are all relevant."""
         full = "Body mass index: weight divided by height squared"
         pairs = pd.DataFrame(
             [("BMI", "Body mass index"), ("Quetelet index", "Body mass index"),
-             ("BMI", full)],
+             ("BMI", full), ("bmi", "Body Mass Index")],
             columns=["anchor", "positive"],
         )  # fmt: skip
         queries, corpus, relevant = train.validation_texts(pairs)
-        assert queries == {"BMI": "BMI", "Quetelet index": "Quetelet index"}
-        assert corpus == {"Body mass index": "Body mass index", full: full}
+        full_key = "body mass index: weight divided by height squared"
+        assert queries == {"bmi": "BMI", "quetelet index": "Quetelet index"}
+        assert corpus == {"body mass index": "Body mass index", full_key: full}
         assert relevant == {
-            "BMI": {"Body mass index", full},
-            "Quetelet index": {"Body mass index"},
+            "bmi": {"body mass index", full_key},
+            "quetelet index": {"body mass index"},
         }
 
 

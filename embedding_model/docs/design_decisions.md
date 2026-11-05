@@ -2394,8 +2394,9 @@ the targets. sentence-transformers' `InformationRetrievalEvaluator` ranks a
 corpus for each query. It keeps each query's hits in Python lists, up to the
 largest cutoff asked for. Its default cutoff for MRR is 10.
 
-**Decision.** At each evaluation, each distinct validation anchor ranks every
-distinct validation positive. The evaluator gives MRR@10, and accuracy@1, @3,
+**Decision.** At each evaluation, each validation anchor ranks every
+validation positive, each counted once as the tokenizer normalises it. The
+evaluator gives MRR@10, and accuracy@1, @3,
 @5 and @10. The trainer logs them with the validation loss. The evaluator is
 built as `score` builds its own, with a cutoff of 10.
 
@@ -2405,6 +2406,9 @@ built as `score` builds its own, with a cutoff of 10.
   without opening a benchmark.
 - Good, because every metric comes from the evaluator, with no code of our
   own.
+- Good, because the model reads `BMI` and `bmi` as one text, so they are one
+  query, with the positives of both. As two queries, each would count only
+  its own positive as relevant, and even a perfect model would miss one.
 - Bad, because MRR@10 counts a positive below the tenth rank as 0, while the
   benchmarks' main measure, MRR, counts every rank. `score` also reports
   MRR@10, which compares.
@@ -2423,6 +2427,8 @@ built as `score` builds its own, with a cutoff of 10.
 check that:
 
 - a run writes the validation loss, MRR@10 and accuracy@k at the last step;
+- two anchors that the tokenizer normalises to one text are one query, with
+  the positives of both;
 - the trainer's log holds MRR@10 at each evaluation.
 
 ### A run trains on one GPU, the first one it sees

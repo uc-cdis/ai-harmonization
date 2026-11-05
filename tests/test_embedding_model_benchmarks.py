@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
+import yaml
 
 from ai_harmonization.formatters import MAX_VALUES_IN_PROMPT, VALUE_SEPARATOR
 from embedding_model import benchmarks, download, manifests
@@ -172,7 +173,7 @@ class TestBuilders:
     """Each builder reads its pins from the committed manifest."""
 
     def test_topmed_reads_its_pin_from_the_manifest(self, monkeypatch, tmp_path):
-        """The documentation is fetched at the manifest's commit and kept under it."""
+        """The documentation is fetched at the manifest's commit."""
         archive = documentation_archive(
             {
                 "harmonized-variable-documentation/demographic/sex_1.json": harmonized(
@@ -182,12 +183,12 @@ class TestBuilders:
         )
         fetched = []
 
-        def fake_cached(url, path):
-            """Serve the archive and record where it was asked for."""
-            fetched.append((url, path))
+        def fake_archive(repository, commit, folder):
+            """Serve the archive and record what was asked for."""
+            fetched.append((repository, commit, folder))
             return archive
 
-        monkeypatch.setattr(topmed, "cached", fake_cached)
+        monkeypatch.setattr(topmed, "github_archive", fake_archive)
         monkeypatch.setattr(
             topmed,
             "resolve_components",
@@ -199,12 +200,7 @@ class TestBuilders:
         pin = {"name": topmed.DOCUMENTATION, "role": "mappings and targets",
                "location": "https://github.com/abcd/docs", "version": "abcd1234"}  # fmt: skip
         targets, mappings, sources, counts = topmed.build(tmp_path, {"sources": [pin]})
-        assert fetched == [
-            (
-                "https://codeload.github.com/abcd/docs/tar.gz/abcd1234",
-                tmp_path / "abcd1234.tar.gz",
-            )
-        ]
+        assert fetched == [("https://github.com/abcd/docs", "abcd1234", tmp_path)]
         assert [row["expected_target"] for row in mappings] == [["demographic.sex_1"]]
         assert sources == [pin]
         assert counts["source_variables"] == len(mappings) == 1
@@ -212,101 +208,32 @@ class TestBuilders:
 
     GDC_PIN = {"name": gdc.GROUND_TRUTH, "role": "mappings", "version": "999999",
                "location": "https://doi.org/10.5281/zenodo.999999"}  # fmt: skip
+    DICTIONARY_PIN = {"name": gdc.DICTIONARY, "role": "targets", "version": "abcd1234",
+                      "location": "https://github.com/abcd/gdcdictionary"}  # fmt: skip
 
-    def serve_gdc(self, monkeypatch, served):
-        """Serve a fictional GDC API and Zenodo record, and give the addresses asked for.
+    def test_gdc_reads_its_dictionary_at_the_pinned_commit(self, monkeypatch, tmp_path):
+        """The dictionary's release is fetched at the manifest's commit and recorded as pinned."""
+        archive = dictionary_archive({**SHARED_SCHEMAS, "case.yaml": CASE_SCHEMA})
+        fetched = []
 
-        The ground truth, its papers and its mappings are stubbed, so a build
-        reads only the API's status and dictionary.
-        """
-        asked = []
+        def fake_archive(repository, commit, folder):
+            """Serve the release and record what was asked for."""
+            fetched.append((repository, commit, folder))
+            return archive
 
-        def fake_fetch(url, **request):
-            """Serve the fictional response for an address, and note it."""
-            asked.append(url)
-            return served.get(url, b"{}")
-
-        monkeypatch.setattr(download, "fetch", fake_fetch)
-        monkeypatch.setattr(gdc, "fetch", fake_fetch)
+        monkeypatch.setattr(gdc, "github_archive", fake_archive)
+        monkeypatch.setattr(gdc, "cached", lambda url, path: b"{}")
         monkeypatch.setattr(gdc, "read_ground_truth", lambda archive: {})
         monkeypatch.setattr(gdc, "require_papers", lambda *args: None)
         monkeypatch.setattr(gdc, "mapping_rows", lambda *args: [])
-        return asked
-
-    @staticmethod
-    def status(release):
-        """A fictional response of the GDC API's status."""
-        return json.dumps(
-            {"data_release": release, "tag": "9.9.9", "commit": "abcd123"}
-        ).encode()
-
-    def test_gdc_keeps_the_dictionary_for_the_next_build(self, monkeypatch, tmp_path):
-        """A second build of the GDC benchmark reads the kept dictionary and status, with no network."""
-        dictionary = json.dumps(TestDictionaryTargets.DICTIONARY).encode()
-        served = {
-            gdc.GDC_STATUS: self.status("Data Release 99.0"),
-            gdc.GDC_DICTIONARY: dictionary,
-        }
-        asked = self.serve_gdc(monkeypatch, served)
-        first_targets = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})[0]
-        kept = tmp_path / "dictionary"
-        assert (kept / "status.json").read_bytes() == served[gdc.GDC_STATUS]
-        assert (kept / "dictionary.json").read_bytes() == dictionary
-        os.utime(kept / "dictionary.json", (0, 1_000_000_000))
-        asked.clear()
-        targets, _, sources, _ = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
-        assert asked == []
-        assert targets == first_targets
-        (dictionary_source,) = [s for s in sources if s["role"] == "targets"]
-        assert dictionary_source["version"] == (
-            "Data Release 99.0; API 9.9.9, commit abcd123"
+        targets, _, sources, _ = gdc.build(
+            tmp_path, {"sources": [self.GDC_PIN, self.DICTIONARY_PIN]}
         )
-        assert dictionary_source["fetched"] == date.fromtimestamp(1e9).isoformat()
-
-    def test_gdc_fetches_both_again_when_one_is_missing(self, monkeypatch, tmp_path):
-        """A kept status without its dictionary is fetched again, so the two always match."""
-        served = {
-            gdc.GDC_STATUS: self.status("Data Release 99.0"),
-            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
-        }
-        asked = self.serve_gdc(monkeypatch, served)
-        gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
-        (tmp_path / "dictionary" / "dictionary.json").unlink()
-        served[gdc.GDC_STATUS] = self.status("Data Release 100.0")
-        asked.clear()
-        sources = gdc.build(tmp_path, {"sources": [self.GDC_PIN]})[2]
-        assert {gdc.GDC_STATUS, gdc.GDC_DICTIONARY} <= set(asked)
-        (dictionary_source,) = [s for s in sources if s["role"] == "targets"]
-        assert dictionary_source["version"].startswith("Data Release 100.0;")
-
-    def test_gdc_keeps_no_status_without_its_release(self, monkeypatch, tmp_path):
-        """A status that does not name its release is refused, and nothing is kept."""
-        served = {
-            gdc.GDC_STATUS: json.dumps({"message": "down for maintenance"}).encode(),
-            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
-        }
-        self.serve_gdc(monkeypatch, served)
-        with pytest.raises(ValueError, match="without data_release, tag, commit"):
-            gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
-        assert not (tmp_path / "dictionary").exists()
-
-    @pytest.mark.parametrize("broken", [gdc.GDC_STATUS, gdc.GDC_DICTIONARY])
-    def test_gdc_keeps_nothing_when_a_response_is_not_json(
-        self, monkeypatch, tmp_path, broken
-    ):
-        """A response that is not JSON is named by its URL, and neither file is kept."""
-        served = {
-            gdc.GDC_STATUS: self.status("Data Release 99.0"),
-            gdc.GDC_DICTIONARY: json.dumps(TestDictionaryTargets.DICTIONARY).encode(),
-        }
-        served[broken] = b"<html><body>Service unavailable</body></html>"
-        self.serve_gdc(monkeypatch, served)
-        with pytest.raises(
-            ValueError, match="returned something other than JSON"
-        ) as raised:
-            gdc.build(tmp_path, {"sources": [self.GDC_PIN]})
-        assert broken in str(raised.value)
-        assert not (tmp_path / "dictionary").exists()
+        assert fetched == [
+            ("https://github.com/abcd/gdcdictionary", "abcd1234", tmp_path)
+        ]
+        assert [target["target_property"] for target in targets] == ["case.abcd_score"]
+        assert sources[-1] == self.DICTIONARY_PIN
 
     @pytest.mark.parametrize("builder", [topmed, gdc])
     def test_a_missing_pin_is_named(self, builder, tmp_path):
@@ -526,11 +453,92 @@ class TestTopmedMappingRows:
         assert row["source_description"] == "Calcium score, v2"
 
 
+def dictionary_archive(schemas):
+    """A fictional release of gdcdictionary, with its YAML schemas where GitHub's .tar.gz keeps them."""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        for name, schema in schemas.items():
+            data = yaml.safe_dump(schema).encode()
+            member = tarfile.TarInfo(
+                f"gdcdictionary-abcd1234/src/gdcdictionary/schemas/{name}"
+            )
+            member.size = len(data)
+            tar.addfile(member, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+# The shared schemas of a fictional release. _definitions.yaml holds a
+# reference that no node uses and that points nowhere, as gdcdictionary 4.0.3's
+# file_format does.
+SHARED_SCHEMAS = {
+    "metaschema.yaml": {"id": "metaschema", "properties": {}},
+    "_definitions.yaml": {
+        "id": "_definitions",
+        "ubiquitous_properties": {"type": {"type": "string"}, "id": {"type": "string"}},
+        "unused": {"$ref": "_terms.yaml#/no_such_term"},
+    },
+    "_terms.yaml": {
+        "id": "_terms",
+        "abcd_score": {
+            "common": {
+                "description": "The abcd score.",
+                "termDef": {"$ref": "_terms_enum.yaml#/abcd_definition"},
+            }
+        },
+    },
+    "_terms_enum.yaml": {
+        "id": "_terms_enum",
+        "abcd_definition": {"source": "abcd-source", "term_id": 9999901},
+    },
+}
+# A node that refers to the shared schemas, for its properties and for one
+# property's term, and that sets the term's description again.
+CASE_SCHEMA = {
+    "id": "case",
+    "title": "Case",
+    "type": "object",
+    "category": "administrative",
+    "systemProperties": ["id"],
+    "links": [],
+    "properties": {
+        "$ref": ["_definitions.yaml#/ubiquitous_properties"],
+        "abcd_score": {
+            "$ref": ["_terms.yaml#/abcd_score/common"],
+            "type": "number",
+            "description": "Its own description.",
+        },
+    },
+}
+
+
+class TestReadDictionary:
+    """GDC's dictionary from a gdcdictionary release, resolved as its own loader resolves it."""
+
+    def dictionary(self):
+        """The fictional release, read."""
+        return gdc.read_dictionary(
+            dictionary_archive({**SHARED_SCHEMAS, "case.yaml": CASE_SCHEMA})
+        )
+
+    def test_only_the_nodes_are_read_as_nodes(self):
+        """The shared schemas and the meta-schema are not nodes, and an unused reference in them is not read."""
+        assert list(self.dictionary()) == ["case"]
+
+    def test_a_reference_is_merged_over_the_nodes_own_keys(self):
+        """A node's list of references adds properties; a term's keys win over the node's own."""
+        properties = self.dictionary()["case"]["properties"]
+        assert sorted(properties) == ["abcd_score", "id", "type"]
+        assert properties["abcd_score"] == {
+            "type": "number",
+            "description": "The abcd score.",
+            "termDef": {"source": "abcd-source", "term_id": 9999901},
+        }
+
+
 class TestDictionaryTargets:
     """The GDC benchmark's targets: the properties of GDC's dictionary that a variable can map to."""
 
     DICTIONARY = {
-        "_definitions": {"properties": {"ignored": {"type": "string"}}},
         "demographic": {
             "description": "Demographic data.",
             "systemProperties": ["id", "state"],
@@ -560,11 +568,6 @@ class TestDictionaryTargets:
                 "cases": {"anyOf": [{"items": {}}]},
             },
         },
-        "_terms": ["not", "a", "node"],
-        "metaschema": {
-            "description": "",
-            "properties": {"category": {"type": "string"}},
-        },
         "root": {
             "description": "",
             "properties": {"schema_version": {"type": "string"}},
@@ -579,7 +582,7 @@ class TestDictionaryTargets:
         }
 
     def test_only_data_properties_are_targets(self):
-        """Links, system properties, the node's type and the meta-entries are not targets."""
+        """Links, system properties, the node's type and the root node are not targets."""
         assert sorted(self.rows()) == [
             "demographic.age_at_index",
             "demographic.ethnicity",

@@ -49,8 +49,8 @@ cover them.
 ### GDC
 
 **Website:** GDC-SM's [Zenodo record](https://doi.org/10.5281/zenodo.14963588),
-the [GDC Data Dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/), and
-Magneto's code,
+the [GDC Data Dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/), released
+as [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary), and Magneto's code,
 [VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher).
 
 **License:** The ground truth is [CC BY

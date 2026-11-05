@@ -78,6 +78,10 @@ embedding-model = [
     # embedding_model.benchmarks.gdc (publishers' .xlsx tables, read through
     # pandas.read_excel)
     "openpyxl>=3.1.5",
+    # embedding_model.benchmarks.gdc (the $ref of GDC's data dictionary, looked
+    # up across its schemas). Its minimum version is the one that jsonschema
+    # 4.23 requires.
+    "referencing>=0.28.4",
     # embedding_model.sources.nhanes and embedding_model.pairs (HTML pages and
     # tags, read with BeautifulSoup)
     "beautifulsoup4>=4.12.0",

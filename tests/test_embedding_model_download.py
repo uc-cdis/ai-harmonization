@@ -56,6 +56,25 @@ class TestCached:
         assert path.read_bytes() == b"<html><a href='x'></a></html>"
 
 
+class TestGithubArchive:
+    """Downloading a GitHub repository at one commit."""
+
+    def test_the_archive_of_the_commit_is_kept_under_its_hash(
+        self, monkeypatch, tmp_path
+    ):
+        """The commit's archive is fetched from codeload and kept as <commit>.tar.gz."""
+        cached = MagicMock(return_value=b"archive")
+        monkeypatch.setattr(download, "cached", cached)
+        archive = download.github_archive(
+            "https://github.com/abcd/docs", "abcd1234", tmp_path
+        )
+        assert archive == b"archive"
+        cached.assert_called_once_with(
+            "https://codeload.github.com/abcd/docs/tar.gz/abcd1234",
+            tmp_path / "abcd1234.tar.gz",
+        )
+
+
 class TestFetch:
     """How ``download.fetch`` asks a server."""
 

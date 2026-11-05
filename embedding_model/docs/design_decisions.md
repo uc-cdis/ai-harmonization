@@ -105,13 +105,13 @@ format. Scoring needs ranks and metrics.
 **Context.** The repository holds no data from the benchmarks or the sources.
 Much of that data is third-party text under its own license, as
 [licenses.md](licenses.md) says. So each machine builds the benchmarks and the
-sources itself, perhaps months later. Some sources, and GDC's dictionary for
-the [GDC benchmark](benchmarks.md#gdc), serve only their current state. That
-state can change without notice.
+sources itself, perhaps months later. Some sources serve only their current
+state, which can change without notice. The benchmarks' documentation and
+dictionary are kept on GitHub, where a commit pins every file.
 
 **Decision.** Each benchmark and source has a committed manifest.
-It pins each input by its version or its SHA-256, and lists each file
-built, with its checksum. A build that differs is refused, and the previous
+It pins each input by its version, its commit or its SHA-256, and lists each
+file built, with its checksum. A build that differs is refused, and the previous
 build's files are kept. An intended change becomes a
 [new version](manifests.md#making-a-new-version) of the benchmark or the
 source. Downloads are kept for later builds.
@@ -128,8 +128,9 @@ source. Downloads are kept for later builds.
 - Good, because a kept download is read again without the network. So a
   change to a reader can be tested on the same files.
 - Good, because some inputs serve only their current state, such as
-  [NHANES](sources.md#nhanes)'s pages and GDC's dictionary. Their kept files
-  are the only copy of the state that the manifest pins.
+  [NHANES](sources.md#nhanes)'s pages and [NIH CDE](sources.md#nih-cde)'s
+  export. Their kept files are the only copy of the state that the manifest
+  pins.
 - Bad, because a newer state of such an input is read only after someone
   moves its kept copy aside. The docs say to move it, not to delete it, so
   the copy that a committed version pins is not lost.
@@ -537,66 +538,6 @@ check that:
 
 - a property that two nodes carry is expected in both;
 - a node that gives the property another meaning is left out.
-
-### The GDC benchmark's targets come from the live dictionary
-
-**Described in:** [benchmarks.md](benchmarks.md#the-targets).
-
-**Context.** The GDC API serves only the current
-[dictionary](https://api.gdc.cancer.gov/v0/submission/_dictionary/_all), and it
-does not name its release of
-[gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). gdcdictionary is the
-GitHub project of GDC's data dictionary. It is a Python package that holds the
-schemas, which refer to each other by `$ref`, and a loader that resolves them.
-The GDC benchmark will change: its next version also changes the source texts.
-
-**Decision.** The GDC benchmark's build reads the dictionary that the GDC API
-serves. The first build saves it, with the API's
-[status](https://api.gdc.cancer.gov/status), in `downloads/gdc/dictionary/`,
-and later builds read that copy. The manifest holds the status's data
-release and the SHA-256 of the dictionary's content. A build on a changed
-dictionary is refused until a new version is made.
-
-**Consequences.**
-
-- Good, because the manifest's checksum catches every change of the
-  dictionary, as it does for every input that
-  [Committed manifests pin the inputs](#committed-manifests-pin-the-inputs)
-  covers.
-- Good, because the status and the dictionary are fetched and kept
-  together. So the kept status names the kept dictionary's release.
-- Good, because the API serves the dictionary with its `$ref`s resolved, so
-  the build needs no loader of gdcdictionary's own.
-- Bad, because a machine without the kept copy can rebuild a version only
-  until GDC publishes a new dictionary. After that, it gets the new release,
-  which needs a new version of the benchmark, as
-  [Making a new version](manifests.md#making-a-new-version) says.
-- Bad, because [GDC-SM](https://doi.org/10.5281/zenodo.14963588)'s names and
-  the dictionary's can drift apart. For example, the variables that GDC-SM maps
-  to `gender` have `clinical.gender` as their only expected target. The
-  dictionary also has `demographic.sex_at_birth`, which then counts as wrong
-  for them.
-
-**Alternatives considered.**
-
-- A pinned release of gdcdictionary from its GitHub repository, read with its
-  own loader: any machine could then rebuild any version of the benchmark.
-  But ai-harmonization would depend on a package installed from git.
-- The `gdcdictionary` package on PyPI: it is not GDC's current dictionary.
-  It is an old release, not updated since, that calls itself a "Gen3 generic
-  data dictionary".
-- Reading the dictionary from the API on every build: each build would need
-  the network. A version could not be built again once GDC publishes a new
-  dictionary, even on the machine that built it. A kept copy avoids both, as
-  for the other inputs that serve only their current state.
-
-**Confirmation.** The tests in
-[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
-check that:
-
-- a second build reads the kept dictionary and status, with no network;
-- both are fetched again when one of them is missing;
-- a status that does not name its release is refused, and nothing is kept.
 
 ## Scoring
 

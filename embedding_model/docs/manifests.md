@@ -144,10 +144,10 @@ make a new version of it:
 
 1. In the committed manifest, raise `version`. For a new pin, such as another
    commit of a benchmark's documentation or a source's new release, also edit
-   the input's `version`. A change that cannot be pinned, such as a new
-   dictionary from a server that serves only its current state, needs only the
-   raised `version`. The build reads such an input's kept copy, so first move
-   that copy aside, as the input's section in benchmarks.md or sources.md says.
+   the input's `version`. A change that cannot be pinned, such as a new export
+   from a server that serves only its current state, needs only the raised
+   `version`. The build reads such an input's kept copy, so first move that
+   copy aside, as the input's section in sources.md says.
 2. Build again with `--update-manifest`, as `benchmarks build` or
    `sources fetch`. It writes the new checksums into the committed manifest.
 3. Commit the manifest.

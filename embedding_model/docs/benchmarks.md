@@ -229,7 +229,9 @@ It is built from three published inputs:
   publishers, for each variable's type and values. They are prepared as
   GDC-SM's own download script prepares them (`gdc_download.py` in the Zenodo
   record). GDC-SM describes no variable, so the description is empty.
-- the **GDC submission dictionary**, as the [GDC API](https://docs.gdc.cancer.gov/API/Users_Guide/Getting_Started/) serves it, for the targets.
+- the **GDC data dictionary**, for the targets: a release of
+  [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary), GDC's dictionary on
+  GitHub, pinned by its commit.
 
 The ground truth names each property without its node. Each node that
 carries the property gives an expected target, as
@@ -257,19 +259,15 @@ text that they build. These properties are not targets:
 - the bookkeeping fields that each node lists as `systemProperties`, such as
   `id`, `created_datetime` and `state`;
 - every node's `type`, which holds the node's own name;
-- the JSON meta-schema and the root, which the API serves beside the nodes.
+- the root node, whose one field beside its id is the dictionary's schema
+  version.
 
-The GDC API serves only the current dictionary. So the first build keeps it in
-`downloads/gdc/dictionary/`, with the API's status, which names the data
-release. Later builds read that copy. The manifest holds the data release
-and the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the dictionary's content, with keys sorted.
-
-To build from a newer dictionary, move `downloads/gdc/dictionary/` aside, for
-example to `downloads/gdc/dictionary.old/`, and build again. The build keeps
-the new dictionary in `downloads/gdc/dictionary/`. If the dictionary changed,
-the build reports the difference, and `benchmarks/gdc/` keeps its previous
-files. To use the new dictionary, raise the benchmark's version; see
-[Making a new version](manifests.md#making-a-new-version).
+The manifest pins a release of gdcdictionary by its commit, such as the commit
+of release `4.0.3`. The first build downloads that commit's archive from
+GitHub, and keeps it in `downloads/gdc/`. Each node is a YAML file, which
+refers to shared definitions by `$ref`. The build resolves the references as
+gdcdictionary's own loader does. A definition is merged over the node's own
+keys, so where both hold a key, the definition's wins.
 
 ### Which targets a variable maps to
 
@@ -293,8 +291,9 @@ only, so its scores and these are not comparable.
 **Newer releases.** The ground truth is pinned by its Zenodo record. A new
 version of GDC-SM is a new record: write its number as the ground truth's
 `version`, and its DOI as its `location`. Then make a new version, as
-[Making a new version](manifests.md#making-a-new-version) says. The build
-keeps a copy of the GDC dictionary. To read a new GDC data release, move that
-copy aside and build again, as [The targets](#the-targets) says.
+[Making a new version](manifests.md#making-a-new-version) says. The
+dictionary is pinned by a commit of gdcdictionary. For a newer release, write
+the commit of its tag as the dictionary's `version`, and make a new version
+in the same way.
 
 [licenses.md](licenses.md#gdc) gives its license and reference.

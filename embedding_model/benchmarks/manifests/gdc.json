@@ -1,6 +1,6 @@
 {
   "benchmark": "gdc",
-  "version": "2",
+  "version": "3",
   "built": "2026-10-22",
   "files": {
     "gdc_mappings.csv": {
@@ -104,11 +104,9 @@
     },
     {
       "role": "targets",
-      "name": "GDC submission dictionary",
-      "location": "https://api.gdc.cancer.gov/v0/submission/_dictionary/_all",
-      "version": "Data Release 46.0 - August 10, 2026; API 8.5.0, commit 8f7c2a51ab0084b216ad1b62a3fae8b945439c53",
-      "fetched": "2026-10-22",
-      "sha256": "ad0e70170564ad07396ab5f6d1b135eb44c25edafd38c86cf08da121c9470a6f",
+      "name": "GDC data dictionary",
+      "location": "https://github.com/NCI-GDC/gdcdictionary",
+      "version": "bd56b99f6859cf7c47d0e49cb1def94d8400453e",
       "license": "Apache-2.0",
       "citation": "embedding_model/docs/licenses.md#gdc"
     }

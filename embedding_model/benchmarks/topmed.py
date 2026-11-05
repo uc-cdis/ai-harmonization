@@ -26,7 +26,7 @@ import tarfile
 from ai_harmonization.dbgap import map_dbgap_type, parse_dbgap_table
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model import manifests
-from embedding_model.download import cached, downloaded
+from embedding_model.download import cached, downloaded, github_archive
 
 # The manifest source that pins the documentation, by its commit.
 DOCUMENTATION = "TOPMed DCC harmonized phenotype documentation"
@@ -315,13 +315,9 @@ def build(downloads, manifest):
             prints.
     """
     documentation = manifests.pinned(manifest, DOCUMENTATION)
-    repository = documentation["location"].removeprefix("https://github.com/")
-    commit = documentation["version"]
-    archive = cached(
-        f"https://codeload.github.com/{repository}/tar.gz/{commit}",
-        downloads / f"{commit}.tar.gz",
+    variables = read_documentation(
+        github_archive(documentation["location"], documentation["version"], downloads)
     )
-    variables = read_documentation(archive)
     references = {ref for variable in variables for ref in variable["components"]}
     resolved, dbgap_sources = resolve_components(references, downloads / "dbgap")
     targets = target_rows(variables)

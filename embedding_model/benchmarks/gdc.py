@@ -3,33 +3,47 @@
 Variables from the supplementary tables of ten cancer papers, mapped by
 experts to the GDC data dictionary: the ground truth of GDC-SM, the schema
 matching benchmark published with Magneto. GDC-SM distributes the mappings
-only, so the source tables are downloaded from their publishers and the
-targets from the GDC submission dictionary that the GDC API serves. Each
-variable's study is the dbGaP study of its paper's cohort.
+only, so the source tables are downloaded from their publishers. The targets
+come from a release of gdcdictionary, GDC's data dictionary on GitHub,
+pinned by its commit. Each variable's study is the dbGaP study of its paper's
+cohort.
 """
 
 import io
 import json
+import tarfile
 import zipfile
 from pathlib import PurePosixPath
 
 import pandas as pd
+import yaml
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
-from embedding_model.download import cached, fetch, keep, modified
+from embedding_model.download import cached, github_archive
 from embedding_model.manifests import sha256
 
 # The manifest source that pins the ground truth, by its Zenodo record.
 GROUND_TRUTH = "GDC-SM ground truth"
 ZENODO_FILE = "https://zenodo.org/records/{record}/files/{name}?download=1"
-GDC_DICTIONARY = "https://api.gdc.cancer.gov/v0/submission/_dictionary/_all"
-GDC_STATUS = "https://api.gdc.cancer.gov/status"
-# The status's fields that the manifest holds as the dictionary's version.
-STATUS_FIELDS = ("data_release", "tag", "commit")
-# Entries the API serves beside the nodes: the JSON meta-schema and the root.
-NOT_NODES = {"metaschema", "root"}
+# The manifest source that pins the dictionary: gdcdictionary's repository, and
+# the commit of a release.
+DICTIONARY = "GDC data dictionary"
+# The schemas that the nodes refer to by $ref, and the meta-schema. As in
+# gdcdictionary's own loader, they are not nodes, and only what a node refers
+# to in them is read.
+SHARED_SCHEMAS = {
+    "metaschema.yaml",
+    "_definitions.yaml",
+    "_terms.yaml",
+    "_terms_enum.yaml",
+}
+# The root of GDC's graph, whose one property beside its id is the
+# dictionary's schema version, not data.
+NOT_NODES = {"root"}
 
 # The ground truth names a property, not a node. So a property that several
 # nodes carry is an expected target in each of them, except where a node gives
@@ -111,13 +125,11 @@ def dictionary_targets(dictionary):
     point to other nodes rather than hold data; the bookkeeping fields that
     each node lists as ``systemProperties`` -- ``id``, ``created_datetime``,
     ``state`` -- and every node's ``type``, which holds the node's own name.
-    The JSON meta-schema and the root, which the API serves beside the nodes,
-    are not targets either.
+    The nodes of NOT_NODES give no targets.
 
     Args:
-        dictionary (dict): The dictionary as the GDC API serves it: nodes by
-            name, each with its ``properties``; keys starting with ``_`` hold
-            shared definitions, not nodes.
+        dictionary (dict): The dictionary's nodes by name, each with its
+            ``properties``, as ``read_dictionary`` gives them.
 
     Returns:
         list[dict]: The targets, keyed by TARGET_COLUMNS and sorted.
@@ -351,67 +363,80 @@ def mapping_rows(truth, tables, targets, papers):
     ]
 
 
-def kept_dictionary(downloads):
-    """The GDC API's status and dictionary, fetched once and kept together.
+def resolved(schema, resolver):
+    """A schema with its ``$ref`` resolved, as gdcdictionary's loader resolves it.
 
-    Both are fetched again when either one is missing, so the kept status
-    always names the release of the kept dictionary. Both responses are read
-    before either is kept. A response that is not JSON, or a status without
-    STATUS_FIELDS, is never kept, so the next build tries again.
+    A ``$ref`` is one reference or a list of them. Each one's definition is
+    merged over the schema's own keys, so where both hold a key, the
+    definition's wins. A definition's own references are resolved from its
+    own file.
 
     Args:
-        downloads (Path): Where the GDC benchmark's downloads are kept.
+        schema (dict | list | object): A schema, or a part of one.
+        resolver (referencing.Resolver): What looks a reference up, from the
+            file that the schema is in.
 
     Returns:
-        tuple[dict, dict, Path]: The status, the dictionary, and the kept
-            dictionary's file.
-
-    Raises:
-        ValueError: If a response is not JSON, or the status lacks one of
-            STATUS_FIELDS.
+        dict | list | object: The schema, with no ``$ref`` left.
     """
-    files = {
-        GDC_STATUS: downloads / "dictionary" / "status.json",
-        GDC_DICTIONARY: downloads / "dictionary" / "dictionary.json",
-    }
-    if not all(path.exists() for path in files.values()):
-        served = {url: fetch(url) for url in files}
-        for url, data in served.items():
-            try:
-                json.loads(data)
-            except Exception as error:
-                raise ValueError(
-                    f"{url} returned something other than JSON"
-                    f" ({type(error).__name__}: {error}). Nothing was kept; try"
-                    " again later."
-                ) from error
-        status = json.loads(served[GDC_STATUS])
-        missing = [field for field in STATUS_FIELDS if field not in status]
-        if missing:
-            raise ValueError(
-                f"{GDC_STATUS} answered without {', '.join(missing)}. Nothing "
-                "was kept; try again later."
-            )
-        for url, path in files.items():
-            keep(path, served[url])
-    status, dictionary = (json.loads(path.read_bytes()) for path in files.values())
-    return status, dictionary, files[GDC_DICTIONARY]
+    if isinstance(schema, list):
+        return [resolved(part, resolver) for part in schema]
+    if not isinstance(schema, dict):
+        return schema
+    merged = {key: part for key, part in schema.items() if key != "$ref"}
+    references = schema.get("$ref", [])
+    for reference in references if isinstance(references, list) else [references]:
+        found = resolver.lookup(reference)
+        merged.update(resolved(found.contents, found.resolver))
+    return {key: resolved(part, resolver) for key, part in merged.items()}
+
+
+def read_dictionary(archive):
+    """GDC's dictionary from a release of gdcdictionary, with its references resolved.
+
+    The release keeps each node as a YAML file under ``schemas/``. The nodes
+    refer by ``$ref`` to SHARED_SCHEMAS and to each other, and the
+    ``referencing`` library looks each reference up. The result is what
+    gdcdictionary's own loader gives, ``GDCDictionary`` in its ``core.py``.
+
+    Args:
+        archive (bytes): The release's ``.tar.gz``, as GitHub serves it.
+
+    Returns:
+        dict: The nodes by their ``id``, each with its references resolved.
+    """
+    schemas = {}
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+        for member in tar.getmembers():
+            path = PurePosixPath(member.name)
+            if (
+                member.isfile()
+                and path.parent.name == "schemas"
+                and path.suffix == ".yaml"
+            ):
+                schemas[path.name] = yaml.safe_load(tar.extractfile(member))
+    registry = Registry().with_resources(
+        (name, Resource.from_contents(schema, default_specification=DRAFT4))
+        for name, schema in schemas.items()
+    )
+    nodes = {}
+    for name, schema in sorted(schemas.items()):
+        if name not in SHARED_SCHEMAS:
+            nodes[schema["id"]] = resolved(schema, registry.resolver(base_uri=name))
+    return nodes
 
 
 def build(downloads, manifest):
     """Build the GDC benchmark from the inputs that its manifest pins.
 
-    The ground truth, the publishers' spreadsheets and the dictionary are kept
-    between builds. The GDC API serves only the current dictionary, so the
-    kept copy is the only copy of the dictionary that the manifest pins. The
-    API's status, which names the data release, is kept with it, as
-    ``kept_dictionary`` says. The manifest holds the dictionary's SHA-256,
-    so a build on a changed dictionary shows as a different benchmark.
+    The ground truth, the publishers' spreadsheets and the dictionary's
+    release are kept between builds.
 
     Args:
         downloads (Path): Where downloaded files are kept between builds.
         manifest (dict): The committed manifest; its ground-truth source gives
-            the Zenodo record.
+            the Zenodo record, and its dictionary source gives gdcdictionary's
+            repository and commit.
 
     Returns:
         tuple[list[dict], list[dict], list[dict], dict]: The targets, the
@@ -442,7 +467,9 @@ def build(downloads, manifest):
         tables[paper] = read_source_table(spreadsheet, info["Sheet Name"], paper)
         sources.append(paper_source(paper, info, spreadsheet, PAPERS))
 
-    status, dictionary, dictionary_file = kept_dictionary(downloads)
+    release = manifests.pinned(manifest, DICTIONARY)
+    commit = release["version"]
+    dictionary = read_dictionary(github_archive(release["location"], commit, downloads))
     targets = dictionary_targets(dictionary)
     mappings = mapping_rows(truth, tables, targets, PAPERS)
     counts = {
@@ -452,25 +479,7 @@ def build(downloads, manifest):
     }
     print(
         f"  {counts['papers']} papers, {counts['source_variables']} source "
-        f"variables, {counts['targets']:,} targets ({status['data_release']})"
+        f"variables, {counts['targets']:,} targets (gdcdictionary {commit[:7]})"
     )
-    sources = [
-        {**ground_truth, "sha256": sha256(archive)},
-        *sources,
-        {
-            "role": "targets",
-            "name": "GDC submission dictionary",
-            "location": GDC_DICTIONARY,
-            "version": (
-                f"{status['data_release']}; API {status['tag']}, "
-                f"commit {status['commit']}"
-            ),
-            "fetched": modified(dictionary_file),
-            # The SHA-256 is of the content, with keys sorted, so a reordering
-            # by the API is not a new dictionary.
-            "sha256": sha256(json.dumps(dictionary, sort_keys=True).encode()),
-            "license": "Apache-2.0",
-            "citation": "embedding_model/docs/licenses.md#gdc",
-        },
-    ]
+    sources = [{**ground_truth, "sha256": sha256(archive)}, *sources, release]
     return targets, mappings, sources, counts

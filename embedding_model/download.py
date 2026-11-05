@@ -149,3 +149,27 @@ def cached(url, path, json=None, auth=None):
         bytes: The file's contents.
     """
     return downloaded(url, path, json=json, auth=auth).read_bytes()
+
+
+def github_archive(repository, commit, folder):
+    """A GitHub repository at one commit, as GitHub's archive, downloaded once.
+
+    The archive is kept as ``<commit>.tar.gz`` in ``folder``. The commit pins
+    the files in it. GitHub builds the archive on request, so its bytes are
+    not pinned, and no checksum of them is checked.
+
+    Args:
+        repository (str): The repository's address, such as
+            ``https://github.com/abcd/docs``.
+        commit (str): The commit's full hash.
+        folder (Path): Where the archive is kept.
+
+    Returns:
+        bytes: The archive, a ``.tar.gz`` with one top folder, named for the
+            repository and the commit.
+    """
+    name = repository.removeprefix("https://github.com/")
+    return cached(
+        f"https://codeload.github.com/{name}/tar.gz/{commit}",
+        Path(folder) / f"{commit}.tar.gz",
+    )

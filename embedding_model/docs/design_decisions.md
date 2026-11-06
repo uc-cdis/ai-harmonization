@@ -475,7 +475,7 @@ check that:
 - a query prompt is not added;
 - the default prompt goes on both sides.
 
-### MRR, accuracy@k and the median rank
+### MRR, accuracy@k, the median rank and nDCG
 
 **Described in:** [scoring.md](scoring.md#the-metrics).
 
@@ -489,14 +489,16 @@ benchmarks, many source variables have several expected targets. By default,
 - accuracy, precision and recall at 1, 3, 5 and 10;
 - the mean average precision at 100, MAP@100.
 
-**Decision.** `score` reports where each source variable's best-placed expected
-target lands, in four metrics:
+**Decision.** `score` reports where each source variable's best-placed
+expected target lands:
 
 - MRR with no cut-off, as the main measure;
-- the evaluator's MRR@10, beside it;
+- MRR@10, beside it;
 - accuracy@k at the evaluator's own cut-offs, 1, 3, 5 and 10;
-- the median rank, which `score` computes from the ranks that the evaluator
-  writes.
+- the median rank, from the evaluator's ranks.
+
+It also reports the evaluator's overall nDCG@10, the retrieval score of BEIR and
+MTEB.
 
 **Consequences.**
 
@@ -514,16 +516,22 @@ target lands, in four metrics:
   whether an expected target is among them.
 - Good, because a few very low ranks do not move the median rank, as they
   move a mean.
-- Bad, because the scores do not compare with the nDCG@10 that BEIR and MTEB
-  report.
+- Good, because nDCG@10 is the main score of BEIR
+  ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and of
+  MTEB's retrieval tasks
+  ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)).
+  So the scores compare with theirs.
+- Bad, because nDCG@10 and MRR can disagree on a variable. A variable whose
+  expected targets come first and third has an MRR of 1. Its nDCG@10 is below
+  1, though its first target is enough to harmonize it.
 
 **Alternatives considered.**
 
-- nDCG@10, the evaluator's own main score, and the main score of BEIR
-  ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and MTEB
-  ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)):
-  it rewards ranking every expected target high, and it gives no credit below
-  rank 10.
+- nDCG@10 as the main measure, as the evaluator, BEIR and MTEB use it. It
+  rewards ranking every expected target high, and gives no credit below rank
+  10. One expected target is enough to harmonize a variable.
+- Leaving nDCG@10 out: readers who know BEIR and MTEB look for it, and it
+  costs one column.
 - Recall@k or MAP: they measure how many of a variable's expected targets
   are found. One is enough to harmonize a variable.
 
@@ -532,7 +540,9 @@ target lands, in four metrics:
 check that:
 
 - the ranks and the metrics are right on a fictional benchmark;
-- MRR@10 counts a rank past 10 as 0, and MRR counts it.
+- MRR@10 and nDCG@10 count a rank past 10 as 0, and MRR counts it;
+- nDCG@10 counts every expected target in the first ten, and MRR only the
+  best placed.
 
 ### Models are compared in one text format
 

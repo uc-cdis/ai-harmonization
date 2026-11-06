@@ -223,7 +223,7 @@ leakage.
 
 `score` ranks every target of a benchmark for each source variable. It reports
 where the expected targets land: the mean reciprocal rank (MRR), MRR@10,
-accuracy@1, @3, @5 and @10, and the median rank. [docs/scoring.md](docs/scoring.md)
+nDCG@10, accuracy@1, @3, @5 and @10, and the median rank. [docs/scoring.md](docs/scoring.md)
 explains:
 
 - how a model is scored, and what each metric means;

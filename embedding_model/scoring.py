@@ -2,7 +2,7 @@
 
 For each source variable, the model ranks every target of the benchmark by
 cosine similarity. sentence-transformers' ``InformationRetrievalEvaluator`` encodes
-the texts, ranks the targets and computes MRR and accuracy@k.
+the texts, ranks the targets and computes MRR, nDCG@10 and accuracy@k.
 
 A variable with several expected targets takes the rank of the best placed of
 them. accuracy@k is the share of variables with an expected target among the
@@ -37,9 +37,14 @@ ACCURACY_AT_K = (1, 3, 5, 10)
 # the validation pairs, and score reports it beside the full MRR, so the two
 # compare.
 MRR_CUTOFF = 10
+# The cutoff of nDCG@10, the retrieval metric that BEIR and MTEB report, and
+# the evaluator's default. score reports it so that its scores compare with
+# theirs.
+NDCG_CUTOFF = 10
 METRIC_COLUMNS = [
     "mrr",
     f"mrr@{MRR_CUTOFF}",
+    f"ndcg@{NDCG_CUTOFF}",
     *[f"accuracy@{k}" for k in ACCURACY_AT_K],
     "median_rank",
 ]
@@ -115,10 +120,10 @@ def ranking_evaluator(
 
     Every text of the corpus is ranked for each query, by cosine similarity.
     Scoring ranks a benchmark's targets with it. MRR is then computed over the
-    whole ranking, and MRR@10 beside it. Training ranks the validation pairs'
-    positives, with a cutoff: the evaluator keeps each query's hits in Python
-    lists, so a whole ranking of tens of thousands of positives for each of
-    tens of thousands of queries would not fit.
+    whole ranking, and MRR@10 and nDCG@10 beside it. Training ranks the
+    validation pairs' positives, with a cutoff: the evaluator keeps each
+    query's hits in Python lists, so a whole ranking of tens of thousands of
+    positives for each of tens of thousands of queries would not fit.
 
     Args:
         model (SentenceTransformer): The model, for its default prompt.
@@ -130,9 +135,9 @@ def ranking_evaluator(
             metrics, such as ``validation_cosine_mrr@<corpus size>``.
         write_predictions (bool): Whether the evaluator writes each query's
             full ranking when it is given a folder.
-        cutoff (int | None): The last rank that the metrics count: MRR@cutoff,
-            and the evaluator's other metrics at most at the cutoff. None
-            counts the whole ranking, for MRR and MRR@10.
+        cutoff (int | None): The last rank that the metrics count: MRR,
+            nDCG and accuracy at the cutoff at most. None counts the whole
+            ranking, for MRR, MRR@10 and nDCG@10.
 
     Returns:
         InformationRetrievalEvaluator: The evaluator.
@@ -149,15 +154,6 @@ def ranking_evaluator(
     from sentence_transformers.util import cos_sim
 
     prompt = model.prompts.get(model.default_prompt_name, "")
-    # The evaluator also computes precision, recall, nDCG and MAP, at its own
-    # default cutoffs. With a cutoff, none of them looks further.
-    limits = {}
-    if cutoff is not None:
-        limits = {
-            "precision_recall_at_k": [cutoff],
-            "ndcg_at_k": [cutoff],
-            "map_at_k": [cutoff],
-        }
     return InformationRetrievalEvaluator(
         queries=queries,
         corpus=corpus,
@@ -166,8 +162,12 @@ def ranking_evaluator(
         corpus_prompt=prompt,
         score_functions={"cosine": cos_sim},
         mrr_at_k=[cutoff] if cutoff else sorted({MRR_CUTOFF, len(corpus)}),
+        ndcg_at_k=[cutoff] if cutoff else [NDCG_CUTOFF],
         accuracy_at_k=[k for k in ACCURACY_AT_K if cutoff is None or k <= cutoff],
-        **limits,
+        # The evaluator always computes precision, recall and MAP too, and
+        # nothing here reads them. So they get the smallest cutoff, 1.
+        precision_recall_at_k=[1],
+        map_at_k=[1],
         batch_size=batch_size,
         name=name,
         show_progress_bar=False,
@@ -180,10 +180,11 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     """Rank every target for each source, and score the ranks.
 
     Targets are ranked by cosine similarity. The evaluator gives the results
-    two ways. It returns the averages in memory: MRR, MRR@10 and accuracy@k
-    over all source variables. Its predictions file, written to a temporary folder,
-    holds each source variable's full ranking. Each source variable's rank and
-    top-1 target are read from that file, and the folder is deleted.
+    two ways. It returns the averages in memory: MRR, MRR@10, nDCG@10 and
+    accuracy@k over all source variables. Its predictions file, written to a
+    temporary folder, holds each source variable's full ranking. Each source
+    variable's rank and top-1 target are read from that file, and the folder is
+    deleted.
 
     Args:
         model (SentenceTransformer): The model to score.
@@ -228,6 +229,7 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     metrics = {
         "mrr": round(float(scores[f"cosine_mrr@{len(target_texts)}"]), 4),
         f"mrr@{MRR_CUTOFF}": round(float(scores[f"cosine_mrr@{MRR_CUTOFF}"]), 4),
+        f"ndcg@{NDCG_CUTOFF}": round(float(scores[f"cosine_ndcg@{NDCG_CUTOFF}"]), 4),
         **{
             f"accuracy@{k}": round(float(scores[f"cosine_accuracy@{k}"]), 4)
             for k in ACCURACY_AT_K

@@ -19,22 +19,31 @@ then the best placed of them counts.
 
 ## The metrics
 
-From those ranks:
+From the rankings:
 
 - **MRR**, mean reciprocal rank: the average of 1 / rank. An expected target
   at the top counts fully, second counts half, and so on. MRR is one number with
   no cut-off.
 - **MRR@10**: MRR with every rank past 10 counted as 0. Training reports it
   on the validation pairs.
+- **nDCG@10**, the normalized discounted cumulative gain at 10. Each expected
+  target among the first 10 counts 1 / log2(rank + 1): 1 at rank 1, 0.63 at
+  rank 2, 0.5 at rank 3. The sum is divided by the sum of a perfect ranking,
+  which puts every expected target first. So a variable whose expected
+  targets all come first scores 1. Unlike MRR and accuracy@k, it counts every
+  expected target, not only the best placed. For example, a variable with two
+  expected targets, at ranks 1 and 3, scores (1 + 0.5) / (1 + 0.63) = 0.92. A
+  perfect ranking would put them at ranks 1 and 2. Its MRR is 1. BEIR and MTEB report nDCG@10, so it compares with their
+  scores.
 - **accuracy@k**, for k of 1, 3, 5 and 10: how often an expected target is
   among the first k. It is what someone reviewing the top k suggestions sees.
 - **median rank**: where the expected target typically lands.
 
 The `InformationRetrievalEvaluator` of
 [sentence-transformers](https://sbert.net), which Hugging Face maintains, ranks
-the targets and computes MRR, MRR@10 and accuracy@k. It embeds both sides with
-the model's default prompt only: a model's `query` and `document` prompts are
-not added.
+the targets and computes MRR, MRR@10, nDCG@10 and accuracy@k. It embeds both
+sides with the model's default prompt only: a model's `query` and `document`
+prompts are not added.
 
 Every source variable's rank is kept, in `per_variable.csv`.
 
@@ -127,8 +136,8 @@ scores as they were; see [Inputs and outputs](../README.md#inputs-and-outputs).
 It holds:
 
 - `metrics.csv`, one row: `model`, `benchmark`, `benchmark_version`, `format`,
-  `n` (the variables scored), `targets`, `mrr`, `mrr@10`, `accuracy@1`,
-  `accuracy@3`, `accuracy@5`, `accuracy@10` and `median_rank`.
+  `n` (the variables scored), `targets`, `mrr`, `mrr@10`, `ndcg@10`,
+  `accuracy@1`, `accuracy@3`, `accuracy@5`, `accuracy@10` and `median_rank`.
 - `per_variable.csv`, one row per source variable: `source_study_id`,
   `source_table_id`, `source_variable_id`, `source_variable_name`,
   `expected_target`, `rank`, and the target that the model ranked first,

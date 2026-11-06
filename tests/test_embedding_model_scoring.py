@@ -138,6 +138,7 @@ class TestRankTargets:
         assert metrics == {
             "mrr": round((1 + 1 + 1 / 3) / 3, 4),
             "mrr@10": round((1 + 1 + 1 / 3) / 3, 4),
+            "ndcg@10": round((1 + 1 + 0.5) / 3, 4),
             "accuracy@1": round(2 / 3, 4),
             "accuracy@3": 1.0,
             "accuracy@5": 1.0,
@@ -146,7 +147,7 @@ class TestRankTargets:
         }
 
     def test_mrr_at_10_counts_a_rank_past_10_as_0(self, model):
-        """MRR counts every rank, and MRR@10 only the first ten.
+        """MRR counts every rank, and MRR@10 and nDCG@10 only the first ten.
 
         The model puts eleven race targets before sex, so Gender's expected
         target comes twelfth.
@@ -161,6 +162,29 @@ class TestRankTargets:
         assert ranked["0"]["rank"] == 12
         assert metrics["mrr"] == round(1 / 12, 4)
         assert metrics["mrr@10"] == 0.0
+        assert metrics["ndcg@10"] == 0.0
+
+    def test_ndcg_at_10_counts_every_expected_target(self, model):
+        """nDCG@10 counts every expected target in the first ten, MRR only the best placed.
+
+        A gender variable can map to both a gender property and a sex
+        property. The model ranks gender first, race second and sex third. So
+        the variable's MRR is 1, and its nDCG@10 is below 1. Each expected
+        target adds 1 / log2(rank + 1): gender at rank 1, and sex at rank 3.
+        A perfect ranking would put both expected targets first: gender at
+        rank 1, sex at rank 2, then race.
+        """
+        metrics, ranked = scoring.rank_targets(
+            model,
+            {"0": "Gender"},
+            {"abcd.gender": "Gender", "abcd.race": "Race", "abcd.sex": "Sex"},
+            {"0": {"abcd.gender", "abcd.sex"}},
+        )
+        assert ranked["0"]["rank"] == 1
+        assert metrics["mrr"] == 1.0
+        dcg = 1 / np.log2(1 + 1) + 1 / np.log2(3 + 1)
+        perfect_dcg = 1 / np.log2(1 + 1) + 1 / np.log2(2 + 1)
+        assert metrics["ndcg@10"] == round(dcg / perfect_dcg, 4)
 
     def test_a_query_prompt_is_not_added(self, model, inputs):
         """Sources are embedded as the approaches embed them, without a query prompt."""
@@ -231,6 +255,7 @@ class TestScore:
         assert metrics.loc[0, "mrr"] == row["mrr"]
         assert (metrics.loc[0, "n"], metrics.loc[0, "targets"]) == (3, 4)
         assert metrics.loc[0, "benchmark_version"] == manifest_version("topmed")
+        assert metrics.loc[0, "ndcg@10"] == row["ndcg@10"]
         per_variable = pd.read_csv(folder / "per_variable.csv")
         assert list(per_variable["rank"]) == [1, 1, 3]
         assert list(per_variable["source_variable_name"]) == ["AGE01", "RACE", "GENDER"]

@@ -15,17 +15,19 @@ class TestFormats:
         """A target property's text is what the formatter writes when called directly."""
         expected = get_node_property_as_name_type_description_values(
             Node(name="a", description="", links=[], properties=[]),
-            Property(name="age", description="Age", type="integer", values=["1"]),
+            Property(name="sex", description="Sex", type="string", values=["F", "M"]),
         )
         formatter = texts.FORMATS["name_type_description_values"]
-        written = texts.property_text(formatter, "a", "age", "integer", "Age", ["1"])
+        written = texts.property_text(
+            formatter, "a", "sex", "string", "Sex", ["F", "M"]
+        )
         assert written == expected
 
     def test_a_source_has_no_leading_dot(self):
         """A source variable has no node, so its text starts with its name."""
         formatter = texts.FORMATS[texts.DEFAULT_FORMAT]
         written = texts.property_text(
-            formatter, "", "AGE01", "integer", "Age at exam", ["1"]
+            formatter, "", "AGE01", "integer", "Age at exam", None
         )
         assert written.startswith("AGE01")
 
@@ -63,9 +65,9 @@ class TestCompact:
 
     def test_values_without_a_description_follow_the_type(self):
         """Values follow the type when there is no description."""
-        assert texts.property_text(texts.compact, "", "sex", "string", "", ["F"]) == (
-            "sex (string) Values: F"
-        )
+        assert texts.property_text(
+            texts.compact, "", "sex", "string", "", ["F", "M"]
+        ) == ("sex (string) Values: F | M")
 
     def test_only_the_first_12_values_are_written(self):
         """The values are cut to the first 12, as the formatters cut them."""

@@ -122,7 +122,7 @@ lists the texts that it uses.
 ### Names
 
 An anchor must be a name: it has two letters in a row. So ids and bare
-numbers, such as `2223612v3.0:2178533v1.0` or `535`, are not anchors.
+numbers, such as `9999901v3.0:9999902v1.0` or `535`, are not anchors.
 
 An item uses each of its texts once as a name, even when its source lists a
 text twice. Texts are compared as the tokenizer

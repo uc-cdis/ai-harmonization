@@ -142,7 +142,7 @@ def trained_tokenizer(inputs):
 
 
 def write_benchmark(inputs):
-    """A fictional benchmark named topmed at version 1, over the training texts.
+    """A fictional benchmark named topmed at version 1, of vital signs that the corpus does not hold.
 
     The corpus's manifest then records the benchmark's files, as ``corpus
     build`` does for each benchmark that it checks.
@@ -151,14 +151,15 @@ def write_benchmark(inputs):
     folder.mkdir(parents=True)
     targets = [
         {
-            "target_property": f"abcd.{name}",
-            "target_type": "float",
-            "target_description": positive.split(": ", 1)[1],
+            "target_property": key,
+            "target_type": target_type,
+            "target_description": description,
             "target_values": "",
         }
-        for name, positive in (
-            (anchor.lower().replace(" ", "_"), positive)
-            for anchor, positive in TRAINING
+        for key, target_type, description in (
+            ("vital_signs.mean_arterial_pressure", "float", "Mean arterial pressure"),
+            ("vital_signs.respiratory_rate", "integer", "Respiratory rate"),
+            ("vital_signs.oxygen_saturation", "float", "Oxygen saturation"),
         )
     ]
     mappings = [
@@ -166,11 +167,11 @@ def write_benchmark(inputs):
             "source_study_id": "phs999999",
             "source_table_id": "pht999999.v1",
             "source_variable_id": "phv99999901.v1",
-            "source_variable_name": "SBP01",
+            "source_variable_name": "MAP01",
             "source_type": "float",
-            "source_description": "Systolic blood pressure",
+            "source_description": "Mean arterial pressure",
             "source_values": "",
-            "expected_target": ["abcd.systolic_blood_pressure"],
+            "expected_target": ["vital_signs.mean_arterial_pressure"],
         }
     ]
     manifest = benchmarks.write_benchmark(
@@ -255,7 +256,12 @@ class TestConfig:
         assert {"learning_rate", "num_train_epochs"} <= given
 
     def test_the_defaults_are_the_recipes(self, tmp_path):
-        """A config that names only its data trains at the recipe's settings, the library's where it is silent, and random batches."""
+        """A config that names only its data trains at the recipe's settings, with this pipeline's own.
+
+        The recipe gives the batch size, the warmup, the learning rate and the
+        width. This pipeline gives 5 epochs and random batches. The loss's
+        scale is the library's.
+        """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"]}))
         values, _ = train.read_config(path, 0, ["--use_cpu"])
@@ -348,7 +354,11 @@ class TestConfig:
             train.read_config(path, 0)
 
     def test_a_bert_config_reads_its_own_section(self, tmp_path):
-        """A BERT run reads the bert section, at BERT-Small's shape and BertConfig's other defaults."""
+        """A BERT run reads the bert section, at BERT-Small's width and the BERT paper's length and rate.
+
+        The length, 128 tokens, and the learning rate, 1e-4, are the BERT
+        paper's. The other settings are BertConfig's defaults.
+        """
         from transformers import BertConfig
 
         path = tmp_path / "abcd-run.yaml"
@@ -701,9 +711,9 @@ class TestTrain:
     def test_a_tokenizer_from_another_corpus_is_noted(self):
         """The note names the corpus that the tokenizer learned its vocabulary from."""
         manifest = {"sources": [{"role": "corpus", "name": "efgh-corpus"}]}
-        note = train.tokenizer_note("abcd-corpus", "efgh-8k", manifest)
+        note = train.tokenizer_note("abcd-corpus", "efgh-corpus-8k", manifest)
         assert "learned its vocabulary from efgh-corpus" in note
-        assert train.tokenizer_note("efgh-corpus", "efgh-8k", manifest) is None
+        assert train.tokenizer_note("efgh-corpus", "efgh-corpus-8k", manifest) is None
 
     def test_a_negative_seed_is_refused(self, inputs, config, tmp_path, capsys):
         """A seed below 0 is refused before anything is read."""
@@ -840,7 +850,9 @@ class TestScoreRun:
         built = inputs / "benchmarks" / "topmed"
         mappings = built / "topmed_mappings.csv"
         mappings.write_text(
-            mappings.read_text().replace("Systolic blood pressure", "Abcd pressure")
+            mappings.read_text().replace(
+                "Mean arterial pressure", "Mean blood pressure"
+            )
         )
         manifest = json.loads((built / "manifest.json").read_text())
         manifest["files"]["topmed_mappings.csv"]["sha256"] = file_sha256(mappings)

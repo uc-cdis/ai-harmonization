@@ -65,12 +65,12 @@ def target(key, description, values=""):
     }
 
 
-def mapping(name, description, expected):
+def mapping(name, description, expected, number=1):
     """A row of a benchmark's mappings file, from a fictional study."""
     return {
         "source_study_id": "phs999999",
         "source_table_id": "pht999999.v1",
-        "source_variable_id": f"phv9999990{len(name)}.v1",
+        "source_variable_id": f"phv999999{number:02d}.v1",
         "source_variable_name": name,
         "source_type": "string",
         "source_description": description,
@@ -86,9 +86,9 @@ TARGETS = [
     target("demographic.race", "Race"),
 ]
 MAPPINGS = [
-    mapping("AGE01", "Age at exam", ["demographic.age"]),
-    mapping("RACE", "Race", ["clinical.race", "demographic.race"]),
-    mapping("GENDER", "Gender", ["demographic.sex"]),
+    mapping("AGE01", "Age at exam", ["demographic.age"], 1),
+    mapping("RACE", "Race", ["clinical.race", "demographic.race"], 2),
+    mapping("GENDER", "Gender", ["demographic.sex"], 3),
 ]
 
 
@@ -124,7 +124,9 @@ class TestRankTargets:
     def test_ranks_and_metrics(self, model, inputs):
         """A source variable's rank is the rank of its best placed expected target.
 
-        The metrics come from those ranks.
+        The metrics come from those ranks. RACE's two expected targets come
+        first and second, so its nDCG@10 is 1. GENDER's comes third, and adds
+        1 / log2(3 + 1).
         """
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         source_texts, target_texts, expected = scoring.benchmark_texts(
@@ -138,7 +140,7 @@ class TestRankTargets:
         assert metrics == {
             "mrr": round((1 + 1 + 1 / 3) / 3, 4),
             "mrr@10": round((1 + 1 + 1 / 3) / 3, 4),
-            "ndcg@10": round((1 + 1 + 0.5) / 3, 4),
+            "ndcg@10": round((1 + 1 + 1 / np.log2(3 + 1)) / 3, 4),
             "accuracy@1": round(2 / 3, 4),
             "accuracy@3": 1.0,
             "accuracy@5": 1.0,
@@ -149,15 +151,32 @@ class TestRankTargets:
     def test_mrr_at_10_counts_a_rank_past_10_as_0(self, model):
         """MRR counts every rank, and MRR@10 and nDCG@10 only the first ten.
 
-        The model puts eleven race targets before sex, so Gender's expected
-        target comes twelfth.
+        The model puts eleven race properties, such as "Race: White", before
+        sex. Their other words are unknown to it, so each points along race.
+        So Gender's expected target, sex, comes twelfth.
         """
-        race_targets = {f"abcd.race_{number}": "Race" for number in range(11)}
+        races = [
+            "White",
+            "Asian",
+            "Black or African American",
+            "American Indian or Alaska Native",
+            "Native Hawaiian or Other Pacific Islander",
+            "More than one race",
+            "Other",
+            "Unknown",
+            "Not reported",
+            "Not allowed to collect",
+            "Declined",
+        ]
+        race_targets = {
+            f"demographic.race_{race.lower().replace(' ', '_')}": f"Race: {race}"
+            for race in races
+        }
         metrics, ranked = scoring.rank_targets(
             model,
             {"0": "Gender"},
-            {**race_targets, "abcd.sex": "Sex"},
-            {"0": {"abcd.sex"}},
+            {**race_targets, "demographic.sex": "Sex"},
+            {"0": {"demographic.sex"}},
         )
         assert ranked["0"]["rank"] == 12
         assert metrics["mrr"] == round(1 / 12, 4)
@@ -187,7 +206,11 @@ class TestRankTargets:
         assert metrics["ndcg@10"] == round(dcg / perfect_dcg, 4)
 
     def test_a_query_prompt_is_not_added(self, model, inputs):
-        """Sources are embedded as the approaches embed them, without a query prompt."""
+        """Sources are embedded as the approaches embed them, without a query prompt.
+
+        The query prompt, the word sex five times, would pull every source
+        toward sex and change the ranks. Without it, they stay 1, 1 and 3.
+        """
         model.prompts = {"query": "sex sex sex sex sex ", "document": ""}
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         _, ranked = scoring.rank_targets(
@@ -225,9 +248,7 @@ class TestRankTargets:
                 target("clinical.race", "Race abcd efgh ijkl mnop"),
             ]
         )
-        mappings = pd.DataFrame(
-            [{**mapping("RACE", "Race", []), "expected_target": "clinical.race"}]
-        )
+        mappings = pd.DataFrame([mapping("RACE", "Race", "clinical.race")])
         model.similarity_fn_name = "dot"
         _, ranked = scoring.rank_targets(
             model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
@@ -383,18 +404,7 @@ class TestWriteScores:
         folder = tmp_path / "scores" / "abcd-model" / "topmed" / "compact"
         folder.mkdir(parents=True)
         (folder / "metrics.csv").write_text("previous")
-        mappings = pd.DataFrame(
-            {
-                column: ["abcd"]
-                for column in (
-                    "source_study_id",
-                    "source_table_id",
-                    "source_variable_id",
-                    "source_variable_name",
-                    "expected_target",
-                )
-            }
-        )
+        mappings = pd.DataFrame([mapping("AGE01", "Age at exam", "demographic.age")])
 
         to_csv = pd.DataFrame.to_csv
 
@@ -404,7 +414,9 @@ class TestWriteScores:
                 raise OSError("no space left on device")
             return to_csv(frame, path, **keywords)
 
-        ranked = {"0": {"rank": 1, "top1_target": "a.b", "top1_similarity": 0.9}}
+        ranked = {
+            "0": {"rank": 1, "top1_target": "demographic.age", "top1_similarity": 0.9}
+        }
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(pd.DataFrame, "to_csv", failing)
             with pytest.raises(OSError):

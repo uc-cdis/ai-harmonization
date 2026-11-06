@@ -22,6 +22,7 @@ from embedding_model.benchmarks import gdc, topmed
 COMMIT_FOLDER = "topmed-dcc-harmonized-phenotypes-abcd1234"
 AGE_REFERENCE = "phs999999.v1.pht999999.v1.phv99999901.v1"
 SEX_REFERENCE = "phs999999.v1.pht999999.v1.phv99999902.v1"
+CAC_REFERENCE = "phs999999.v1.pht999999.v1.phv99999903.v1"
 
 DATA_DICT_XML = textwrap.dedent(
     """\
@@ -79,14 +80,14 @@ def harmonized(name, has_age=True, components=(), values=()):
     }
 
 
-def record(name, description, phs="phs999999"):
+def record(name, description, variable, source_type="integer", phs="phs999999"):
     """A resolved dbGaP variable, keyed like the mapping columns."""
     return {
         "source_study_id": phs,
         "source_table_id": "pht999999.v1.p1",
-        "source_variable_id": "phv99999901.v1",
+        "source_variable_id": f"{variable}.v1",
         "source_variable_name": name,
-        "source_type": "integer",
+        "source_type": source_type,
         "source_description": description,
         "source_values": "",
     }
@@ -119,7 +120,7 @@ class TestReadDocumentation:
                     values=["Female", "Male"],
                 ),
                 "harmonized-variable-documentation/atherosclerosis/cac_1.json": (
-                    harmonized("cac_1", components=[AGE_REFERENCE])
+                    harmonized("cac_1", components=[CAC_REFERENCE, AGE_REFERENCE])
                 ),
                 "README.md": b"not documentation",
             }
@@ -196,19 +197,30 @@ class TestBuilders:
             topmed,
             "resolve_components",
             lambda references, downloads: (
-                {("phs999999", "1", "phv99999902"): record("SEX", "Sex")},
+                {
+                    ("phs999999", "1", "phv99999902"): record(
+                        "SEX", "Sex", "phv99999902", "string/encoded"
+                    )
+                },
                 [],
             ),
         )
         pin = {"name": topmed.DOCUMENTATION, "role": "mappings and targets",
-               "location": "https://github.com/abcd/docs", "version": "abcd1234"}  # fmt: skip
+               "location": "https://github.com/abcd-org/topmed-dcc-harmonized-phenotypes",
+               "version": "abcd1234"}  # fmt: skip
         targets, mappings, sources, counts = topmed.build(tmp_path, {"sources": [pin]})
-        assert fetched == [("https://github.com/abcd/docs", "abcd1234", tmp_path)]
+        assert fetched == [
+            (
+                "https://github.com/abcd-org/topmed-dcc-harmonized-phenotypes",
+                "abcd1234",
+                tmp_path,
+            )
+        ]
         assert [row["expected_target"] for row in mappings] == [["demographic.sex_1"]]
         assert sources[0] == pin
         assert sources[-1]["role"] == "corrections"
         assert counts["source_variables"] == len(mappings) == 1
-        assert counts["targets"] == len(targets)
+        assert counts["targets"] == len(targets) == 1
 
     GDC_PIN = {"name": gdc.GROUND_TRUTH, "role": "mappings", "version": "999999",
                "location": "https://doi.org/10.5281/zenodo.999999"}  # fmt: skip
@@ -375,7 +387,7 @@ class TestResolveComponents:
     def test_a_kept_study_listing_without_the_release_is_fetched_again(
         self, served, tmp_path
     ):
-        """A study listing kept from before a release appeared is refreshed once."""
+        """A kept study listing that lacks the cited release is fetched again, once."""
         stale = tmp_path / "phs999999" / "listing.html"
         stale.parent.mkdir(parents=True)
         stale.write_bytes(b'<a href="phs999999.v2.p1/">')
@@ -411,9 +423,15 @@ class TestTopmedMappingRows:
     def resolved(self):
         """The dbGaP text of the three variables."""
         return {
-            ("phs999999", "1", "phv99999901"): record("AGE01", "Age at exam 1"),
-            ("phs999999", "1", "phv99999903"): record("CAC", "Calcium score"),
-            ("phs999999", "1", "phv99999904"): record("HT", "Standing height"),
+            ("phs999999", "1", "phv99999901"): record(
+                "AGE01", "Age at exam 1", "phv99999901"
+            ),
+            ("phs999999", "1", "phv99999903"): record(
+                "CAC", "Calcium score", "phv99999903", "float"
+            ),
+            ("phs999999", "1", "phv99999904"): record(
+                "HT", "Standing height", "phv99999904", "float"
+            ),
         }
 
     def test_phenotypes_and_ages(self):
@@ -450,8 +468,12 @@ class TestTopmedMappingRows:
                             ("phs999999", "2", "pht999999", "1", "phv99999903")]},
         ]  # fmt: skip
         resolved = {
-            ("phs999999", "1", "phv99999903"): record("CAC", "Calcium score, v1"),
-            ("phs999999", "2", "phv99999903"): record("CAC", "Calcium score, v2"),
+            ("phs999999", "1", "phv99999903"): record(
+                "CAC", "Calcium score, v1", "phv99999903", "float"
+            ),
+            ("phs999999", "2", "phv99999903"): record(
+                "CAC", "Calcium score, v2", "phv99999903", "float"
+            ),
         }
         (row,) = topmed.mapping_rows(variables, resolved)
         assert row["source_description"] == "Calcium score, v2"
@@ -542,7 +564,7 @@ class TestCorrections:
     ]
 
     def rows(self):
-        """Two mapping rows: a day count linked to a score, and a variable with two links."""
+        """Two mapping rows: a day count mapped to a score, and a variable with two mappings."""
         return [
             {
                 "source_variable_id": "phv99999901.v1",
@@ -569,7 +591,7 @@ class TestCorrections:
         ]
 
     def test_an_added_mapping_moves_a_day_count_to_the_age(self):
-        """An exclude and an add move a variable from its indicator to its age."""
+        """An exclude and an add move a variable from its score to its age."""
         corrections = [
             correction("exclude", "phv99999901.v1", "abcd.score_1", "times the event"),
             correction(
@@ -613,9 +635,7 @@ class TestCorrections:
         assert len(mappings) == len(set(mappings))
         assert all(row["reason"] for row in rows)
         assert all(
-            ".age_at_" in row["target"] or row["target"].endswith("_age_1")
-            for row in rows
-            if row["action"] == "add"
+            ".age_at_" in row["target"] for row in rows if row["action"] == "add"
         )
         order = [
             (
@@ -852,8 +872,10 @@ class TestGdcMappingRows:
         {"target_property": key}
         for key in (
             "case.primary_site",
+            "clinical.ethnicity",
             "clinical.gender",
             "clinical.race",
+            "demographic.ethnicity",
             "demographic.race",
             "demographic.sex_at_birth",
             "project.primary_site",
@@ -887,12 +909,17 @@ class TestGdcMappingRows:
 
     def test_several_published_targets_merge_into_one_row(self):
         """Two ground-truth mappings for one variable give one row with both targets."""
-        truth = {"Abcd": ground_truth([("Site", "primary_site"), ("Site", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Site": ["Ovary"]})}
+        truth = {
+            "Abcd": ground_truth(
+                [("Race/Ethnicity", "race"), ("Race/Ethnicity", "ethnicity")]
+            )
+        }
+        tables = {"Abcd": pd.DataFrame({"Race/Ethnicity": ["White, not Hispanic"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == [
-            "case.primary_site",
+            "clinical.ethnicity",
             "clinical.race",
+            "demographic.ethnicity",
             "demographic.race",
         ]
 
@@ -905,10 +932,10 @@ class TestGdcMappingRows:
 
     def test_target_not_in_the_dictionary_drops_the_mapping(self, capsys):
         """A published mapping to a target the dictionary does not carry is dropped, and named."""
-        truth = {"Abcd": ground_truth([("Stage", "retired_property")])}
+        truth = {"Abcd": ground_truth([("Stage", "tumor_stage")])}
         tables = {"Abcd": pd.DataFrame({"Stage": ["I"]})}
         assert gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS) == []
-        assert "Abcd: Stage -> retired_property" in capsys.readouterr().out
+        assert "Abcd: Stage -> tumor_stage" in capsys.readouterr().out
 
     def test_variable_missing_from_its_table_raises(self):
         """A mapped variable that is not a column of its table fails the build."""

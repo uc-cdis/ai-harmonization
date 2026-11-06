@@ -12,36 +12,41 @@ from embedding_model.manifests import file_sha256
 from embedding_model.pairs import common, pairs_sha256
 from embedding_model.pairs import manifest as pairs_manifest
 
-# A fictional benchmark: two source variables, from two fictional studies.
+# A fictional benchmark: two source variables, from two fictional studies. A
+# waist measurement maps to one target, and a smoking status to two.
 MAPPINGS = pd.DataFrame(
     {
         "source_study_id": ["phs999901", "phs999902"],
         "source_table_id": ["pht999901.v1", "pht999902.v1"],
         "source_variable_id": ["phv99999901.v1", "phv99999902.v1"],
-        "source_variable_name": ["abcd_score", "efgh_level"],
+        "source_variable_name": ["waist_cm", "smoking_status"],
         "source_type": ["float", "string"],
-        "source_description": ["Abcd efgh score", ""],
+        "source_description": ["Waist in cm", ""],
         "source_values": ["", ""],
-        "expected_target": ["node1.abcd_index", "node2.efgh_value;node3.efgh_value"],
+        "expected_target": [
+            "node1.waist_circumference",
+            "node2.smoking_history;node3.smoking_history",
+        ],
     }
 )
 LONG_DESCRIPTION = (
-    "Abcd index of the ijkl, measured at the first visit of each mnop participant."
+    "Waist circumference of the participant, measured at the first visit with a"
+    " tape."
 )
 TARGETS = pd.DataFrame(
     {
         "target_property": [
-            "node1.abcd_index",
-            "node2.efgh_value",
-            "node3.efgh_value",
-            "node4.ijkl_other",
+            "node1.waist_circumference",
+            "node2.smoking_history",
+            "node3.smoking_history",
+            "node4.alcohol_use",
         ],
         "target_type": ["float", "string", "string", "string"],
         "target_description": [
             LONG_DESCRIPTION,
-            "The efgh value",
-            "Efgh value in node three",
-            "Other ijkl",
+            "History of smoking",
+            "Smoking history at study entry",
+            "Alcohol use",
         ],
         "target_values": ["", "", "", ""],
     }
@@ -53,7 +58,7 @@ def pair(anchor_name="", positive_name="", **fields):
     row = {
         "anchor": anchor_name,
         "positive": positive_name,
-        "source": "ncit",
+        "source": "abcd-source",
         "kind": "name",
         "item": "C999901",
         "term_type": "SY",
@@ -78,24 +83,31 @@ def pair(anchor_name="", positive_name="", **fields):
 # second definition is a description_description pair's anchor name, and a
 # name_to_description pair's description is its positive name.
 PLANTED = [
-    pair("Abcd Score", "Abcd Index"),
-    pair("efgh_level", "Efgh", positive_description="The efgh value"),
-    pair("Abcd efgh score", "abcd_index", kind="description_description"),
-    pair("efgh value", "EFGH LEVEL"),
-    pair("abcd score", "Abcd", positive_description=f"{LONG_DESCRIPTION} More."),
-    pair("abcd_score", f"{LONG_DESCRIPTION} More.", kind="name_to_description"),
-    pair("Score of Abcd", "Qrst", positive_description=LONG_DESCRIPTION),
-    pair("Mnop", "Qrst", study="phs999902|phs999777"),
+    pair("Waist CM", "Waist Circumference"),
+    pair("smoking_status", "Smoking", positive_description="History of smoking"),
+    pair("Waist in cm", "waist_circumference", kind="description_description"),
+    pair("smoking history", "SMOKING STATUS"),
+    pair("waist cm", "Waist", positive_description=f"{LONG_DESCRIPTION} In cm."),
+    pair("waist_cm", f"{LONG_DESCRIPTION} In cm.", kind="name_to_description"),
+    pair("Waist size in cm", "Abdominal girth", positive_description=LONG_DESCRIPTION),
+    pair("Hip size", "Hip circumference", study="phs999902|phs999777"),
 ]
 INNOCENT = [
-    pair("abcd score", "Something else"),
-    pair("abcd score", "efgh value"),
-    pair("Uvwx", "Yzab", anchor_values=["abcd index"], positive_values=["abcd score"]),
+    pair("waist cm", "Blood pressure"),
+    pair("waist cm", "smoking history"),
     pair(
-        "efgh_level", "Cdef", positive_description="Efgh value in node three and more"
+        "Body size",
+        "Body measures",
+        anchor_values=["waist circumference"],
+        positive_values=["waist cm"],
     ),
-    pair("Ghij", "Klmn", study="phs999555"),
-    pair("Score of Abcd", "Abcd Index"),
+    pair(
+        "smoking_status",
+        "Tobacco use",
+        positive_description="Smoking history at study entry, in pack-years",
+    ),
+    pair("Heart rate", "Pulse rate", study="phs999555"),
+    pair("Waist size in cm", "Waist Circumference"),
 ]
 
 
@@ -128,23 +140,25 @@ class TestLeakage:
             "anchor name = source name, positive name ~ target description",
             "anchor name >= source name, positive description = target description",
         ]
-        assert findings.target_property.tolist()[0] == "node1.abcd_index"
+        assert findings.target_property.tolist()[0] == "node1.waist_circumference"
         assert findings.target_description.tolist()[0] == LONG_DESCRIPTION
-        assert findings.source_variable_description.tolist()[0] == "Abcd efgh score"
+        assert findings.source_variable_description.tolist()[0] == "Waist in cm"
         assert findings.target_description.tolist()[7] == ""
         assert findings.study_id.tolist()[7] == "phs999902"
 
     def test_a_text_that_matches_source_and_target_on_one_side_is_kept(self):
         """A source name equal to its target's name, on one side only, is shared vocabulary."""
-        mappings = MAPPINGS.assign(source_variable_name=["abcd_index", "efgh_level"])
-        pairs = pd.DataFrame([pair("Abcd Index", "Wxyz")])
+        mappings = MAPPINGS.assign(
+            source_variable_name=["waist_circumference", "smoking_status"]
+        )
+        pairs = pd.DataFrame([pair("Waist Circumference", "Body measures")])
         assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
 
     def test_a_one_word_name_matches_only_an_equal_text(self, monkeypatch):
         """A one-word name is not matched by its words, even beside a description match."""
-        mappings = MAPPINGS.assign(source_variable_name=["Abcd", "efgh_level"])
+        mappings = MAPPINGS.assign(source_variable_name=["Waist", "smoking_status"])
         pairs = pd.DataFrame(
-            [pair("Abcd Efgh", "Ijkl", positive_description=LONG_DESCRIPTION)]
+            [pair("Waist Size", "Abdomen", positive_description=LONG_DESCRIPTION)]
         )
         assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
         monkeypatch.setattr(leakage, "MIN_NAME_WORDS", 1)
@@ -156,8 +170,8 @@ class TestLeakage:
     def test_a_long_name_matches_by_eight_words_in_a_row(self):
         """The 8-word overlap applies to names too, not only to descriptions."""
         name = "abcd efgh ijkl mnop qrst uvwx yzab cdef ghij"
-        mappings = MAPPINGS.assign(source_variable_name=[name, "efgh_level"])
-        pairs = pd.DataFrame([pair(name.rsplit(" ", 1)[0], "Abcd Index")])
+        mappings = MAPPINGS.assign(source_variable_name=[name, "smoking_status"])
+        pairs = pd.DataFrame([pair(name.rsplit(" ", 1)[0], "Waist Circumference")])
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})
         assert findings.fields.tolist() == [
             "anchor name ~ source name, positive name = target name"
@@ -168,14 +182,16 @@ class TestLeakage:
         pairs = pd.DataFrame(
             [
                 pair(
-                    "efgh_level",
-                    "Efgh",
+                    "smoking_status",
+                    "Smoking",
                     kind="name_description",
-                    positive_description="The efgh value",
+                    positive_description="History of smoking",
                 ),
-                pair("efgh_level", "Efgh"),
-                pair("EFGH-level", "efgh.", source="cadsr", item="999902"),
-                pair("efgh_level", "Ijkl"),
+                pair("smoking_status", "Smoking"),
+                pair(
+                    "SMOKING-status", "smoking.", source="efgh-source", item="C999902"
+                ),
+                pair("smoking_status", "Physical activity"),
             ]
         )
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
@@ -188,7 +204,7 @@ class TestLeakage:
             ]
             * 2
         )
-        assert findings.target_property.tolist() == ["node2.efgh_value"] * 3
+        assert findings.target_property.tolist() == ["node2.smoking_history"] * 3
 
     def test_a_twin_of_one_benchmark_and_answer_key_of_another_has_both(self):
         """A pair that is one benchmark's twin and another's answer key gets a finding for each."""
@@ -197,25 +213,27 @@ class TestLeakage:
                 TARGETS,
                 pd.DataFrame(
                     {
-                        "target_property": ["node5.efgh"],
+                        "target_property": ["node5.smoking"],
                         "target_type": ["string"],
-                        "target_description": ["An efgh"],
+                        "target_description": ["Tobacco smoking"],
                         "target_values": [""],
                     }
                 ),
             ],
             ignore_index=True,
         )
-        mappings = MAPPINGS.assign(expected_target=["node1.abcd_index", "node5.efgh"])
+        mappings = MAPPINGS.assign(
+            expected_target=["node1.waist_circumference", "node5.smoking"]
+        )
         pairs = pd.DataFrame(
             [
                 pair(
-                    "efgh_level",
-                    "Efgh",
+                    "smoking_status",
+                    "Smoking",
                     kind="name_description",
-                    positive_description="The efgh value",
+                    positive_description="History of smoking",
                 ),
-                pair("efgh_level", "Efgh"),
+                pair("smoking_status", "Smoking"),
             ]
         )
         findings, _ = leakage.audit(
@@ -235,7 +253,7 @@ class TestLeakage:
 
     def test_a_pair_that_leaks_two_benchmarks_has_a_finding_for_each(self):
         """One pair can leak two benchmarks, and each one gets its finding."""
-        pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index")])
+        pairs = pd.DataFrame([pair("Waist CM", "Waist Circumference")])
         findings, _ = leakage.audit(
             pairs,
             {
@@ -248,26 +266,32 @@ class TestLeakage:
 
     def test_an_answer_key_comes_before_a_benchmark_study(self):
         """A pair that is an answer key and from a benchmark's study has one finding."""
-        pairs = pd.DataFrame([pair("Abcd Score", "Abcd Index", study="phs999902")])
+        pairs = pd.DataFrame(
+            [pair("Waist CM", "Waist Circumference", study="phs999902")]
+        )
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
         assert findings.finding.tolist() == [leakage.ANSWER_KEY]
 
     def test_accents_and_case_do_not_hide_an_answer_key(self):
         """A pair whose texts differ from a benchmark's only by accents and case is an answer key."""
-        pairs = pd.DataFrame([pair("Ábcd Scöre", "ABCD INDEX")])
+        pairs = pd.DataFrame([pair("Wäist Cm", "WAIST CIRCUMFERENCE")])
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
         assert findings.finding.tolist() == [leakage.ANSWER_KEY]
 
     def test_shared_vocabulary_is_reported(self, audited):
-        """Benchmark texts in the kept pairs are counted, not dropped."""
+        """Benchmark texts in the kept pairs are counted, not dropped.
+
+        Both benchmark rows have a source text and a target text in the kept
+        pairs.
+        """
         shared = audited[1]["abcd-benchmark"]
-        assert shared["rows_with_shared_source"] == 2
-        assert shared["rows_with_shared_target"] == 2
+        assert shared["rows_with_shared_source"] == len(MAPPINGS)
+        assert shared["rows_with_shared_target"] == len(MAPPINGS)
         assert {item["text"] for item in shared["most_common"]} == {
-            "abcd index",
-            "abcd score",
-            "efgh level",
-            "efgh value",
+            "waist circumference",
+            "waist cm",
+            "smoking status",
+            "smoking history",
         }
 
     def test_texts_overlap_when_they_share_eight_words_in_a_row(self):
@@ -287,9 +311,9 @@ class TestLeakage:
         pairs = pd.DataFrame(
             [
                 pair(
-                    "efgh_level",
-                    "Cdef",
-                    positive_description="Efgh value in node three and more",
+                    "smoking_status",
+                    "Tobacco use",
+                    positive_description="Smoking history at study entry, in pack-years",
                 )
             ]
         )
@@ -304,15 +328,18 @@ class TestLeakage:
     def test_benchmark_texts_are_cleaned_and_named_after_their_last_dot(self):
         """A benchmark's texts are cleaned before keying, as the pairs' texts were."""
         mappings = MAPPINGS.assign(
-            source_description=["Abcd &amp; efgh <b>score</b>", ""],
-            expected_target=["node1.sub.abcd_index", "node4.ijkl_other"],
+            source_description=["Waist &amp; hip <b>in cm</b>", ""],
+            expected_target=["node1.sub.waist_circumference", "node4.alcohol_use"],
         )
         targets = TARGETS.assign(
-            target_property=["node1.sub.abcd_index", *TARGETS.target_property[1:]]
+            target_property=[
+                "node1.sub.waist_circumference",
+                *TARGETS.target_property[1:],
+            ]
         )
         sources, expected = leakage.benchmark_texts("abcd-benchmark", targets, mappings)
-        assert "abcd efgh score" in set(sources.text_key)
-        assert "abcd index" in set(expected.text_key)
+        assert "waist hip in cm" in set(sources.text_key)
+        assert "waist circumference" in set(expected.text_key)
 
     def test_text_keys_are_those_of_pairs(self):
         """``text_keys`` writes pairs.common.text_key: accents go, Greek letters stay."""
@@ -390,9 +417,9 @@ class TestBuild:
         assert kept.set_index("anchor_name").source["Wxyz"] == "ncit"
         assert dropped.finding.tolist() == [leakage.ANSWER_KEY] * 3
         assert dropped.benchmark_source_variable_name.tolist() == [
-            "abcd_score",
-            "efgh_level",
-            "abcd_score",
+            "waist_cm",
+            "smoking_status",
+            "waist_cm",
         ]
         assert written["counts"]["rows"] == {
             "combined": 7,
@@ -671,24 +698,29 @@ class TestBuild:
         assert "sources fetch --source ncit" in capsys.readouterr().err
 
     def test_the_split_follows_a_fixed_hash_of_the_group(self):
-        """A group's side comes from a fixed hash, and NCIt and CDISC share groups."""
-        assert corpus.bucket("ncit:C0") == 117
-        assert corpus.bucket("ncit:C51") == 0
+        """A group's side comes from a fixed hash, and NCIt and CDISC share groups.
+
+        corpus.bucket is the group id's blake2b hash, of 8 bytes, modulo
+        BUCKETS (1,000). A bucket below VALIDATION_SHARE x BUCKETS (20) is
+        validation. These two ids were picked for buckets on each side of 20.
+        """
+        assert corpus.bucket("ncit:C999904") == 20
+        assert corpus.bucket("ncit:C999909") == 19
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "cdisc", "cadsr", "ncit", "cdisc"],
-                "item": ["C0", "C0", "C0", "C51", "C51"],
+                "item": ["C999904", "C999904", "C999904", "C999909", "C999909"],
                 "kind": "name",
                 "anchor_name": "Wxyz",
                 "positive_name": ["Abcd", "Abcd", "Efgh", "Ijkl", "Ijkl"],
             }
         )
         assert corpus.group_ids(pairs).tolist() == [
-            "ncit:C0",
-            "ncit:C0",
-            "cadsr:C0",
-            "ncit:C51",
-            "ncit:C51",
+            "ncit:C999904",
+            "ncit:C999904",
+            "cadsr:C999904",
+            "ncit:C999909",
+            "ncit:C999909",
         ]
         assert corpus.splits(pairs).tolist() == [
             corpus.TRAIN,
@@ -699,11 +731,18 @@ class TestBuild:
         ]
 
     def test_items_with_one_canonical_text_share_a_group(self):
-        """Items linked by a canonical text, or through a code, take the first ``item_id``."""
+        """Items linked by a canonical text, or through a code, take the first ``item_id`` in sorted order."""
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "obo", "cdisc", "cde", "cadsr", "nhanes"],
-                "item": ["C1", "MONDO:9999901", "C1", "abcd1", "abcd2", "abcd3"],
+                "item": [
+                    "C999901",
+                    "MONDO:9999901",
+                    "C999901",
+                    "abcd1",
+                    "abcd2",
+                    "abcd3",
+                ],
                 "kind": ["name"] * 5 + ["name_to_description"],
                 "anchor_name": ["Wxyz"] * 5 + ["Efgh"],
                 "positive_name": [
@@ -726,15 +765,15 @@ class TestBuild:
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "obo", "cde", "cadsr"],
-                "item": ["C1", "MONDO:9999901", "abcd1", "abcd2"],
+                "item": ["C999901", "MONDO:9999901", "abcd1", "abcd2"],
                 "kind": ["name"] * 4,
                 "anchor_name": ["Wxyz"] * 4,
                 "positive_name": ["Abcd, Efgh", "abcd-efgh", "?", "?"],
             }
         )
         assert corpus.group_ids(pairs).tolist() == [
-            "ncit:C1",
-            "ncit:C1",
+            "ncit:C999901",
+            "ncit:C999901",
             "cde:abcd1",
             "cadsr:abcd2",
         ]

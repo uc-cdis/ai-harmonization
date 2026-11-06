@@ -191,7 +191,7 @@ class TestNamesAndTypes:
         """Ids and numbers are not names."""
         assert common.is_name("Abcd")
         assert common.is_name("AB")
-        assert not common.is_name("2223612v3.0:2178533v1.0")
+        assert not common.is_name("9999901v3.0:9999902v1.0")
         assert not common.is_name("535")
 
     def test_term_group_comes_from_the_shape(self):
@@ -274,7 +274,7 @@ class TestNamesAndTypes:
         """Spellings of one text are one anchor, with the studies of all of them."""
         item = Item(
             id="abcd1",
-            canonical="Abcd",
+            canonical="Body Height",
             texts=[
                 Text("HEIGHT", "dbGaP variable name", study="phs999999"),
                 Text("height", "dbGaP variable name", study="phs999997|phs999998"),
@@ -309,7 +309,7 @@ class TestStar:
     """Pairs around each item's canonical, the same for every source."""
 
     def test_each_text_twice_and_each_other_description_once(self):
-        """Each text gives two pairs, and each other description gives one pair."""
+        """Each text gives two pairs, and each other description that differs from the first gives one pair."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -493,12 +493,16 @@ class TestStar:
         assert common.replacements(items[0], by_id) == []
 
     def test_a_text_of_two_canonicals_is_counted(self):
-        """A name that two items give, for two canonicals, is one ambiguous text."""
+        """A name that two items give, for two canonicals, is one ambiguous name."""
         found, _ = common.star(
             [
-                Item(id="abcd1", canonical="Abcd", texts=[Text("Other", "SY")]),
-                Item(id="abcd2", canonical="Efgh", texts=[Text("other", "SY")]),
-                Item(id="abcd3", canonical="Ijkl", texts=[Text("Mnop", "SY")]),
+                Item(
+                    id="abcd1", canonical="Multiple Sclerosis", texts=[Text("MS", "AB")]
+                ),
+                Item(id="abcd2", canonical="Mitral Stenosis", texts=[Text("ms", "AB")]),
+                Item(
+                    id="abcd3", canonical="Myasthenia Gravis", texts=[Text("MG", "AB")]
+                ),
             ],
             source="abcd-source",
         )
@@ -701,33 +705,33 @@ class TestNcit:
 
     TABLES = {
         "concepts": table(
-            code=["C1", "C2", "C3"],
+            code=["C999901", "C999902", "C999903"],
             preferred_name=["Abcd", "Efgh", "Old abcd"],
             status=["", "Provisional_Concept", "Retired_Concept"],
             open=[True, True, True],
         ),
         "synonyms": table(
-            code=["C1", "C1", "C1", "C2", "C2"],
-            name=["AB", "Abcd grammar", "Abcd syn", "EF", "EFG"],
+            code=["C999901", "C999901", "C999901", "C999902", "C999902"],
+            name=["AB", "Abcdal", "Abcd syn", "EF", "EFG"],
             term_type=["AB", "AD", "SY", "PT", "CA3"],
         ),
         "definitions": table(
-            code=["C1", "C1", "C1"],
+            code=["C999901", "C999901", "C999901"],
             definition=["An abcd (CDISC)", "An abcd. (NCI)", "The abcd. (NCI04)"],
             kind=["ALT_DEFINITION", "DEFINITION", "DEFINITION"],
             source=["CDISC", "NCI", "NCI-GLOSS"],
         ),
         "values": table(
-            code=["C1", "C1", "C1", "C1"],
+            code=["C999901", "C999901", "C999901", "C999901"],
             association=["Has_B_Value", "Has_B_Value", "Has_A_Value", "Has_A_Value"],
-            value_code=["C9", "C8", "C8", "C9"],
+            value_code=["C999909", "C999908", "C999908", "C999909"],
             value=["Zeta", "Alpha", "Alpha", "Zeta"],
         ),
         "replacements": table(
-            code=["C3"],
+            code=["C999903"],
             action=["merge"],
             date=["2026-01-01"],
-            replacement_code=["C1"],
+            replacement_code=["C999901"],
             replacement_name=["Abcd"],
         ),
     }
@@ -755,7 +759,7 @@ class TestNcit:
         assert first.lists == [("Has_A_Value", ["Alpha", "Zeta"])]
         assert [text.text for text in second.texts] == ["EF", "EFG"]
         assert (second.status, third.status) == (DRAFT, RETIRED)
-        assert third.replaced_by == ["C1"]
+        assert third.replaced_by == ["C999901"]
 
     def test_a_source_inside_an_open_parenthesis_is_kept(self):
         """A source that closes a parenthesis opened before it is part of the text."""
@@ -911,8 +915,8 @@ class TestCdisc:
         tables = {
             "terms": table(
                 **{
-                    "Code": ["C9", "C1", "C1", "C2"],
-                    "Codelist Code": ["", "C9", "C8", "C9"],
+                    "Code": ["C999909", "C999901", "C999901", "C999902"],
+                    "Codelist Code": ["", "C999909", "C999908", "C999909"],
                     "Codelist Name": [
                         "Abcd Test Name",
                         "Abcd Test Name",
@@ -1013,7 +1017,7 @@ class TestCde:
             "values": table(
                 tiny_id=["abcd1", "abcd1"],
                 position=[0, 1],
-                permissible_value=["1", "2"],
+                permissible_value=["1", "Unknown"],
                 value_meaning_name=["Yes", ""],
             ),
         }
@@ -1028,7 +1032,7 @@ class TestCde:
             "An abcd. The efgh.",
             ["Another abcd."],
         )
-        assert (first.type, first.lists) == ("Value List", [("", ["Yes", "2"])])
+        assert (first.type, first.lists) == ("Value List", [("", ["Yes", "Unknown"])])
         assert (second.status, second.canonical, second.texts) == (CURRENT, "", [])
         assert "'Abcd status'" in capsys.readouterr().out
 
@@ -1311,7 +1315,11 @@ class TestPhenx:
         assert phenx.unquoted('"Abcd" or "efgh"?') == '"Abcd" or "efgh"?'
 
     def test_value_labels(self):
-        """Codes are taken off; ranges list no values; a tab also separates entries."""
+        """Codes are taken off; ranges list no values; a tab also separates entries.
+
+        An explanation on the right is not the label: in "Yes = Classify as a
+        user", the label is Yes.
+        """
         assert phenx.labels("(-3) = Abcd|? = Efgh\vIjkl|0..110") == [
             "Abcd",
             "Efgh",
@@ -1322,9 +1330,9 @@ class TestPhenx:
         assert phenx.labels("A = 1 mm|= = Abcd") == ["1 mm", "Abcd"]
         assert phenx.labels("Abcd = n/t|001 - 700 = efgh") == ["Abcd", "efgh"]
         assert phenx.labels("99/99/9999 = abcd|>=18 = efgh") == ["abcd", "efgh"]
-        assert phenx.labels("Yes = Classify as abcd|NA = Not abcd") == [
+        assert phenx.labels("Yes = Classify as a user|NA = Not applicable") == [
             "Yes",
-            "Not abcd",
+            "Not applicable",
         ]
 
 

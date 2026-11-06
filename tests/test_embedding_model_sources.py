@@ -587,10 +587,8 @@ class TestLoinc:
         manifest = {"sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": md5}]}
         tables, found, counts = loinc.fetch_source(tmp_path, manifest)
         assert len(tables["codes"]) == 3
-        assert counts == {
-            "codes": 3,
-            "not_open": int((~tables["codes"].open).sum()),
-        }
+        # 99999-2 has its own notice, and 99999-5 sits only in a closed panel.
+        assert counts == {"codes": 3, "not_open": 2}
         assert found[0]["md5"] == md5
 
 
@@ -1155,7 +1153,7 @@ class TestPhenx:
         )
         manifest = {"sources": [{"name": phenx.EXPORT, "version": "Ver 9.1"}]}
         tables, found, counts = phenx.fetch_source(tmp_path, manifest)
-        assert counts["variables"] == len(tables["variables"])
+        assert counts["variables"] == len(tables["variables"]) == 3
         assert (tmp_path / "Phenx_DB.zip").exists()
         assert tables["replacements"].protocol_new_id.tolist() == ["1"]
         assert found[0]["role"] == "service"

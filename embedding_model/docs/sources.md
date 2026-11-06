@@ -1,10 +1,12 @@
 # Sources
 
 The model learns from pairs of texts that mean the same thing, such as a
-variable's name and its description. Such texts come from two kinds of
-public source. Vocabularies name medical concepts in several ways. Data
-dictionaries describe the variables of real studies. Eight sources are used,
-and each is fetched from its publisher and kept on your machine:
+variable's name and its description. Such texts come from three kinds of
+public source. Terminologies and ontologies name medical concepts in several
+ways. Collections of standard data elements hold the fields that studies
+reuse. A survey's data dictionary describes the variables that it collected.
+Eight sources are used, and each is fetched from its publisher and kept on
+your machine:
 
 ```
 python -m embedding_model sources fetch                    # every source

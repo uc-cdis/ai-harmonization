@@ -863,6 +863,69 @@ check that:
 
 ## Sources
 
+### Eight public sources, of three kinds
+
+**Described in:** [sources.md](sources.md) and
+[licenses.md](licenses.md#training-sources).
+
+**Context.** The model learns from pairs of texts that mean the same thing.
+Three kinds of public source hold such texts. Terminologies and ontologies
+name medical concepts in several ways: synonyms, abbreviations and
+definitions. Collections of standard data elements hold the fields that
+studies reuse: their names, questions and values. A survey's data dictionary
+describes the variables that it collected. Each source has its own license or
+terms. Some sources also mark single items as restricted.
+
+**Decision.** Eight sources are used, of all three kinds. The terminologies
+and ontologies are NCIt, seven OBO Foundry ontologies, LOINC and CDISC. The
+collections of data elements are NIH CDE, caDSR and PhenX. NHANES is a
+survey's data dictionary. Each source is fetched from its publisher, and is
+free to use under its own license or terms.
+
+**Consequences.**
+
+- Good, because the three kinds give what the task needs. Terminologies and
+  ontologies give the many names of one concept. Data elements and a
+  survey's variables give the short names, questions and value lists that
+  studies use.
+- Good, because each source comes from its publisher, under one license or
+  terms. [licenses.md](licenses.md#training-sources) gives each one, and the
+  manifests record it.
+- Good, because a source's restricted items are left out, as
+  [An item is open only when its value is known to allow use](#an-item-is-open-only-when-its-value-is-known-to-allow-use)
+  says.
+- Bad, because a large terminology whose license is not open to every user
+  stays out, though it holds many synonyms. SNOMED CT, for one, needs a
+  license for each user, with fees in some countries.
+- Bad, because some sources need a free registration before a download, such
+  as LOINC.
+
+**Alternatives considered.**
+
+- The UMLS Metathesaurus, which joins many terminologies, NCIt and LOINC
+  among them. Downloading it needs a UMLS license. Its
+  [license agreement](https://www.nlm.nih.gov/research/umls/knowledge_sources/metathesaurus/release/license_agreement.html)
+  prohibits distributing the Metathesaurus or subsets of it, except as an
+  integral part of an application. Some of its sources allow only internal
+  use. So each source's terms would have to be checked within it, by its
+  restriction category.
+- SNOMED CT, a large clinical terminology with many synonyms. Each person who
+  downloads it needs a license of their own. NLM's
+  [licensing page](https://www.nlm.nih.gov/healthit/snomedct/snomed_licensing.html)
+  says that it is free in IHTSDO member countries, such as the US. Fees may
+  apply elsewhere, so not every user could rebuild the corpus for free.
+- dbGaP's public data dictionaries, of studies that no benchmark uses. They
+  describe real study variables, in the shape that the task reads. They are
+  not used yet. The benchmarks come from dbGaP studies too, so each added
+  study must be checked against every benchmark first. A later version may
+  add them, first as texts for comparing tokenizers.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- each source records its license as an SPDX license expression.
+
 ### An item is open only when its value is known to allow use
 
 **Described in:** [licenses.md](licenses.md#restricted-items).
@@ -893,13 +956,20 @@ any notice closes its item, without a print.
 - Good, because the fetch keeps every item, closed ones too, and marks each in
   its `open` column. So a later change of verdict needs no new download: a
   new fetch reads the kept files again, and writes the new `open` column.
+- Good, because a restriction on a parent covers its children. An NHANES
+  data file's constraints cover its variables, and a PhenX protocol's
+  availability covers its variables. A LOINC code that sits only in closed
+  forms is closed too.
+- Good, because each allow-list holds only values whose meaning was checked.
+  NHANES's "RDC Only", for one, restricts access to a data file's data, not
+  to the documentation that the fetch reads. So it allows use.
 - Bad, because a harmless new value closes items until its source's
   allow-list is updated.
 
 **Alternatives considered.**
 
 - A deny-list of the values known to restrict: a new value would let its
-  items in unseen.
+  items in, undetected.
 - For caDSR, closing an element only on a Proprietary Measure Permission: a
   new kind of document would leave its elements open before anyone reviews
   it. That bases the decision on exclusion, against the fail-safe default
@@ -1158,6 +1228,108 @@ check that:
 - a fictional item gives the pairs that the test lists;
 - each of them joins a text to the canonical.
 
+### Four kinds of pair, once for each value list
+
+**Described in:**
+[pairs.md](pairs.md#the-shape-a-star-around-each-item) and
+[pairs.md](pairs.md#values).
+
+**Context.** An item has a canonical, and often other names and a
+description. Some items have no other name, only a description. Some have a
+second description, such as another definition. A target's text holds a
+description only when its data model gives one. An item can have several
+value lists, as an NCIt concept can.
+
+**Decision.** Each other name gives a `name` pair, with the canonical alone,
+and a `name_description` pair when the item has a description. Each other
+description gives a `description_description` pair. An item with no other
+name pairs its canonical with its description, as `name_to_description`. An
+item with several value lists repeats its pairs for each, with that list's
+values in the positive.
+
+**Consequences.**
+
+- Good, because a target comes with a description or without one, and the
+  model learns to match both.
+- Good, because an item with no other name still gives a pair,
+  `name_to_description`: its canonical, matched with its description.
+- Good, because two descriptions of one meaning teach the model that two
+  wordings of a definition match.
+- Good, because each positive shows values that the item really has. Lists
+  are never merged, so a positive never mixes two lists.
+- Bad, because an item with a description gives each name twice. So items
+  with descriptions weigh more in the corpus.
+- Bad, because an item with several lists repeats its names once for each
+  list.
+
+**Alternatives considered.**
+
+- Only `name` pairs: the model would never see a description, though many
+  targets have one.
+- One pair for each name, with the description when there is one: an item
+  with a description would never be a positive without it. Yet a data model
+  can name the same thing without a description.
+- One pair for each name, with the item's value lists merged: a positive
+  would show values that no single list has.
+- Pairs for the first value list only: the other lists' values would be
+  lost.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- each name gives a `name` and a `name_description` pair, and another
+  description gives a `description_description` pair;
+- an item with no other name pairs its canonical with its description;
+- an item with two lists gives its pairs once for each, with each list
+  named.
+
+### An ambiguous name is paired with each item that it names
+
+**Described in:** [pairs.md](pairs.md#ambiguous-names).
+
+**Context.** Some names are ambiguous: one name stands for several items. An
+abbreviation can stand for several concepts, as `MS` stands for multiple
+sclerosis and for mitral stenosis. A study can use such a name for either
+meaning. Training uses in-batch negatives: in one batch, each pair's positive
+is a negative for the other pairs' anchors.
+
+**Decision.** An ambiguous name is an anchor of each item that it names. None
+of its pairs is dropped, and no item is chosen over the others. Each source's
+pairs manifest counts these names, as `ambiguous_texts`.
+
+**Consequences.**
+
+- Good, because each of these pairs is true: the name stands for each item.
+- Good, because studies use ambiguous names too. A model that never saw them
+  could not rank any of their meanings.
+- Good, because `ambiguous_texts` shows how many such names a source has. So
+  a new release that adds many of them is seen.
+- Bad, because a name has one embedding. The model places it between its
+  items, so none of them ranks clearly first.
+- Bad, because two of its pairs can share a batch. Each one's positive then
+  counts as a negative for the other.
+- Bad, because `ambiguous_texts` counts within one source. A name that two
+  sources give to different items is not counted.
+
+**Alternatives considered.**
+
+- Dropping an ambiguous name: true pairs would be lost, and studies use such
+  names.
+- Keeping one of its items, such as the first: the choice would be
+  arbitrary, and the other pairs would be lost.
+- The `NO_DUPLICATES` sampler, which keeps a text from appearing twice in a
+  batch.
+  [The defaults start from Hugging Face's recipe for a static model](#the-defaults-start-from-hugging-faces-recipe-for-a-static-model)
+  gives why it is not used.
+
+**Confirmation.** The tests in
+[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
+check that:
+
+- an ambiguous name that two items give keeps a pair for each, and counts
+  once in `ambiguous_texts`.
+
 ### Retired items are used
 
 **Described in:** [pairs.md](pairs.md#retired-items).
@@ -1188,7 +1360,10 @@ Each pair's `status` marks a retired item's pairs as `retired`.
 - Bad, because every corpus holds the retired texts, and nothing reads
   `status` by default.
 - Bad, because a retired item with a replacement gives the replacement all
-  its texts, even one that another current item also has.
+  its texts, even one that another current item has. That text then becomes
+  an [ambiguous name](#an-ambiguous-name-is-paired-with-each-item-that-it-names),
+  an anchor of both items. Removing copies does not help, since the two pairs
+  have different positives.
 
 **Confidence.** Low: no training run has measured what retired items add.
 
@@ -1274,7 +1449,7 @@ LOINC, whose marks are its columns, the fetch prints a new column.
 - Every text, whatever its mark: instructions and related names would become
   anchors of the same meaning.
 - A deny-list of the marks known not to be names: a new mark would let its
-  texts in unseen.
+  texts in, undetected.
 
 **Confirmation.** The tests check that:
 
@@ -1369,6 +1544,9 @@ or the canonical, is used once.
 - Good, because no copy's study is lost. The pair kept takes the studies of
   all its copies. So when any copy comes from a benchmark's study, the study
   rule drops the pair kept as well.
+- Good, because within a source, a current item's copy comes first, then a
+  draft's, then a retired item's. So a pair is marked `retired` only when no
+  current or draft item gives it.
 - Bad, because a count of pairs by source puts every shared pair under the
   earliest source.
 
@@ -1937,6 +2115,9 @@ They are a sanity check, not a measure of quality.
 - Learning the vocabulary from the validation and benchmark texts too: the
   vocabulary would then depend on the data that judges the model. And a word that only
   validation texts hold would get a token whose row training never updates.
+- A pretrained tokenizer, such as a released model's: its vocabulary was
+  learned from other texts, and its size is fixed. A rare word of the corpus,
+  such as a variable's short name, would more often be cut into pieces.
 
 **Confirmation.** The tests in
 [test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)

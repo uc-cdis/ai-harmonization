@@ -95,7 +95,7 @@ beside its pairs in the same folder. It has the fields that
   - the items, and the items not open;
   - the pairs by kind, term group and status;
   - the duplicates removed;
-  - the texts that point to several canonicals.
+  - the [ambiguous names](#ambiguous-names), as `ambiguous_texts`.
 
 ## The rules every source shares
 
@@ -171,10 +171,11 @@ by their [`text_key`](leakage.md#how-two-texts-match). So a retired
 Draft items are used like current items. The `status` column keeps them
 apart, so a training run can leave them out.
 
-### One text, several canonicals
+### Ambiguous names
 
-A text can name several items, such as "Other, specify". It is then
-used for each of them. The manifest counts such texts.
+A name can stand for several items, as `MS` stands for multiple sclerosis and
+for mitral stenosis. It is then an anchor of each of them. Each source's
+manifest counts such names, as `ambiguous_texts`.
 
 ### Duplicates
 

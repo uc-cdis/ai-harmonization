@@ -114,7 +114,7 @@ It pins each input by its version, its commit or its SHA-256, and lists each
 file built, with its checksum. A build that differs is refused, and the previous
 build's files are kept. An intended change becomes a
 [new version](manifests.md#making-a-new-version) of the benchmark or the
-source. Downloads are kept for later builds.
+source.
 
 **Consequences.**
 
@@ -123,17 +123,8 @@ source. Downloads are kept for later builds.
   build, and the manifest says from which inputs, with which checksums.
 - Good, because the data never changes silently. A source that changed shows
   as a build that differs.
-- Good, because a committed version never changes, as a released package
-  version never does.
-- Good, because a kept download is read again without the network. So a
-  change to a reader can be tested on the same files.
-- Good, because some inputs serve only their current state, such as
-  [NHANES](sources.md#nhanes)'s pages and [NIH CDE](sources.md#nih-cde)'s
-  export. Their kept files are the only copy of the state that the manifest
-  pins.
-- Bad, because a newer state of such an input is read only after someone
-  moves its kept copy aside. The docs say to move it, not to delete it, so
-  the copy that a committed version pins is not lost.
+- Good, because a version names one build. A build that differs needs a new
+  version, as a released package does.
 - Bad, because a build that differs needs git. When git cannot say which
   version is committed, a build that differs is refused. It cannot tell
   whether a raised version is new or already committed. A build that matches
@@ -152,9 +143,6 @@ source. Downloads are kept for later builds.
 - Writing a differing build, with a warning, when git cannot say which
   version is committed: the build could change a committed version without
   anyone noticing.
-- Downloading on every build: a source that serves only its current state
-  could change between two builds. And every build would wait on the network.
-
 **Confirmation.** The tests in
 [test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py)
 check that:
@@ -166,204 +154,49 @@ check that:
   committed;
 - a matching build needs no git.
 
-### Licenses are SPDX license expressions
+### Downloads are kept for later builds
 
-**Described in:** [manifests.md](manifests.md#its-fields) and
-[licenses.md](licenses.md).
+**Described in:** [sources.md](sources.md#what-a-fetch-writes) and
+[manifests.md](manifests.md#making-a-new-version).
 
-**Context.** Each input has a license, and some have terms of their own. A
-manifest holds each input's license, for tools and for people. One license
-can be spelled in several ways, and license pages move.
+**Context.** Each benchmark build and each source fetch downloads its inputs
+from their publishers. Some inputs serve only their current state, such as
+[NHANES](sources.md#nhanes)'s pages and [NIH CDE](sources.md#nih-cde)'s
+export. That state can change without notice. A change to a reader is tested
+on the files that it reads.
 
-**Decision.** Each input's `license` is an
-[SPDX license expression](https://spdx.github.io/spdx-spec/v2.3.1/SPDX-license-expressions/).
-SPDX is the System Package Data Exchange. A license on SPDX's
-[License List](https://spdx.org/licenses/) has its short id, such as
-`CC-BY-4.0`. Other terms have a `LicenseRef-` id, such as
-`LicenseRef-Abcd-Terms`. An input that states no license is `NONE`.
-[licenses.md](licenses.md) gives each id's terms and links.
+**Decision.** Each download is kept in the inputs folder. A later build reads
+the kept file again, and downloads only what it does not have.
 
 **Consequences.**
 
-- Good, because SPDX is the standard way to name a license so that tools can
-  read it. It is the ISO/IEC 5962:2021 standard, and Python's package
-  metadata uses it too ([PEP 639](https://peps.python.org/pep-0639/)).
-- Good, because a manifest holds only the id, not the address of the
-  terms. Each address is written once, in licenses.md. So when a license page
-  moves, one link in licenses.md changes, and no manifest does.
-- Good, because `NONE` is SPDX's own value for no license. It is not a
-  license expression, but SPDX's license fields allow it beside one.
-- Bad, because terms without an SPDX id get a `LicenseRef-` id of our own,
-  which only licenses.md explains.
+- Good, because a kept download is read again without the network. So a
+  change to a reader can be tested on the same files.
+- Good, because the kept files of an input that serves only its current
+  state are the only copy of the state that the manifest pins.
+- Bad, because a newer state of such an input is read only after someone
+  moves its kept copy aside. The docs say to move it, not to delete it, so
+  the copy that a committed version pins is not lost.
+- Bad, because the kept downloads take disk space.
 
 **Alternatives considered.**
 
-- A license's name or address in each manifest: one license is spelled in
-  several ways. And a moved address would need a fix in every manifest.
+- Downloading on every build: a source that serves only its current state
+  could change between two builds. And every build would wait on the network.
 
 **Confirmation.** The tests in
-[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+[test_embedding_model_download.py](../../tests/test_embedding_model_download.py)
 check that:
 
-- a stated license becomes its SPDX expression;
-- an unknown license stops the fetch.
-
-### Each output folder is written whole
-
-**Described in:** [Inputs and outputs](../README.md#inputs-and-outputs).
-
-**Context.** A step writes many files into one output folder, such as
-`corpora/abcd/` for a corpus. A run can fail halfway through, or be stopped
-by its user or by a time limit. A later step reads the folder as a whole. A
-folder cannot be renamed over a folder that holds files, and a rename can
-fail across two file systems.
-
-**Decision.** `folders.staged` gives each step a new folder in a hidden
-staging folder beside the destination, such as `corpora/.abcd.x1y2/abcd/` for
-`corpora/abcd/`. The step writes its whole output there. Then
-`folders.replace` swaps it in with two renames: the previous folder into the
-staging folder, then the new folder into its place. If the second rename
-fails, the previous folder is moved back.
-
-**Consequences.**
-
-- Good, because a later step never reads half an output. Each rename is
-  atomic, for a folder as for a file. `folders.replace` renames with
-  `Path.rename`, which calls `os.rename`. Its
-  [documentation](https://docs.python.org/3/library/os.html#os.rename) says:
-  "If successful, the renaming will be an atomic operation (this is a POSIX
-  requirement)." So the destination holds the
-  whole previous output or the whole new one.
-- Good, because a run that fails leaves the previous output as it was.
-- Bad, because the swap as a whole is not atomic. Between its two renames, no
-  folder is at the destination, for a moment. The steps run one after
-  another, so no step reads a folder in that moment.
-- Bad, because the staging folder must sit on the destination's file
-  system. So it cannot be in a temporary folder such as `/tmp`.
-- Bad, because a run that is stopped leaves its staging folder behind. The
-  next run warns about it and says what to do: delete it, or move the
-  previous output back from it. Someone has to do that by hand.
-
-**Alternatives considered.**
-
-- Writing the files in place: a failed run leaves a mix of old and new files.
-- Deleting the previous folder first: if the new folder then cannot move in,
-  neither folder is left.
-- `shutil.move`: across file systems, it copies the folder and then deletes
-  the original. A run that fails during the copy leaves half a folder.
-- `os.replace` in place of `Path.rename`: the two work the same here. On
-  Linux and macOS, both make the same system call. On Windows, they differ
-  when something already has the new name: `os.replace` replaces it, and
-  `os.rename` raises an error. In the swap, nothing has the new name, so
-  this case never comes up.
-- Linux's `renameat2` with `RENAME_EXCHANGE`, which swaps two folders in one
-  call: Python's `os` module does not offer it. It works only on Linux, and
-  only on file systems that support it. A package that calls it would be one
-  more dependency.
-- A symbolic link to the current version's folder: each build writes a new
-  version beside the link. One `os.replace` then points the link to the new
-  version, and the earlier version is deleted. So the output is never
-  missing, even for a moment. But every output becomes a link, and common
-  tools treat a link differently from a folder. On Linux, `cp -r
-  corpora/abcd` and `tar` copy only the link, so the copy points to a folder
-  that is not there. `rm -r corpora/abcd` deletes only the link, and leaves
-  the data. The gain is small: it closes only the moment between the two
-  renames, when no step reads the folder.
-
-**Confirmation.** The tests in
-[test_embedding_model_folders.py](../../tests/test_embedding_model_folders.py)
-check that:
-
-- a finished run replaces the previous folder;
-- a run that raises keeps the previous folder;
-- a failed move puts the previous folder back;
-- a previous folder that cannot be put back is kept, and the warning names it;
-- a staging folder that a killed run left is warned about;
-- the warning says whether to delete that folder or to move the previous
-  folder back;
-- the staging folder of a longer name, such as `abcd.v2`, is not warned about.
-
-### Large tables are kept as parquet
-
-**Described in:** [sources.md](sources.md#what-a-fetch-writes),
-[pairs.md](pairs.md#what-a-pair-holds) and
-[corpus.md](corpus.md#what-a-corpus-holds).
-
-**Context.** The source, pairs and corpus tables are large tables of text. Some
-of their columns hold lists, or true and false. Many of their texts are real
-labels that look like missing values, such as `None` in the list
-`Mild | Moderate | Severe | None`, or `N/A`. Training hands the pairs to the
-trainer as a [`datasets`](https://huggingface.co/docs/datasets) `Dataset`.
-The benchmark and score tables are small, and people open them to check
-them.
-
-**Decision.** The source, pairs and corpus tables are written as parquet, by
-pandas with [pyarrow](https://arrow.apache.org/docs/python/). The benchmark and
-score tables are written as CSV, which opens in a text editor or a spreadsheet.
-A benchmark table is read with every cell as a text, so an empty cell stays an
-empty text.
-
-**Consequences.**
-
-- Good, because each column keeps its type. A list stays a list, true or
-  false stays a boolean, and the text `None` stays a text. Parquet stores a
-  list with the encoding of Dremel
-  ([Melnik et al., 2010](https://doi.org/10.14778/1920841.1920886)), as its
-  [format](https://github.com/apache/parquet-format) says.
-- Good, because parquet stores a table by column, and compresses each
-  column. pandas compresses with snappy by default. So a large table takes
-  less space than as CSV, and it is read without parsing text.
-- Good, because parquet is a common standard. In data analytics, Parquet and
-  [ORC](https://orc.apache.org/) are the most widely adopted open-source
-  columnar formats
-  ([Zeng et al., 2023](https://doi.org/10.14778/3626292.3626298)). Hugging
-  Face's dataset viewer converts every dataset on the Hub to parquet
-  ([Hugging Face](https://huggingface.co/docs/dataset-viewer/parquet)).
-- Bad, because a parquet file's bytes depend on the library that wrote it.
-  So a table has a second checksum, as
-  [Two checksums, for two questions](#two-checksums-for-two-questions) says.
-- Bad, because a text editor or a spreadsheet cannot open a parquet file.
-  pandas, `datasets` and viewers read it, such as the VS Code extensions
-  [Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer)
-  and Microsoft's
-  [Data Wrangler](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.datawrangler).
-  Both run on Linux, macOS and Windows.
-
-**Alternatives considered.**
-
-- CSV for every table: a list would need a text format of its own. By
-  default, pandas reads an empty cell, and texts such as `NA`, `NULL` and
-  `None`, as missing values
-  ([`pandas.read_csv`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html)).
-  So every read would need `keep_default_na=False`. And a large table would
-  take more space.
-- [JSON Lines](https://jsonlines.org/): it keeps lists, booleans and texts. But
-  it is not compressed, and every read parses each row as text.
-- ORC, the other widely adopted columnar format: pandas reads and writes it
-  too. Hugging Face's Hub keeps datasets as parquet, so parquet is what its
-  tools expect.
-- Arrow IPC (Feather): it keeps types too, and pandas reads it. The same
-  holds for it: Hugging Face's tools expect parquet.
-- Reading a benchmark table with pandas' defaults: each empty cell would
-  become `NaN`. So would a cell that holds only a text such as `None` or
-  `N/A`, such as a value list with that one label. A column whose cells are
-  all empty would also get a number type, `float64`. A missing description
-  would then be formatted as `nan`.
-
-**Confirmation.** The tests check that:
-
-- texts that look missing, such as `None` and `N/A`, an empty text, and true
-  or false read back as written
-  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
-- a pair's values read back from the corpus as the list written
-  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+- a file is downloaded once, and no partial file is left;
+- a failed check keeps nothing.
 
 ### Two checksums, for two questions
 
 **Described in:** [manifests.md](manifests.md#two-checksums).
 
 **Context.** Two builds are compared across machines, and a step checks each
-file that it reads. The bytes of a [parquet](#large-tables-are-kept-as-parquet)
+file that it reads. The bytes of a [parquet](https://parquet.apache.org/)
 file depend on the libraries that wrote it. The file stores each column's
 [Arrow](https://arrow.apache.org/docs/python/api/datatypes.html) type, such as
 `string`, `bool` or `int64`. CSV text loses these types: it writes `True` and
@@ -776,45 +609,6 @@ check that:
 - a source's text has no leading dot;
 - a text that starts with a dot of its own keeps it.
 
-### Ties keep sentence-transformers' order
-
-**Described in:** [scoring.md](scoring.md#running-score).
-
-**Context.** A tie needs two targets with identical texts. For a static model,
-which averages its tokens, the same tokens in another order tie too. Only
-`stdelement` leaves a target's node out, so only it gives one property in
-several nodes the same text. In the [GDC benchmark](benchmarks.md#gdc), many
-targets share their `stdelement` text, but no expected target shares it with
-a target that is not expected. The [TOPMed
-benchmark](benchmarks.md#topmed)'s targets share no texts.
-
-**Decision.** Targets with the same similarity keep the order that
-[sentence-transformers](https://sbert.net)' evaluator gives them. Version 6
-breaks a tie by target key, in alphabetical order: `clinical.race` comes
-before `demographic.race`.
-
-**Consequences.**
-
-- Good, because every metric comes from the evaluator, with no code of our
-  own.
-- Good, because the order changes no score on these benchmarks. A tie changes
-  a rank only when an expected target ties with a target that is not expected.
-- Bad, because a future benchmark could hold such ties. Its scores would
-  then depend on which tied target comes first. Version 6 puts them in a fixed
-  order, so a score repeats. Earlier releases leave the order to chance, so a
-  score could change from one run to the next.
-- Bad, because each copy of a target that is not expected still takes a rank
-  of its own. That cost belongs to the `stdelement` format.
-
-**Alternatives considered.**
-
-- The realistic rank, the mean of the best and the worst place among tied
-  targets
-  ([Berrendorf et al., 2020](https://doi.org/10.1109/wiiat50758.2020.00053)).
-  Two targets tied at places 2 and 3 would each be at 2.5. Every metric would
-  then be computed in code of our own, not by the evaluator. And it changes no
-  score on these benchmarks.
-
 ### Scoring a run uses its corpus's leakage check
 
 **Described in:** [training.md](training.md#scoring-a-run).
@@ -986,36 +780,31 @@ check that:
 - a new NHANES use constraint closes its variables;
 - a PhenX protocol that is not available closes its variables.
 
-### Two readers of our own: OWL files and PhenX's export
+### OWL files are read by a reader of our own
 
-**Described in:** [sources.md](sources.md#ontologies) and
-[sources.md](sources.md#phenx).
+**Described in:** [sources.md](sources.md#ontologies).
 
 **Context.** [NCIt](sources.md#ncit) and
 [the ontologies](sources.md#ontologies) publish
 [OWL](https://www.w3.org/OWL/) files in RDF/XML. pronto, rdflib and owlready2
-read OWL files. PhenX publishes a MySQL database export. Neither Python nor the
-repository's dependencies read MySQL exports.
+read OWL files.
 
 **Decision.** `sources/owl.py` reads OWL files in RDF/XML in one streaming
-pass, with defusedxml. `sources/phenx.py` reads PhenX's export as text: a
-regex tokenizer reads its `INSERT` statements, and checks each row's field
-count.
+pass, with defusedxml.
 
 **Consequences.**
 
 - Good, because one OWL reader reads NCIt and every ontology.
 - Good, because defusedxml refuses entities and external references in the
   XML.
-- Good, because the PhenX reader needs no MySQL server.
-- Bad, because both readers are code of our own to maintain. A change in a
-  file's layout needs a change in its reader.
+- Bad, because the reader is code of our own to maintain. A change in the
+  files' layout needs a change in the reader.
 
 **Alternatives considered.**
 
-- rdflib, for the OWL files: it builds the whole graph in memory. It was many
-  times slower than this reader on the base file of HP, the Human Phenotype
-  Ontology. Only this file was timed with both readers.
+- rdflib: it builds the whole graph in memory. It was many times slower than
+  this reader on the base file of HP, the Human Phenotype Ontology. Only this
+  file was timed with both readers.
 - pronto: it is not a dependency. It knows the annotations that OBO defines,
   such as a synonym and its scope. NCIt writes its synonyms with properties of
   its own, which pronto does not know. On the ontologies' base files, pronto
@@ -1025,9 +814,36 @@ count.
 - The ontologies' OBO files, read with pronto: EVS publishes NCIt in OWL and
   as a flat file, not in OBO. So NCIt would still need an OWL reader. pronto's
   strict OBO parser fails on the OBO file of Uberon, the anatomy ontology.
-- sqlite3, for the PhenX export: it cannot run the export's `CREATE TABLE`
-  statements. Turning only `\'` into SQL's own escape leaves many variables
-  wrong, from `\"`, `\n` and `\r`.
+- The ontologies' OBO Graphs JSON files, read with `json`: EVS publishes no
+  such file for NCIt. So NCIt would still need an OWL reader.
+
+**Confirmation.** The tests in
+[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
+check that:
+
+- the OWL reader keeps each statement's exact text.
+
+### PhenX's export is read by a reader of our own
+
+**Described in:** [sources.md](sources.md#phenx).
+
+**Context.** PhenX publishes a MySQL database export. Neither Python nor the
+repository's dependencies read MySQL exports.
+
+**Decision.** `sources/phenx.py` reads PhenX's export as text: a regex
+tokenizer reads its `INSERT` statements, and checks each row's field count.
+
+**Consequences.**
+
+- Good, because the reader needs no MySQL server.
+- Bad, because the reader is code of our own to maintain. A change in the
+  export's layout needs a change in the reader.
+
+**Alternatives considered.**
+
+- sqlite3: it cannot run the export's `CREATE TABLE` statements. Turning only
+  `\'` into SQL's own escape leaves many variables wrong, from `\"`, `\n`
+  and `\r`.
 - sqlparse: it is not a dependency. It splits SQL into tokens, such as one
   quoted string, and groups them. A token keeps its text as written, with its
   quotes and backslash escapes. So the code that reads each value would still
@@ -1038,51 +854,7 @@ count.
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- the OWL reader keeps each statement's exact text;
 - the PhenX reader reads rows with quotes, escapes and nulls.
-
-### NCIt is read from its OWL release
-
-**Described in:** [sources.md](sources.md#ncit) and
-[pairs.md](pairs.md#ncit).
-
-**Context.** EVS publishes each NCIt release as an
-[OWL](https://www.w3.org/OWL/) file and as a flat file, and its archive keeps
-every release. The flat file has one row per concept: its names, one definition
-and its parents, as EVS's
-[ReadMe](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ReadMe.txt) describes it.
-It has no term types and no associations. The pairs need three things that the
-OWL release holds:
-
-- each synonym's term type and source;
-- every definition, with its source;
-- the associations that give value lists.
-
-**Decision.** `sources fetch` reads NCIt from its OWL release,
-`Thesaurus_<version>.OWL.zip`, in EVS's archive.
-
-**Consequences.**
-
-- Good, because the rule that picks names of the same meaning can run, and
-  value lists can be built.
-- Good, because the manifest pins a release, and every later fetch reads the
-  same file. It is a release file, so another machine can rebuild the same
-  version.
-- Bad, because the OWL release is the larger file to download, and it needs
-  the OWL reader of our own.
-
-**Alternatives considered.**
-
-- The flat file, `Thesaurus.FLAT.zip`: it is smaller and simpler to read. But
-  without term types, the rule that picks names of the same meaning could not
-  run, and no value list could be built.
-
-**Confirmation.** The tests in
-[test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
-check that:
-
-- a fictional OWL release gives its concepts, synonyms, definitions and value
-  lists.
 
 ### NCIt's replacements come from its merge records
 
@@ -1094,8 +866,7 @@ an action, such as `merge` or `retire`. A `merge` record names the concept
 that a retired concept was merged into. A `retire` record names the concept's
 old parent, as EVS's
 [ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt)
-says. EVS's replacements service, a live service, also gives that parent as a
-replacement.
+says.
 
 **Decision.** `sources fetch` reads NCIt's replacements from the history file
 of the same release, from its `merge` records only.
@@ -1114,10 +885,12 @@ of the same release, from its `merge` records only.
 
 **Alternatives considered.**
 
-- EVS's replacements service: it serves only its current state. And it gives
-  a retired concept's old parent as its replacement.
+- EVS's replacements service, a live service: it serves only its current
+  state. And it gives a retired concept's old parent as its replacement.
 - `retire` records as replacements too: they name the old parent, a broader
   concept, not one of the same meaning.
+- `split` records as replacements: a split names the concepts that each take
+  a part of the old concept's meaning. Each of them would get all its names.
 
 **Confirmation.** The tests in
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
@@ -1220,6 +993,10 @@ with the canonical "Body Mass Index". They are never paired with each other.
 - Pairs among all the texts of a concept, as SapBERT builds them from UMLS
   ([Liu et al., 2021](https://doi.org/10.18653/v1/2021.naacl-main.334)).
   SapBERT caps a concept at 50 pairs, to keep the data balanced.
+- A cap on each item's pairs, as SapBERT caps a concept: a few items give far
+  more pairs than most. Many of their names are short variable names that
+  forms give one caDSR element. Each is a real variable name, so a cap would
+  drop true pairs.
 
 **Confirmation.** The tests in
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
@@ -1572,56 +1349,6 @@ or the canonical, is used once.
 - the sources combine in their own order, whatever the order named
   ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
 
-### Texts are cleaned with ftfy, until nothing changes
-
-**Described in:** [pairs.md](pairs.md#cleaning).
-
-**Context.** Source texts hold markup, HTML entities, escapes such as R's
-`<U+00A0>`, and text decoded with the wrong encoding. A source can escape a
-text twice by mistake, as in `&amp;lt;5`. One cleaning step can leave work
-for an earlier one: `Caf&lt;U+00E9&gt;` becomes `Caf<U+00E9>` after one
-pass.
-
-**Decision.** `pairs.common.clean` repairs encodings and unescapes HTML
-entities with ftfy's `fix_text`
-([Speer, 2019](https://doi.org/10.5281/ZENODO.2591652)), with
-`unescape_html=True`. Its other steps read escapes, remove HTML tags, and
-normalise characters and spaces. All of `clean`'s steps repeat until the text
-stops changing.
-
-**Consequences.**
-
-- Good, because ftfy is a maintained library for text decoded with the wrong
-  encoding. Its `fix_text` repeats its fixes until the text stops changing.
-- Good, because cleaning is idempotent: cleaning a clean text changes nothing,
-  as with Unicode's normal forms. So a step that cleans a text again does no
-  harm.
-- Good, because a text that a source escaped twice becomes the text that its
-  author meant: `&amp;lt;5` becomes `<5`.
-- Bad, because a text about HTML entities would lose them. Data dictionaries
-  hold none.
-
-**Alternatives considered.**
-
-- Unescaping once, as a web page shows a text: `&amp;lt;5` would stay
-  `&lt;5`.
-- ftfy's default for HTML, `unescape_html="auto"`: it leaves the entities of
-  a text that holds a `<`, such as a tag.
-- ftfy's `decode_escapes`, for escapes such as `\u2122`: it also turns the
-  `\n` of `C:\new` into a line break.
-- [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) alone, for
-  tags: it reads any text in angle brackets as a tag. So "Candida
-  <Debaryomycetaceae> infection" would lose a word. Only known HTML tags are
-  removed.
-
-**Confirmation.** The tests in
-[test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
-check that:
-
-- cleaning a clean text changes nothing;
-- an escape written with entities is read;
-- entities are read until none is left.
-
 ## Corpus
 
 ### Texts are compared by a broader `text_key` for leakage, the split, retired items and descriptions
@@ -1853,14 +1580,14 @@ study's variable names are often variants of a benchmark name, such as
 
 **Decision.** Two texts match by their
 [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
-in one of three ways:
+in three ways:
 
 - `=`: they are equal;
 - `~`: they share at least 8 words in a row (`min_overlap_words`);
-- `>=`: a side holds every word of a benchmark name of 2 words or more
-  (`min_name_words`), and the other side matches that row's description.
+- `>=`: a side holds every word of a benchmark name of 2 or more words
+  (`min_name_words`), and the other side matches the row's description.
 
-The source and the target must match on different sides.
+The source and the target match on different sides.
 
 **Consequences.**
 
@@ -1929,62 +1656,6 @@ check that:
 - a text that matches the source and the target on one side is kept.
 
 ## Tokenizer
-
-### The tokenizer is built with Hugging Face's tokenizers
-
-**Described in:** [tokenizer.md](tokenizer.md).
-
-**Context.** A later step trains the model, a static embedding table of
-[sentence-transformers](#the-model-is-built-trained-and-scored-with-sentence-transformers).
-Its `StaticEmbedding` module reads the tokenizer. It takes a tokenizer of
-Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers)
-library, or a `transformers` tokenizer that wraps one. Its docstring says the
-tokenizer "Must be a fast tokenizer". The tokenizer is trained from scratch,
-on the corpus's training texts. It needs a normaliser, a pre-tokenizer, a vocabulary
-trainer and a file that other tools read.
-
-**Decision.** The tokenizer is built from the parts of `tokenizers`: its
-normalizers, its `BertPreTokenizer`, a `BPE` model that its `BpeTrainer`
-trains, and its `tokenizer.json` file.
-[The vocabulary's entry](#the-vocabulary-is-learned-by-bpe-not-wordpiece)
-says why BPE. Our own code, in [`tokenizer.py`](../tokenizer.py), chooses the
-[training texts](tokenizer.md#what-it-learns-from) and the settings. It also
-counts the [diagnostics](tokenizer.md#diagnostics) from the tokens that the
-library gives.
-
-**Consequences.**
-
-- Good, because `StaticEmbedding` reads the tokenizer directly, with no
-  conversion.
-- Good, because `tokenizer.json` loads anywhere: with `Tokenizer.from_file`,
-  or in `transformers`, whose fast tokenizers wrap the same library.
-- Good, because none of the tokenizer's algorithms is our own code. Hugging
-  Face maintains the library.
-- Bad, because the library's defaults decide part of the result.
-  `tokenizer train` sets each setting that matters, and the manifest holds
-  the library's version.
-- Bad, because `tokenizers` 1.0 cannot yet train or save a tokenizer from
-  Python, in its first release candidate. So the project requires a version
-  below 1.0 for now. Hugging Face's
-  [roadmap for 1.0](https://github.com/huggingface/tokenizers#v100-roadmap)
-  brings back the whole Python API before the final release.
-
-**Alternatives considered.**
-
-- [SentencePiece](https://github.com/google/sentencepiece), Google's tokenizer
-  library: `StaticEmbedding` cannot read its model file, so each tokenizer
-  would need a conversion to `tokenizer.json`.
-- [TkTkT](https://github.com/bauwenst/TkTkT) for the diagnostics: this toolkit
-  of tokenizers and of measures for them would give more measures, such as
-  Rényi entropy and morphological boundaries. But it adds many other
-  dependencies.
-
-**Confirmation.** The tests in
-[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
-check that:
-
-- the `tokenizer.json` that `tokenizer train` writes loads with
-  `Tokenizer.from_file`.
 
 ### The vocabulary is learned by BPE, not WordPiece
 
@@ -2245,8 +1916,7 @@ that does not exist is refused.
 - Good, because argparse reads a default that is text by the setting's type.
   So `1e-3` in a config becomes a number.
 - Good, because each architecture's settings have a section of their own.
-  So a static model's config cannot carry BERT's by mistake
-  ([Each architecture's settings are its library's](#each-architectures-settings-are-its-librarys-in-a-section-of-their-own)).
+  So a static model's config cannot carry BERT's by mistake.
 - Bad, because the flags have no sections, so each name must be unique
   across them. A test checks it.
 
@@ -2256,6 +1926,14 @@ that does not exist is refused.
   scripts: it takes a flat file, so the sections would be lost.
 - A flag of our own for each setting: each setting of the trainer would need
   code of ours, under a name of ours.
+- [Hydra](https://hydra.cc/) or [OmegaConf](https://omegaconf.readthedocs.io/),
+  the common config tools of machine learning: they would replace only the
+  reading of the config and its overrides. The checks of each architecture
+  would stay our code. Overrides would be written as
+  `training.learning_rate=1e-2`, not as the trainer's own flags. And their
+  typed configs refuse some of the trainer's settings. OmegaConf 2.4 refuses
+  `batch_sampler`. Hydra 1.3 needs an older OmegaConf, and also refuses
+  `report_to`.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
@@ -2435,6 +2113,9 @@ added to a text, as for the static model.
 
 - A pretrained BERT, fine-tuned on the corpus: its pretraining texts are
   outside the leakage check.
+- Masked-language pretraining on the corpus's own texts before the pair
+  loss, as the BERT paper pretrains: not done yet. A series can test it as an
+  arm, and the tokenizer keeps `[MASK]` for it.
 - CLS pooling, as BERT's own classifiers use: a `[CLS]` token goes before
   each text, and its output vector is the embedding. A static model cannot
   pool this way: its `[CLS]` vector is the same for every text. So a BERT
@@ -2449,31 +2130,22 @@ check that:
 - two runs of one config and one seed give the same weights, on a CPU;
 - `score` ranks a benchmark with a BERT run.
 
-### Each architecture's settings are its library's, in a section of their own
+### BERT defaults to BERT-Small's shape and 128 tokens
 
-**Described in:** [training.md](training.md#architectures).
+**Described in:** [training.md](training.md#bert-a-transformer-embedding-model-with-berts-architecture).
 
-**Context.** `StaticEmbedding` names its width `embedding_dim`.
-[`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig)
-names it `hidden_size`. Its documentation
-says that its defaults "will yield a similar configuration to that of the
-google-bert/bert-base-uncased" model: 12 layers of 768 dimensions. Google's
-release of smaller BERT models names BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
+**Context.** `BertConfig`'s documentation says that its defaults "will yield a
+similar configuration to that of the google-bert/bert-base-uncased" model: 12
+layers of 768 dimensions. Google's release of smaller BERT models names
+BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
 `max_position_embeddings`, 512 in `BertConfig`. The BERT paper notes that
-"attention is quadratic to the sequence length". `HfArgumentParser` cannot read
-`BertConfig` itself.
+"attention is quadratic to the sequence length".
 
-**Decision.** Each architecture has a section named after it, under its
-library's names. `static` holds `embedding_dim`. `bert` holds eight fields of
-`BertConfig`. Its shape defaults to BERT-Small's, its length to 128 tokens,
-and its other settings to `BertConfig`'s defaults. The `model` section names
-the architecture. A config or a flag that gives another architecture's settings
-is refused.
+**Decision.** The `bert` section's shape defaults to BERT-Small's, and its
+length to 128 tokens. Its other settings default to `BertConfig`'s.
 
 **Consequences.**
 
-- Good, because each setting has the name that its library's documentation
-  gives it.
 - Good, because BERT's default shape is a standard one: BERT-Small, from
   Google's release ([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)).
   Its feed-forward part is 4 times the width, as the BERT paper sets it.
@@ -2482,8 +2154,6 @@ is refused.
   batch of 2,048 pairs on one GPU.
 - Good, because BERT's other defaults are read from `BertConfig` itself, so
   the code copies none of its numbers.
-- Good, because a static config cannot carry BERT's settings by mistake, and
-  a BERT config cannot carry the static width.
 - Bad, because BERT-Small is a guess at a size that suits a corpus of short
   texts. A series tests other shapes as arms.
 - Bad, because a text longer than 128 tokens is cut, in training and in
@@ -2495,21 +2165,13 @@ is refused.
   and slow to train from scratch, at a batch of 2,048 pairs.
 - `BertConfig`'s own length, 512 tokens: a batch of 2,048 pairs padded to
   512 does not fit on one GPU, even for BERT-Small.
-- One width for both, `embedding_dim`: BERT's width would not have its
-  library's name, `hidden_size`. Its default of 1,024 would also give BERT
-  twice BERT-Small's width.
-- Every field of `BertConfig`: many of them, such as `is_decoder`, do not
-  apply to an encoder trained here.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a BERT config reads its own section, at BERT-Small's shape, 128 tokens
-  and `BertConfig`'s other defaults;
-- a setting of the other architecture, in its section or as a flag, is
-  refused;
-- no two sections share a setting's name.
+- a BERT config gets BERT-Small's shape, 128 tokens and `BertConfig`'s other
+  defaults.
 
 ### Each architecture has its own learning rate
 
@@ -2673,6 +2335,11 @@ stops, and asks for `CUDA_VISIBLE_DEVICES` to name one GPU.
   have to ask NVIDIA's management library before CUDA starts.
 - Setting the trainer's `_n_gpu` to 1: `transformers` does not document that
   attribute, so a release could change it.
+- DistributedDataParallel (DDP), launched with `torchrun` or `accelerate`:
+  each GPU would rank its pairs only against its own batch. The loss's
+  `gather_across_devices` joins the batches, and it is off by default. Its
+  docstring warns that it may slow training and run out of memory. One GPU
+  already trains the models here at a batch of 2,048 pairs.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)

@@ -262,8 +262,6 @@ and the scores are CSV files. To look at a parquet file, read it with pandas.
 Or open it in VS Code with an extension such as
 [Parquet Explorer](https://marketplace.visualstudio.com/items?itemName=AdamViola.parquet-explorer) or Microsoft's
 [Data Wrangler](https://marketplace.visualstudio.com/items?itemName=ms-toolsai.datawrangler).
-[docs/design_decisions.md](docs/design_decisions.md#large-tables-are-kept-as-parquet)
-says why the tables are parquet.
 
 A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer, a
 training run and a model's scores are each written whole. For example, `corpus build --name abcd`
@@ -271,8 +269,6 @@ first writes the new corpus into a hidden staging folder,
 `corpora/.abcd.x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
 complete does it replace `corpora/abcd/`. So a run that fails leaves the
 previous corpus as it was.
-[docs/design_decisions.md](docs/design_decisions.md#each-output-folder-is-written-whole)
-says why the steps write their outputs this way.
 
 A run that is stopped with Ctrl-C deletes its staging folder. A run that is
 killed, such as by `scancel` or a time limit, cannot. The next run of

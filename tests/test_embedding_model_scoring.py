@@ -1,0 +1,578 @@
+"""Tests for the embedding model's scoring: texts, ranks, metrics and outputs."""
+
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+import yaml
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
+from tokenizers.normalizers import Lowercase
+from tokenizers.pre_tokenizers import Whitespace
+
+from embedding_model import benchmarks, scoring, texts
+from embedding_model.__main__ import main
+
+WORDS = ["[UNK]", "age", "sex", "race", "gender"]
+
+
+@pytest.fixture
+def model():
+    """A small static model that mistakes gender for race.
+
+    age, sex and race are each their own direction. gender lies between race
+    (0.8) and sex (0.6), so a gender variable sits closer to race than to sex.
+    The mistake is on purpose: it lets the tests check a variable whose
+    expected target is not ranked first. GENDER's expected target,
+    demographic.sex, comes third.
+    """
+    from sentence_transformers import SentenceTransformer
+    from sentence_transformers.sentence_transformer.modules import StaticEmbedding
+
+    tokenizer = Tokenizer(
+        WordLevel({w: i for i, w in enumerate(WORDS)}, unk_token="[UNK]")
+    )
+    tokenizer.normalizer = Lowercase()
+    tokenizer.pre_tokenizer = Whitespace()
+    weights = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [0.0, 0.6, 0.8],
+        ],
+        dtype=np.float32,
+    )
+    return SentenceTransformer(
+        modules=[StaticEmbedding(tokenizer, embedding_weights=weights)], device="cpu"
+    )
+
+
+def target(key, description, values=""):
+    """A target row of a benchmark."""
+    return {
+        "target_property": key,
+        "target_type": "string",
+        "target_description": description,
+        "target_values": values,
+    }
+
+
+def mapping(name, description, expected, number=1):
+    """A row of a benchmark's mappings file, from a fictional study."""
+    return {
+        "source_study_id": "phs999999",
+        "source_table_id": "pht999999.v1",
+        "source_variable_id": f"phv999999{number:02d}.v1",
+        "source_variable_name": name,
+        "source_type": "string",
+        "source_description": description,
+        "source_values": "",
+        "expected_target": expected,
+    }
+
+
+TARGETS = [
+    target("demographic.age", "Age"),
+    target("demographic.sex", "Sex"),
+    target("clinical.race", "Race"),
+    target("demographic.race", "Race"),
+]
+MAPPINGS = [
+    mapping("AGE01", "Age at exam", ["demographic.age"], 1),
+    mapping("RACE", "Race", ["clinical.race", "demographic.race"], 2),
+    mapping("GENDER", "Gender", ["demographic.sex"], 3),
+]
+
+
+def manifest_version(name):
+    """The version of a benchmark's committed manifest, which a test build takes."""
+    committed = benchmarks.MANIFESTS / f"{name}.json"
+    return json.loads(committed.read_text(encoding="utf-8"))["version"]
+
+
+def built(tmp_path, mappings, name="topmed"):
+    """A benchmark built from TARGETS and the mappings given, at its committed version.
+
+    Returns:
+        Path: The inputs folder it was built into.
+    """
+    folder = tmp_path / "inputs" / "benchmarks" / name
+    folder.mkdir(parents=True, exist_ok=True)
+    benchmarks.write_benchmark(
+        folder, name, manifest_version(name), TARGETS, mappings, [], {}
+    )
+    return tmp_path / "inputs"
+
+
+@pytest.fixture
+def saved(model, tmp_path):
+    """The small static model, saved to a folder named abcd-model."""
+    model.save(str(tmp_path / "abcd-model"))
+    return str(tmp_path / "abcd-model")
+
+
+@pytest.fixture
+def inputs(tmp_path):
+    """The benchmark built from TARGETS and MAPPINGS, in a temp inputs folder."""
+    return built(tmp_path, MAPPINGS)
+
+
+class TestRankTargets:
+    """Ranking each source variable's targets, and the metrics of the ranks."""
+
+    def test_ranks_and_metrics(self, model, inputs):
+        """A source variable's rank is the rank of its best placed expected target.
+
+        The metrics come from those ranks. RACE's two expected targets come
+        first and second, so its nDCG@10 is 1. GENDER's comes third, and adds
+        1 / log2(3 + 1).
+        """
+        targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
+        source_texts, target_texts, expected = scoring.benchmark_texts(
+            targets, mappings, texts.DEFAULT_FORMAT
+        )
+        metrics, ranked = scoring.rank_targets(
+            model, source_texts, target_texts, expected
+        )
+        assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
+        assert ranked["2"]["top1_target"] in {"clinical.race", "demographic.race"}
+        assert metrics == {
+            "mrr": round((1 + 1 + 1 / 3) / 3, 4),
+            "mrr@10": round((1 + 1 + 1 / 3) / 3, 4),
+            "ndcg@10": round((1 + 1 + 1 / np.log2(3 + 1)) / 3, 4),
+            "accuracy@1": round(2 / 3, 4),
+            "accuracy@3": 1.0,
+            "accuracy@5": 1.0,
+            "accuracy@10": 1.0,
+            "median_rank": 1.0,
+        }
+
+    def test_mrr_at_10_counts_a_rank_past_10_as_0(self, model):
+        """MRR counts every rank, and MRR@10 and nDCG@10 only the first ten.
+
+        The model puts eleven race properties, such as "Race: White", before
+        sex. Their other words are unknown to it, so each points along race.
+        So Gender's expected target, sex, comes twelfth.
+        """
+        races = [
+            "White",
+            "Asian",
+            "Black or African American",
+            "American Indian or Alaska Native",
+            "Native Hawaiian or Other Pacific Islander",
+            "More than one race",
+            "Other",
+            "Unknown",
+            "Not reported",
+            "Not allowed to collect",
+            "Declined",
+        ]
+        race_targets = {
+            f"demographic.race_{race.lower().replace(' ', '_')}": f"Race: {race}"
+            for race in races
+        }
+        metrics, ranked = scoring.rank_targets(
+            model,
+            {"0": "Gender"},
+            {**race_targets, "demographic.sex": "Sex"},
+            {"0": {"demographic.sex"}},
+        )
+        assert ranked["0"]["rank"] == 12
+        assert metrics["mrr"] == round(1 / 12, 4)
+        assert metrics["mrr@10"] == 0.0
+        assert metrics["ndcg@10"] == 0.0
+
+    def test_ndcg_at_10_counts_every_expected_target(self, model):
+        """nDCG@10 counts every expected target in the first ten, MRR only the best placed.
+
+        A gender variable can map to both a gender property and a sex
+        property. The model ranks gender first, race second and sex third. So
+        the variable's MRR is 1, and its nDCG@10 is below 1. Each expected
+        target adds 1 / log2(rank + 1): gender at rank 1, and sex at rank 3.
+        A perfect ranking would put both expected targets first: gender at
+        rank 1, sex at rank 2, then race.
+        """
+        metrics, ranked = scoring.rank_targets(
+            model,
+            {"0": "Gender"},
+            {"abcd.gender": "Gender", "abcd.race": "Race", "abcd.sex": "Sex"},
+            {"0": {"abcd.gender", "abcd.sex"}},
+        )
+        assert ranked["0"]["rank"] == 1
+        assert metrics["mrr"] == 1.0
+        dcg = 1 / np.log2(1 + 1) + 1 / np.log2(3 + 1)
+        perfect_dcg = 1 / np.log2(1 + 1) + 1 / np.log2(2 + 1)
+        assert metrics["ndcg@10"] == round(dcg / perfect_dcg, 4)
+
+    def test_a_query_prompt_is_not_added(self, model, inputs):
+        """Sources are embedded as the approaches embed them, without a query prompt.
+
+        The query prompt, the word sex five times, would pull every source
+        toward sex and change the ranks. Without it, they stay 1, 1 and 3.
+        """
+        model.prompts = {"query": "sex sex sex sex sex ", "document": ""}
+        targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
+        _, ranked = scoring.rank_targets(
+            model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
+        )
+        assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
+
+    def test_the_default_prompt_goes_on_both_sides(self, model, inputs):
+        """A default prompt is added to sources and targets, as model.encode() adds it."""
+        targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
+        sources, target_texts, expected = scoring.benchmark_texts(
+            targets, mappings, texts.DEFAULT_FORMAT
+        )
+        prompt = "sex sex "
+        by_hand = scoring.rank_targets(
+            model,
+            {key: prompt + text for key, text in sources.items()},
+            {key: prompt + text for key, text in target_texts.items()},
+            expected,
+        )
+        model.prompts = {"abcd-prompt": prompt}
+        model.default_prompt_name = "abcd-prompt"
+        assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
+
+    def test_targets_are_ranked_by_cosine(self, model):
+        """Targets are ranked by cosine, even when the model's config names another similarity.
+
+        The race target's text has four unknown words. They shorten its vector
+        but keep its direction. So cosine ranks it first, while a dot product
+        would rank the gender target first.
+        """
+        targets = pd.DataFrame(
+            [
+                target("demographic.gender", "Gender"),
+                target("clinical.race", "Race abcd efgh ijkl mnop"),
+            ]
+        )
+        mappings = pd.DataFrame([mapping("RACE", "Race", "clinical.race")])
+        model.similarity_fn_name = "dot"
+        _, ranked = scoring.rank_targets(
+            model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
+        )
+        assert ranked["0"]["rank"] == 1
+
+
+class TestScore:
+    """Scoring a model on built benchmarks, and the files that it writes."""
+
+    def test_writes_metrics_ranks_and_config(self, saved, inputs, tmp_path):
+        """Scoring writes one metrics row, every source variable's rank, and the config.
+
+        The model's parameters are its embedding weights: a row of 3 for each word.
+        """
+        (row,) = scoring.score(
+            saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
+        folder = folder / texts.DEFAULT_FORMAT
+        metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
+        assert metrics.loc[0, "mrr"] == row["mrr"]
+        assert (metrics.loc[0, "n"], metrics.loc[0, "targets"]) == (3, 4)
+        assert metrics.loc[0, "parameters"] == len(WORDS) * 3
+        assert metrics.loc[0, "benchmark_version"] == manifest_version("topmed")
+        assert metrics.loc[0, "ndcg@10"] == row["ndcg@10"]
+        per_variable = pd.read_csv(folder / "per_variable.csv")
+        assert list(per_variable["rank"]) == [1, 1, 3]
+        assert list(per_variable["source_variable_name"]) == ["AGE01", "RACE", "GENDER"]
+        config = yaml.safe_load((folder / "config.yaml").read_text())
+        assert config["benchmark_manifest"]["version"] == manifest_version("topmed")
+        assert config["benchmark_manifest"]["files"]["topmed_mappings.csv"]["sha256"]
+        assert config["format"] == texts.DEFAULT_FORMAT
+        assert config["device"] == "cpu"
+        assert set(config["ai_harmonization"]) == {"commit", "uncommitted_changes"}
+        assert config["model_revision"] is None
+
+    def test_another_model_of_the_same_name_is_a_warning(
+        self, model, saved, inputs, capsys, tmp_path
+    ):
+        """Scores of another model folder with the same name are replaced, with a warning."""
+        other = tmp_path / "other" / "abcd-model"
+        model.save(str(other))
+        for folder in (saved, str(other), str(other)):
+            scoring.score(
+                folder, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+            )
+        assert capsys.readouterr().err.count("They are replaced by those of") == 1
+
+    def test_a_model_folder_is_loaded_without_asking_hugging_face(
+        self, saved, inputs, monkeypatch, tmp_path
+    ):
+        """Loading a model folder sends no request to Hugging Face for its card."""
+        from sentence_transformers.base import model_card
+
+        asked = []
+        monkeypatch.setattr(
+            model_card, "get_model_info", lambda *args, **kwargs: asked.append(args)
+        )
+        scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
+        assert asked == []
+
+    def test_a_relative_model_path_is_recorded_in_full(
+        self, model, inputs, monkeypatch, capsys, tmp_path
+    ):
+        """Two folders given by the same relative path, from two places, are told apart."""
+        for place in ("a", "b"):
+            model.save(str(tmp_path / place / "abcd-model"))
+            monkeypatch.chdir(tmp_path / place)
+            scoring.score(
+                "abcd-model", ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+            )
+        folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
+        config = yaml.safe_load(
+            (folder / texts.DEFAULT_FORMAT / "config.yaml").read_text()
+        )
+        assert config["model"] == str((tmp_path / "b" / "abcd-model").resolve())
+        assert "They are replaced by those of" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("text", ["", "{", "[1, 2]"])
+    def test_a_config_that_cannot_be_read_is_replaced_quietly(
+        self, text, saved, inputs, capsys, tmp_path
+    ):
+        """A config.yaml that names no model, or is not YAML, is replaced with no warning."""
+        folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
+        folder = folder / texts.DEFAULT_FORMAT
+        folder.mkdir(parents=True)
+        (folder / "config.yaml").write_text(text)
+        scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
+        assert "warning" not in capsys.readouterr().err
+        assert yaml.safe_load((folder / "config.yaml").read_text())["model"]
+
+    def test_scores_each_benchmark(self, saved, inputs, tmp_path):
+        """One call scores the model on each benchmark given, into its own folder."""
+        built(tmp_path, MAPPINGS[:2], name="gdc")
+        rows = scoring.score(
+            saved, ["topmed", "gdc"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        assert [(row["benchmark"], row["n"]) for row in rows] == [
+            ("topmed", 3),
+            ("gdc", 2),
+        ]
+        scores = tmp_path / "outputs" / "scores" / "abcd-model"
+        for name in ("topmed", "gdc"):
+            assert (scores / name / texts.DEFAULT_FORMAT / "metrics.csv").exists()
+
+    def test_a_missing_benchmark_stops_before_any_scoring(
+        self, saved, inputs, tmp_path
+    ):
+        """A benchmark not built yet stops scoring before any benchmark is scored."""
+        with pytest.raises(FileNotFoundError, match="benchmarks build --gdc"):
+            scoring.score(
+                saved, ["topmed", "gdc"], inputs, tmp_path / "outputs", device="cpu"
+            )
+        assert not (tmp_path / "outputs").exists()
+
+
+class TestReadScores:
+    """Reading the scores that score wrote, as compare reads them."""
+
+    def test_reads_what_score_wrote(self, saved, inputs, tmp_path):
+        """The metrics row and each source variable's rank come back as score wrote them."""
+        (written,) = scoring.score(
+            saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        row, ranks, _ = scoring.read_scores(
+            saved, "topmed", texts.DEFAULT_FORMAT, tmp_path / "outputs", manifest
+        )
+        assert row["mrr"] == written["mrr"]
+        assert list(ranks["rank"]) == [1, 1, 3]
+
+    def test_a_model_not_scored_names_the_command(self, inputs, tmp_path):
+        """A model without scores is refused, with the score command that makes them."""
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="Score it first") as raised:
+            scoring.read_scores(
+                "ijkl-org/ijkl-model",
+                "topmed",
+                "compact",
+                tmp_path / "outputs",
+                manifest,
+            )
+        assert (
+            "python -m embedding_model score --model ijkl-org/ijkl-model"
+            " --benchmark topmed --format compact"
+        ) in str(raised.value)
+
+    def test_scores_of_another_build_are_refused(self, saved, inputs, tmp_path):
+        """A benchmark built again under its version, with a target described anew, is another build.
+
+        Its targets file differs, so the scores of the first build are refused,
+        with the command that scores the model again.
+        """
+        scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
+        edited = [dict(row) for row in TARGETS]
+        edited[0]["target_description"] = "Age at the visit"
+        benchmarks.write_benchmark(
+            inputs / "benchmarks" / "topmed",
+            "topmed",
+            manifest_version("topmed"),
+            edited,
+            MAPPINGS,
+            [],
+            {},
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="another build of it") as raised:
+            scoring.read_scores(
+                saved, "topmed", texts.DEFAULT_FORMAT, tmp_path / "outputs", manifest
+            )
+        assert "targets.csv" in str(raised.value)
+        assert "Score it again" in str(raised.value)
+
+    def test_scores_of_another_model_of_the_same_name_are_refused(
+        self, model, inputs, tmp_path
+    ):
+        """Two model folders of one name share a scores folder, so the other one's scores are refused."""
+        first = tmp_path / "first" / "abcd-model"
+        second = tmp_path / "second" / "abcd-model"
+        model.save(str(first))
+        model.save(str(second))
+        scoring.score(
+            str(second), ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="their config.yaml names .*second"):
+            scoring.read_scores(
+                str(first),
+                "topmed",
+                texts.DEFAULT_FORMAT,
+                tmp_path / "outputs",
+                manifest,
+            )
+
+
+class TestScoresFolder:
+    """Where a model's scores are written."""
+
+    def test_a_hugging_face_model_keeps_its_owner(self, tmp_path):
+        """A Hugging Face model's scores sit under its owner and name."""
+        folder = scoring.scores_folder(
+            tmp_path, "abcd-org/abcd-model", "gdc", "stdelement"
+        )
+        scores = tmp_path / "scores" / "abcd-org" / "abcd-model"
+        assert folder == scores / "gdc" / "stdelement"
+
+    def test_a_model_on_disk_is_named_after_its_folder(self, tmp_path):
+        """A model on disk has its scores under its folder's name."""
+        (tmp_path / "runs" / "abcd-run").mkdir(parents=True)
+        folder = scoring.scores_folder(
+            tmp_path, str(tmp_path / "runs" / "abcd-run"), "gdc", "stdelement"
+        )
+        assert folder == tmp_path / "scores" / "abcd-run" / "gdc" / "stdelement"
+
+    def test_each_format_has_its_own_folder(self, tmp_path):
+        """A model scored in two formats keeps both scores."""
+        folders = {
+            scoring.scores_folder(tmp_path, "abcd-org/abcd-model", "gdc", text_format)
+            for text_format in ("stdelement", texts.DEFAULT_FORMAT)
+        }
+        assert len(folders) == 2
+
+
+class TestWriteScores:
+    """Writing one scoring's files as a whole folder."""
+
+    def test_a_failed_write_keeps_the_previous_scores(self, tmp_path):
+        """A scoring that fails while it writes leaves the previous files, all of them."""
+        folder = tmp_path / "scores" / "abcd-model" / "topmed" / "compact"
+        folder.mkdir(parents=True)
+        (folder / "metrics.csv").write_text("previous")
+        mappings = pd.DataFrame([mapping("AGE01", "Age at exam", "demographic.age")])
+
+        to_csv = pd.DataFrame.to_csv
+
+        def failing(frame, path, **keywords):
+            """Write metrics.csv, then fail on per_variable.csv, as on a full disk."""
+            if Path(path).name == "per_variable.csv":
+                raise OSError("no space left on device")
+            return to_csv(frame, path, **keywords)
+
+        ranked = {
+            "0": {"rank": 1, "top1_target": "demographic.age", "top1_similarity": 0.9}
+        }
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(pd.DataFrame, "to_csv", failing)
+            with pytest.raises(OSError):
+                scoring.write_scores(folder, {"mrr": 1.0}, mappings, ranked, {})
+        assert (folder / "metrics.csv").read_text() == "previous"
+        assert [path.name for path in folder.parent.iterdir()] == ["compact"]
+
+
+class TestCommandLine:
+    """The `score` command."""
+
+    def test_score_command(self, model, inputs, tmp_path):
+        """`score` scores a model folder on two built benchmarks."""
+        built(tmp_path, MAPPINGS, name="gdc")
+        model.save(str(tmp_path / "abcd-model"))
+        status = main(
+            [
+                "score",
+                "--model",
+                str(tmp_path / "abcd-model"),
+                "--benchmark",
+                "topmed",
+                "gdc",
+                "--inputs",
+                str(inputs),
+                "--outputs",
+                str(tmp_path / "outputs"),
+                "--device",
+                "cpu",
+            ]
+        )
+        assert status == 0
+        scores = tmp_path / "outputs" / "scores" / "abcd-model"
+        for name in ("topmed", "gdc"):
+            assert (scores / name / texts.DEFAULT_FORMAT / "metrics.csv").exists()
+
+    def test_an_unbuilt_benchmark_is_a_clean_error(self, capsys, tmp_path):
+        """An unbuilt benchmark exits 1 with the build command, not a traceback."""
+        status = main(
+            [
+                "score",
+                "--model",
+                "abcd-model",
+                "--benchmark",
+                "gdc",
+                "--inputs",
+                str(tmp_path),
+            ]
+        )
+        assert status == 1
+        assert "benchmarks build --gdc" in capsys.readouterr().err
+
+    def test_a_model_that_cannot_be_loaded_is_named(self, inputs, capsys, tmp_path):
+        """A folder that holds no model is named, and score exits 1."""
+        empty = tmp_path / "abcd-model"
+        empty.mkdir()
+        status = main(
+            [
+                "score",
+                "--model",
+                str(empty),
+                "--benchmark",
+                "topmed",
+                "--inputs",
+                str(inputs),
+                "--outputs",
+                str(tmp_path / "outputs"),
+                "--device",
+                "cpu",
+            ]
+        )
+        assert status == 1
+        assert f"the model {empty} cannot be loaded" in capsys.readouterr().err
+
+    def test_score_needs_a_known_benchmark(self):
+        """An unknown benchmark is a usage error."""
+        with pytest.raises(SystemExit) as raised:
+            main(["score", "--model", "abcd-model", "--benchmark", "abcd-benchmark"])
+        assert raised.value.code == 2

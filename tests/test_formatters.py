@@ -159,6 +159,11 @@ class TestValueCap:
         joined = format_values(prop_many_values.values, limit=3)
         assert joined == VALUE_SEPARATOR.join(["code 0", "code 1", "code 2"])
 
+    def test_separator_is_a_parameter(self, prop_many_values):
+        """An explicit separator replaces VALUE_SEPARATOR between the values."""
+        joined = format_values(prop_many_values.values, limit=2, separator="; ")
+        assert joined == "code 0; code 1"
+
     def test_both_value_bearing_variants_cap_alike(self, node, prop_many_values):
         """Variants C and D format the target documents and the source queries,
         so one cap here is what keeps the two sides comparable."""

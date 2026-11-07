@@ -1,0 +1,557 @@
+target,unit,source_variable_id,source_variable_name,action,use,reason
+atherosclerosis.cac_score_1,FHS_Gen3,phv00023197.v3,studydat,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `CA1`, `CA2`."
+atherosclerosis.age_at_cac_score_1,FHS_Gen3,phv00023197.v3,studydat,add,computes the age,The unit computes this age from it.
+atherosclerosis.cac_score_1,FHS_Offspring,phv00023203.v3,studydat,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `CA1`, `CA2`."
+atherosclerosis.age_at_cac_score_1,FHS_Offspring,phv00023203.v3,studydat,add,computes the age,The unit computes this age from it.
+atherosclerosis.cac_score_1,FHS_Omnis,phv00257669.v1,IDTYPE,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `CAC_S`.
+atherosclerosis.cac_score_1,FHS_Omnis,phv00257672.v1,scan_date,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `CAC_S`."
+atherosclerosis.age_at_cac_score_1,FHS_Omnis,phv00257672.v1,scan_date,add,computes the age,The unit computes this age from it.
+atherosclerosis.cac_volume_1,FHS,phv00257672.v1,scan_date,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `CAC_V`."
+atherosclerosis.age_at_cac_volume_1,FHS,phv00257672.v1,scan_date,add,computes the age,The unit computes this age from it.
+atherosclerosis.carotid_plaque_1,CHS,phv00100290.v1,PERSTAT,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `LMRPH141`, `LMRPH155`, `LMRPH241`, `LMRPH255`."
+atherosclerosis.carotid_stenosis_1,CHS,phv00100290.v1,PERSTAT,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `PSTEN141`, `PSTEN155`, `PSTEN241`, `PSTEN255`."
+atherosclerosis.cimt_2,CHS,phv00100290.v1,PERSTAT,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `FMAX141`, `FMAX155`, `FMAX541`, `FMAX555`, `NMAX141`, `NMAX155`, `NMAX541`, `NMAX555`."
+atherosclerosis_events_incident.angina_incident_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.angina_incident_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_incident.angina_incident_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.age_at_angina_incident_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_angina_incident_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.angina_incident_1,WHI,phv00193146.v3,ANGINADY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_incident.angina_incident_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_incident.angina_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_incident.angina_incident_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `ANGINA`.
+atherosclerosis_events_incident.angina_incident_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_incident.age_at_angina_incident_1,WHI,phv00193146.v3,ANGINADY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_angina_incident_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_angina_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_angina_incident_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.cabg_incident_1,FHS,phv00054697.v8,PROCDATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `VESSEL`."
+atherosclerosis_events_incident.cabg_incident_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `VESSEL`."
+atherosclerosis_events_incident.cabg_incident_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `VESSEL`."
+atherosclerosis_events_incident.age_at_cabg_incident_1,FHS,phv00054697.v8,PROCDATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_cabg_incident_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.cabg_incident_1,WHI,phv00193158.v3,CABGDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_incident.cabg_incident_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_incident.cabg_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_incident.cabg_incident_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `CABG`.
+atherosclerosis_events_incident.cabg_incident_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_incident.age_at_cabg_incident_1,WHI,phv00193158.v3,CABGDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_cabg_incident_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_cabg_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_cabg_incident_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.chd_death_definite_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.chd_death_definite_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_incident.chd_death_definite_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.age_at_chd_death_definite_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_definite_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.chd_death_definite_1,WHI,phv00193498.v3,DEATHDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_definite_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_definite_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_definite_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_definite_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.age_at_chd_death_definite_1,WHI,phv00193498.v3,DEATHDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_definite_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_definite_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_definite_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.chd_death_probable_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.chd_death_probable_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_incident.chd_death_probable_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.age_at_chd_death_probable_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_probable_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.chd_death_probable_1,WHI,phv00193498.v3,DEATHDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_probable_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_probable_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_probable_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.chd_death_probable_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DEATH`, `DEATHCAUSE`."
+atherosclerosis_events_incident.age_at_chd_death_probable_1,WHI,phv00193498.v3,DEATHDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_probable_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_probable_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_chd_death_probable_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.coronary_angioplasty_incident_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_incident.coronary_angioplasty_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_incident.coronary_angioplasty_incident_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `PTCA`.
+atherosclerosis_events_incident.coronary_angioplasty_incident_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_incident.coronary_angioplasty_incident_1,WHI,phv00193200.v3,PTCADY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_incident.age_at_coronary_angioplasty_incident_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_coronary_angioplasty_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_coronary_angioplasty_incident_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_coronary_angioplasty_incident_1,WHI,phv00193200.v3,PTCADY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.mi_incident_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.mi_incident_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_incident.mi_incident_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.age_at_mi_incident_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_mi_incident_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.mi_incident_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `MI`."
+atherosclerosis_events_incident.mi_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `MI`."
+atherosclerosis_events_incident.mi_incident_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `MI`.
+atherosclerosis_events_incident.mi_incident_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `MI`."
+atherosclerosis_events_incident.mi_incident_1,WHI,phv00193170.v3,MIDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `MI`."
+atherosclerosis_events_incident.age_at_mi_incident_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_mi_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_mi_incident_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_mi_incident_1,WHI,phv00193170.v3,MIDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.pad_incident_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.pad_incident_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_incident.pad_incident_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_incident.age_at_pad_incident_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_pad_incident_1,FHS,phv00190823.v7,cvddate,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.pad_incident_1,WHI,phv00193504.v3,ENDEXT1DY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PADABDOP`, `PADAMP`, `PADDX`, `PADEXER`, `PADLEG`, `PADPLAQ`, `PADSURG`, `PERIPH`."
+atherosclerosis_events_incident.pad_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PADABDOP`, `PADAMP`, `PADDX`, `PADEXER`, `PADLEG`, `PADPLAQ`, `PADSURG`, `PERIPH`."
+atherosclerosis_events_incident.pad_incident_1,WHI,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `PADABDOP`, `PADAMP`, `PADDX`, `PADEXER`, `PADLEG`, `PADPLAQ`, `PADSURG`, `PERIPH`."
+atherosclerosis_events_incident.pad_incident_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PADABDOP`, `PADAMP`, `PADDX`, `PADEXER`, `PADLEG`, `PADPLAQ`, `PADSURG`, `PERIPH`."
+atherosclerosis_events_incident.pad_incident_1,WHI,phv00193191.v3,PERIPHDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PADABDOP`, `PADAMP`, `PADDX`, `PADEXER`, `PADLEG`, `PADPLAQ`, `PADSURG`, `PERIPH`."
+atherosclerosis_events_incident.age_at_pad_incident_1,WHI,phv00193504.v3,ENDEXT1DY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_pad_incident_1,WHI,phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_pad_incident_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_incident.age_at_pad_incident_1,WHI,phv00193191.v3,PERIPHDY,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.angina_prior_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.angina_prior_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_prior.angina_prior_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.age_at_angina_prior_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.angina_prior_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_prior.angina_prior_1,WHI,phv00078507.v6,F30DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `ANGINA`."
+atherosclerosis_events_prior.age_at_angina_prior_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.age_at_angina_prior_1,WHI,phv00078507.v6,F30DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.cabg_prior_1,ARIC,phv00208853.v1,PHEA08,exclude,selects records,"Only keeps the subjects who answered the section. The value comes from `PHEA06`, `PHEA07A`."
+atherosclerosis_events_prior.cabg_prior_1,FHS,phv00054697.v8,PROCDATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `VESSEL`."
+atherosclerosis_events_prior.cabg_prior_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `VESSEL`."
+atherosclerosis_events_prior.cabg_prior_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `VESSEL`."
+atherosclerosis_events_prior.age_at_cabg_prior_1,FHS,phv00054697.v8,PROCDATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.cabg_prior_1,JHS,phv00127731.v1,MHXA52C,exclude,selects records,"Only keeps the subjects who answered the section. The value comes from `MHXA51`, `MHXA52A`."
+atherosclerosis_events_prior.cabg_prior_1,JHS,phv00127733.v1,MHXA52E1,exclude,selects records,"Only keeps the subjects who answered the section. The value comes from `MHXA51`, `MHXA52A`."
+atherosclerosis_events_prior.cabg_prior_1,JHS,phv00127740.v1,MHXA55A,exclude,selects records,"Only keeps the subjects who answered the section. The value comes from `MHXA51`, `MHXA52A`."
+atherosclerosis_events_prior.cabg_prior_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_prior.cabg_prior_1,WHI,phv00078507.v6,F30DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `CABG`."
+atherosclerosis_events_prior.age_at_cabg_prior_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.age_at_cabg_prior_1,WHI,phv00078507.v6,F30DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,ARIC,phv00208845.v1,PHEA06,exclude,selects records,"Only keeps the subjects who answered the section. The value comes from `PHEA08`, `PHEA09A`."
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,JHS,phv00127727.v1,MHXA51,exclude,selects records,Only keeps the subjects who answered the section. The value comes from `MHXA54A`.
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,JHS,phv00127731.v1,MHXA52C,exclude,selects records,Only keeps the subjects who answered the section. The value comes from `MHXA54A`.
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,JHS,phv00127733.v1,MHXA52E1,exclude,selects records,Only keeps the subjects who answered the section. The value comes from `MHXA54A`.
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,JHS,phv00127740.v1,MHXA55A,exclude,selects records,Only keeps the subjects who answered the section. The value comes from `MHXA54A`.
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_prior.coronary_angioplasty_prior_1,WHI,phv00078507.v6,F30DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PTCA`."
+atherosclerosis_events_prior.age_at_coronary_angioplasty_prior_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.age_at_coronary_angioplasty_prior_1,WHI,phv00078507.v6,F30DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.mi_prior_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.mi_prior_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_prior.mi_prior_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.age_at_mi_prior_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.mi_prior_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `MI`."
+atherosclerosis_events_prior.pad_prior_1,FHS,phv00036471.v12,DATE,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.pad_prior_1,FHS,phv00190817.v7,cvd,exclude,selects records,"Picks the subjects with no CVD event, who get 0. The events come from `EVENT`."
+atherosclerosis_events_prior.pad_prior_1,FHS,phv00190823.v7,cvddate,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT`."
+atherosclerosis_events_prior.age_at_pad_prior_1,FHS,phv00036471.v12,DATE,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.pad_prior_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PAD`."
+atherosclerosis_events_prior.pad_prior_1,WHI,phv00078507.v6,F30DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `PAD`."
+atherosclerosis_events_prior.age_at_pad_prior_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+atherosclerosis_events_prior.age_at_pad_prior_1,WHI,phv00078507.v6,F30DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.current_smoker_baseline_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `MONSMOKE`, `NOWSMOKE`."
+baseline_common_covariates.current_smoker_baseline_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `CIGSDAY`, `SMOKENOW`."
+baseline_common_covariates.current_smoker_baseline_1,HVH,phv00259376.v2,ccs,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `smoke`.
+baseline_common_covariates.current_smoker_baseline_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `smoke`.
+baseline_common_covariates.current_smoker_baseline_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SMOKEVR`, `SMOKNOW`."
+baseline_common_covariates.current_smoker_baseline_1,WHI,phv00078773.v6,F34DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SMOKEVR`, `SMOKNOW`."
+baseline_common_covariates.age_at_current_smoker_baseline_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.age_at_current_smoker_baseline_1,WHI,phv00078773.v6,F34DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.age_at_ever_smoker_baseline_1,CFS,phv00122341.v1,AGESMOK,exclude,records another concept,"The age when smoking began, not the age at measurement. The age comes from `age`."
+baseline_common_covariates.ever_smoker_baseline_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `AVGSMOK`, `MONSMOKE`, `NOWSMOKE`, `SMOKED`."
+baseline_common_covariates.ever_smoker_baseline_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `EVERSMOK`, `SMOKENOW`."
+baseline_common_covariates.ever_smoker_baseline_1,HVH,phv00259376.v2,ccs,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `smoke`.
+baseline_common_covariates.ever_smoker_baseline_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `smoke`.
+baseline_common_covariates.ever_smoker_baseline_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SMOKEVR`."
+baseline_common_covariates.ever_smoker_baseline_1,WHI,phv00078773.v6,F34DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SMOKEVR`."
+baseline_common_covariates.age_at_ever_smoker_baseline_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.age_at_ever_smoker_baseline_1,WHI,phv00078773.v6,F34DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.height_baseline_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `htcm`.
+baseline_common_covariates.height_baseline_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,Only chooses the visit or exam to use. The value comes from `HT`.
+baseline_common_covariates.height_baseline_1,HVH,phv00259376.v2,ccs,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `height`.
+baseline_common_covariates.height_baseline_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `height`.
+baseline_common_covariates.height_baseline_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEIGHTX`."
+baseline_common_covariates.height_baseline_1,WHI,phv00079852.v6,F80DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEIGHTX`."
+baseline_common_covariates.height_baseline_1,WHI,phv00079851.v6,F80VY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `HEIGHTX`.
+baseline_common_covariates.age_at_height_baseline_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.age_at_height_baseline_1,WHI,phv00079852.v6,F80DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.weight_baseline_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `wtkg`.
+baseline_common_covariates.weight_baseline_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `BMI`, `HT`."
+baseline_common_covariates.weight_baseline_1,HVH,phv00259376.v2,ccs,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `weight`.
+baseline_common_covariates.weight_baseline_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `weight`.
+baseline_common_covariates.weight_baseline_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `WEIGHTX`."
+baseline_common_covariates.weight_baseline_1,WHI,phv00079852.v6,F80DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `WEIGHTX`."
+baseline_common_covariates.weight_baseline_1,WHI,phv00079851.v6,F80VY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `WEIGHTX`.
+baseline_common_covariates.age_at_weight_baseline_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+baseline_common_covariates.age_at_weight_baseline_1,WHI,phv00079852.v6,F80DAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.basophil_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `BA_PER`, `WBC`."
+blood_cell_count.eosinophil_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `EO_PER`, `WBC`."
+blood_cell_count.hematocrit_vfr_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A28`, `B764`, `HCT`."
+blood_cell_count.hematocrit_vfr_bld_1,WHI,phv00077363.v6,CBCDAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEMATOCR`."
+blood_cell_count.hematocrit_vfr_bld_1,WHI,phv00077362.v6,CBCVY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `HEMATOCR`.
+blood_cell_count.hematocrit_vfr_bld_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEMATOCR`."
+blood_cell_count.age_at_hematocrit_vfr_bld_1,WHI,phv00077363.v6,CBCDAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.age_at_hematocrit_vfr_bld_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.hemoglobin_mcnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A140`, `B763`, `HGB`."
+blood_cell_count.hemoglobin_mcnc_bld_1,WHI,phv00077363.v6,CBCDAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEMOGLBN`."
+blood_cell_count.hemoglobin_mcnc_bld_1,WHI,phv00077362.v6,CBCVY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `HEMOGLBN`.
+blood_cell_count.hemoglobin_mcnc_bld_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HEMOGLBN`."
+blood_cell_count.age_at_hemoglobin_mcnc_bld_1,WHI,phv00077363.v6,CBCDAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.age_at_hemoglobin_mcnc_bld_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.lymphocyte_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `LY_PER`, `WBC`."
+blood_cell_count.mch_entmass_rbc_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A143`, `B766`, `MCH`."
+blood_cell_count.mchc_mcnc_rbc_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A144`, `B767`, `MCHC`."
+blood_cell_count.mcv_entvol_rbc_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A142`, `B765`, `MCV`."
+blood_cell_count.monocyte_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `MO_PER`, `WBC`."
+blood_cell_count.neutrophil_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `NE_PER`, `WBC`."
+blood_cell_count.platelet_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `PLT`.
+blood_cell_count.platelet_ncnc_bld_1,WHI,phv00077363.v6,CBCDAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `PLATELET`."
+blood_cell_count.platelet_ncnc_bld_1,WHI,phv00077362.v6,CBCVY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `PLATELET`.
+blood_cell_count.platelet_ncnc_bld_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `PLATELET`."
+blood_cell_count.age_at_platelet_ncnc_bld_1,WHI,phv00077363.v6,CBCDAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.age_at_platelet_ncnc_bld_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.pmv_entvol_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `MPV`.
+blood_cell_count.rbc_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A139`, `B762`, `RBC`."
+blood_cell_count.rdw_ratio_rbc_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `RDW`.
+blood_cell_count.wbc_ncnc_bld_1,"FHS_Offspring, FHS_Omni1",phv00227024.v1,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `A138`, `B761`, `WBC`."
+blood_cell_count.wbc_ncnc_bld_1,WHI,phv00077363.v6,CBCDAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `WBC`."
+blood_cell_count.wbc_ncnc_bld_1,WHI,phv00077362.v6,CBCVY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `WBC`.
+blood_cell_count.wbc_ncnc_bld_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `WBC`."
+blood_cell_count.age_at_wbc_ncnc_bld_1,WHI,phv00077363.v6,CBCDAYS,add,computes the age,The unit computes this age from it.
+blood_cell_count.age_at_wbc_ncnc_bld_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.antihypertensive_meds_1,CARDIA,phv00113154.v2,A09MDTYP,exclude,selects records,"Picks the blood-pressure medication records. The value comes from `A08BPMED`, `A09MDNOW`."
+blood_pressure.antihypertensive_meds_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `xbpmeds`.
+blood_pressure.antihypertensive_meds_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `ADULTDY`, `F44DAYS`, `F80DAYS`, `TCCODE`."
+blood_pressure.antihypertensive_meds_1,WHI,phv00169603.v4,F44VTYP,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `ADULTDY`, `F44DAYS`, `F80DAYS`, `TCCODE`."
+blood_pressure.antihypertensive_meds_1,WHI,phv00079850.v6,F80VTYP,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `ADULTDY`, `F44DAYS`, `F80DAYS`, `TCCODE`."
+blood_pressure.age_at_antihypertensive_meds_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.age_at_antihypertensive_meds_1,WHI,phv00169605.v4,F44DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.age_at_antihypertensive_meds_1,WHI,phv00079852.v6,F80DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.bp_diastolic_1,ARIC,phv00210284.v1,SBPA15,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA16`, `SBPA17`, `SBPA19`, `SBPA20`."
+blood_pressure.bp_diastolic_1,ARIC,phv00210287.v1,SBPA18,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA16`, `SBPA17`, `SBPA19`, `SBPA20`."
+blood_pressure.bp_diastolic_1,Amish,phv00252995.v1,sbp_baseline,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `dbp_baseline`."
+blood_pressure.bp_diastolic_1,CARDIA,phv00112481.v2,A02R2S,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2D`, `A02R3D`, `A02RZ2D`, `A02RZ3D`."
+blood_pressure.bp_diastolic_1,CARDIA,phv00112487.v2,A02R3S,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2D`, `A02R3D`, `A02RZ2D`, `A02RZ3D`."
+blood_pressure.bp_diastolic_1,CARDIA,phv00112483.v2,A02RZ2S,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2D`, `A02R3D`, `A02RZ2D`, `A02RZ3D`."
+blood_pressure.bp_diastolic_1,CARDIA,phv00112489.v2,A02RZ3S,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2D`, `A02R3D`, `A02RZ2D`, `A02RZ3D`."
+blood_pressure.bp_diastolic_1,CFS,phv00123001.v1,sbp,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `dbp`."
+blood_pressure.bp_diastolic_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `dbp`.
+blood_pressure.bp_diastolic_1,CHS,phv00100435.v1,AVZMSYS,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `AVZMDIA`."
+blood_pressure.bp_diastolic_1,COPDGene,phv00159590.v4,sysBP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `diasBP`."
+blood_pressure.bp_diastolic_1,FHS_Gen3_NOS_Omni2,phv00277045.v1,SBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `DBP1`."
+blood_pressure.bp_diastolic_1,FHS_Offspring,phv00277185.v1,SBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `DBP1`."
+blood_pressure.bp_diastolic_1,FHS_Omni1,phv00250561.v1,e485,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `e486`, `e582`."
+blood_pressure.bp_diastolic_1,FHS_Omni1,phv00250652.v1,e581,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `e486`, `e582`."
+blood_pressure.bp_diastolic_1,FHS_Original,phv00000719.v1,MF264,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `MF265`, `MF267`."
+blood_pressure.bp_diastolic_1,FHS_Original,phv00000721.v1,MF266,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `MF265`, `MF267`."
+blood_pressure.bp_diastolic_1,GENOA,phv00277520.v1,RAND_SYS2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_DIA2`, `RAND_DIA3`."
+blood_pressure.bp_diastolic_1,GENOA,phv00307801.v1,RAND_SYS2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_DIA2`, `RAND_DIA3`."
+blood_pressure.bp_diastolic_1,GENOA,phv00277522.v1,RAND_SYS3,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_DIA2`, `RAND_DIA3`."
+blood_pressure.bp_diastolic_1,GENOA,phv00307803.v1,RAND_SYS3,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_DIA2`, `RAND_DIA3`."
+blood_pressure.bp_diastolic_1,GOLDN,phv00259052.v1,SBP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `DBP`."
+blood_pressure.bp_diastolic_1,HCHS_SOL,phv00226390.v1,SBPA5,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA6`."
+blood_pressure.bp_diastolic_1,JHS,phv00128370.v1,SBPA13,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA14`, `SBPA15`, `SBPA17`, `SBPA18`."
+blood_pressure.bp_diastolic_1,JHS,phv00128373.v1,SBPA16,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA14`, `SBPA15`, `SBPA17`, `SBPA18`."
+blood_pressure.bp_diastolic_1,MESA,phv00083403.v1,s2bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,MESA,phv00085735.v2,s2bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,MESA,phv00087509.v1,s2bpf,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,MESA,phv00083406.v1,s3bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,MESA,phv00085737.v2,s3bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,MESA,phv00087512.v1,s3bpf,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `d2bp1`, `d2bpf`, `d3bp1`, `d3bpf`."
+blood_pressure.bp_diastolic_1,SAS,phv00258701.v1,Systolic_BP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `Diastolic_BP`."
+blood_pressure.bp_diastolic_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `DIASBP1`, `DIASBP2`."
+blood_pressure.bp_diastolic_1,WHI,phv00079852.v6,F80DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `DIASBP1`, `DIASBP2`."
+blood_pressure.bp_diastolic_1,WHI,phv00079850.v6,F80VTYP,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `DIASBP1`, `DIASBP2`."
+blood_pressure.bp_diastolic_1,WHI,phv00079854.v6,SYSTBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `DIASBP1`, `DIASBP2`."
+blood_pressure.bp_diastolic_1,WHI,phv00079856.v6,SYSTBP2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `DIASBP1`, `DIASBP2`."
+blood_pressure.age_at_bp_diastolic_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.age_at_bp_diastolic_1,WHI,phv00079852.v6,F80DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.bp_systolic_1,ARIC,phv00210285.v1,SBPA16,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA15`, `SBPA17`, `SBPA18`, `SBPA20`."
+blood_pressure.bp_systolic_1,ARIC,phv00210288.v1,SBPA19,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA15`, `SBPA17`, `SBPA18`, `SBPA20`."
+blood_pressure.bp_systolic_1,Amish,phv00252996.v1,dbp_baseline,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `sbp_baseline`."
+blood_pressure.bp_systolic_1,CARDIA,phv00112482.v2,A02R2D,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2S`, `A02R3S`, `A02RZ2S`, `A02RZ3S`."
+blood_pressure.bp_systolic_1,CARDIA,phv00112488.v2,A02R3D,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2S`, `A02R3S`, `A02RZ2S`, `A02RZ3S`."
+blood_pressure.bp_systolic_1,CARDIA,phv00112484.v2,A02RZ2D,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2S`, `A02R3S`, `A02RZ2S`, `A02RZ3S`."
+blood_pressure.bp_systolic_1,CARDIA,phv00112490.v2,A02RZ3D,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `A02R2S`, `A02R3S`, `A02RZ2S`, `A02RZ3S`."
+blood_pressure.bp_systolic_1,CFS,phv00123002.v1,dbp,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `sbp`."
+blood_pressure.bp_systolic_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `sbp`.
+blood_pressure.bp_systolic_1,CHS,phv00100436.v1,AVZMDIA,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `AVZMSYS`."
+blood_pressure.bp_systolic_1,COPDGene,phv00159583.v4,diasBP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `sysBP`."
+blood_pressure.bp_systolic_1,FHS_Gen3_NOS_Omni2,phv00277034.v1,DBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBP1`."
+blood_pressure.bp_systolic_1,FHS_Offspring,phv00277137.v1,DBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBP1`."
+blood_pressure.bp_systolic_1,FHS_Omni1,phv00250562.v1,e486,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `e485`, `e581`."
+blood_pressure.bp_systolic_1,FHS_Omni1,phv00250653.v1,e582,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `e485`, `e581`."
+blood_pressure.bp_systolic_1,FHS_Original,phv00000720.v1,MF265,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `MF264`, `MF266`."
+blood_pressure.bp_systolic_1,FHS_Original,phv00000722.v1,MF267,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `MF264`, `MF266`."
+blood_pressure.bp_systolic_1,GENOA,phv00277521.v1,RAND_DIA2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_SYS2`, `RAND_SYS3`."
+blood_pressure.bp_systolic_1,GENOA,phv00307802.v1,RAND_DIA2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_SYS2`, `RAND_SYS3`."
+blood_pressure.bp_systolic_1,GENOA,phv00277523.v1,RAND_DIA3,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_SYS2`, `RAND_SYS3`."
+blood_pressure.bp_systolic_1,GENOA,phv00307804.v1,RAND_DIA3,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `RAND_SYS2`, `RAND_SYS3`."
+blood_pressure.bp_systolic_1,GOLDN,phv00259053.v1,DBP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBP`."
+blood_pressure.bp_systolic_1,HCHS_SOL,phv00226391.v1,SBPA6,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA5`."
+blood_pressure.bp_systolic_1,JHS,phv00128371.v1,SBPA14,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA13`, `SBPA15`, `SBPA16`, `SBPA18`."
+blood_pressure.bp_systolic_1,JHS,phv00128374.v1,SBPA17,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SBPA13`, `SBPA15`, `SBPA16`, `SBPA18`."
+blood_pressure.bp_systolic_1,MESA,phv00083404.v1,d2bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,MESA,phv00085736.v2,d2bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,MESA,phv00087510.v1,d2bpf,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,MESA,phv00083407.v1,d3bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,MESA,phv00085738.v2,d3bp1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,MESA,phv00087513.v1,d3bpf,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `s2bp1`, `s2bpf`, `s3bp1`, `s3bpf`."
+blood_pressure.bp_systolic_1,SAS,phv00258703.v1,Diastolic_BP,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `Systolic_BP`."
+blood_pressure.bp_systolic_1,WHI,phv00079855.v6,DIASBP1,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SYSTBP1`, `SYSTBP2`."
+blood_pressure.bp_systolic_1,WHI,phv00079857.v6,DIASBP2,exclude,checks another value,"A reading of the other pressure, used only to check this one. The value comes from `SYSTBP1`, `SYSTBP2`."
+blood_pressure.bp_systolic_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SYSTBP1`, `SYSTBP2`."
+blood_pressure.bp_systolic_1,WHI,phv00079852.v6,F80DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `SYSTBP1`, `SYSTBP2`."
+blood_pressure.bp_systolic_1,WHI,phv00079850.v6,F80VTYP,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `SYSTBP1`, `SYSTBP2`."
+blood_pressure.age_at_bp_systolic_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+blood_pressure.age_at_bp_systolic_1,WHI,phv00079852.v6,F80DAYS,add,computes the age,The unit computes this age from it.
+demographic.annotated_sex_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `male`.
+demographic.annotated_sex_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,Only chooses the visit or exam to use. The value comes from `SEX`.
+demographic.annotated_sex_1,WHI,phv00077315.v8,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `annotated_sex` to ""female"" for every subject."
+demographic.geographic_site_1,GENOA,phv00277506.v1,GENDER,exclude,not used,"The unit's code does not use it. The unit sets `geographic_site` to ""GENOA_MS"" for every subject."
+demographic.geographic_site_1,GENOA,phv00307787.v1,GENDER,exclude,not used,"The unit's code does not use it. The unit sets `geographic_site` to ""GENOA_MS"" for every subject."
+demographic.hispanic_or_latino_1,BAGS,phv00273200.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `hispanic_or_latino` to ""notHL"" for every subject."
+demographic.hispanic_or_latino_1,FHS_Gen3,phv00021398.v5,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `G3A484`, `g3b0624`."
+demographic.hispanic_or_latino_1,"FHS_Gen3, FHS_NewOffspringSpouse, FHS_Omni2",phv00177238.v3,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `G3A484`, `g3a484`, `g3b0624`."
+demographic.hispanic_or_latino_1,FHS_NewOffspringSpouse,phv00273701.v1,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `g3a484`, `g3b0624`."
+demographic.hispanic_or_latino_1,FHS_Offspring,phv00072044.v5,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `H700`, `H701`."
+demographic.hispanic_or_latino_1,FHS_Omni1,phv00251263.v1,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `h700`, `h701`."
+demographic.hispanic_or_latino_1,FHS_Omni2,phv00274194.v2,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `g3a484`, `g3b0624`."
+demographic.hispanic_or_latino_1,GALAII,phv00320615.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `hispanic_or_latino` to ""HL"" for every subject."
+demographic.hispanic_or_latino_1,HCHS_SOL,phv00226241.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `hispanic_or_latino` to ""HL"" for every subject."
+demographic.hispanic_subgroup_1,CRA,phv00258651.v2,race,exclude,selects records,"Keeps the Hispanic subjects. The unit sets `hispanic_subgroup` to ""CostaRican"" for every subject."
+demographic.hispanic_subgroup_1,WHI,phv00078450.v6,RACE,exclude,records another concept,"Records something else, and the unit does not compute this from it. The value comes from `SPANISH`."
+demographic.race_us_1,Amish,phv00252969.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `race_us` to ""White"" for every subject."
+demographic.race_us_1,FHS_Gen3,phv00021251.v5,G3A490,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `G3A483`, `G3A484`, `G3A485`, `G3A486`, `G3A487`, `G3A488`, `G3A489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_Gen3,phv00021398.v5,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `G3A483`, `G3A484`, `G3A485`, `G3A486`, `G3A487`, `G3A488`, `G3A489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,"FHS_Gen3, FHS_NewOffspringSpouse, FHS_Omni2",phv00177603.v3,g3b0630,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `G3A483`, `G3A484`, `G3A485`, `G3A486`, `G3A487`, `G3A488`, `G3A489`, `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,"FHS_Gen3, FHS_NewOffspringSpouse, FHS_Omni2",phv00177238.v3,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `G3A483`, `G3A484`, `G3A485`, `G3A486`, `G3A487`, `G3A488`, `G3A489`, `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_NewOffspringSpouse,phv00274073.v1,g3a490,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_NewOffspringSpouse,phv00273701.v1,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_Offspring,phv00072537.v5,H707,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `H702`, `H703`, `H704`, `H705`, `H706`."
+demographic.race_us_1,FHS_Offspring,phv00072044.v5,IDTYPE,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `H702`, `H703`, `H704`, `H705`, `H706`."
+demographic.race_us_1,FHS_Omni1,phv00251753.v1,h707,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `h702`, `h703`, `h704`, `h705`, `h706`."
+demographic.race_us_1,FHS_Omni1,phv00251263.v1,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `h702`, `h703`, `h704`, `h705`, `h706`."
+demographic.race_us_1,FHS_Omni2,phv00274564.v2,g3a490,exclude,selects records,"Marks the answer as not given, so the subject gets no race. The race comes from `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_Omni2,phv00274194.v2,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `g3a483`, `g3a484`, `g3a485`, `g3a486`, `g3a487`, `g3a488`, `g3a489`, `g3b0624`, `g3b0625`, `g3b0626`, `g3b0627`, `g3b0628`, `g3b0629`."
+demographic.race_us_1,FHS_Original,phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The unit sets `race_us` to ""White"" for every subject."
+demographic.race_us_1,GALAII,phv00320615.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `race_us` to ""Other"" for every subject."
+demographic.race_us_1,GOLDN,phv00202090.v2,consent,exclude,selects records,"Only drops the subjects without consent. The unit sets `race_us` to ""White"" for every subject."
+demographic.race_us_1,GeneSTAR,phv00369267.v1,VISIT,exclude,selects records,Only chooses the visit or exam to use. The value comes from `RACE`.
+demographic.race_us_1,HCHS_SOL,phv00226241.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `race_us` to ""Other"" for every subject."
+demographic.race_us_1,JHS,phv00124546.v3,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `race_us` to ""Black"" for every subject."
+demographic.subcohort_1,ARIC,phv00098580.v4,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""ARIC_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,BAGS,phv00273200.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""BAGS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,CARDIA,phv00112395.v2,Consent,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""CARDIA_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,CCAF,phv00273537.v2,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""CCAF_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,CFS,phv00122002.v2,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""CFS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,CFS,phv00122012.v1,visit,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""CFS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,COPDGene,phv00159560.v3,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""COPDGene_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,CRA,phv00258637.v2,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""CRA_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,DHS,phv00310005.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""DHS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,GALAII,phv00320615.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""GALAII_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,GENOA_AfricanAmerican,phv00277508.v1,EXAMYEAR,exclude,selects records,"Only chooses the visit or exam to use. The unit sets `subcohort` to ""GENOA_AfricanAmerican"" for every subject."
+demographic.subcohort_1,GENOA_EuropeanAmerican,phv00307741.v1,EXAMYEAR,exclude,selects records,"Only chooses the visit or exam to use. The unit sets `subcohort` to ""GENOA_EuropeanAmerican"" for every subject."
+demographic.subcohort_1,GENOA_EuropeanAmerican,phv00307789.v1,EXAMYEAR,exclude,selects records,"Only chooses the visit or exam to use. The unit sets `subcohort` to ""GENOA_EuropeanAmerican"" for every subject."
+demographic.subcohort_1,GENOA_EuropeanAmerican,phv00307950.v1,EXAMYEAR,exclude,selects records,"Only chooses the visit or exam to use. The unit sets `subcohort` to ""GENOA_EuropeanAmerican"" for every subject."
+demographic.subcohort_1,GOLDN,phv00202090.v2,consent,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""GOLDN_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,HCHS_SOL,phv00226241.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""HCHS_SOL_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,HVH,phv00259370.v3,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""HVH_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,HVH,phv00259376.v2,ccs,exclude,selects records,"Only selects the cohort's subjects or records. The unit sets `subcohort` to ""HVH_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,HVH,phv00259377.v2,indexy,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""HVH_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,JHS,phv00124546.v3,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""JHS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,MESA_airnr,phv00082644.v1,site1c,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""MESA_AirNR"" for every subject."
+demographic.subcohort_1,MESA_classic,phv00084447.v2,site1c,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""MESA_Classic"" for every subject."
+demographic.subcohort_1,MESA_family,phv00087075.v1,sitefc,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""MESA_Family"" for every subject."
+demographic.subcohort_1,MGH_AF,phv00265704.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""MGH_AF_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,Mayo_VTE_GENEVA,phv00121830.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""Mayo_VTE_GENEVA"" for every subject."
+demographic.subcohort_1,Mayo_VTE_Olmsted,phv00389900.v1,phenotype,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""Mayo_VTE_Olmsted"" for every subject."
+demographic.subcohort_1,Partners,phv00253774.v1,CONSENT,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""Partners_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,SAGE,phv00252275.v3,CONSENT,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""SAGE_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,SAS,phv00258664.v1,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""SAS_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,VAFAR,phv00253604.v3,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""VAFAR_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,VU_AF,phv00253678.v2,CONSENT,exclude,selects records,"Only drops the subjects without consent. The unit sets `subcohort` to ""VU_AF_NoSubcohortStructure"" for every subject."
+demographic.subcohort_1,WGHS,phv00258321.v2,CONSENT,exclude,not used,"The unit's code does not use it. The unit sets `subcohort` to ""WGHS_NoSubcohortStructure"" for every subject."
+inflammation.crp_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `crpam`.
+inflammation.crp_1,"FHS_Gen3_Offspring, FHS_NewOffspringSpouse_Omni2, FHS_Omni1",phv00177928.v5,idtype,exclude,not used,"The unit's code does not use it. The value comes from `CRP`, `crp`, `crp_i`."
+inflammation.eselectin_1,MESA,phv00082970.v1,eselect1m,exclude,not used,The unit's code does not use it. The value comes from `eselect1`.
+inflammation.icam1_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `icam`, `icam_comment`, `icam_flag`."
+inflammation.icam1_1,FHS_NewOffspringSpouse_Omni1,phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `icam`.
+inflammation.il10_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `il10`, `il10_comment`."
+inflammation.il1_beta_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `il1b`, `il1b_comment`."
+inflammation.il6_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `il6am`.
+inflammation.il6_1,FHS_Gen3,phv00081000.v3,flag,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `il6`.
+inflammation.il6_1,"FHS_Gen3, FHS_NewOffspringSpouse_Omni1, FHS_Offspring",phv00177928.v5,idtype,exclude,not used,The unit's code does not use it. The value comes from `il6`.
+inflammation.isoprostane_8_epi_pgf2a_1,FHS,phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `conc1`, `iso`, `res1`."
+inflammation.lppla2_act_1,FHS,phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `Activity`, `cam`."
+inflammation.lppla2_mass_1,FHS,phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `MASS`, `mass`, `plac`."
+inflammation.mcp1_1,FHS_NewOffspringSpouse_Omni1,phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `mcp1`.
+inflammation.opg_1,FHS_Gen3_Omni2,phv00156666.v3,flag,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `opg`.
+inflammation.opg_1,FHS_Offspring_Omni1,phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `opg`.
+inflammation.pselectin_1,FHS_Gen3_Omni2,phv00156678.v3,flag,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `pselectin`.
+inflammation.pselectin_1,FHS_Omni1,phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `pselectin`.
+inflammation.tnfa_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `tnfaam`, `tnfaam_comment`."
+inflammation.tnfa_1,MESA,phv00160529.v1,exam3,exclude,selects records,"Only selects the exam's records. The value comes from `tnfa3`, `tnfa3m`."
+inflammation.tnfr2_1,FHS,phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `tnf`, `tnfr`, `tnfr2`."
+lipids.fasting_lipids_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The unit sets `fasting_lipids` to ""1"" for every subject."
+lipids.hdl_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `hdl`.
+lipids.lipid_lowering_medication_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `statins`.
+lipids.total_cholesterol_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `cholesterol`.
+lipids.triglycerides_1,CFS,phv00122012.v1,visit,exclude,selects records,Only chooses the visit or exam to use. The value comes from `triglyceride`.
+sleep.sleep_duration_1,CFS,phv00122012.v1,visit,exclude,selects records,"Only chooses the visit or exam to use. The value comes from `DAYBED`, `DAYHRS`, `DAYMIN`, `DAYWAKE`."
+sleep.sleep_duration_1,FHS_Offspring_Omni1,phv00254011.v2,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `B104`, `D426`, `EH_10A`, `G689`, `H480`, `H726`, `HrsWD02`, `TFAWDA02`, `TFAWDH02`, `TFAWDM02`, `TWUWDA02`, `TWUWDH02`, `TWUWDM02`, `j628`, `j913`, `j914`, `j915`, `j918`, `j919`, `j920`, `j921`, `j922`."
+sleep.sleep_duration_1,WHI,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HRSSLP`."
+sleep.sleep_duration_1,WHI,phv00078870.v6,F37DAYS,exclude,times the event,"Gives the age at measurement, not the measurement itself. The value comes from `HRSSLP`."
+sleep.sleep_duration_1,WHI,phv00078869.v6,F37VY,exclude,selects records,Only chooses the visit or exam to use. The value comes from `HRSSLP`.
+sleep.age_at_sleep_duration_1,WHI,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+sleep.age_at_sleep_duration_1,WHI,phv00078870.v6,F37DAYS,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,ARIC,phv00298126.v1,PTime,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `event`."
+vte.age_at_vte_case_status_1,ARIC,phv00298126.v1,PTime,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,CHS,phv00273566.v1,ttoevent,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `vt`, `vtpehx01`."
+vte.age_at_vte_case_status_1,CHS,phv00273566.v1,ttoevent,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00277005.v1,EDATE1,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177927.v4,att1,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177931.v4,att2,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177933.v4,att3,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177935.v4,att4,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177985.v4,date2,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177986.v4,date3,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177987.v4,date4,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `EVENT1`.
+vte.age_at_vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00277005.v1,EDATE1,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177985.v4,date2,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177986.v4,date3,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177987.v4,date4,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177937.v4,att5,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177939.v4,att6,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177941.v4,att7,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177943.v4,att8,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177945.v4,att9,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177988.v4,date5,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177989.v4,date6,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177990.v4,date7,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177991.v4,date8,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177992.v4,date9,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.age_at_vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177988.v4,date5,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177989.v4,date6,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177990.v4,date7,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177991.v4,date8,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"FHS_Offspring, FHS_Original",phv00177992.v4,date9,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,FHS_Original,phv00177947.v4,att10,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177949.v4,att11,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177951.v4,att12,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177953.v4,att13,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177955.v4,att14,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177957.v4,att15,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177959.v4,att16,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177961.v4,att17,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177963.v4,att18,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177965.v4,att19,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177967.v4,att20,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177969.v4,att21,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177971.v4,att22,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177973.v4,att23,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177975.v4,att24,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177977.v4,att25,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177979.v4,att26,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177981.v4,att27,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177983.v4,att28,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00226997.v1,att29,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00227000.v1,att30,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00227003.v1,att31,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00227006.v1,att32,exclude,selects records,Decides whether a subject was followed long enough to be a control. The status comes from `EVENT1`.
+vte.vte_case_status_1,FHS_Original,phv00177993.v4,date10,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177994.v4,date11,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177995.v4,date12,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177996.v4,date13,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177997.v4,date14,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177998.v4,date15,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00177999.v4,date16,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178000.v4,date17,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178001.v4,date18,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178002.v4,date19,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178003.v4,date20,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178004.v4,date21,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178005.v4,date22,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178006.v4,date23,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178007.v4,date24,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178008.v4,date25,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178009.v4,date26,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178010.v4,date27,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00178011.v4,date28,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00226998.v1,date29,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00227001.v1,date30,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00227004.v1,date31,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.vte_case_status_1,FHS_Original,phv00227007.v1,date32,exclude,times the event,"Gives a control's age at the last exam, and the window of follow-up. The status comes from `EVENT1`."
+vte.age_at_vte_case_status_1,FHS_Original,phv00177993.v4,date10,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177994.v4,date11,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177995.v4,date12,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177996.v4,date13,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177997.v4,date14,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177998.v4,date15,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00177999.v4,date16,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178000.v4,date17,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178001.v4,date18,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178002.v4,date19,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178003.v4,date20,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178004.v4,date21,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178005.v4,date22,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178006.v4,date23,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178007.v4,date24,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178008.v4,date25,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178009.v4,date26,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178010.v4,date27,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00178011.v4,date28,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00226998.v1,date29,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00227001.v1,date30,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00227004.v1,date31,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,FHS_Original,phv00227007.v1,date32,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `ccs`.
+vte.vte_case_status_1,HVH,phv00259384.v2,priorvt,exclude,selects records,Drops the controls who had a prior VT. The status comes from `ccs`.
+vte.vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193179.v3,DVTDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `PE`."
+vte.vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193505.v3,ENDFOLLOWDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `PE`."
+vte.vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `PE`."
+vte.vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00080426.v6,HRTFLAG,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DVT`, `PE`."
+vte.vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193194.v3,PEDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `PE`."
+vte.age_at_vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193179.v3,DVTDY,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193505.v3,ENDFOLLOWDY,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_case_status_1,"WHI_HRT, WHI_MRCnonHRT",phv00193194.v3,PEDY,add,computes the age,The unit computes this age from it.
+vte.vte_case_status_1,WHI_MRCnonHRT,phv00192301.v3,EXT2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `PE`."
+vte.vte_case_status_1,WHI_MRCnonHRT,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DVT`, `PE`."
+vte.vte_followup_start_age_1,ARIC,phv00298125.v1,event,exclude,not used,The unit's code does not use it. The value comes from `V1AGE01`.
+vte.vte_followup_start_age_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177928.v5,idtype,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `age1`, `date23`, `date24`, `date25`, `date5`, `date6`, `date7`."
+vte.vte_followup_start_age_1,FHS_Offspring,phv00177937.v4,att5,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date5`, `date6`, `date7`."
+vte.vte_followup_start_age_1,FHS_Offspring,phv00177939.v4,att6,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date5`, `date6`, `date7`."
+vte.vte_followup_start_age_1,FHS_Offspring,phv00177941.v4,att7,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date5`, `date6`, `date7`."
+vte.vte_followup_start_age_1,FHS_Original,phv00177973.v4,att23,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date23`, `date24`, `date25`."
+vte.vte_followup_start_age_1,FHS_Original,phv00177975.v4,att24,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date23`, `date24`, `date25`."
+vte.vte_followup_start_age_1,FHS_Original,phv00177977.v4,att25,exclude,selects records,"Only selects the records or subjects used. The value comes from `age1`, `date23`, `date24`, `date25`."
+vte.vte_followup_start_age_1,"WHI_HRT, WHI_MRCnonHRT",phv00080426.v6,HRTFLAG,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `AGE`, `EXT2DAYS`, `F2DAYS`."
+vte.vte_followup_start_age_1,WHI_MRCnonHRT,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `AGE`, `EXT2DAYS`, `F2DAYS`."
+vte.vte_prior_history_1,ARIC,phv00298125.v1,event,exclude,not used,"The unit's code does not use it. The unit sets `vte_prior_history` to ""0"" for every subject."
+vte.vte_prior_history_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00277005.v1,EDATE1,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_prior_history_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00177928.v5,idtype,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `EVENT1`.
+vte.age_at_vte_prior_history_1,"FHS_G3NOSOm12, FHS_Offspring, FHS_Original",phv00277005.v1,EDATE1,add,computes the age,The unit computes this age from it.
+vte.vte_prior_history_1,FHS_Offspring,phv00177988.v4,date5,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_prior_history_1,FHS_Offspring,phv00177989.v4,date6,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_prior_history_1,FHS_Offspring,phv00177990.v4,date7,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.age_at_vte_prior_history_1,FHS_Offspring,phv00177988.v4,date5,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,FHS_Offspring,phv00177989.v4,date6,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,FHS_Offspring,phv00177990.v4,date7,add,computes the age,The unit computes this age from it.
+vte.vte_prior_history_1,FHS_Original,phv00178006.v4,date23,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_prior_history_1,FHS_Original,phv00178007.v4,date24,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.vte_prior_history_1,FHS_Original,phv00178008.v4,date25,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `EVENT1`."
+vte.age_at_vte_prior_history_1,FHS_Original,phv00178006.v4,date23,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,FHS_Original,phv00178007.v4,date24,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,FHS_Original,phv00178008.v4,date25,add,computes the age,The unit computes this age from it.
+vte.vte_prior_history_1,HVH,phv00259376.v2,ccs,exclude,selects records,Only selects the cohort's subjects or records. The value comes from `priorvt`.
+vte.vte_prior_history_1,HVH,phv00259377.v2,indexy,exclude,selects records,Only chooses the visit or exam to use. The value comes from `priorvt`.
+vte.vte_prior_history_1,"WHI_HRT, WHI_MRCnonHRT",phv00080426.v6,HRTFLAG,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DVT`, `DVTDY`, `EXT2DAYS`, `F33DVT`, `F33PE`, `PE`, `PEDY`."
+vte.vte_prior_history_1,WHI_MRCnonHRT,phv00192302.v3,EXT2MRC,exclude,selects records,"Only selects the cohort's subjects or records. The value comes from `DVT`, `DVTDY`, `EXT2DAYS`, `F33DVT`, `F33PE`, `PE`, `PEDY`."
+vte.vte_prior_history_1,WHI_MRCnonHRT,phv00078436.v6,F2DAYS,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `DVTDY`, `EXT2DAYS`, `F33DVT`, `F33PE`, `PE`, `PEDY`."
+vte.vte_prior_history_1,WHI_MRCnonHRT,phv00170650.v4,F33DVTDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `DVTDY`, `EXT2DAYS`, `F33DVT`, `F33PE`, `PE`, `PEDY`."
+vte.vte_prior_history_1,WHI_MRCnonHRT,phv00170652.v4,F33PEDY,exclude,times the event,"Gives the age at the event, not the event itself. The indicator comes from `DVT`, `DVTDY`, `EXT2DAYS`, `F33DVT`, `F33PE`, `PE`, `PEDY`."
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00193179.v3,DVTDY,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00192301.v3,EXT2DAYS,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00078436.v6,F2DAYS,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00170650.v4,F33DVTDY,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00170652.v4,F33PEDY,add,computes the age,The unit computes this age from it.
+vte.age_at_vte_prior_history_1,WHI_MRCnonHRT,phv00193194.v3,PEDY,add,computes the age,The unit computes this age from it.

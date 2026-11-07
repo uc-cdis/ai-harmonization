@@ -525,6 +525,182 @@ def checked_benchmarks(record):
     }
 
 
+def check_corpus_checked(record, benchmark_builds, inputs):
+    """Check that a run's corpus was checked for leakage against each benchmark.
+
+    A benchmark counts as checked when the run's record lists it for the
+    corpus, with the same files, by their checksums, as the benchmark that is
+    built.
+
+    Args:
+        record (dict): The run's record.
+        benchmark_builds (dict): Each benchmark's targets, mappings and
+            manifest, from read_benchmark, by name.
+        inputs (Path): The inputs folder that the run's corpus was built in.
+
+    Raises:
+        ValueError: If the corpus was not checked against a benchmark, or was
+            checked against another build of it. The message gives the
+            command that builds the corpus again.
+    """
+    checked = checked_benchmarks(record)
+    corpus_name = next(
+        source["name"] for source in record["sources"] if source.get("role") == "corpus"
+    )
+    rebuild = build_command(Path(inputs) / "corpora" / corpus_name)
+    for name, (_, _, manifest) in benchmark_builds.items():
+        if name not in checked:
+            unchecked = f"benchmark {name}"
+        else:
+            changed = differences(
+                {"files": checked[name].get("files", {})},
+                {"files": manifest["files"]},
+            )
+            if not changed:
+                continue
+            unchecked = f"this build of benchmark {name} ({'; '.join(changed)})"
+        raise ValueError(
+            f"the corpus of run {record['run']} was not checked against"
+            f" {unchecked} for leakage, so the model may have learned its"
+            f" mappings. Build the corpus again, after the benchmark:"
+            f" {rebuild}. Then train again"
+        )
+
+
+def checked_model(model, benchmark_builds, inputs, text_format):
+    """Check the model against the benchmarks, and find its path and texts' format.
+
+    A run of ``train`` is scored from its record. Its texts take the run's
+    training format, unless ``text_format`` names another. Its corpus must
+    have been checked against each benchmark, and its model must have the
+    checksums that its record holds. Any other model has no record, so its
+    leakage is unknown, and a note says so.
+
+    Args:
+        model (str): A Hugging Face model id, a model folder or a run's
+            folder.
+        benchmark_builds (dict): Each benchmark's targets, mappings and
+            manifest, from read_benchmark, by name.
+        inputs (Path): The inputs folder that the benchmarks were built into.
+        text_format (str | None): A key of FORMATS. None takes a run's
+            training format, and DEFAULT_FORMAT for any other model.
+
+    Returns:
+        tuple[str, str, str]: The model, as scoring names it: the run's
+            folder for a run, and ``model`` itself for any other model; the
+            path to load it from; and the texts' format.
+
+    Raises:
+        ValueError: If a run's record cannot be read, its corpus was not
+            checked against a benchmark, or its model differs from its record.
+    """
+    run = run_record(model)
+    if run is None:
+        print(
+            f"note: {model} was not trained here, so whether its training data"
+            " leaks a benchmark is unknown"
+        )
+        return model, model, text_format or DEFAULT_FORMAT
+    run_folder, record = run
+    trained_format = recorded_format(
+        record,
+        run_folder / "manifest.json",
+        "train the run again from its config.yaml",
+    )
+    check_corpus_checked(record, benchmark_builds, inputs)
+    check_run_files(run_folder, record)
+    return str(run_folder), str(run_folder / "model"), text_format or trained_format
+
+
+def loaded_encoder(model, model_path, device):
+    """The model, loaded by sentence-transformers.
+
+    A model on disk is loaded without asking Hugging Face.
+
+    Args:
+        model (str): The model, as checked_model names it, for the error.
+        model_path (str): The model's folder on disk, or its Hugging Face id.
+        device (str | None): ``cpu`` or ``cuda``. None uses a GPU if there is
+            one, and the CPU otherwise.
+
+    Returns:
+        SentenceTransformer: The loaded model.
+
+    Raises:
+        ValueError: If the model cannot be loaded.
+    """
+    from sentence_transformers import SentenceTransformer
+
+    try:
+        return SentenceTransformer(
+            model_path, device=device, local_files_only=Path(model_path).is_dir()
+        )
+    except Exception as error:
+        raise ValueError(
+            f"the model {model} cannot be loaded ({type(error).__name__}:"
+            f" {error}); give a model folder on disk or a Hugging Face model id"
+        ) from error
+
+
+def benchmark_scores(
+    encoder, model, benchmark, manifest, texts, text_format, batch_size
+):
+    """Score a model on one benchmark: its metrics row, its ranks and its config.
+
+    The config records the code, the libraries and the time of this scoring.
+
+    Args:
+        encoder (SentenceTransformer): The loaded model.
+        model (str): The model, as checked_model names it.
+        benchmark (str): The benchmark's name.
+        manifest (dict): The benchmark's manifest, from read_benchmark.
+        texts (tuple[list[str], list[str], dict]): The benchmark's source
+            texts, target texts and expected targets, from benchmark_texts.
+        text_format (str): The texts' format, a key of FORMATS.
+        batch_size (int): Texts encoded at a time.
+
+    Returns:
+        tuple[dict, dict, dict]: The metrics row; each source variable's rank
+            and top-1 target, from rank_targets; and what config.yaml holds.
+    """
+    source_texts, target_texts, expected = texts
+    print(
+        f"{benchmark} version {manifest['version']}: {len(source_texts):,} source "
+        f"variables, {len(target_texts):,} targets; format {text_format}"
+    )
+    metrics, ranked = rank_targets(
+        encoder, source_texts, target_texts, expected, batch_size
+    )
+    scored = model_id(model)
+    row = {
+        "model": scored,
+        "benchmark": benchmark,
+        "benchmark_version": manifest["version"],
+        "format": text_format,
+        "n": len(source_texts),
+        "targets": len(target_texts),
+        "parameters": sum(parameter.numel() for parameter in encoder.parameters()),
+        **metrics,
+    }
+    config = {
+        "model": scored,
+        "model_revision": model_revision(model),
+        "benchmark": benchmark,
+        "format": text_format,
+        "device": str(encoder.device),
+        "batch_size": batch_size,
+        "benchmark_manifest": {
+            key: manifest[key]
+            for key in ("version", "built", "files")
+            if key in manifest
+        },
+        "ai_harmonization": code_commit(),
+        "libraries": library_versions(),
+        "scored": datetime.now().isoformat(timespec="seconds"),
+    }
+    return row, ranked, config
+
+
 def score(
     model,
     benchmarks,
@@ -581,116 +757,32 @@ def score(
             be read or its model differs from it, or if the model cannot be
             loaded.
     """
-    from sentence_transformers import SentenceTransformer
-
-    built = {name: read_benchmark(inputs, name) for name in benchmarks}
-    run = run_record(model)
-    if run is None:
-        text_format = text_format or DEFAULT_FORMAT
-        print(
-            f"note: {model} was not trained here, so whether its training data"
-            " leaks a benchmark is unknown"
-        )
-        model_path = model
-    else:
-        run_folder, record = run
-        trained_format = recorded_format(
-            record,
-            run_folder / "manifest.json",
-            "train the run again from its config.yaml",
-        )
-        text_format = text_format or trained_format
-        checked = checked_benchmarks(record)
-        corpus_name = next(
-            source["name"]
-            for source in record["sources"]
-            if source.get("role") == "corpus"
-        )
-        rebuild = build_command(Path(inputs) / "corpora" / corpus_name)
-        for name, (_, _, manifest) in built.items():
-            if name not in checked:
-                unchecked = f"benchmark {name}"
-            else:
-                changed = differences(
-                    {"files": checked[name].get("files", {})},
-                    {"files": manifest["files"]},
-                )
-                if not changed:
-                    continue
-                unchecked = f"this build of benchmark {name} ({'; '.join(changed)})"
-            raise ValueError(
-                f"the corpus of run {record['run']} was not checked against"
-                f" {unchecked} for leakage, so the model may have learned its"
-                f" mappings. Build the corpus again, after the benchmark:"
-                f" {rebuild}. Then train again"
-            )
-        check_run_files(run_folder, record)
-        model, model_path = str(run_folder), str(run_folder / "model")
+    benchmark_builds = {name: read_benchmark(inputs, name) for name in benchmarks}
+    model, model_path, text_format = checked_model(
+        model, benchmark_builds, inputs, text_format
+    )
     texts = {
         name: benchmark_texts(targets, mappings, text_format)
-        for name, (targets, mappings, _) in built.items()
+        for name, (targets, mappings, _) in benchmark_builds.items()
     }
-    try:
-        encoder = SentenceTransformer(
-            model_path, device=device, local_files_only=Path(model_path).is_dir()
-        )
-    except Exception as error:
-        raise ValueError(
-            f"the model {model} cannot be loaded ({type(error).__name__}:"
-            f" {error}); give a model folder on disk or a Hugging Face model id"
-        ) from error
-    scored = model_id(model)
-    parameters = sum(parameter.numel() for parameter in encoder.parameters())
-    commit = code_commit()
-    revision = model_revision(model)
+    encoder = loaded_encoder(model, model_path, device)
     rows = []
-    for name, (_, mappings, manifest) in built.items():
-        source_texts, target_texts, expected = texts[name]
-        print(
-            f"{name} version {manifest['version']}: {len(source_texts):,} source "
-            f"variables, {len(target_texts):,} targets; format {text_format}"
+    for name, (_, mappings, manifest) in benchmark_builds.items():
+        row, ranked, config = benchmark_scores(
+            encoder, model, name, manifest, texts[name], text_format, batch_size
         )
-        metrics, ranked = rank_targets(
-            encoder, source_texts, target_texts, expected, batch_size
-        )
-        row = {
-            "model": scored,
-            "benchmark": name,
-            "benchmark_version": manifest["version"],
-            "format": text_format,
-            "n": len(source_texts),
-            "targets": len(target_texts),
-            "parameters": parameters,
-            **metrics,
-        }
-        config = {
-            "model": scored,
-            "model_revision": revision,
-            "benchmark": name,
-            "format": text_format,
-            "device": str(encoder.device),
-            "batch_size": batch_size,
-            "benchmark_manifest": {
-                key: manifest[key]
-                for key in ("version", "built", "files")
-                if key in manifest
-            },
-            "ai_harmonization": commit,
-            "libraries": library_versions(),
-            "scored": datetime.now().isoformat(timespec="seconds"),
-        }
         folder = scores_location(outputs, model, name, text_format)
         previous = scores_config(folder).get("model")
-        if previous and previous != scored:
+        if previous and previous != row["model"]:
             print(
                 f"warning: {folder} held the scores of {previous}. They are "
-                f"replaced by those of {scored}.",
+                f"replaced by those of {row['model']}.",
                 file=sys.stderr,
             )
         write_scores(folder, row, mappings, ranked, config)
         print(
             "  "
-            + ", ".join(f"{metric} {metrics[metric]}" for metric in METRIC_COLUMNS)
+            + ", ".join(f"{metric} {row[metric]}" for metric in METRIC_COLUMNS)
             + f"\n  -> {folder}"
         )
         rows.append(row)

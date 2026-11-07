@@ -358,6 +358,177 @@ def manifest(
     }
 
 
+def checked_sources(name, sources, validation_share):
+    """Check the corpus's name, sources and validation share, and order the sources.
+
+    Args:
+        name (str): The corpus's name, used as its folder's name.
+        sources (list[str]): The sources to combine, from READERS.
+        validation_share (float): The share of groups held out for
+            validation, a multiple of 1 / BUCKETS.
+
+    Returns:
+        list[str]: The sources, each once, in READERS' order: the order in
+            which they are read and combined.
+
+    Raises:
+        ValueError: If the name is not a FOLDER_NAME, no source is given or
+            one is not in READERS, or the validation share is not a multiple
+            of 1 / BUCKETS between 0 and 1.
+    """
+    if not FOLDER_NAME.fullmatch(name):
+        raise ValueError(f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}")
+    unknown = sorted(set(sources) - set(READERS))
+    if unknown or not sources:
+        raise ValueError(
+            f"choose sources among {', '.join(READERS)}; unknown: {unknown}"
+        )
+    try:
+        validation_buckets(validation_share)
+    except ValueError as error:
+        raise ValueError(f"--validation-share: {error}") from error
+    return [source for source in READERS if source in sources]
+
+
+def read_benchmarks(inputs):
+    """The built benchmarks, which the corpus is checked against for leakage.
+
+    The benchmarks are printed with their versions. A benchmark that cannot be
+    read, or no benchmark built, is reported on stderr.
+
+    Args:
+        inputs (Path): The inputs folder that the benchmarks were built into.
+
+    Returns:
+        dict | None: Each benchmark's targets, mappings and record, from
+            built_benchmarks, or None when the corpus cannot be checked.
+    """
+    try:
+        benchmark_builds = built_benchmarks(inputs)
+    except Exception as error:
+        print(f"a benchmark cannot be read: {error}", file=sys.stderr)
+        return None
+    if not benchmark_builds:
+        print(
+            "no benchmark is built, so the corpus cannot be checked for leakage;"
+            " run: python -m embedding_model benchmarks build --topmed",
+            file=sys.stderr,
+        )
+        return None
+    print(
+        "  checked against: "
+        + ", ".join(
+            f"{benchmark} v{record['version']}"
+            for benchmark, (_, _, record) in benchmark_builds.items()
+        )
+    )
+    return benchmark_builds
+
+
+def read_sources(inputs, sources):
+    """Each source's pairs and their manifest, in the order given.
+
+    Each source read prints its number of pairs. A source that cannot be read
+    is reported on stderr, and so are sources whose pairs are in different
+    text formats.
+
+    Args:
+        inputs (Path): The inputs folder that the sources' pairs are in.
+        sources (list[str]): The sources to combine, from checked_sources.
+
+    Returns:
+        tuple[list[pd.DataFrame] | None, list[dict] | None]: The sources'
+            pairs and their manifests, or None for both when a source cannot
+            be used.
+    """
+    frames, pairs_manifests, failed = [], [], []
+    for source in sources:
+        try:
+            pairs, pairs_manifest = read_pairs(inputs, source)
+        except Exception as error:
+            print(f"  {source}: {type(error).__name__}: {error}", file=sys.stderr)
+            failed.append(source)
+            continue
+        frames.append(pairs)
+        pairs_manifests.append(pairs_manifest)
+        print(f"  {source:<7}{len(pairs):>10,} pairs")
+    if failed:
+        print(
+            f"the pairs of {', '.join(failed)} cannot be used, as said above",
+            file=sys.stderr,
+        )
+        return None, None
+    formats = {
+        record["source"]: record["settings"]["format"] for record in pairs_manifests
+    }
+    if len(set(formats.values())) > 1:
+        print(
+            "the sources' pairs are in different text formats: "
+            + ", ".join(f"{source} {formats[source]}" for source in formats)
+            + "; prepare them again: python -m embedding_model pairs prepare"
+            f" --source {' '.join(formats)}",
+            file=sys.stderr,
+        )
+        return None, None
+    return frames, pairs_manifests
+
+
+def dropped_and_kept(distinct, benchmark_builds):
+    """The pairs that leak a benchmark, with their findings, and the pairs kept.
+
+    Args:
+        distinct (pd.DataFrame): The sources' pairs, combined, each once.
+        benchmark_builds (dict): Each benchmark's targets, mappings and
+            record, from built_benchmarks.
+
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame, dict]: The dropped pairs, each with
+            its finding's columns; the pairs kept; and each benchmark's
+            vocabulary shared with the pairs, from leakage.audit.
+    """
+    findings, shared_vocabulary = leakage.audit(
+        distinct,
+        {benchmark: tables[:2] for benchmark, tables in benchmark_builds.items()},
+    )
+    detail = findings.drop(columns="pair").rename(
+        columns={
+            column: f"benchmark_{column}"
+            for column in leakage.COLUMNS
+            if column not in ("pair", "finding", "benchmark", "fields")
+        }
+    )
+    dropped = pd.concat(
+        [distinct.loc[findings.pair].reset_index(drop=True), detail], axis=1
+    )
+    kept_pairs = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
+    return dropped, kept_pairs, shared_vocabulary
+
+
+def print_summary(corpus_manifest, destination):
+    """Print the pairs dropped for leakage, the pairs kept, and where they went.
+
+    Args:
+        corpus_manifest (dict): The corpus's manifest, with its counts.
+        destination (Path): The corpus's folder.
+    """
+    rows = corpus_manifest["counts"]["rows"]
+    counted = corpus_manifest["counts"]["leakage_findings"]["by_finding"]
+    print(
+        f"  {rows['leakage_removed']:,} pairs dropped for leakage"
+        + (
+            " (findings: "
+            + ", ".join(f"{key} {value:,}" for key, value in counted.items())
+            + ")"
+            if counted
+            else ""
+        )
+    )
+    print(
+        f"  {rows['kept']:,} pairs kept: {rows[TRAIN]:,} for training, "
+        f"{rows[VALIDATION]:,} for validation -> {destination}"
+    )
+
+
 def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
     """Combine the sources' pairs, drop what leaks a benchmark, and split.
 
@@ -378,71 +549,16 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
         OSError: If the corpus cannot be written or moved into place. The
             previous corpus of that name is then kept.
     """
-    if not FOLDER_NAME.fullmatch(name):
-        print(
-            f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}",
-            file=sys.stderr,
-        )
-        return 1
-    unknown = sorted(set(sources) - set(READERS))
-    if unknown or not sources:
-        print(
-            f"choose sources among {', '.join(READERS)}; unknown: {unknown}",
-            file=sys.stderr,
-        )
-        return 1
     try:
-        validation_buckets(validation_share)
+        sources = checked_sources(name, sources, validation_share)
     except ValueError as error:
-        print(f"--validation-share: {error}", file=sys.stderr)
+        print(error, file=sys.stderr)
         return 1
-    try:
-        benchmark_builds = built_benchmarks(inputs)
-    except Exception as error:
-        print(f"a benchmark cannot be read: {error}", file=sys.stderr)
+    benchmark_builds = read_benchmarks(inputs)
+    if benchmark_builds is None:
         return 1
-    if not benchmark_builds:
-        print(
-            "no benchmark is built, so the corpus cannot be checked for leakage;"
-            " run: python -m embedding_model benchmarks build --topmed",
-            file=sys.stderr,
-        )
-        return 1
-    print(
-        "  checked against: "
-        + ", ".join(
-            f"{benchmark} v{record['version']}"
-            for benchmark, (_, _, record) in benchmark_builds.items()
-        )
-    )
-    frames, pairs_manifests, failed = [], [], []
-    for source in [source for source in READERS if source in sources]:
-        try:
-            pairs, pairs_manifest = read_pairs(inputs, source)
-        except Exception as error:
-            print(f"  {source}: {type(error).__name__}: {error}", file=sys.stderr)
-            failed.append(source)
-            continue
-        frames.append(pairs)
-        pairs_manifests.append(pairs_manifest)
-        print(f"  {source:<7}{len(pairs):>10,} pairs")
-    if failed:
-        print(
-            f"the pairs of {', '.join(failed)} cannot be used, as said above",
-            file=sys.stderr,
-        )
-        return 1
-    formats = {
-        record["source"]: record["settings"]["format"] for record in pairs_manifests
-    }
-    if len(set(formats.values())) > 1:
-        print(
-            "the sources' pairs are in different text formats: "
-            + ", ".join(f"{source} {formats[source]}" for source in formats)
-            + "; prepare them again: python -m embedding_model pairs prepare"
-            f" --source {' '.join(formats)}",
-            file=sys.stderr,
-        )
+    frames, pairs_manifests = read_sources(inputs, sources)
+    if frames is None:
         return 1
     distinct, copy_sources = combine(frames)
     if distinct.empty:
@@ -451,26 +567,13 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
             file=sys.stderr,
         )
         return 1
-    # The sources' own frames, and the last one read, are not needed past this
-    # point. Freeing them lowers the peak memory.
-    del frames, pairs
+    # The sources' own frames are not needed past this point. Freeing them
+    # lowers the peak memory.
+    del frames
     print(f"  {len(copy_sources):,} pairs already in an earlier source, kept once")
-
-    findings, shared_vocabulary = leakage.audit(
-        distinct,
-        {benchmark: tables[:2] for benchmark, tables in benchmark_builds.items()},
+    dropped, kept_pairs, shared_vocabulary = dropped_and_kept(
+        distinct, benchmark_builds
     )
-    detail = findings.drop(columns="pair").rename(
-        columns={
-            column: f"benchmark_{column}"
-            for column in leakage.COLUMNS
-            if column not in ("pair", "finding", "benchmark", "fields")
-        }
-    )
-    dropped = pd.concat(
-        [distinct.loc[findings.pair].reset_index(drop=True), detail], axis=1
-    )
-    kept_pairs = distinct.drop(index=findings.pair.unique()).reset_index(drop=True)
     if kept_pairs.empty:
         print(
             f"leakage prevention dropped all {len(distinct):,} pairs, so there is"
@@ -479,7 +582,6 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
         )
         return 1
     kept_pairs["split"] = splits(kept_pairs, validation_share)
-
     destination = Path(inputs) / "corpora" / name
     with staged(destination) as built:
         kept_pairs.to_parquet(built / "pairs.parquet", index=False)
@@ -503,20 +605,5 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
             validation_share=validation_share,
         )
         manifests.write(built / "manifest.json", corpus_manifest)
-    rows = corpus_manifest["counts"]["rows"]
-    counted = corpus_manifest["counts"]["leakage_findings"]["by_finding"]
-    print(
-        f"  {rows['leakage_removed']:,} pairs dropped for leakage"
-        + (
-            " (findings: "
-            + ", ".join(f"{key} {value:,}" for key, value in counted.items())
-            + ")"
-            if counted
-            else ""
-        )
-    )
-    print(
-        f"  {rows['kept']:,} pairs kept: {rows[TRAIN]:,} for training, "
-        f"{rows[VALIDATION]:,} for validation -> {destination}"
-    )
+    print_summary(corpus_manifest, destination)
     return 0

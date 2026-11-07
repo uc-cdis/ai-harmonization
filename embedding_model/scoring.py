@@ -6,7 +6,7 @@ the texts, ranks the targets and computes MRR, nDCG@10 and accuracy@k.
 
 A variable with several expected targets takes the rank of the best placed of
 them. accuracy@k is the share of variables with an expected target among the
-first k. It is what a reviewer of the top k suggestions sees.
+first k. It is what a data curator who reviews the top k suggestions sees.
 """
 
 import json
@@ -48,6 +48,14 @@ METRIC_COLUMNS = [
     *[f"accuracy@{k}" for k in ACCURACY_AT_K],
     "median_rank",
 ]
+# The columns of per_variable.csv that name a source variable. compare checks
+# that two models' scores list the same variables, in the same order.
+VARIABLE_KEY = (
+    "source_study_id",
+    "source_table_id",
+    "source_variable_id",
+    "source_variable_name",
+)
 # sentence-transformers' own default, in encode() and in its
 # InformationRetrievalEvaluator.
 BATCH_SIZE = 32
@@ -269,9 +277,60 @@ def scores_folder(outputs, model, benchmark, text_format):
     Returns:
         Path: ``<outputs>/scores/<model>/<benchmark>/<format>``.
     """
+    return Path(outputs) / "scores" / model_name(model) / benchmark / text_format
+
+
+def model_name(model):
+    """A model's short name: a model folder's own name, or a Hugging Face id.
+
+    Args:
+        model (str): A Hugging Face model id or a model folder.
+
+    Returns:
+        str: The folder's name, or the id.
+    """
     local = Path(model)
-    name = local.resolve().name if local.is_dir() else model
-    return Path(outputs) / "scores" / name / benchmark / text_format
+    return local.resolve().name if local.is_dir() else model
+
+
+def model_id(model):
+    """The model as score records it in metrics.csv and config.yaml.
+
+    A run of train is recorded by its run folder, another model folder by its
+    full path, and a Hugging Face model by its id.
+
+    Args:
+        model (str): A Hugging Face model id, a model folder or a run folder.
+
+    Returns:
+        str: The model's record.
+    """
+    run = run_record(model)
+    if run is not None:
+        return str(run[0])
+    local = Path(model)
+    return str(local.resolve()) if local.is_dir() else model
+
+
+def scores_location(outputs, model, benchmark, text_format):
+    """Where score writes a model's scores on a benchmark, in one format.
+
+    A run of train keeps its scores in its own folder. Any other model's go
+    under ``outputs/scores/``, as scores_folder names them.
+
+    Args:
+        outputs (Path): The outputs folder.
+        model (str): A Hugging Face model id, a model folder or a run folder.
+        benchmark (str): The benchmark.
+        text_format (str): The key of FORMATS that the texts are written in.
+
+    Returns:
+        Path: The scores folder.
+    """
+    run = run_record(model)
+    if run is not None:
+        return run[0] / "scores" / benchmark / text_format
+    return scores_folder(outputs, model, benchmark, text_format)
 
 
 def write_scores(folder, row, mappings, ranked, config):
@@ -289,15 +348,7 @@ def write_scores(folder, row, mappings, ranked, config):
             number, from rank_targets.
         config (dict): What config.yaml holds.
     """
-    per_variable = mappings[
-        [
-            "source_study_id",
-            "source_table_id",
-            "source_variable_id",
-            "source_variable_name",
-            "expected_target",
-        ]
-    ].copy()
+    per_variable = mappings[[*VARIABLE_KEY, "expected_target"]].copy()
     for column in ("rank", "top1_target", "top1_similarity"):
         per_variable[column] = [ranked[str(i)][column] for i in range(len(mappings))]
     with staged(folder) as built:
@@ -308,21 +359,83 @@ def write_scores(folder, row, mappings, ranked, config):
         )
 
 
-def scored_model(folder):
-    """The model whose scores a scores folder holds, from its config.yaml.
+def scores_config(folder):
+    """What a scores folder's config.yaml records, such as the model and the benchmark's files.
 
     Args:
-        folder (Path): The scores folder, from scores_folder.
+        folder (Path): The scores folder, from scores_location.
 
     Returns:
-        str | None: The model, or None when the folder has no config.yaml
+        dict: The config, or an empty dict when the folder has no config.yaml
             that can be read.
     """
     try:
         config = yaml.safe_load((folder / "config.yaml").read_text(encoding="utf-8"))
-        return config.get("model")
     except Exception:
-        return None
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
+def read_scores(model, benchmark, text_format, outputs, built_manifest):
+    """A model's scores on a benchmark: its metrics row and its ranks.
+
+    A run's scores are in its own folder, so they are its own, even after the
+    run's folder has moved. Any other model's scores are checked against the
+    model that config.yaml names, since two model folders of one name share a
+    scores folder.
+
+    Args:
+        model (str): The model, as ``--model`` gives it.
+        benchmark (str): The benchmark.
+        text_format (str): The text format of the scores.
+        outputs (Path): The outputs folder.
+        built_manifest (dict): The manifest of the benchmark built.
+
+    Returns:
+        tuple[pd.Series, pd.DataFrame, Path]: The metrics row, each source
+            variable's row of ``per_variable.csv``, and the scores folder.
+
+    Raises:
+        ValueError: If the model has no scores there, or the folder holds
+            another model's scores, or scores of another build of the
+            benchmark. The message names the command that scores it.
+    """
+    folder = scores_location(outputs, model, benchmark, text_format)
+    command = (
+        f"python -m embedding_model score --model {model} --benchmark"
+        f" {benchmark} --format {text_format}"
+    )
+    if (
+        not (folder / "metrics.csv").exists()
+        or not (folder / "per_variable.csv").exists()
+    ):
+        raise ValueError(
+            f"{model} has no scores on {benchmark} in format {text_format}, in"
+            f" {folder}. Score it first: {command}"
+        )
+    config = scores_config(folder)
+    if run_record(model) is None and config.get("model") != model_id(model):
+        raise ValueError(
+            f"the scores in {folder} are not {model}'s: their config.yaml names"
+            f" {config.get('model') or 'no model'}. Score it again: {command}"
+        )
+    changed = differences(
+        {"files": config.get("benchmark_manifest", {}).get("files", {})},
+        {"files": built_manifest["files"]},
+    )
+    if changed:
+        raise ValueError(
+            f"{model}'s scores on {benchmark} come from another build of it"
+            f" than the one built ({'; '.join(changed)}). Score it again: {command}"
+        )
+    metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
+    row = metrics.iloc[0]
+    ranks = pd.read_csv(
+        folder / "per_variable.csv",
+        dtype={**dict.fromkeys(VARIABLE_KEY, str), "rank": int},
+        keep_default_na=False,
+    )
+    return row, ranks, folder
 
 
 def run_record(model):
@@ -439,7 +552,8 @@ def score(
 
     For each benchmark, it writes:
 
-    - ``metrics.csv``: one row of metrics;
+    - ``metrics.csv``: one row: the model's number of parameters and its
+      metrics;
     - ``per_variable.csv``: every source variable's rank and top-1 target;
     - ``config.yaml``: the settings, the model's revision, the
       ai-harmonization commit, and the benchmark's version and checksums.
@@ -525,7 +639,8 @@ def score(
             f"the model {model} cannot be loaded ({type(error).__name__}:"
             f" {error}); give a model folder on disk or a Hugging Face model id"
         ) from error
-    scored = str(Path(model).resolve()) if Path(model).is_dir() else model
+    scored = model_id(model)
+    parameters = sum(parameter.numel() for parameter in encoder.parameters())
     commit = code_commit()
     revision = model_revision(model)
     rows = []
@@ -545,6 +660,7 @@ def score(
             "format": text_format,
             "n": len(source_texts),
             "targets": len(target_texts),
+            "parameters": parameters,
             **metrics,
         }
         config = {
@@ -563,11 +679,8 @@ def score(
             "libraries": library_versions(),
             "scored": datetime.now().isoformat(timespec="seconds"),
         }
-        if run is None:
-            folder = scores_folder(outputs, model, name, text_format)
-        else:
-            folder = Path(model) / "scores" / name / text_format
-        previous = scored_model(folder)
+        folder = scores_location(outputs, model, name, text_format)
+        previous = scores_config(folder).get("model")
         if previous and previous != scored:
             print(
                 f"warning: {folder} held the scores of {previous}. They are "

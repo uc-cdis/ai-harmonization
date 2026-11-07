@@ -36,7 +36,7 @@ From the rankings:
   perfect ranking would put them at ranks 1 and 2. Its MRR is 1. BEIR and MTEB report nDCG@10, so it compares with their
   scores.
 - **accuracy@k**, for k of 1, 3, 5 and 10: how often an expected target is
-  among the first k. It is what someone reviewing the top k suggestions sees.
+  among the first k. It is what a data curator who reviews the top k suggestions sees.
 - **median rank**: where the expected target typically lands.
 
 The `InformationRetrievalEvaluator` of
@@ -136,8 +136,9 @@ scores as they were; see [Inputs and outputs](../README.md#inputs-and-outputs).
 It holds:
 
 - `metrics.csv`, one row: `model`, `benchmark`, `benchmark_version`, `format`,
-  `n` (the variables scored), `targets`, `mrr`, `mrr@10`, `ndcg@10`,
-  `accuracy@1`, `accuracy@3`, `accuracy@5`, `accuracy@10` and `median_rank`.
+  `n` (the variables scored), `targets`, `parameters` (the model's number of
+  parameters), `mrr`, `mrr@10`, `ndcg@10`, `accuracy@1`, `accuracy@3`,
+  `accuracy@5`, `accuracy@10` and `median_rank`.
 - `per_variable.csv`, one row per source variable: `source_study_id`,
   `source_table_id`, `source_variable_id`, `source_variable_name`,
   `expected_target`, `rank`, and the target that the model ranked first,

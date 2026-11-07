@@ -48,6 +48,8 @@ TARGET_COLUMNS = [
 TARGET_SEPARATOR = ";"
 MANIFESTS = Path(__file__).resolve().parent / "manifests"
 BUILDERS = {"topmed": topmed, "gdc": gdc}
+# Each benchmark's name as its publishers write it, for figures and reports.
+TITLES = {"topmed": "TOPMed", "gdc": "GDC"}
 
 
 def write_benchmark(directory, name, version, targets, mappings, sources, counts):

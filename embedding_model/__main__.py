@@ -6,6 +6,7 @@ from pathlib import Path
 
 from embedding_model import (
     benchmarks,
+    compare,
     corpus,
     pairs,
     scoring,
@@ -221,6 +222,48 @@ def main(argv=None):
         help="texts encoded at a time (default: %(default)s)",
     )
 
+    compare_step = steps.add_parser(
+        "compare",
+        parents=[common, writes_outputs],
+        help=(
+            "compare scored models: their metrics with intervals, paired tests"
+            " of each model against a reference, and figures"
+        ),
+    )
+    compare_step.add_argument(
+        "--name",
+        required=True,
+        help="the comparison's name, and its folder under outputs/comparisons/",
+    )
+    compare_step.add_argument(
+        "--model",
+        required=True,
+        nargs="+",
+        action="extend",
+        help=(
+            "one or more models: a Hugging Face model id, a model folder or a"
+            " run's folder"
+        ),
+    )
+    compare_step.add_argument(
+        "--reference",
+        help="one of the models, which each other model is measured against",
+    )
+    compare_step.add_argument(
+        "--benchmark",
+        required=True,
+        nargs="+",
+        action="extend",
+        choices=sorted(benchmarks.BUILDERS),
+        help="one or more benchmarks that every model was scored on",
+    )
+    compare_step.add_argument(
+        "--format",
+        default=texts.DEFAULT_FORMAT,
+        choices=sorted(texts.FORMATS),
+        help="the text format of the scores (default: %(default)s)",
+    )
+
     # Only train takes more flags: the settings that override its config.
     args, overrides = parser.parse_known_args(argv)
     if overrides and args.step != "train":
@@ -240,6 +283,21 @@ def main(argv=None):
             )
         except Exception as error:
             print(f"score: {type(error).__name__}: {error}", file=sys.stderr)
+            return 1
+        return 0
+    if args.step == "compare":
+        try:
+            compare.compare(
+                args.name,
+                args.model,
+                args.benchmark,
+                args.inputs,
+                args.outputs,
+                args.format,
+                args.reference,
+            )
+        except Exception as error:
+            print(f"compare: {type(error).__name__}: {error}", file=sys.stderr)
             return 1
         return 0
     if args.step == "benchmarks" and args.action == "build":

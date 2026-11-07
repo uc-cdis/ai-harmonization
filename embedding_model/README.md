@@ -108,6 +108,26 @@ Each training is a run: one config, trained with one seed. A run is named
 after its config and its seed, so this one is `outputs/runs/run_example_s0/`.
 [docs/training.md](docs/training.md) says what a run's folder holds.
 
+### Compare it with a released model
+
+```
+python -m embedding_model score --model uc-ctds/bge-large-en-v1.5-bio-mapping --benchmark topmed
+python -m embedding_model compare --name example \
+    --model embedding_model/outputs/runs/run_example_s0 uc-ctds/bge-large-en-v1.5-bio-mapping \
+    --reference embedding_model/outputs/runs/run_example_s0 \
+    --benchmark topmed
+```
+
+`score` downloads the released model from Hugging Face, about 1.3 GB, and
+scores it. `compare` writes to `outputs/comparisons/example/`:
+
+- each model's metrics, with their 95% confidence intervals;
+- the paired tests of the other model against the reference, the example
+  run;
+- four figures.
+
+[docs/comparing.md](docs/comparing.md) says what each figure shows.
+
 ### Run a small series
 
 `small_series_example.yaml` declares a base configuration and two arms at five
@@ -198,6 +218,7 @@ rerun on its own.
 | benchmarks | `benchmarks build --topmed` | builds the [TOPMed benchmark](docs/benchmarks.md#topmed) | `inputs/benchmarks/` |
 | | `benchmarks build --gdc` | builds the [GDC benchmark](docs/benchmarks.md#gdc) | `inputs/benchmarks/` |
 | | `score --model <model> --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | scores any model, trained here or elsewhere, on one or more benchmarks | `scores/<benchmark>/<format>/` in the run's folder, or `outputs/scores/<model>/<benchmark>/<format>/` for a model trained elsewhere: the metrics and every source variable's rank |
+| | `compare --name <comparison> --model <model> [<model> ...] [--reference <model>] --benchmark <benchmark> [<benchmark> ...] [--format <format>]` | [compares](docs/comparing.md) scored models: their metrics with 95% confidence intervals, paired tests of each model against a reference, and figures | `outputs/comparisons/<comparison>/` |
 | training data | `sources fetch [--source <source> ...]` | downloads the [training sources](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/<source>/` |
 | | `corpus build --name <corpus> [--source <source> ...] [--validation-share <share>]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
@@ -241,6 +262,11 @@ There are two benchmarks:
 [docs/benchmarks.md](docs/benchmarks.md) describes what each one is built from,
 and how to build it or make a new version.
 
+`compare` puts scored models side by side. It gives each model's metrics with
+their 95% confidence intervals, and tests each model against one reference
+model. It draws four figures, ready for print.
+[docs/comparing.md](docs/comparing.md) says how, and what each figure shows.
+
 `get_metrics_for_approach` evaluates a harmonization approach end to end. The
 approach suggests a set of mappings for a source and a target model, and the
 suggestions are scored by precision, recall and F1. Use it to evaluate a
@@ -252,7 +278,7 @@ The steps that prepare data write under `embedding_model/inputs/`. Those
 steps are the benchmarks, sources, pairs, corpora and tokenizers. Training
 runs read what they need from there. They write everything that
 they produce under `embedding_model/outputs/`: the model, its record and its
-scores. Both folders are gitignored.
+scores. Comparisons of models go there too. Both folders are gitignored.
 
 `--inputs DIR` and `--outputs DIR` set a different location for either one,
 such as a larger disk.
@@ -305,8 +331,9 @@ outputs/
         tables/                  the comparison tables `experiment report` writes
         figures/                 its figures, one per comparison family
         pick.md                  the record `experiment pick` writes
-    scores/<model>/              the scores of a model trained elsewhere, such as uc-ctds/StdElement-Mapper
+    scores/<model>/              the scores of a model trained elsewhere, such as uc-ctds/bge-large-en-v1.5-bio-mapping
         <benchmark>/<format>/    one folder per benchmark and text format
+    comparisons/<comparison>/    what `compare` writes: metrics.csv, differences.csv, manifest.json, and figures/ with the figures
 ```
 
 A series is read from two tables: the ledger, with one row per training run,

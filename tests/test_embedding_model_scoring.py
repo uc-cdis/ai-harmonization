@@ -113,6 +113,13 @@ def built(tmp_path, mappings, name="topmed"):
 
 
 @pytest.fixture
+def saved(model, tmp_path):
+    """The small static model, saved to a folder named abcd-model."""
+    model.save(str(tmp_path / "abcd-model"))
+    return str(tmp_path / "abcd-model")
+
+
+@pytest.fixture
 def inputs(tmp_path):
     """The benchmark built from TARGETS and MAPPINGS, in a temp inputs folder."""
     return built(tmp_path, MAPPINGS)
@@ -259,14 +266,11 @@ class TestRankTargets:
 class TestScore:
     """Scoring a model on built benchmarks, and the files that it writes."""
 
-    @pytest.fixture
-    def saved(self, model, tmp_path):
-        """The small static model, saved to a folder named abcd-model."""
-        model.save(str(tmp_path / "abcd-model"))
-        return str(tmp_path / "abcd-model")
-
     def test_writes_metrics_ranks_and_config(self, saved, inputs, tmp_path):
-        """Scoring writes one metrics row, every source variable's rank, and the config."""
+        """Scoring writes one metrics row, every source variable's rank, and the config.
+
+        The model's parameters are its embedding weights: a row of 3 for each word.
+        """
         (row,) = scoring.score(
             saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
         )
@@ -275,6 +279,7 @@ class TestScore:
         metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
         assert metrics.loc[0, "mrr"] == row["mrr"]
         assert (metrics.loc[0, "n"], metrics.loc[0, "targets"]) == (3, 4)
+        assert metrics.loc[0, "parameters"] == len(WORDS) * 3
         assert metrics.loc[0, "benchmark_version"] == manifest_version("topmed")
         assert metrics.loc[0, "ndcg@10"] == row["ndcg@10"]
         per_variable = pd.read_csv(folder / "per_variable.csv")
@@ -366,6 +371,85 @@ class TestScore:
                 saved, ["topmed", "gdc"], inputs, tmp_path / "outputs", device="cpu"
             )
         assert not (tmp_path / "outputs").exists()
+
+
+class TestReadScores:
+    """Reading the scores that score wrote, as compare reads them."""
+
+    def test_reads_what_score_wrote(self, saved, inputs, tmp_path):
+        """The metrics row and each source variable's rank come back as score wrote them."""
+        (written,) = scoring.score(
+            saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        row, ranks, _ = scoring.read_scores(
+            saved, "topmed", texts.DEFAULT_FORMAT, tmp_path / "outputs", manifest
+        )
+        assert row["mrr"] == written["mrr"]
+        assert list(ranks["rank"]) == [1, 1, 3]
+
+    def test_a_model_not_scored_names_the_command(self, inputs, tmp_path):
+        """A model without scores is refused, with the score command that makes them."""
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="Score it first") as raised:
+            scoring.read_scores(
+                "ijkl-org/ijkl-model",
+                "topmed",
+                "compact",
+                tmp_path / "outputs",
+                manifest,
+            )
+        assert (
+            "python -m embedding_model score --model ijkl-org/ijkl-model"
+            " --benchmark topmed --format compact"
+        ) in str(raised.value)
+
+    def test_scores_of_another_build_are_refused(self, saved, inputs, tmp_path):
+        """A benchmark built again under its version, with a target described anew, is another build.
+
+        Its targets file differs, so the scores of the first build are refused,
+        with the command that scores the model again.
+        """
+        scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
+        edited = [dict(row) for row in TARGETS]
+        edited[0]["target_description"] = "Age at the visit"
+        benchmarks.write_benchmark(
+            inputs / "benchmarks" / "topmed",
+            "topmed",
+            manifest_version("topmed"),
+            edited,
+            MAPPINGS,
+            [],
+            {},
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="another build of it") as raised:
+            scoring.read_scores(
+                saved, "topmed", texts.DEFAULT_FORMAT, tmp_path / "outputs", manifest
+            )
+        assert "targets.csv" in str(raised.value)
+        assert "Score it again" in str(raised.value)
+
+    def test_scores_of_another_model_of_the_same_name_are_refused(
+        self, model, inputs, tmp_path
+    ):
+        """Two model folders of one name share a scores folder, so the other one's scores are refused."""
+        first = tmp_path / "first" / "abcd-model"
+        second = tmp_path / "second" / "abcd-model"
+        model.save(str(first))
+        model.save(str(second))
+        scoring.score(
+            str(second), ["topmed"], inputs, tmp_path / "outputs", device="cpu"
+        )
+        manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
+        with pytest.raises(ValueError, match="their config.yaml names .*second"):
+            scoring.read_scores(
+                str(first),
+                "topmed",
+                texts.DEFAULT_FORMAT,
+                tmp_path / "outputs",
+                manifest,
+            )
 
 
 class TestScoresFolder:

@@ -104,9 +104,10 @@ embedding-model = [
     # version, so its own requirement sets the minimum.
     "huggingface-hub>=0.20.0",
     # embedding_model.corpus (the split's groups, as the connected components
-    # of a graph of items and canonical texts). Its minimum version is the
-    # first with wheels for Python 3.12, the project's lowest Python.
-    "scipy>=1.11.2",
+    # of a graph of items and canonical texts) and embedding_model.compare (the
+    # bootstrap intervals and the permutation test). Its minimum version is the
+    # first whose bootstrap and permutation_test take their seed as `rng`.
+    "scipy>=1.15.0",
     # embedding_model.train (the trainer's data collator, which takes a
     # preprocess_fn, and the module paths of version 6)
     "sentence-transformers>=6.0.0",

@@ -6,9 +6,20 @@ the code and the model that produced it.
 
 import os
 import platform
+from importlib import import_module
 from pathlib import Path
 
 from embedding_model import manifests
+
+# The libraries that train and score a model, whose versions a run's record
+# and a score's config.yaml hold.
+MODEL_LIBRARIES = (
+    "sentence_transformers",
+    "transformers",
+    "torch",
+    "datasets",
+    "tokenizers",
+)
 
 # The files whose changes can change a score or a trained model, as git
 # pathspecs from the top of the checkout.
@@ -79,25 +90,20 @@ def model_revision(model):
     return Path(folder).name
 
 
-def library_versions():
-    """The versions of Python and of the libraries that train and score a model.
+def library_versions(libraries=MODEL_LIBRARIES):
+    """The versions of Python and of some libraries.
+
+    Each version is the module's ``__version__``, as a plain str. torch's own
+    is a TorchVersion, a kind of str that YAML cannot write. It also keeps its
+    build, such as ``+cu130``, which the package's metadata leaves out.
+
+    Args:
+        libraries (tuple[str]): The libraries, by their modules' names.
 
     Returns:
         dict[str, str]: Each version, by the library's name.
     """
-    import datasets
-    import sentence_transformers
-    import tokenizers
-    import torch
-    import transformers
-
     return {
         "python": platform.python_version(),
-        "sentence_transformers": sentence_transformers.__version__,
-        "transformers": transformers.__version__,
-        # torch's version is a TorchVersion, a kind of str that YAML cannot
-        # write.
-        "torch": str(torch.__version__),
-        "datasets": datasets.__version__,
-        "tokenizers": tokenizers.__version__,
+        **{name: str(import_module(name).__version__) for name in libraries},
     }

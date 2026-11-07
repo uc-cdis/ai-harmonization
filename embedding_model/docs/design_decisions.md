@@ -28,6 +28,7 @@ earlier text.
 - [All steps](#all-steps)
 - [Benchmarks](#benchmarks)
 - [Scoring](#scoring)
+- [Comparing](#comparing)
 - [Sources](#sources)
 - [Pairs](#pairs)
 - [Corpus](#corpus)
@@ -479,9 +480,9 @@ check that:
 
 **Described in:** [scoring.md](scoring.md#the-metrics).
 
-**Context.** A reviewer harmonizes a source variable by choosing its target
-from the suggestions, and needs one expected target near the top. In both
-benchmarks, many source variables have several expected targets. By default,
+**Context.** A data curator harmonizes a source variable by choosing its
+target from the suggestions, and needs one expected target near the top. In
+both benchmarks, many source variables have several expected targets. By default,
 [sentence-transformers](https://sbert.net)' evaluator reports:
 
 - the mean reciprocal rank at 10, MRR@10;
@@ -503,17 +504,17 @@ MTEB.
 **Consequences.**
 
 - Good, because MRR, accuracy@k and the median rank depend only on a source
-  variable's highest expected target: MRR and accuracy@k by their
+  variable's highest expected target. MRR and accuracy@k do so by their
   definitions, and the median rank because `score` takes that rank. A
-  reviewer needs only that one target to harmonize the variable. Precision,
+  curator needs only that one target to harmonize the variable. Precision,
   recall, MAP and nDCG count every expected target.
 - Good, because MRR without a cut-off counts every rank. A model that moves an
   expected target from rank 50 to rank 20 scores better. MRR@10 scores every
   rank past 10 as 0.
 - Good, because MRR@10 compares with the validation MRR@10 that training
   logs.
-- Good, because accuracy@k is what a reviewer of the top k suggestions sees:
-  whether an expected target is among them.
+- Good, because accuracy@k is what a curator who reviews the top k
+  suggestions sees: whether an expected target is among them.
 - Good, because a few very low ranks do not move the median rank, as they
   move a mean.
 - Good, because nDCG@10 is the main score of BEIR
@@ -664,6 +665,489 @@ check that:
 - a benchmark that it was not checked against is refused;
 - another build of a checked benchmark is refused;
 - a new version with the same files is scored.
+
+## Comparing
+
+### `compare` reads the scores that `score` wrote
+
+**Described in:** [comparing.md](comparing.md#running-compare).
+
+**Context.** For each source variable, `score` ranks every target of a
+benchmark. It writes the rank of the best-placed
+[expected target](#a-benchmark-is-two-files-mappings-and-targets) to
+`per_variable.csv`, and each metric's mean to `metrics.csv`. Ranking needs
+the model, and a large model ranks slowly on a CPU. `score` names a scores
+folder after the model folder's own name. A [run](training.md) of `train`
+keeps its scores in its own folder. `score` records the checksums of the
+benchmark's files.
+
+**Decision.** `compare` reads each model's scores, and loads no model. Each
+mean comes from `metrics.csv`. Each variable's rank, in `per_variable.csv`,
+is used for the intervals and the tests. `compare` refuses another model's
+scores, scores of another build of the benchmark, and two models' scores of
+other variables.
+
+**Consequences.**
+
+- Good, because a comparison needs no GPU. It runs again at once, with other
+  scored models or another reference.
+- Good, because each mean is the number that `score` reports, and its
+  interval comes from the same ranking.
+- Good, because a benchmark is matched by its files' checksums, as when
+  `score` [checks a run's corpus](#scoring-a-run-uses-its-corpuss-leakage-check).
+  So a benchmark built again with other files, under the same version, is
+  refused.
+- Good, because a run's scores sit inside the run's folder. So `compare`
+  finds them after the folder moves.
+- Bad, because each model must be scored first, on the same benchmarks and in
+  the same format.
+
+**Alternatives considered.**
+
+- `compare` scores each model itself: it would repeat the work of `score`
+  each time a comparison changes.
+- `compare` scores only the models that have no scores: it would still load
+  models, and a large one needs a GPU.
+- A warning for scores that do not match, and the comparison continues: its
+  tests would match up variables that differ, or builds that differ.
+
+**Confirmation.** The tests check that:
+
+- the scores come back as `score` wrote them, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
+- a model that is not scored is refused, with the command that scores it, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
+- the scores of another model of the same name are refused, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
+- scores of another build of the benchmark are refused, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
+- two models' scores that list other variables, or list them in another
+  order, are refused, with ids and without them, in
+  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py);
+- a run's scores are read from the run's own folder, also after the run has
+  moved, in
+  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py).
+
+### One reference, which each other model is measured against
+
+**Described in:** [comparing.md](comparing.md#running-compare).
+
+**Context.** A comparison often asks how models compare with one model: the
+model in use, or the best setting so far. Testing each of n models against
+every other one makes n(n - 1) / 2 tests per metric. The bar plot,
+`accuracy_and_mrr`, marks each difference found with a comparison bracket: a
+line over the two bars that it compares. A difference between two models can
+be taken either way round.
+
+**Decision.** `--reference` names one model. Each other model is tested
+against it, and each difference is that model minus the reference. The
+reference's bar comes first in each group. Without `--reference`, `compare`
+gives each model's intervals and makes no tests.
+
+**Consequences.**
+
+- Good, because the tests ask what a comparison asks: how each model compares
+  with the reference. A comparison makes n - 1 tests per metric, not
+  n(n - 1) / 2.
+- Good, because each difference reads as its own model's gain: a positive
+  difference means that the model does better than the reference.
+  Estimation plots define a difference so, as the test group minus the
+  control ([Ho et al., 2019](https://doi.org/10.1038/s41592-019-0470-3)).
+- Good, because each group of bars in `accuracy_and_mrr` has at most n - 1
+  comparison brackets, which a reader can follow. Each one starts at the
+  reference's bar, the first of its group.
+- Bad, because a test between two other models needs a second comparison,
+  with one of them as the reference.
+
+**Alternatives considered.**
+
+- Each model against every other one: many tests, and more comparison
+  brackets than the bar plot can show clearly.
+- A default reference, such as the first model of `--model`: the tests would
+  then measure against a model that nobody chose.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- the differences are each other model minus the reference;
+- the reference is drawn first;
+- without a reference, no differences are written, and `compare` says so;
+- a reference named by a relative path is the model given by its full path;
+- a reference that is not one of the models, even in a folder of the same
+  name, or that has no other model, is refused.
+
+### accuracy@k: Wilson intervals, Newcombe's paired interval and McNemar's exact test
+
+**Described in:** [comparing.md](comparing.md#what-it-shows).
+
+**Context.** For accuracy@k, a source variable gives a model a 1 if an
+expected target is among its first k suggestions, else 0. So accuracy@k is the
+share of variables with a 1. A benchmark is a sample of variables, so the
+share has a sampling error, which a confidence interval shows. Two models on
+one benchmark rank the same variables. They often agree: when both rank the
+expected target first, both get 1 on accuracy@1.
+
+**Decision.** A model's accuracy@k gets a 95% Wilson score interval. Each
+other model's difference from the reference gets Newcombe's interval for
+paired shares. It combines the two models' Wilson intervals with how often
+the two models agree. The test of that difference is McNemar's exact test: a
+binomial test on the variables where the two models differ.
+
+**Consequences.**
+
+- Good, because the Wilson score interval
+  ([Wilson, 1927](https://doi.org/10.1080/01621459.1927.10502953)) is the
+  interval recommended for a share
+  ([Brown et al., 2001](https://doi.org/10.1214/ss/1009213286)). Recent work
+  on evaluating models confirms it on small benchmarks
+  ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
+- Good, because the Wilson interval keeps a width at a share of 0 or 1.
+- Good, because Newcombe's interval uses the pairing. Two models that agree
+  on many variables get a narrower interval than their two Wilson intervals
+  would give apart. It is among the intervals recommended for paired shares
+  ([Newcombe, 1998](https://doi.org/10.1002/(SICI)1097-0258(19981130)17:22%3C2635::AID-SIM954%3E3.0.CO;2-C);
+  [Fagerland et al., 2014](https://doi.org/10.1002/sim.6148)).
+- Good, because McNemar's test
+  ([McNemar, 1947](https://doi.org/10.1007/bf02295996)), in its exact form, is
+  the exact paired permutation test for values of 1 and 0. It looks only at
+  the variables where the two models differ. So it can find a difference that
+  two overlapping intervals hide.
+- Good, because `scipy.stats.binomtest` computes both the Wilson interval and
+  McNemar's exact test.
+- Bad, because no released library computes Newcombe's interval. `compare`
+  computes it by Newcombe's formula, from scipy's Wilson limits. statsmodels
+  has added it as `confint_proportions_paired`, but has no release with it
+  yet.
+- Bad, because the exact test is conservative when few variables differ: its
+  p tends to be larger than it should be
+  ([Fagerland et al., 2013](https://doi.org/10.1186/1471-2288-13-91)).
+- Bad, because a difference's interval and its test are two methods, so near
+  0 they can disagree. Far from 0, the two agree. When an end of the interval
+  is close to 0, the interval can just miss 0 while p is just above 0.05, or
+  the reverse.
+
+**Alternatives considered.**
+
+- The BCa bootstrap, as for MRR: one method for every metric. But at a share
+  of 0 or 1 its interval has no width, and on small benchmarks it covers too
+  little ([Bowyer et al.,
+  2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
+- Clopper and Pearson's exact interval: it always covers at least 95%, but it
+  is wider than needed ([Brown et al.,
+  2001](https://doi.org/10.1214/ss/1009213286)).
+- A Bayesian interval, from a Beta distribution: about as good as the Wilson
+  interval for one share ([Bowyer et al.,
+  2025](https://proceedings.mlr.press/v267/bowyer25a.html)). For a paired
+  difference, it needs sampling code of our own.
+- The Wald interval, the share plus or minus 1.96 standard errors: it can
+  leave the range from 0 to 1. It has no width at 0 or 1 ([Brown et al.,
+  2001](https://doi.org/10.1214/ss/1009213286)).
+- Two Wilson intervals combined as if the models were independent: wider
+  than needed, since the two models agree on many variables.
+- `scipy.stats.permutation_test`, as for MRR: one test for every metric. But
+  on a benchmark of real size, scipy samples the swaps instead of trying them
+  all. Its p is then an estimate, with a floor set by the number of resamples.
+  The binomial test gives the exact p of the same test.
+- statsmodels' `mcnemar`: the same exact test, from a library that the
+  repository does not otherwise need.
+- McNemar's mid-p test, which Fagerland et al. recommend: its p keeps closer
+  to the stated rate. But it is not the exact permutation test, and
+  `scipy.stats.binomtest` gives no mid-p.
+- Comparing the two models' intervals: it misses differences that a paired
+  test finds.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- `metrics.csv` gives a share of 1 a Wilson interval of some width;
+- Newcombe's interval is narrower for two models that agree than for two
+  that agree only by chance, with the same shares. It keeps some width when
+  they agree on every variable;
+- Newcombe's interval treats the two models alike: swapping the model and
+  the reference turns [low, high] into [-high, -low];
+- `differences.csv` gives each difference of accuracy@k Newcombe's interval;
+- McNemar's p is right on an example computed by hand: three variables that
+  only the reference finds give p = 2 × 0.5³ = 0.25;
+- two models that never differ have a p of 1;
+- the stars mark the p below each level.
+
+### MRR and MRR@10: the BCa bootstrap and a paired permutation test
+
+**Described in:** [comparing.md](comparing.md#what-it-shows).
+
+**Context.** For MRR, each source variable gives a model a value between 0
+and 1: 1 / rank, or 0 past rank 10 for
+[MRR@10](#mrr-accuracyk-the-median-rank-and-ndcg). Many of the values are 1.
+A benchmark is a sample of variables, so the mean has a sampling error,
+which a confidence interval shows. Two models' values match up, variable by
+variable. `score`'s evaluator gives each mean and each variable's ranking,
+but no interval.
+
+**Decision.** A model's MRR, and each difference from the reference, get a
+95% confidence interval from a bootstrap over the source variables. The
+bootstrap takes scipy's defaults: its number of resamples, and BCa, the
+bias-corrected and accelerated method. Its seed is fixed. The test of a
+difference between two models' MRR is a paired permutation test.
+
+**Consequences.**
+
+- Good, because the bootstrap needs no assumption about the shape of the
+  values, which pile up at 1. BCa adjusts the interval for the bias and the
+  skew of the bootstrap's distribution
+  ([Efron, 1987](https://doi.org/10.1080/01621459.1987.10478410)).
+- Good, because resampling the source variables keeps each variable's two
+  values together. So a difference's interval uses the pairing.
+- Good, because the permutation test is reliable in IR evaluation. When two
+  systems do not differ, it gives p < 0.05 about 1 time in 20, as it should.
+  This holds across measures and sample sizes
+  ([Urbano et al., 2019](https://doi.org/10.1145/3331184.3331259);
+  [Ihemelandu & Ekstrand, 2023](https://doi.org/10.1145/3539618.3592004)).
+- Good, because `scipy.stats.bootstrap` and `scipy.stats.permutation_test`
+  compute them, with no setting of our own.
+- Good, because the fixed seed makes a comparison repeat exactly.
+- Bad, because a bootstrap interval covers too little on a small benchmark
+  ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
+- Bad, because resampling is slower than a formula, and the test's p varies
+  a little with the seed. The seed is fixed.
+- Bad, because a difference's interval and its test are two methods, so near
+  0 they can disagree, as for accuracy@k.
+
+**Alternatives considered.**
+
+- The percentile bootstrap: simpler, but less accurate than BCa when the
+  distribution is skewed.
+- The t interval: it assumes that the mean is normally distributed. The mean
+  of values that pile up at 1, on a small benchmark, is not.
+- 10,000 resamples: about the precision of scipy's default, 9,999, with one
+  more setting to keep.
+- The Wilcoxon signed-rank test: it drops the variables where both models
+  tie, and it does not test the mean. It is unreliable for means in IR
+  evaluation, more so as samples grow
+  ([Urbano et al., 2019](https://doi.org/10.1145/3331184.3331259);
+  [Urbano, 2026](https://doi.org/10.1145/3805712.3808540)).
+- The sign test: unreliable for the same reasons ([Urbano et al.,
+  2019](https://doi.org/10.1145/3331184.3331259)).
+- The paired t-test: IR's most common test, and as reliable as the permutation
+  test ([Urbano et al., 2019](https://doi.org/10.1145/3331184.3331259)). It
+  gives nearly the same p. The permutation test needs no assumption about how
+  the differences are distributed.
+- A bootstrap test: its p leans toward small values ([Urbano et al.,
+  2019](https://doi.org/10.1145/3331184.3331259)).
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- a model's MRR lies inside its interval, and a second run gives the same
+  interval, since the seed is fixed;
+- on 200 variables, the interval is about as wide as a normal 95% interval;
+- when every variable has an MRR of 1, the interval is [1, 1]. scipy's BCa
+  gives no interval there;
+- MRR is compared by a paired test: it finds a model that ranks each target
+  one place higher, which an unpaired test would miss.
+
+### Each paired test is reported alone, with no correction for the number of tests
+
+**Described in:** [comparing.md](comparing.md#what-it-shows).
+
+**Context.** Each test asks: does this model differ from the reference, on
+this metric and benchmark? Models are not tested against each other. Two
+models and a reference, on 6 metrics and 2 benchmarks, make 2 x 6 x 2 = 24
+tests. By chance, a test gives p < 0.05 about 1 time in 20.
+A correction for multiple comparisons, such as Holm's, keeps the chance of a
+false finding among the 24 below 0.05.
+
+**Decision.** Each p is reported as its test gives it, with no correction. A
+comparison bracket marks each comparison with p < 0.05.
+
+**Consequences.**
+
+- Good, because each comparison bracket is its own claim: this model differs
+  from the reference on this metric. A claim about one comparison needs no
+  correction for the others
+  ([Rothman, 1990](https://doi.org/10.1097/00001648-199001000-00010)).
+- Good, because a claim that a model beats the reference on every metric
+  needs no correction either. It holds at 0.05 when each of its tests gives
+  p < 0.05 ([Berger, 1982](https://doi.org/10.1080/00401706.1982.10487790)).
+- Good, because a small benchmark keeps its power to find a real difference.
+- Bad, because `compare` leaves a claim about the whole set to its reader.
+  Picking the best of several models from its tables is such a claim, and
+  needs a correction. `differences.csv` gives every p, so that a reader can
+  apply one.
+
+**Alternatives considered.**
+
+- Bonferroni's correction: each test is held to 0.05 divided by the number
+  of tests, such as 0.05 / 24. It is the simplest correction, and it keeps
+  the chance of any false finding in the set below 0.05. But it costs the
+  most power, and a small benchmark then finds few differences.
+- Holm's correction: the same guarantee as Bonferroni's, by a step-down rule,
+  and it never finds fewer differences. It fits a claim about the whole set,
+  but still costs power on a small benchmark.
+- Dunnett's procedure, made for several treatments against one control
+  ([Dunnett, 1955](https://doi.org/10.1080/01621459.1955.10501294)): it fits a
+  claim about the whole set too. It assumes normally distributed means, which
+  a share near 1 on a small benchmark is not.
+- Benjamini and Hochberg's procedure: it bounds the expected share of false
+  findings among the differences found. It suits a search through many
+  tests, not a claim about each one.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- the p of accuracy@1 in `differences.csv` is the p of its own test.
+
+### Four figures
+
+**Described in:** [comparing.md](comparing.md#what-it-shows).
+
+**Context.** A model developer compares models to answer a few questions
+quickly:
+
+- How often, and how high, does each model rank an expected target?
+- How does that change as a
+  [data curator](#mrr-accuracyk-the-median-rank-and-ndcg) reviews more
+  suggestions?
+- How does a model's quality relate to its size?
+- How much better or worse than the reference is each model?
+
+A figure shows such answers at a glance. `metrics.csv` and
+`differences.csv` hold the values.
+
+**Decision.** `compare` draws one figure for each question:
+
+1. `accuracy_and_mrr`: accuracy@1, @5 and @10 as grouped bars, with MRR;
+2. `accuracy_by_k`: accuracy@k for every k from 1 to 50;
+3. `mrr_by_size`: MRR by the model's number of parameters;
+4. `differences_from_reference`, with a reference: each model's difference
+   from it.
+
+The bars carry no numbers. A comparison holds at most 8 models.
+
+**Consequences.**
+
+- Good, because `accuracy_and_mrr` answers the first question as the
+  repository's evaluation notebook does, with grouped bars. So its readers
+  know the plot already. A bar shows well the share of source variables that
+  a model finds. Comparison brackets mark which differences hold.
+- Good, because `accuracy_by_k` shows where a model gains as a curator
+  reviews more suggestions, beyond the three k of the bars.
+- Good, because `mrr_by_size` places each model by its number of
+  parameters, on a log scale.
+- Good, because `differences_from_reference` shows by how much each model
+  differs from the reference, with an interval, on an axis of its own. On the
+  0-to-1 axis of `accuracy_and_mrr`, a difference of 0.01 is hard to see.
+  This is an estimation plot
+  ([Ho et al., 2019](https://doi.org/10.1038/s41592-019-0470-3)). It shows
+  how large each difference is, not only whether a test finds it.
+- Good, because the figures give the answers at a glance, and the tables
+  keep every value. So the bars need no numbers.
+- Bad, because a comparison of more than 8 models is refused. Its bars would
+  grow too thin to read, and its comparison brackets would fill half of each
+  panel.
+
+**Alternatives considered.**
+
+- Tables alone, with no figures: exact, but slow to read. A curve's shape,
+  or a difference of 0.01, is hard to see in a column of numbers.
+- Numbers on the bars, as the notebook draws them: past a few models they
+  crowd the bars, and `metrics.csv` holds every value.
+- Points with intervals in place of bars, for the first question: they suit
+  any mean, but show a share less plainly than a bar.
+- Comparison brackets alone, for the last question, without
+  `differences_from_reference`: they say whether two models differ, but not
+  by how much.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- each figure is written as a PNG, a PDF and an EPS file;
+- `differences_from_reference` puts each model at its difference from the
+  reference;
+- a comparison of 9 models is refused.
+
+### Colors from matplotlib's petroff10, not its default tab10
+
+**Described in:** [comparing.md](comparing.md#colors).
+
+**Context.** The figures give each model a color. The default color sequence
+of matplotlib is tab10. It also ships petroff10, a sequence made for readers
+with a color vision deficiency. The repository requires matplotlib
+3.10 or later, so that it runs on Google Colab.
+
+**Decision.** The figures take their colors from petroff10, in the order of
+`--model`.
+
+**Consequences.**
+
+- Good, because petroff10 was chosen for readers with a color vision
+  deficiency, and for how people rated its look
+  ([Petroff, 2021](https://doi.org/10.48550/ARXIV.2107.02270)).
+- Bad, because the bars of `accuracy_and_mrr` carry no marker or pattern,
+  only a color. In black-and-white print, a reader must go by the bars'
+  order, which the legend follows.
+
+**Alternatives considered.**
+
+- tab10, matplotlib's default: under simulated protanopia
+  ([Machado et al., 2009](https://doi.org/10.1109/tvcg.2009.113)), two of
+  its colors look nearly the same.
+- A pattern on each bar, by matplotlib's hatching: it would keep the bars
+  apart in black-and-white print. But up to 8 patterns crowd the bars, and
+  matplotlib names no sequence of patterns, as it does of colors.
+- [Okabe and Ito's](https://jfly.uni-koeln.de/color/) eight colors, and
+  Petroff's eight: matplotlib ships them only from 3.11, above the version
+  that the repository requires. Okabe and Ito's also hold black, the color of
+  the error bars and the text.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- each model's bars take petroff10's color of its place in `--model`.
+
+### nDCG@10 and the median rank get no interval, test or figure
+
+**Described in:** [comparing.md](comparing.md#where-the-numbers-come-from).
+
+**Context.** `score` reports nDCG@10, as BEIR and MTEB do, and the median
+rank, each as one number. A variable can have several expected targets. MRR
+and accuracy@k count the best-placed one, and nDCG@10 counts every one. An
+interval or a test of nDCG@10 needs each variable's own nDCG@10, from the rank
+of every expected target. `per_variable.csv` keeps only the best-placed one's
+rank. A curator needs one expected target to map a variable.
+
+**Decision.** `compare` copies nDCG@10 and the median rank into its
+`metrics.csv` as plain numbers, with no interval or test, and draws neither.
+
+**Consequences.**
+
+- Good, because readers who know MTEB find nDCG@10.
+- Good, because the figures show what a curator needs: where the first
+  expected target lands.
+- Bad, because a difference in nDCG@10 is not tested.
+
+**Alternatives considered.**
+
+- Each variable's nDCG@10: `score` would keep the rank of every expected
+  target, and a library of IR measures would compute it. It adds files and a
+  dependency, for a metric that a curator does not need.
+- nDCG@10 in the figures: it marks a model down for missing a second
+  expected target, which a curator does not need.
+- The median rank in the figures, with an interval: it often shows nothing.
+  When more than half of the variables rank their expected target first, the
+  median rank is 1. It stays 1 when a model moves its worst variables up, and
+  its bootstrap interval is [1, 1].
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- `metrics.csv` copies nDCG@10 from the scores.
 
 ## Sources
 
@@ -2369,11 +2853,24 @@ check that:
 > with Sentence Transformers*. Hugging Face.
 > https://huggingface.co/blog/static-embeddings
 
+> Berger, R. L. (1982). Multiparameter Hypothesis Testing and Acceptance
+> Sampling. *Technometrics, 24*(4), 295–300.
+> https://doi.org/10.1080/00401706.1982.10487790
+
 > Berrendorf, M., Faerman, E., Vermue, L., & Tresp, V. (2020). Interpretable
 > and Fair Comparison of Link Prediction or Entity Alignment Methods. *2020
 > IEEE/WIC/ACM International Joint Conference on Web Intelligence and
 > Intelligent Agent Technology (WI-IAT)*, 371–374.
 > https://doi.org/10.1109/wiiat50758.2020.00053
+
+> Bowyer, S., Aitchison, L., & Ivanova, D. R. (2025). Position: Don't Use the
+> CLT in LLM Evals With Fewer Than a Few Hundred Datapoints. *Proceedings of
+> the 42nd International Conference on Machine Learning*, 81143–81184.
+> https://proceedings.mlr.press/v267/bowyer25a.html
+
+> Brown, L. D., Cai, T. T., & DasGupta, A. (2001). Interval Estimation for a
+> Binomial Proportion. *Statistical Science, 16*(2), 101–133.
+> https://doi.org/10.1214/ss/1009213286
 
 > Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J., Dhariwal, P.,
 > Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S.,
@@ -2395,8 +2892,35 @@ check that:
 > Conference on Empirical Methods in Natural Language Processing*,
 > 1286–1305. https://doi.org/10.18653/v1/2021.emnlp-main.98
 
+> Dunnett, C. W. (1955). A Multiple Comparison Procedure for Comparing
+> Several Treatments with a Control. *Journal of the American Statistical
+> Association, 50*(272), 1096–1121.
+> https://doi.org/10.1080/01621459.1955.10501294
+
+> Efron, B. (1987). Better Bootstrap Confidence Intervals. *Journal of the
+> American Statistical Association, 82*(397), 171–185.
+> https://doi.org/10.1080/01621459.1987.10478410
+
+> Fagerland, M. W., Lydersen, S., & Laake, P. (2013). The McNemar test for
+> binary matched-pairs data: mid-p and asymptotic are better than exact
+> conditional. *BMC Medical Research Methodology, 13*(1).
+> https://doi.org/10.1186/1471-2288-13-91
+
+> Fagerland, M. W., Lydersen, S., & Laake, P. (2014). Recommended tests and
+> confidence intervals for paired binomial proportions. *Statistics in
+> Medicine, 33*(16), 2850–2875. https://doi.org/10.1002/sim.6148
+
 > Géron, A. (2022). *Hands-on machine learning with Scikit-Learn, Keras, and
 > TensorFlow* (3rd ed.). O'Reilly Media.
+
+> Ho, J., Tumkaya, T., Aryal, S., Choi, H., & Claridge-Chang, A. (2019).
+> Moving beyond P values: data analysis with estimation graphics. *Nature
+> Methods, 16*(7), 565–566. https://doi.org/10.1038/s41592-019-0470-3
+
+> Ihemelandu, N., & Ekstrand, M. D. (2023). Inference at Scale: Significance
+> Testing for Large Search and Recommendation Experiments. *Proceedings of the
+> 46th International ACM SIGIR Conference on Research and Development in
+> Information Retrieval*, 2087–2091. https://doi.org/10.1145/3539618.3592004
 
 > Kopp, O., Armbruster, A., & Zimmermann, O. (2018). Markdown Architectural
 > Decision Records: Format and Tool Support. In N. Herzberg, C. Hochreiner, O.
@@ -2416,6 +2940,15 @@ check that:
 > Association for Computational Linguistics: Human Language Technologies*,
 > 4228–4238. https://doi.org/10.18653/v1/2021.naacl-main.334
 
+> Machado, G. M., Oliveira, M. M., & Fernandes, L. (2009). A
+> Physiologically-based Model for Simulation of Color Vision Deficiency.
+> *IEEE Transactions on Visualization and Computer Graphics, 15*(6),
+> 1291–1298. https://doi.org/10.1109/tvcg.2009.113
+
+> McNemar, Q. (1947). Note on the Sampling Error of the Difference Between
+> Correlated Proportions or Percentages. *Psychometrika, 12*(2), 153–157.
+> https://doi.org/10.1007/bf02295996
+
 > Melnik, S., Gubarev, A., Long, J. J., Romer, G., Shivakumar, S., Tolton,
 > M., & Vassilakis, T. (2010). Dremel: Interactive Analysis of Web-Scale
 > Datasets. *Proceedings of the VLDB Endowment, 3*(1-2), 330–339.
@@ -2425,6 +2958,11 @@ check that:
 > Text Embedding Benchmark. *Proceedings of the 17th Conference of the
 > European Chapter of the Association for Computational Linguistics*,
 > 2014–2037. https://doi.org/10.18653/v1/2023.eacl-main.148
+
+> Newcombe, R. G. (1998). Improved confidence intervals for the difference
+> between binomial proportions based on paired data. *Statistics in Medicine,
+> 17*(22), 2635–2650.
+> https://doi.org/10.1002/(SICI)1097-0258(19981130)17:22<2635::AID-SIM954>3.0.CO;2-C
 
 > Nygard, M. (2011, November 15). *Documenting architecture decisions*.
 > Cognitect.
@@ -2436,11 +2974,17 @@ check that:
 > Belgum, J., … Zoph, B. (2023). *GPT-4 Technical Report* (Version 6). arXiv.
 > https://doi.org/10.48550/ARXIV.2303.08774
 
+> Petroff, M. A. (2021). *Accessible Color Sequences for Data Visualization*
+> (Version 3). arXiv. https://doi.org/10.48550/ARXIV.2107.02270
+
 > Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence Embeddings
 > using Siamese BERT-Networks. *Proceedings of the 2019 Conference on
 > Empirical Methods in Natural Language Processing and the 9th International
 > Joint Conference on Natural Language Processing (EMNLP-IJCNLP)*, 3980–3990.
 > https://doi.org/10.18653/v1/d19-1410
+
+> Rothman, K. J. (1990). No Adjustments Are Needed for Multiple Comparisons.
+> *Epidemiology, 1*(1), 43–46. https://doi.org/10.1097/00001648-199001000-00010
 
 > Rust, P., Pfeiffer, J., Vulić, I., Ruder, S., & Gurevych, I. (2021). How
 > Good is Your Tokenizer? On the Monolingual Performance of Multilingual
@@ -2449,13 +2993,13 @@ check that:
 > Natural Language Processing (Volume 1: Long Papers)*, 3118–3135.
 > https://doi.org/10.18653/v1/2021.acl-long.243
 
-> Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
-> Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
-> (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
-
 > Saltzer, J. H., & Schroeder, M. D. (1975). The protection of information in
 > computer systems. *Proceedings of the IEEE, 63*(9), 1278–1308.
 > https://doi.org/10.1109/proc.1975.9939
+
+> Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
+> Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
+> (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
 
 > Speer, R. (2019). *ftfy* (Version 5.5.1) [Computer software]. Zenodo.
 > https://doi.org/10.5281/ZENODO.2591652
@@ -2476,6 +3020,20 @@ check that:
 
 > Unicode Consortium. (2026). *Unicode Normalization Forms* (Unicode Standard
 > Annex #15, Revision 58). https://www.unicode.org/reports/tr15/
+
+> Urbano, J. (2026). Stop Using the Wilcoxon Test: Myth, Misconception and
+> Misuse in IR Research. *Proceedings of the 49th International ACM SIGIR
+> Conference on Research and Development in Information Retrieval*,
+> 2758–2768. https://doi.org/10.1145/3805712.3808540
+
+> Urbano, J., Lima, H., & Hanjalic, A. (2019). Statistical Significance
+> Testing in Information Retrieval. *Proceedings of the 42nd International
+> ACM SIGIR Conference on Research and Development in Information
+> Retrieval*, 505–514. https://doi.org/10.1145/3331184.3331259
+
+> Wilson, E. B. (1927). Probable Inference, the Law of Succession, and
+> Statistical Inference. *Journal of the American Statistical Association,
+> 22*(158), 209–212. https://doi.org/10.1080/01621459.1927.10502953
 
 > Yang, S., Chiang, W.-L., Zheng, L., Gonzalez, J. E., & Stoica, I. (2023).
 > *Rethinking Benchmark and Contamination for Language Models with Rephrased

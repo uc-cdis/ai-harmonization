@@ -276,7 +276,7 @@ files by `sha256`. A step that reads a file checks its `sha256`.
 ### A benchmark is two files: mappings and targets
 
 **Described in:**
-[benchmarks.md](benchmarks.md#how-a-benchmark-is-laid-out).
+[benchmarks.md](benchmarks.md#what-a-benchmark-holds).
 
 **Context.** Harmonizing a real study means searching a whole data model. A
 source variable has a few expected targets among many properties. In the TOPMed
@@ -316,7 +316,7 @@ Each source variable is ranked against every target in the targets file.
   targets. Its scores would then overstate how a model does.
 - BEIR's layout, with the queries apart from the entries that they should
   find: here, one row holds a source variable and all its expected targets.
-  Each row is then the experts' mapping, whole.
+  Each row then holds all the experts' mappings of that variable.
 
 **Confirmation.** The tests in
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
@@ -2033,7 +2033,7 @@ value list, such as `Unknown | Not Reported | No | Yes`, matches many
 targets.
 
 **Decision.** Leakage prevention compares four
-[fields](pairs.md#what-a-pair-holds) of a pair: `anchor_name`,
+[fields](pairs.md#pairsparquet) of a pair: `anchor_name`,
 `anchor_description`, `positive_name` and `positive_description`. Each is
 compared with the benchmark's names and with its descriptions. It never
 compares formatted texts, and it never compares values.

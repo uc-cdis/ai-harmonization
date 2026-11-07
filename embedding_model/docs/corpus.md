@@ -112,46 +112,63 @@ folder that `--inputs` names. It writes the folder whole, so a failed build
 leaves the previous corpus as it was; see
 [Inputs and outputs](../README.md#inputs-and-outputs).
 
-- **`pairs.parquet`:** the kept pairs, with the columns that
-  [pairs.md](pairs.md#what-a-pair-holds) lists, and `split`: `train` or
-  `validation`.
-- **`dropped.parquet`:** every dropped pair, with its columns and its finding.
-  A pair that leaks two benchmarks has a row for each:
-  - `finding`: `answer_key` or `benchmark_study`, and `benchmark`;
-  - for an answer key:
-    - `benchmark_row`: the row's position in `<benchmark>_mappings.csv`,
-      counted from 0;
-    - `benchmark_source_variable_name` and
-      `benchmark_source_variable_description`: the source variable, as the
-      benchmark gives it;
-    - `benchmark_target_property` and `benchmark_target_description`: the
-      expected target that matched;
-    - `fields`: the two fields that matched, such as `anchor name = source
-      name, positive name = target name`. [How two texts match](leakage.md#how-two-texts-match)
-      says how to read it;
-  - for the study rule: `benchmark_study_id`, the benchmark's study that the
-    pair holds.
-- **`manifest.json`:** the corpus's manifest, with the fields that
-  [manifests.md](manifests.md#its-fields) lists:
-  - `files`: `pairs.parquet` and `dropped.parquet`, each with its row count,
-    its file's `sha256` and its table's `content_sha256`;
-  - `sources`: each source's pairs, with the source's version and the pairs'
-    checksum, and each benchmark, with its version and its files' checksums;
-  - `settings`:
-    - `format`: the text format that every source's pairs share;
-    - `min_overlap_words`: the minimum number of words in a row that two
-      texts share to match;
-    - `min_name_words`: the minimum number of words of a name that can match
-      by its words;
-    - `validation_share` and `buckets`: the split's share and its hash
-      buckets;
-  - `counts`:
-    - `rows`:
-      - `combined`: the pairs of all the sources;
-      - `duplicates_removed`: the copies of an earlier source's pairs;
-      - `leakage_removed`: the pairs that leakage prevention drops;
-      - `kept`, split into `train` and `validation`;
-    - `duplicates_by_source`;
-    - `leakage_findings`, counted by finding, benchmark, source and fields. A
-      pair that leaks two benchmarks counts twice;
-    - `shared_vocabulary`, per benchmark.
+### `pairs.parquet`
+
+The kept pairs, with the columns that
+[pairs.md](pairs.md#pairsparquet) lists, and `split`: `train` or
+`validation`. A pair that several sources hold is kept once, and its `study`
+holds the studies of every copy.
+
+### `dropped.parquet`
+
+Every dropped pair, with the columns of `pairs.parquet`, without `split`,
+and its [finding](leakage.md). A pair that leaks two benchmarks has a row for
+each. The finding's columns are:
+
+- `finding`: `answer_key` or `benchmark_study`;
+- `benchmark`: the benchmark that the pair leaks;
+- for an answer key:
+  - `benchmark_row`: the position of the matched row in
+    `<benchmark>_mappings.csv`, counted from 0;
+  - `benchmark_source_variable_name` and
+    `benchmark_source_variable_description`: the source variable, as the
+    benchmark gives it;
+  - `benchmark_target_property` and `benchmark_target_description`: the
+    expected target that matched;
+  - `fields`: the two matches, each from a field of the pair to a field of
+    the benchmark, such as `anchor name = source name, positive name = target
+    name`. [How two texts match](leakage.md#how-two-texts-match) says how to
+    read it;
+- for the study rule: `benchmark_study_id`, the benchmark's study that the
+  pair holds.
+
+### `manifest.json`
+
+The corpus's manifest, with the fields that
+[manifests.md](manifests.md#its-fields) lists:
+
+- `files`: `pairs.parquet` and `dropped.parquet`, each with its row count,
+  its file's `sha256` and its table's `content_sha256`;
+- `sources`: each source's pairs, with the source's version and the pairs'
+  checksum, and each benchmark, with its version and its files' checksums;
+- `settings`:
+  - `format`: the text format that every source's pairs share;
+  - `min_overlap_words`: the minimum number of words in a row that two
+    texts share to match; see
+    [At least 8 words in a row](leakage.md#at-least-8-words-in-a-row);
+  - `min_name_words`: a benchmark name needs at least this many words to
+    match by its words; see
+    [A name's words](leakage.md#a-names-words-with-a-description-on-the-other-side);
+  - `validation_share` and `buckets`: the split's share and the number of
+    hash buckets;
+- `counts`:
+  - `rows`:
+    - `combined`: the pairs of all the sources;
+    - `duplicates_removed`: the copies of an earlier source's pairs;
+    - `leakage_removed`: the pairs that leakage prevention drops;
+    - `kept`, `train` and `validation`: the pairs kept, and their split;
+  - `duplicates_by_source`: the copies removed, by the source that held them;
+  - `leakage_findings`, counted by finding, benchmark, source and fields. A
+    pair that leaks two benchmarks counts twice;
+  - `shared_vocabulary`, per benchmark: see
+    [Shared vocabulary](leakage.md#shared-vocabulary).

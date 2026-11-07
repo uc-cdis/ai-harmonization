@@ -23,8 +23,8 @@ code reads its pins from this file. So the code says how to build, and the
 manifest says from which inputs.
 
 Each build also writes its own manifest beside the files that it makes.
-[benchmarks.md](benchmarks.md#the-manifest) and
-[sources.md](sources.md#what-a-fetch-writes) say where.
+[benchmarks.md](benchmarks.md#manifestjson) and
+[sources.md](sources.md#sourcemanifestjson) say where.
 
 Pairs, corpora and tokenizers have no committed manifest. The code makes
 pairs from a fetch, a corpus from pairs and benchmarks, and a tokenizer from a

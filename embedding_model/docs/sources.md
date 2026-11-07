@@ -24,14 +24,23 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 | [NHANES](#nhanes) | a US health survey's variables: their questions and value labels | the variable-list and codebook pages | their current state, kept after the first fetch |
 | [PhenX](#phenx) | standard study measures' variables, and their mappings to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
+A source that cannot be fetched is reported, and the other sources are still
+fetched. LOINC, for one, needs a loinc.org account: without its credentials or
+a zip placed by hand, it cannot be fetched (see [LOINC](#loinc)). The command
+then exits with status 1, so a script can tell that a source is missing.
+
 The manifest holds the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every file read, and a new fetch is
 compared with it. [design_decisions.md](design_decisions.md#sources) gives the
 reasons for the fetch's rules.
 
 ## What a fetch writes
 
-A source's files go under `embedding_model/inputs/sources/`, or under the
-folder that `--inputs` names:
+`sources fetch` writes each source's tables to
+`embedding_model/inputs/sources/<source>/`, and its downloads to
+`sources/downloads/<source>/`. With `--inputs`, both go under that folder
+instead. It writes `<source>/` whole. A fetch that fails, or that the
+committed manifest refuses, leaves the previous tables as they were; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
 
 ```
 sources/
@@ -39,45 +48,52 @@ sources/
     <source>/             the source's tables, as <table>.parquet, and the fetch's manifest.json
 ```
 
-A fetch downloads a source's files, then reads them into tables. There is one
-table per kind of record, such as a concept, a name or a value. Each record
-links back to its item by the source's own id.
+### `downloads/<source>/`
 
-Every item of a source is kept, including retired, draft and closed ones. The
+The source's files, as downloaded. Downloads are kept, so a later fetch reads
+the same files. Each source's "Newer releases" part below says how to use a
+newer release. For a source that serves only its current state, that means
+moving its kept files aside, as its part says. A fetch that then differs needs
+a [new version](manifests.md#making-a-new-version).
+
+### `<source>/<table>.parquet`
+
+A fetch reads a source's files into tables. There is one table per kind of
+record, such as a concept, a name or a value. Each record links back to its
+item by the source's own id.
+
+Every item of a source is kept, including retired and draft ones, and ones
+that are not open. The
 next step, `pairs prepare`, decides which of them become training pairs (see
 [pairs.md](pairs.md)). A cell with several values, such as a concept's parents,
 joins them with `|`.
 
-Each source's main table has an `open` column, set from the source's
-restriction field (see [Restricted items](licenses.md#restricted-items)). It is
-`true` when the item may be used. It is `false` when its restriction field
-restricts it, or has no value. A table without `open` takes it from the item
-that it links to.
+Each source's main table has an `open` column. It is `true` when the item may
+be used, by the source's rule in
+[Restricted items](licenses.md#restricted-items). Other tables have no `open`:
+a row counts as open when its item is.
 
-Each source has a manifest committed as
-`embedding_model/sources/manifests/<source>.json`. It pins the release that the
-source is read from. Each fetch writes its own manifest beside the tables, as
-`sources/<source>/manifest.json`, with the date in `fetched`. Its `counts`
-hold what the fetch prints, such as the items read and how many are not open.
-Each table has two checksums: `sha256`, of its file, and `content_sha256`, of
-its content. [Two checksums](manifests.md#two-checksums) says what each one is
-for.
+### `<source>/manifest.json`
 
-An input's `role` is `release` for a file pinned by its version, or `service`
-for an address that serves only its current state. [Manifests](manifests.md)
-says what a manifest holds, how a fetch is checked against it, and how to
-make a new version with `sources fetch --update-manifest`.
+The fetch's manifest, with the fields that
+[manifests.md](manifests.md#its-fields) lists:
 
-A source that cannot be fetched is reported, and the other sources are still
-fetched. LOINC, for one, needs a loinc.org account: without its credentials or
-a zip placed by hand, it cannot be fetched (see [LOINC](#loinc)). The command
-then exits with status 1, so a script can tell that a source is missing.
+- `files`: each table, with its row count and two checksums: `sha256`, of its
+  file, and `content_sha256`, of its content.
+  [Two checksums](manifests.md#two-checksums) says what each one is for;
+- `sources`: each file or address read, with its `role`. A `release` is a
+  file pinned by its version, and a `service` is an address that serves only
+  its current state;
+- `counts`: what the fetch prints, such as the items read and how many are
+  not open.
 
-Downloads are kept, so a later fetch reads the same files. Each source's
-"Newer releases" part below says how to use a newer release. For a source
-that serves only its current state, that means deleting its kept files under
-`downloads/`. The new fetch then differs, and is accepted as a
-[new version](manifests.md#making-a-new-version).
+Each source also has a manifest committed as
+`embedding_model/sources/manifests/<source>.json`. It pins what the source is
+read from. A release is pinned by its version and SHA-256. A service's export
+is pinned by the date fetched and its SHA-256. Each fetch is checked against
+it.
+[Manifests](manifests.md) says how, and how to make a new version with
+`sources fetch --update-manifest`.
 
 ## Licenses and references
 

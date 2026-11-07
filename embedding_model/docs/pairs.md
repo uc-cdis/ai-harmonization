@@ -55,13 +55,17 @@ pair and a `name_description` pair. Another description gives no pair when
 its [`text_key`](leakage.md#how-two-texts-match) equals the canonical's or the
 first description's.
 
-## What a pair holds
+## What a preparation writes
 
 `pairs prepare` writes each source's pairs to
-`embedding_model/inputs/pairs/<source>/pairs.parquet`. When `--inputs` names
-another folder, they go to `pairs/<source>/` in that folder. The folder is
-written whole; see [Inputs and outputs](../README.md#inputs-and-outputs). One
-row is one pair:
+`embedding_model/inputs/pairs/<source>/`, or under the folder that `--inputs`
+names. It writes the folder whole, so a failed preparation leaves the
+source's previous pairs as they were; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
+
+### `pairs.parquet`
+
+One row per pair:
 
 | column | what it holds |
 |---|---|
@@ -73,16 +77,18 @@ row is one pair:
 | `term_type` | what the anchor's text is: the source's own label, such as a synonym type or an alternate-name type, or else its field, such as `short name`; `canonical` and `description` for a canonical and another description |
 | `term_group` | `expansion` or `paraphrase`; see [Expansions and paraphrases](#expansions-and-paraphrases) |
 | `status` | `current`, `retired` or `draft`: the status of the item the anchor's text comes from |
-| `study` | the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) studies the anchor's text comes from, joined by `\|`, if any. Only [PhenX](#phenx)'s pairs have one |
+| `study` | the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) studies the anchor's text comes from, joined by `\|`, if any. Only [PhenX](#phenx)'s pairs fill it |
 | `value_list` | the name of the positive's value list, where a source names its lists |
 | `anchor_name`, `anchor_type`, `anchor_description`, `anchor_values` | four columns: the fields the anchor was formatted from |
 | `positive_name`, `positive_type`, `positive_description`, `positive_values` | four columns: the fields the positive was formatted from |
 
-Each side's fields are kept beside its text, so a later step can compare
-fields rather than formatted texts.
+Each side's fields are kept beside its text.
+[Leakage prevention](leakage.md#the-fields-compared) compares these fields,
+not the formatted texts.
 
-`pairs prepare` also writes a manifest for each source, `manifest.json`,
-beside its pairs in the same folder. It has the fields that
+### `manifest.json`
+
+The pairs' manifest, with the fields that
 [manifests.md](manifests.md#its-fields) lists:
 
 - `files`: the pairs' row count, their file's `sha256` and their table's

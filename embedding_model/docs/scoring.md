@@ -67,7 +67,8 @@ the shape of its own training samples: `name_description` for
 it needs a Hugging Face login with access to it.
 
 `--benchmark` takes one or more benchmarks. `--benchmark topmed gdc` loads the
-model once and scores it on both.
+model once and scores it on both. `--batch-size` sets how many texts are
+encoded at a time, 32 by default.
 
 `score` checks each benchmark file against the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) that its manifest
 holds. A file that differs stops scoring, and the error gives the command
@@ -114,44 +115,61 @@ Scoring uses a GPU when there is one, and the CPU otherwise. A large model,
 such as `uc-ctds/StdElement-Mapper`, is much slower on a CPU. `--device cpu`
 keeps scoring on the CPU.
 
-## Outputs
+## What a scoring writes
 
-The scores of a run go to the run's own folder, as
-`scores/<benchmark>/<format>/`. Those of any other model go to
-`embedding_model/outputs/scores/<model>/<benchmark>/<format>/`. `<format>` is
-the `--format` used, so a model scored in two formats keeps both scores.
-`<model>` is:
+`score` writes a run's scores to the run's own folder, as
+`<run>/scores/<benchmark>/<format>/`. It writes any other model's scores to
+`embedding_model/outputs/scores/<model>/<benchmark>/<format>/`, or under the
+folder that `--outputs` names. It writes the folder whole, so a scoring that
+fails leaves the previous scores as they were; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
+
+`<format>` is the text format used, so a model scored in two formats keeps
+both scores. `<model>` is:
 
 - for a Hugging Face model, its owner and name:
   `scores/uc-ctds/StdElement-Mapper/topmed/stdelement/`;
 - for a model saved on disk, the name of its folder: `--model
   path/to/abcd-model` writes to `scores/abcd-model/topmed/compact/`.
 
-`metrics.csv` and `config.yaml` record a model on disk by its full path. Two
-model folders with the same name share a scores folder. Scoring the second
-replaces the first model's scores, with a warning.
+Two model folders with the same name share a scores folder. Scoring the
+second replaces the first one's scores, with a warning. `metrics.csv` and
+`config.yaml` record a model on disk by its full path, so they show which
+model the folder holds.
 
-The folder is written whole, so a scoring that fails leaves the previous
-scores as they were; see [Inputs and outputs](../README.md#inputs-and-outputs).
-It holds:
+### `metrics.csv`
 
-- `metrics.csv`, one row: `model`, `benchmark`, `benchmark_version`, `format`,
-  `n` (the variables scored), `targets`, `parameters` (the model's number of
-  parameters), `mrr`, `mrr@10`, `ndcg@10`, `accuracy@1`, `accuracy@3`,
+One row, with these columns:
+
+- `model`, `benchmark`, `benchmark_version` and `format`;
+- `n`, the source variables scored; `targets`, the targets ranked; and
+  `parameters`, the model's number of parameters;
+- the metrics: `mrr`, `mrr@10`, `ndcg@10`, `accuracy@1`, `accuracy@3`,
   `accuracy@5`, `accuracy@10` and `median_rank`.
-- `per_variable.csv`, one row per source variable: `source_study_id`,
-  `source_table_id`, `source_variable_id`, `source_variable_name`,
-  `expected_target`, `rank`, and the target that the model ranked first,
-  `top1_target`, with its cosine similarity, `top1_similarity`.
-- `config.yaml`, what the scores were computed with:
-  - every setting;
-  - the model's Hugging Face revision, for a model loaded by its id;
-  - under `ai_harmonization`:
-    - `commit`: the ai-harmonization commit of the code that computed them;
-    - `uncommitted_changes`: true when the code differed from that commit,
-      that is, when a Python file of `ai_harmonization/` or `embedding_model/`
-      was new or changed, or when `pyproject.toml` or `uv.lock` was changed.
-      An uncommitted edit to any other file, such as a doc, leaves it false;
-  - `libraries`: the versions of Python and of the libraries, such as
-    [sentence-transformers](https://sbert.net);
-  - the benchmark's version and file checksums, from its manifest.
+
+### `per_variable.csv`
+
+One row per source variable: `source_study_id`, `source_table_id`,
+`source_variable_id`, `source_variable_name`, `expected_target`, `rank`, and
+the target that the model ranked first, `top1_target`, with its cosine
+similarity, `top1_similarity`.
+
+### `config.yaml`
+
+What the scores were computed with. Scores have no manifest:
+`config.yaml` takes its place.
+
+- `model`, `benchmark`, `format`, `device` and `batch_size`: the settings;
+- `model_revision`: the model's Hugging Face revision, for a model loaded by
+  its id;
+- `benchmark_manifest`: the benchmark's version, build date and file
+  checksums, from its manifest;
+- `ai_harmonization`:
+  - `commit`: the ai-harmonization commit of the code that computed them;
+  - `uncommitted_changes`: true when a file of the code was new or changed
+    since that commit. The code is the Python files of `ai_harmonization/`
+    and `embedding_model/`, with `pyproject.toml` and `uv.lock`. An
+    uncommitted edit to any other file, such as a doc, leaves it false;
+- `libraries`: the versions of Python and of the libraries, such as
+  [sentence-transformers](https://sbert.net);
+- `scored`: the date and time of the scoring.

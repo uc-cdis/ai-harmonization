@@ -25,7 +25,7 @@ everything that a build writes under `DIR`, in place of
 [Inputs and outputs](../README.md#inputs-and-outputs).
 
 Every build is checked against the benchmark's committed manifest; see
-[The manifest](#the-manifest). A benchmark that cannot be built, such as one
+[`manifest.json`](#manifestjson). A benchmark that cannot be built, such as one
 whose download fails, is reported, and the other benchmarks are still built.
 The command then exits with status 1. To build a benchmark from updated sources, see
 [Making a new version](manifests.md#making-a-new-version). An updated source
@@ -34,31 +34,28 @@ can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 [design_decisions.md](design_decisions.md#benchmarks) gives the reasons for
 the benchmarks' layout and rules.
 
-## How a benchmark is laid out
+## What a benchmark holds
 
-Each benchmark is a folder, `embedding_model/inputs/benchmarks/<benchmark>/`,
-with two files and the manifest of its build:
+`benchmarks build` writes to `embedding_model/inputs/benchmarks/<benchmark>/`,
+or under the folder that `--inputs` names. It writes the folder whole. A
+build that fails, or that the committed manifest refuses, leaves the previous
+benchmark as it was; see [Inputs and outputs](../README.md#inputs-and-outputs).
 
-- **`<benchmark>_mappings.csv`**: one row per source variable, with its
-  expected targets: the targets that the experts mapped it to. Any of them
-  counts as correct. Each is one mapping. [GDC-SM](#gdc)'s ground truth names a
-  property without its node. So in the GDC benchmark, each node that carries
-  the property gives a target of its own: see
-  [Which targets a variable maps to](#which-targets-a-variable-maps-to).
-- **`<benchmark>_targets.csv`**: one row per target property. Every source
-  variable is ranked against every target of this file, not only against its
-  expected targets. A format turns each row into the text that the model reads
-  on the target side. [scoring.md](scoring.md#running-score) lists the formats.
+```
+benchmarks/
+    downloads/<benchmark>/          the inputs as downloaded, kept for the next build
+    <benchmark>/
+        <benchmark>_mappings.csv    one row per source variable, with its expected targets
+        <benchmark>_targets.csv     one row per target property
+        manifest.json               the build's manifest
+```
 
-Scores on the two benchmarks do not compare. The [TOPMed benchmark](#topmed)'s targets
-are nearly all some variable's expected target, and the GDC benchmark's
-mostly are not.
+Both benchmarks have the same columns. A column that a benchmark has no data
+for is left empty. Both files keep every value that a variable or property
+has. A text format that shows values keeps the first 12; see
+[scoring.md](scoring.md#running-score).
 
-[The columns](#the-columns) lists every column of both files. Both files keep
-every value that a variable or property has. The formatters cap how many values
-a prompt shows.
-
-A build checks the two files against each other before it writes them:
+A build checks the two files before it writes them:
 
 - `<benchmark>_targets.csv` lists each property once, in one row;
 - each expected target in `<benchmark>_mappings.csv` is a property of
@@ -67,16 +64,23 @@ A build checks the two files against each other before it writes them:
 A benchmark that fails either check is not written.
 
 **If you load the files in your own code:** Python's `csv` module reads at
-most 131,072 characters in a field by default. In the GDC benchmark, one
-target's values are longer. `pandas.read_csv` reads the files as they are,
+most 131,072 characters in a field by default. In the GDC benchmark, some
+targets' values are longer. `pandas.read_csv` reads the files as they are,
 and `csv` needs `csv.field_size_limit` raised first.
 
-### The columns
+### `downloads/<benchmark>/`
 
-Every benchmark writes the same columns. A column that a benchmark has no data
-for is left empty.
+The benchmark's inputs, as downloaded. Downloads are kept, so a rebuild reads
+the same files.
 
-`<benchmark>_mappings.csv`:
+### `<benchmark>_mappings.csv`
+
+One row per source variable, with its expected targets: the targets that the
+experts mapped it to. Any of them counts as correct. Each expected target
+makes one mapping.
+[GDC-SM](#gdc)'s ground truth names a property without its node. So in the
+GDC benchmark, each node that carries the property gives a target of its own:
+see [Which targets a variable maps to](#which-targets-a-variable-maps-to).
 
 | column | what it holds | TOPMed | GDC |
 |---|---|---|---|
@@ -93,36 +97,50 @@ The examples are one row of each benchmark.
 [Which target a variable maps to](#which-target-a-variable-maps-to) explains
 the TOPMed row.
 
-`<benchmark>_targets.csv`:
+A study is written without its version, so that every release of a study
+counts as the same study. A table and a variable keep the version that the
+experts cited, because their text comes from that release.
+
+### `<benchmark>_targets.csv`
+
+One row per target property. Every source variable is ranked against every
+target of this file, not only against its expected targets. A format turns
+each row into the text that the model reads on the target side.
+[scoring.md](scoring.md#running-score) lists the formats.
 
 | column | what it holds | TOPMed | GDC |
 |---|---|---|---|
 | `target_property` | the target, as `node.property` | `atherosclerosis.cac_score_1` | `demographic.race` |
 | `target_type` | the target's type, in the data model's own words | `float`, `integer` or `string/encoded` | `enum`, `string`, `integer`, `number`, `boolean` or `array` |
-| `target_description` | the target's description | from its documentation file | from the dictionary |
+| `target_description` | the target's description | from its documentation file; an age target's is `age at measurement of <name> (years)` | from the dictionary |
 | `target_values` | the target's permissible values, joined by ` \| ` | its documented `encoded_values` | the dictionary's permissible values |
 
-A study is written without its version, so that every release of a study
-counts as the same study. A table and a variable keep the version that the
-experts cited, because their text comes from that release.
+Scores on the two benchmarks do not compare. The [TOPMed benchmark](#topmed)'s
+targets are nearly all some variable's expected target, and the GDC
+benchmark's mostly are not.
 
-### The manifest
+### `manifest.json`
 
-Each benchmark has a manifest committed as
+The build's manifest, with the fields that
+[manifests.md](manifests.md#its-fields) lists:
+
+- `files`: the two files, each with its row count and its SHA-256;
+- `sources`: what the benchmark is built from, each input with its `role`.
+  The roles are `mappings`, `targets`, `mappings and targets` for an input
+  that holds both, `source text` for the source variables' texts, and
+  `corrections` for the TOPMed benchmark's [corrections](#corrections);
+- `counts`: what the build prints:
+  - the TOPMed benchmark: the harmonized variables, targets, component
+    references, dbGaP releases and source variables, and the source
+    variables mapped to an age;
+  - the GDC benchmark: the papers, the source variables and the targets.
+
+Each benchmark also has a manifest committed as
 `embedding_model/benchmarks/manifests/<benchmark>.json`. It pins what the
 benchmark is built from, such as the TOPMed documentation's commit or the
-GDC-SM ground truth's [Zenodo record](https://doi.org/10.5281/zenodo.14963588). Each build writes its own manifest beside
-the files, as `manifest.json`, with the date in `built`. An input's `role` is
-`mappings`, `source text` or `targets`. Its `counts` hold what the build
-prints:
-
-- the TOPMed benchmark: the harmonized variables, targets, component
-  references, dbGaP releases and source variables, and the source variables
-  mapped to an age;
-- the GDC benchmark: the papers, the source variables and the targets.
-
-[Manifests](manifests.md) says what a manifest holds, how a build is checked
-against it, and how to make a new version.
+GDC-SM ground truth's [Zenodo record](https://doi.org/10.5281/zenodo.14963588).
+Each build is checked against it. [Manifests](manifests.md) says how, and how
+to make a new version.
 
 ## TOPMed
 

@@ -322,7 +322,7 @@ outputs/
             manifest.json        the run's record: its corpus, tokenizer, validation metrics and versions
             trainer_state.json   the trainer's log: the training loss and the validation metrics, step by step
             model/               the trained model, loadable with sentence-transformers
-            scores/<benchmark>/<format>/  metrics.csv and per_variable.csv: the metrics, and every source variable's rank
+            scores/<benchmark>/<format>/  metrics.csv, per_variable.csv and config.yaml: the metrics, every source variable's rank, and what they were computed with
         ledger.csv               one row per run: its settings, validation loss and training time
         index.csv                one row per scoring: the run, the benchmark and the metrics
     series/<series>/

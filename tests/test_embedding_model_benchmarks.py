@@ -3,11 +3,9 @@
 import csv
 import io
 import json
-import os
 import tarfile
 import textwrap
 import zipfile
-from datetime import date
 from unittest.mock import MagicMock
 
 import pandas as pd
@@ -15,7 +13,7 @@ import pytest
 import yaml
 
 from ai_harmonization.formatters import VALUE_SEPARATOR
-from embedding_model import benchmarks, download, manifests
+from embedding_model import benchmarks, manifests
 from embedding_model.__main__ import main
 from embedding_model.benchmarks import gdc, topmed
 
@@ -1240,7 +1238,7 @@ class TestBuild:
 
     def test_no_answer_from_git_refuses(self, setup, monkeypatch, tmp_path):
         """When git cannot say whether the version is committed, a differing build is refused."""
-        built, manifest, working = setup
+        built, manifest, _ = setup
         benchmarks.build(["topmed"], tmp_path / "inputs", update_manifest=True)
         no_answer = MagicMock(side_effect=RuntimeError("not a git repository"))
         monkeypatch.setattr(benchmarks.manifests, "committed_version", no_answer)

@@ -29,11 +29,7 @@ def model():
     demographic.sex, comes third.
     """
     from sentence_transformers import SentenceTransformer
-
-    try:
-        from sentence_transformers.sentence_transformer.modules import StaticEmbedding
-    except ImportError:
-        from sentence_transformers.models import StaticEmbedding
+    from sentence_transformers.sentence_transformer.modules import StaticEmbedding
 
     tokenizer = Tokenizer(
         WordLevel({w: i for i, w in enumerate(WORDS)}, unk_token="[UNK]")

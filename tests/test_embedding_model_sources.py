@@ -698,7 +698,7 @@ class TestCde:
         export = MagicMock(return_value=[cde_element("abcd1")])
         monkeypatch.setattr(cde, "export", export)
         cde.fetch_source(tmp_path, {"sources": []})
-        path, url, query = export.call_args.args
+        _, _, query = export.call_args.args
         assert query["includeRetired"] is True
         search = MagicMock(return_value=b'{"totalItems": 1}')
         monkeypatch.setattr(cde, "fetch", search)

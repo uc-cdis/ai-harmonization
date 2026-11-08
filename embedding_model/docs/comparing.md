@@ -102,8 +102,8 @@ The comparison's manifest, with the fields that
 
 - `sources`: each scores folder read, with the SHA-256 of its `metrics.csv`
   and `per_variable.csv`;
-- `settings`: the text format, the confidence level, the seed, and each
-  metric's interval, its difference's interval and its test.
+- `settings`: the text format, the confidence level, and each metric's
+  interval, its difference's interval and its test.
 
 It also has five fields of its own:
 
@@ -124,13 +124,13 @@ It also has five fields of its own:
 | the first bar of each group, in `accuracy_and_mrr` | the reference, marked "(reference)" in the legends | |
 | a bar of accuracy@k, in `accuracy_and_mrr` | the share of source variables whose expected target is among the model's first k suggestions | the accuracy@k that `score` reports, in the scores' `metrics.csv` |
 | a bar of MRR, in `accuracy_and_mrr` | how high the first expected target ranks, on average: 1 if first, 1/2 if second, 1/3 if third | the MRR that `score` reports, in the scores' `metrics.csv` |
-| an error bar, in `accuracy_and_mrr`, `mrr_by_size` and `differences_from_reference` | how precise that model's number is: its 95% confidence interval | accuracy@k: the Wilson score interval, from scipy's `binomtest`. MRR: a bootstrap over the source variables, with scipy's defaults: 9,999 resamples, by the BCa method |
-| a bracket with stars, in `accuracy_and_mrr` | that model and the reference differ, on the same source variables: `*` p < 0.05, `**` p < 0.01, `***` p < 0.001, as the note under the legend says. No bracket means no significant difference: p ≥ 0.05 | accuracy@k: McNemar's exact test, the exact form of the paired permutation test for values of 1 and 0. MRR: a paired permutation test, with scipy's default of 9,999 resamples |
+| an error bar, in `accuracy_and_mrr`, `mrr_by_size` and `differences_from_reference` | how precise that model's number is: its 95% confidence interval | accuracy@k: the Wilson score interval, from scipy's `binomtest`. MRR: the t interval of the mean, from scipy's `ttest_1samp` |
+| a bracket with stars, in `accuracy_and_mrr` | that model and the reference differ, on the same source variables: `*` p < 0.05, `**` p < 0.01, `***` p < 0.001, as the note under the legend says. No bracket means no significant difference: p ≥ 0.05 | accuracy@k: McNemar's exact test, a binomial test on the variables where the two models differ. MRR: the paired t-test, scipy's `ttest_rel` |
 | a line in `accuracy_by_k` | the share of source variables whose expected target is among the first k suggestions, for every k from 1 to 50 | from each source variable's rank, in the scores' `per_variable.csv` |
-| a point in `mrr_by_size` | the model's MRR, with its 95% confidence interval, by the model's number of parameters, on a log scale. Models of the same size sit side by side | the MRR that `score` reports, with its interval from the bootstrap; the parameters from the scores' `metrics.csv` |
+| a point in `mrr_by_size` | the model's MRR, with its 95% confidence interval, by the model's number of parameters, on a log scale. Models of the same size sit side by side | the MRR that `score` reports, with its t interval; the parameters from the scores' `metrics.csv` |
 | a point in `differences_from_reference` | that model minus the reference, with its 95% confidence interval. A positive difference means that the model does better than the reference, and a negative one that it does worse | the rows of `differences.csv` |
 | `metrics.csv` | each model's metrics on each benchmark, with their intervals | each metric as `score` reports it, with its interval, as for an error bar |
-| `differences.csv` | each other model minus the reference: the difference, its interval and p | accuracy@k: Newcombe's interval for paired shares, and McNemar's exact test. MRR: a bootstrap over each source variable's difference, and the permutation test |
+| `differences.csv` | each other model minus the reference: the difference, its interval and p | accuracy@k: Newcombe's interval for paired shares, and McNemar's exact test. MRR: the t interval of the source variables' differences, and the paired t-test |
 
 ### Where the numbers come from
 
@@ -161,15 +161,18 @@ them. See [scoring.md](scoring.md#the-metrics) for each metric.
 
 In `accuracy_and_mrr`, two error bars can overlap while a bracket still marks
 a difference. The design entries for [accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test) and for
-[MRR](design_decisions.md#mrr-and-mrr10-the-bca-bootstrap-and-a-paired-permutation-test) say why.
+[MRR](design_decisions.md#mrr-and-mrr10-the-t-interval-and-the-paired-t-test) say why.
 
 `differences_from_reference` shows a small difference at its own scale. An
 interval that crosses 0 means that the benchmark cannot tell the model from
 the reference.
 
-Near 0, the interval and the test's p can disagree: the interval can just
-miss 0 while p is just above 0.05, or the reverse. The design entries for
-[accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test) and for [MRR](design_decisions.md#mrr-and-mrr10-the-bca-bootstrap-and-a-paired-permutation-test) say why.
+For MRR, a difference's interval and its p always agree: the interval
+excludes 0 exactly when p is below 0.05. For accuracy@k, the two can disagree
+near 0: the interval can just miss 0 while p is just above 0.05, or the
+reverse. The design entry for
+[accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test)
+says why.
 
 ### Colors
 

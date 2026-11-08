@@ -231,34 +231,48 @@ def paired_values(both, only_model, only_reference, neither):
 
 
 class TestInterval:
-    """The bootstrap interval for MRR, and Newcombe's for a difference of accuracy@k."""
+    """The t interval for MRR, and Newcombe's for a difference of accuracy@k."""
 
-    def test_the_bootstrap_interval_holds_the_mean_and_repeats(self):
-        """The interval holds the mean, and the same values give the same interval."""
-        values = compare.variable_values(np.array(RANKS[OTHER]))["mrr"]
-        low, high = compare.bootstrap_interval(values)
-        assert low < values.mean() < high
-        assert compare.bootstrap_interval(values) == (low, high)
+    def test_the_t_interval_is_a_95_percent_one(self):
+        """The interval is the 95% t interval around the mean: on 200 variables, 0.75 +/- 0.0349.
 
-    def test_the_bootstrap_interval_is_a_95_percent_one(self):
-        """On 200 variables, the interval is about as wide as a normal 95% interval.
-
-        Half the variables rank their target first and half second: MRR
-        values of 1 and 1/2, with a standard deviation of 0.25. A normal 95%
-        interval of the mean is 2 x 1.96 x 0.25 / sqrt(200) wide, about 0.069.
-        A 90% interval would be about 16% narrower.
+        Of the 200 variables, 100 rank their target first and 100 second: MRR
+        values of 1 and 1/2, with a mean of 0.75. Their standard deviation is
+        0.2506, and t at 97.5% with 199 degrees of freedom is 1.972. So each
+        end lies 1.972 x 0.2506 / sqrt(200) = 0.0349 from the mean.
         """
-        low, high = compare.bootstrap_interval(np.tile([1, 1 / 2], 100))
-        normal = 2 * stats.norm.ppf(0.975) * 0.25 / np.sqrt(200)
-        assert high - low == pytest.approx(normal, rel=0.05)
+        ranks = np.array([1] * 100 + [2] * 100)
+        low, high = compare.t_interval(compare.variable_values(ranks)["mrr"])
+        assert (low, high) == pytest.approx((0.75 - 0.0349, 0.75 + 0.0349), abs=1e-4)
 
+    @pytest.mark.filterwarnings("error")
     def test_equal_values_give_their_value(self):
-        """When every variable has the same MRR, such as 1, the interval is that value.
+        """When every variable has the same MRR, such as 1, the interval is that value, with no warning.
 
-        scipy's BCa gives no interval then: it warns, and returns NaN for
-        both ends. So the code returns the shared value as both ends.
+        The values have no spread, so the interval has no width. scipy gives
+        that interval too, but warns of a loss of precision. The code returns
+        the shared value without asking scipy, so no warning is raised.
         """
-        assert compare.bootstrap_interval(np.ones(6)) == (1.0, 1.0)
+        assert compare.t_interval(np.ones(6)) == (1.0, 1.0)
+
+    def test_the_interval_and_the_test_agree(self):
+        """A difference's interval excludes 0 exactly when the paired t-test's p is below 0.05.
+
+        Both come from one t distribution. Of 20 variables, the model finds
+        8 expected targets first that the reference finds second, and the two
+        tie on the other 12, at ranks 1 to 12: a difference, with p 0.002.
+        With the two models swapped on half of the 8, the means cancel: no
+        difference, and p 1.
+        """
+        tied = list(range(1, 13))
+        reference = 1 / np.array([2] * 8 + tied)
+        better = 1 / np.array([1] * 8 + tied)
+        mixed = 1 / np.array([1] * 4 + [2] * 4 + tied)
+        mixed_reference = 1 / np.array([2] * 4 + [1] * 4 + tied)
+        for model, base in ((better, reference), (mixed, mixed_reference)):
+            low, high = compare.t_interval(model - base)
+            _, p = compare.paired_test("mrr", model, base)
+            assert (low > 0 or high < 0) == (p < 0.05)
 
     def test_newcombes_interval_uses_the_pairing(self):
         """Two models with the same shares get a narrower interval when they agree.
@@ -289,20 +303,12 @@ class TestPairedTest:
     def test_accuracy_is_compared_by_mcnemars_exact_test(self):
         """At k = 1, the models differ on SBP01, HR01 and WAIST01, all for the reference.
 
-        Under no difference, each is a coin flip, so p = 2 x 0.5^3 = 0.25. The
-        exact paired permutation test gives the same p.
+        Under no difference, each is a coin flip, so p = 2 x 0.5^3 = 0.25.
         """
         reference = compare.variable_values(np.array(RANKS[REFERENCE]))["accuracy@1"]
         other = compare.variable_values(np.array(RANKS[OTHER]))["accuracy@1"]
         test, p = compare.paired_test("accuracy@1", other, reference)
         assert (test, p) == (compare.MCNEMAR, 0.25)
-        exact = stats.permutation_test(
-            (other, reference),
-            lambda first, second, axis: np.mean(first - second, axis=axis),
-            permutation_type="samples",
-            n_resamples=np.inf,
-        )
-        assert exact.pvalue == pytest.approx(p)
 
     def test_models_that_never_differ_have_p_1(self):
         """Two models with the same accuracy on every variable have nothing to test."""
@@ -312,18 +318,36 @@ class TestPairedTest:
             1.0,
         )
 
-    def test_mrr_is_compared_by_a_paired_permutation_test(self):
-        """A model that ranks each target one place higher wins on every variable.
+    def test_mrr_is_compared_by_a_paired_t_test(self):
+        """The paired t-test finds a difference that the spread of ranks hides from an unpaired test.
 
-        On 20 variables, one model ranks the targets 1 to 20, the other 2 to
-        21. The paired test finds the difference on each variable. The spread
-        of ranks across variables would hide it from an unpaired test, whose
-        p here is about 0.44.
+        Of 20 variables, the model finds 8 expected targets first that the
+        reference finds second: a difference of 8 x (1 - 1/2) / 20 = 0.2 in
+        MRR. The other 12 tie, at ranks 1 to 12. The paired test sees each
+        variable's difference, and gives p 0.002. An unpaired test sees the
+        spread of the 12 tied ranks too, and gives p 0.07.
         """
-        higher, lower = 1 / np.arange(1, 21), 1 / np.arange(2, 22)
-        test, p = compare.paired_test("mrr", higher, lower)
-        assert test == compare.PERMUTATION
-        assert p < 0.001
+        tied = list(range(1, 13))
+        model = 1 / np.array([1] * 8 + tied)
+        reference = 1 / np.array([2] * 8 + tied)
+        test, p = compare.paired_test("mrr", model, reference)
+        assert test == compare.PAIRED_T
+        assert p == pytest.approx(0.0021, abs=1e-4)
+        assert stats.ttest_ind(model, reference).pvalue > 0.05
+
+    @pytest.mark.filterwarnings("error")
+    def test_differences_without_spread_have_p_0_or_1(self):
+        """When every variable differs by the same amount, p is 0, or 1 when that amount is 0, with no warning.
+
+        The reference ranks each of six targets second, and the model first:
+        each variable gains 1 - 1/2. The t statistic is infinite, so p is 0.
+        Two models that rank alike have nothing to test, so p is 1, where
+        scipy gives NaN. scipy warns in both cases; the code asks it in
+        neither.
+        """
+        model, reference = np.ones(6), np.full(6, 1 / 2)
+        assert compare.paired_test("mrr", model, reference) == (compare.PAIRED_T, 0.0)
+        assert compare.paired_test("mrr", model, model) == (compare.PAIRED_T, 1.0)
 
     def test_the_differences_keep_p_whole(self):
         """The reference finds eleven targets first, and the other model none.
@@ -423,7 +447,8 @@ class TestCompare:
         assert manifest["benchmarks"] == {"topmed": committed_version("topmed")}
         assert manifest["settings"]["format"] == "compact"
         assert manifest["settings"]["intervals"]["accuracy@1"] == compare.WILSON
-        assert manifest["settings"]["difference_intervals"]["mrr"] == compare.BOOTSTRAP
+        assert manifest["settings"]["difference_intervals"]["mrr"] == compare.T_INTERVAL
+        assert manifest["settings"]["tests"]["mrr"] == compare.PAIRED_T
         assert manifest["built"] == date.today().isoformat()
         assert [source["name"] for source in manifest["sources"]] == [REFERENCE, OTHER]
         assert "-> " in capsys.readouterr().out
@@ -632,10 +657,10 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
 
     By default the reference ranks each of six variables' expected target
     first, and each other model second. On accuracy@1 the two then differ on
-    all six variables, and McNemar's p is 2 * 0.5 ** 6 = 0.03125. On MRR each
-    variable differs by 1 - 1/2, and the exact permutation test's p is
-    2 / 2 ** 6, the same. So each gets a bracket with one star. At k of 5
-    and 10 the models agree.
+    all six variables, and McNemar's p is 2 * 0.5 ** 6 = 0.03125: one star. On
+    MRR each variable differs by 1 - 1/2, with no spread, so the paired
+    t-test's p is 0: three stars. So each gets a bracket. At k of 5 and 10
+    the models agree.
     """
     models = [REFERENCE] + [f"efgh-org/model-{n}" for n in range(2, count + 1)]
     benchmark_results, differences = {}, []

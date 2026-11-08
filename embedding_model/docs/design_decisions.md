@@ -809,10 +809,11 @@ binomial test on the variables where the two models differ.
   ([Newcombe, 1998](https://doi.org/10.1002/(SICI)1097-0258(19981130)17:22%3C2635::AID-SIM954%3E3.0.CO;2-C);
   [Fagerland et al., 2014](https://doi.org/10.1002/sim.6148)).
 - Good, because McNemar's test
-  ([McNemar, 1947](https://doi.org/10.1007/bf02295996)), in its exact form, is
-  the exact paired permutation test for values of 1 and 0. It looks only at
-  the variables where the two models differ. So it can find a difference that
-  two overlapping intervals hide.
+  ([McNemar, 1947](https://doi.org/10.1007/bf02295996)) is the standard test
+  for two paired shares. It counts only the variables where the two models
+  differ, so it can find a difference that two overlapping intervals hide.
+  Its exact form, a binomial test on those variables, needs no large-sample
+  approximation.
 - Good, because `scipy.stats.binomtest` computes both the Wilson interval and
   McNemar's exact test.
 - Bad, because no released library computes Newcombe's interval. `compare`
@@ -829,10 +830,9 @@ binomial test on the variables where the two models differ.
 
 **Alternatives considered.**
 
-- The BCa bootstrap, as for MRR: one method for every metric. But at a share
-  of 0 or 1 its interval has no width, and on small benchmarks it covers too
-  little ([Bowyer et al.,
-  2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
+- The BCa bootstrap: one method for every metric. But at a share of 0 or 1
+  its interval has no width, and on small benchmarks it covers too little
+  ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
 - Clopper and Pearson's exact interval: it always covers at least 95%, but it
   is wider than needed ([Brown et al.,
   2001](https://doi.org/10.1214/ss/1009213286)).
@@ -840,20 +840,25 @@ binomial test on the variables where the two models differ.
   interval for one share ([Bowyer et al.,
   2025](https://proceedings.mlr.press/v267/bowyer25a.html)). For a paired
   difference, it needs sampling code of our own.
-- The Wald interval, the share plus or minus 1.96 standard errors: it can
-  leave the range from 0 to 1. It has no width at 0 or 1 ([Brown et al.,
+- The Wald interval: the share plus or minus 1.96 standard errors. MRR's t
+  interval gives it on values of 1 and 0. It can leave the range from 0 to
+  1, and it has no width at 0 or 1 ([Brown et al.,
   2001](https://doi.org/10.1214/ss/1009213286)).
 - Two Wilson intervals combined as if the models were independent: wider
   than needed, since the two models agree on many variables.
-- `scipy.stats.permutation_test`, as for MRR: one test for every metric. But
-  on a benchmark of real size, scipy samples the swaps instead of trying them
-  all. Its p is then an estimate, with a floor set by the number of resamples.
-  The binomial test gives the exact p of the same test.
+- The paired t-test, as for MRR: one test for every metric. On values of 1
+  and 0, it approximates McNemar's test, which the binomial test gives
+  exactly.
+- `scipy.stats.permutation_test`: on a benchmark of real size, scipy samples
+  the swaps instead of trying them all. Its p is then an estimate, with a
+  floor set by the number of resamples. The binomial test gives the exact p
+  of the same test.
 - statsmodels' `mcnemar`: the same exact test, from a library that the
   repository does not otherwise need.
 - McNemar's mid-p test, which Fagerland et al. recommend: its p keeps closer
-  to the stated rate. But it is not the exact permutation test, and
-  `scipy.stats.binomtest` gives no mid-p.
+  to the stated rate. But it is not an exact test, so its error rate is not
+  kept at or below the stated rate. And `scipy.stats.binomtest` gives no
+  mid-p.
 - Comparing the two models' intervals: it misses differences that a paired
   test finds.
 
@@ -873,7 +878,7 @@ check that:
 - two models that never differ have a p of 1;
 - the stars mark the p below each level.
 
-### MRR and MRR@10: the BCa bootstrap and a paired permutation test
+### MRR and MRR@10: the t interval and the paired t-test
 
 **Described in:** [comparing.md](comparing.md#what-it-shows).
 
@@ -882,46 +887,45 @@ and 1: 1 / rank, or 0 past rank 10 for
 [MRR@10](#mrr-accuracyk-the-median-rank-and-ndcg). Many of the values are 1.
 A benchmark is a sample of variables, so the mean has a sampling error,
 which a confidence interval shows. Two models' values match up, variable by
-variable. `score`'s evaluator gives each mean and each variable's ranking,
-but no interval.
+variable. Two good models often give a variable the same rank, so many of
+the differences are 0.
 
-**Decision.** A model's MRR, and each difference from the reference, get a
-95% confidence interval from a bootstrap over the source variables. The
-bootstrap takes scipy's defaults: its number of resamples, and BCa, the
-bias-corrected and accelerated method. Its seed is fixed. The test of a
-difference between two models' MRR is a paired permutation test.
+**Decision.** A model's MRR gets the 95% t interval of its mean. A
+difference from the reference gets the paired t-test, and the test's own 95%
+t interval: the interval of the variables' differences. scipy computes both.
 
 **Consequences.**
 
-- Good, because the bootstrap needs no assumption about the shape of the
-  values, which pile up at 1. BCa adjusts the interval for the bias and the
-  skew of the bootstrap's distribution
-  ([Efron, 1987](https://doi.org/10.1080/01621459.1987.10478410)).
-- Good, because resampling the source variables keeps each variable's two
-  values together. So a difference's interval uses the pairing.
-- Good, because the permutation test is reliable in IR evaluation. When two
-  systems do not differ, it gives p < 0.05 about 1 time in 20, as it should.
-  This holds across measures and sample sizes
+- Good, because the interval and the test come from one t distribution. A
+  difference's interval excludes 0 exactly when the test's p is below 0.05,
+  so the two cannot disagree.
+- Good, because the paired t-test is reliable in IR evaluation, and is its
+  most common test. When two systems do not differ, it gives p < 0.05 about
+  1 time in 20. This holds across measures and sample sizes
   ([Urbano et al., 2019](https://doi.org/10.1145/3331184.3331259);
   [Ihemelandu & Ekstrand, 2023](https://doi.org/10.1145/3539618.3592004)).
-- Good, because `scipy.stats.bootstrap` and `scipy.stats.permutation_test`
-  compute them, with no setting of our own.
-- Good, because the fixed seed makes a comparison repeat exactly.
-- Bad, because a bootstrap interval covers too little on a small benchmark
-  ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
-- Bad, because resampling is slower than a formula, and the test's p varies
-  a little with the seed. The seed is fixed.
-- Bad, because a difference's interval and its test are two methods, so near
-  0 they can disagree, as for accuracy@k.
+- Good, because the t interval and the t-test are the standard methods for
+  a mean ([Student, 1908](https://doi.org/10.2307/2331554)).
+- Bad, because the t interval assumes that the mean is about normally
+  distributed. Values that pile up at 1 need enough variables for that.
+- Bad, because the t-test loses power when the differences are skewed. On a
+  small benchmark, a permutation test can find a difference that the t-test
+  misses.
 
 **Alternatives considered.**
 
+- The BCa bootstrap: it assumes nothing about the shape of the values, and
+  adjusts for skew ([Efron,
+  1987](https://doi.org/10.1080/01621459.1987.10478410)). But when two models
+  give most variables the same rank, its interval of their difference covers
+  too little. On a small benchmark, a bootstrap interval covers too little
+  too ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
 - The percentile bootstrap: simpler, but less accurate than BCa when the
   distribution is skewed.
-- The t interval: it assumes that the mean is normally distributed. The mean
-  of values that pile up at 1, on a small benchmark, is not.
-- 10,000 resamples: about the precision of scipy's default, 9,999, with one
-  more setting to keep.
+- A paired permutation test: as reliable as the t-test ([Urbano et al.,
+  2019](https://doi.org/10.1145/3331184.3331259)), and more powerful when the
+  differences are skewed. But it gives no interval, so a second method would
+  give the interval, and near 0 the two could disagree.
 - The Wilcoxon signed-rank test: it drops the variables where both models
   tie, and it does not test the mean. It is unreliable for means in IR
   evaluation, more so as samples grow
@@ -929,10 +933,6 @@ difference between two models' MRR is a paired permutation test.
   [Urbano, 2026](https://doi.org/10.1145/3805712.3808540)).
 - The sign test: unreliable for the same reasons ([Urbano et al.,
   2019](https://doi.org/10.1145/3331184.3331259)).
-- The paired t-test: IR's most common test, and as reliable as the permutation
-  test ([Urbano et al., 2019](https://doi.org/10.1145/3331184.3331259)). It
-  gives nearly the same p. The permutation test needs no assumption about how
-  the differences are distributed.
 - A bootstrap test: its p leans toward small values ([Urbano et al.,
   2019](https://doi.org/10.1145/3331184.3331259)).
 
@@ -940,13 +940,14 @@ difference between two models' MRR is a paired permutation test.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- a model's MRR lies inside its interval, and a second run gives the same
-  interval, since the seed is fixed;
-- on 200 variables, the interval is about as wide as a normal 95% interval;
-- when every variable has an MRR of 1, the interval is [1, 1]. scipy's BCa
-  gives no interval there;
-- MRR is compared by a paired test: it finds a model that ranks each target
-  one place higher, which an unpaired test would miss.
+- on 200 variables, the interval is the mean plus or minus t × sd / √200;
+- when every variable has an MRR of 1, the interval is [1, 1];
+- a difference's interval excludes 0 exactly when the paired t-test's p is
+  below 0.05;
+- MRR is compared by a paired test: it finds a difference that the spread of
+  tied ranks hides from an unpaired test;
+- when every variable differs by the same amount, p is 0, or 1 when that
+  amount is 0.
 
 ### Each paired test is reported alone, with no correction for the number of tests
 
@@ -3003,6 +3004,9 @@ check that:
 
 > Speer, R. (2019). *ftfy* (Version 5.5.1) [Computer software]. Zenodo.
 > https://doi.org/10.5281/ZENODO.2591652
+
+> Student. (1908). The Probable Error of a Mean. *Biometrika, 6*(1), 1–25.
+> https://doi.org/10.2307/2331554
 
 > Thakur, N., Reimers, N., Rücklé, A., Srivastava, A., & Gurevych, I. (2021).
 > *BEIR: A Heterogenous Benchmark for Zero-shot Evaluation of Information

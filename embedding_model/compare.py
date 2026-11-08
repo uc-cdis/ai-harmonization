@@ -49,35 +49,34 @@ from embedding_model.texts import DEFAULT_FORMAT
 COMPARISONS = "comparisons"
 # The subfolder of a comparison that holds its figures, beside its tables.
 FIGURES = "figures"
-# 95%, the usual confidence level. The bootstrap and the permutation test
-# take scipy's default number of resamples. The seed makes a comparison
-# repeat exactly.
+# 95%, the usual confidence level.
 CONFIDENCE = 0.95
-SEED = 0
 # The metrics that get an interval and a paired test: each is a mean over the
 # source variables of a value that each variable's rank gives.
 TESTED_METRICS = ("mrr", f"mrr@{MRR_CUTOFF}", *[f"accuracy@{k}" for k in ACCURACY_AT_K])
 MCNEMAR = "McNemar's exact test"
-PERMUTATION = "paired permutation test"
+PAIRED_T = "paired t-test"
 # Each tested metric's paired test: McNemar's exact test for accuracy@k, whose
-# values are 1 or 0, and the paired permutation test for MRR and MRR@10.
+# values are 1 or 0, and the paired t-test for MRR and MRR@10.
 TESTS = {
-    metric: MCNEMAR if metric.startswith("accuracy@") else PERMUTATION
+    metric: MCNEMAR if metric.startswith("accuracy@") else PAIRED_T
     for metric in TESTED_METRICS
 }
 WILSON = "Wilson score interval"
 NEWCOMBE = "Newcombe's interval for paired shares"
-BOOTSTRAP = "bootstrap, BCa"
+T_INTERVAL = "t interval"
 # Each tested metric's intervals, for a model's metric and for a difference
 # from the reference. accuracy@k is a share of 1s and 0s: Wilson's interval
 # for one model, and Newcombe's for a paired difference. MRR and MRR@10 take
-# values between 0 and 1: the bootstrap for both.
+# values between 0 and 1: the t interval of the mean for one model, and of
+# the variables' differences for a difference, the paired t-test's own
+# interval.
 INTERVALS = {
-    metric: WILSON if metric.startswith("accuracy@") else BOOTSTRAP
+    metric: WILSON if metric.startswith("accuracy@") else T_INTERVAL
     for metric in TESTED_METRICS
 }
 DIFFERENCE_INTERVALS = {
-    metric: NEWCOMBE if metric.startswith("accuracy@") else BOOTSTRAP
+    metric: NEWCOMBE if metric.startswith("accuracy@") else T_INTERVAL
     for metric in TESTED_METRICS
 }
 # The stars over a bracket, by the test's p.
@@ -233,16 +232,17 @@ def variable_values(ranks):
     return values
 
 
-def bootstrap_interval(values):
-    """The 95% bootstrap confidence interval of the mean of ``values``.
+def t_interval(values):
+    """The 95% t interval of the mean of ``values``.
 
-    scipy's ``bootstrap`` resamples the source variables, as often as its
-    default says, by its default method, BCa. When every value is the same,
-    such as an MRR of 1 for every variable, no resample can differ. BCa then
-    gives NaN for both ends, so the interval is that value instead.
+    It is the interval of scipy's one-sample t-test. On each source
+    variable's difference between two models, it is the paired t-test's
+    interval. When every value is the same, such as an MRR of 1 for every
+    variable, the values have no spread: the interval is that value.
 
     Args:
-        values (np.ndarray): One value for each source variable.
+        values (np.ndarray): One value for each source variable, or each
+            variable's difference between two models.
 
     Returns:
         tuple[float, float]: The interval's low and high ends.
@@ -250,13 +250,8 @@ def bootstrap_interval(values):
     values = np.asarray(values, dtype=float)
     if values.min() == values.max():
         return float(values[0]), float(values[0])
-    result = stats.bootstrap(
-        (values,),
-        np.mean,
-        confidence_level=CONFIDENCE,
-        rng=np.random.default_rng(SEED),
-    )
-    return float(result.confidence_interval.low), float(result.confidence_interval.high)
+    interval = stats.ttest_1samp(values, 0.0).confidence_interval(CONFIDENCE)
+    return float(interval.low), float(interval.high)
 
 
 def wilson_interval(values):
@@ -330,10 +325,11 @@ def paired_test(metric, model, reference):
 
     For accuracy@k, each variable's value is 1 or 0. McNemar's exact test
     counts the variables where the two models differ: under no difference,
-    each is a coin flip, so p is the binomial test's. This is the exact paired
-    permutation test for values of 1 and 0. For MRR and MRR@10, scipy's
-    ``permutation_test`` swaps the two models' values on each variable at
-    random, as often as its default says.
+    each is a coin flip, so p is the binomial test's. For MRR and MRR@10,
+    scipy's paired t-test compares the two models' values on each variable. When
+    every variable differs by the same amount, the differences have no
+    spread: p is 1 when that amount is 0, and 0 otherwise, the limit that
+    scipy reaches with a warning.
 
     Args:
         metric (str): A metric of TESTED_METRICS.
@@ -351,13 +347,10 @@ def paired_test(metric, model, reference):
             return MCNEMAR, 1.0
         result = stats.binomtest(only_model, only_model + only_reference, 0.5)
         return MCNEMAR, float(result.pvalue)
-    result = stats.permutation_test(
-        (model, reference),
-        lambda first, second, axis: np.mean(first - second, axis=axis),
-        permutation_type="samples",
-        rng=np.random.default_rng(SEED),
-    )
-    return PERMUTATION, float(result.pvalue)
+    differences = np.asarray(model, dtype=float) - np.asarray(reference, dtype=float)
+    if differences.min() == differences.max():
+        return PAIRED_T, 1.0 if differences[0] == 0 else 0.0
+    return PAIRED_T, float(stats.ttest_rel(model, reference).pvalue)
 
 
 def stars(p):
@@ -406,7 +399,7 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
         if INTERVALS[metric] == WILSON:
             low, high = wilson_interval(values[metric])
         else:
-            low, high = bootstrap_interval(values[metric])
+            low, high = t_interval(values[metric])
         result[metric] = float(row[metric])
         result[f"{metric}_low"] = round(low, 4)
         result[f"{metric}_high"] = round(high, 4)
@@ -439,7 +432,7 @@ def difference_rows(benchmark, reference, others, values):
             if DIFFERENCE_INTERVALS[metric] == NEWCOMBE:
                 low, high = newcombe_interval(first, second)
             else:
-                low, high = bootstrap_interval(first - second)
+                low, high = t_interval(first - second)
             test, p = paired_test(metric, first, second)
             rows.append(
                 {
@@ -1132,7 +1125,6 @@ def write_comparison(comparison, destination):
                 "settings": {
                     "format": comparison.text_format,
                     "confidence": CONFIDENCE,
-                    "seed": SEED,
                     "intervals": INTERVALS,
                     "difference_intervals": DIFFERENCE_INTERVALS,
                     "tests": TESTS,

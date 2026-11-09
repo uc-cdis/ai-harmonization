@@ -14,7 +14,7 @@ LEARNING_RATE = 0.2
 
 @dataclass
 class Settings:
-    """The static section: the length of each token's vector."""
+    """A static model's settings, in the config's model section: its vectors' length."""
 
     embedding_dim: int = field(
         default=1024, metadata={"help": "the length of each embedding"}
@@ -25,7 +25,7 @@ def build(settings, tokenizer):
     """An untrained static model over a tokenizer's vocabulary.
 
     Args:
-        settings (Settings): The static section; ``embedding_dim`` is the
+        settings (Settings): The static model's settings; ``embedding_dim`` is the
             length of each token's vector.
         tokenizer (Tokenizer): The tokenizer, from ``tokenizer.read_tokenizer``.
 

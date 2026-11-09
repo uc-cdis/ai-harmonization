@@ -2,7 +2,8 @@
 
 Each architecture is a module with:
 
-- ``Settings``: the dataclass of its own config section, named after it;
+- ``Settings``: the dataclass of its settings, which a config gives in its
+  ``model`` section;
 - ``LEARNING_RATE``: its default learning rate;
 - ``build(settings, tokenizer)``: an untrained SentenceTransformer;
 - ``features(token_ids, **kwargs)``, if the architecture reads token ids:

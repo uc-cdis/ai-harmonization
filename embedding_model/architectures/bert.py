@@ -46,7 +46,7 @@ def bert_default(name, help_text):
 
 @dataclass
 class Settings:
-    """The bert section: BertConfig's settings, under its own names.
+    """A BERT's settings, in the config's model section, under BertConfig's names.
 
     The shape's defaults are BERT-Small's, from Google's release of smaller
     BERT models (Turc et al., 2019): 4 layers of 512 dimensions, with 8
@@ -96,8 +96,8 @@ class Settings:
         """
         if self.hidden_size % self.num_attention_heads:
             raise ValueError(
-                f"the bert section's hidden_size, {self.hidden_size}, is not a"
-                f" multiple of its num_attention_heads, {self.num_attention_heads}"
+                f"hidden_size, {self.hidden_size}, is not a multiple of"
+                f" num_attention_heads, {self.num_attention_heads}"
             )
 
 
@@ -109,7 +109,7 @@ def build(settings, tokenizer):
     first, and loaded from it.
 
     Args:
-        settings (Settings): The bert section.
+        settings (Settings): The BERT's settings.
         tokenizer (Tokenizer): The tokenizer, from ``tokenizer.read_tokenizer``.
 
     Returns:

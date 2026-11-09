@@ -2394,11 +2394,13 @@ architecture, its size and the loss's scale. The trainer has many more, in
 every field of a dataclass. Its YAML reader takes one flat list of settings.
 PyYAML reads `1e-3` as text, since YAML 1.1 writes a number with a dot.
 
-**Decision.** A config has five sections: `data`, `model`, the architecture's
-own section, `loss` and `training`. `training` holds the trainer's arguments,
-under their own names. Each section's settings become the defaults of one
-`HfArgumentParser` over the sections' dataclasses. A flag then overrides any setting. A section or a setting
-that does not exist is refused.
+**Decision.** A config has four sections: `data`, `model`, `loss` and
+`training`. `model` holds the
+[architecture and its settings](#the-model-section-holds-the-architecture-and-its-settings).
+`training` holds the trainer's arguments, under their own names. The settings
+become the defaults of one `HfArgumentParser` over their dataclasses. A flag
+then overrides any setting. A section or a setting that does not exist is
+refused.
 
 **Consequences.**
 
@@ -2414,10 +2416,8 @@ that does not exist is refused.
   [sentence-transformers](https://sbert.net/docs/sentence_transformer/training_overview.html)
   takes: the data, the model, the loss and the training arguments.
   Hugging Face's transformers also keeps a model's config, saved with its
-  weights, apart from the `TrainingArguments` that only the trainer reads. So the model's
-  shape and the training's settings never mix.
-- Good, because each architecture's settings have a section of their own.
-  So a static model's config cannot carry BERT's by mistake.
+  weights, apart from the `TrainingArguments` that only the trainer reads.
+  So the model's shape and the training's settings never mix.
 - Bad, because the flags have no sections, so each name must be unique
   across them. A test checks it.
 
@@ -2443,7 +2443,52 @@ check that:
 - a flag overrides the config, and the config overrides the defaults;
 - `1e-3` in a config becomes a number;
 - an unknown section or setting is refused;
-- no two sections share a setting's name.
+- no two settings share a name, in any section or architecture.
+
+### The model section holds the architecture and its settings
+
+**Described in:** [training.md](training.md#the-config).
+
+**Context.** A run trains one of two architectures, `static` or `bert`. A
+static model has one setting, `embedding_dim`. A BERT has eight, from
+`BertConfig`. A run uses only its own architecture's settings.
+
+**Decision.** The `model` section holds `architecture` and that
+architecture's settings. A setting of the other architecture is refused, in
+the config or as a flag.
+
+**Consequences.**
+
+- Good, because the model's kind and its shape sit in one section. A
+  transformers `config.json` keeps them together too:
+  [BERT's](https://huggingface.co/google-bert/bert-base-uncased/blob/main/config.json)
+  has `model_type` beside `hidden_size` and the other settings.
+- Good, because the section takes only its own architecture's settings. So
+  a static model's config cannot carry BERT's by mistake.
+- Bad, because the settings that the section takes depend on its
+  `architecture`. A reader learns them from that architecture's table in
+  [training.md](training.md#architectures), not from the section's name.
+
+**Alternatives considered.**
+
+- A section of its own for each architecture's settings, beside `model`.
+  A config would then choose the kind of model in one section, and set its
+  shape in another.
+- No `architecture` setting: the architecture follows from the section that
+  a config holds, `static` or `bert`. A BERT with every default would then
+  need an empty `bert` section.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a BERT config reads its settings from the model section;
+- a setting of the other architecture is refused, in the model section or
+  as a flag;
+- a setting in the wrong section names the section where it belongs, with
+  its architecture;
+- a run's `config.yaml` holds its architecture's settings in the model
+  section, and reads back as the settings that trained it.
 
 ### A run refuses the trainer's prompts and router_mapping
 
@@ -2642,8 +2687,8 @@ BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
 `max_position_embeddings`, 512 in `BertConfig`. The BERT paper notes that
 "attention is quadratic to the sequence length".
 
-**Decision.** The `bert` section's shape defaults to BERT-Small's, and its
-length to 128 tokens. Its other settings default to `BertConfig`'s.
+**Decision.** A BERT's shape defaults to BERT-Small's, and its length to 128
+tokens. Its other settings default to `BertConfig`'s.
 
 **Consequences.**
 

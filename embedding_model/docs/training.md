@@ -26,31 +26,37 @@ python -m embedding_model train --config embedding_model/examples/run_example.ya
 python -m embedding_model train --config my_run.yaml --seed 1 --learning_rate 1e-2   # a flag overrides the config
 ```
 
-Each setting has a default, so a config names only the corpus, the
-tokenizer and what it changes. This config changes three settings:
+A config has four sections: `data`, `model`, `loss` and `training`. Every
+setting but the corpus and the tokenizer has a default. So a config names
+those two, and the settings that it changes. For example, this config,
+`my_run.yaml`, shows every section:
 
 ```yaml
 data:
   corpus: example
   tokenizer: example-8k
-static:
+model:
+  architecture: static
   embedding_dim: 512
+loss:
+  scale: 20
 training:
   learning_rate: 0.1
   num_train_epochs: 10
 ```
 
-Each token's vector has length 512, in place of 1024. The learning rate is
-0.1, in place of 0.2. Training runs for 10 epochs, in place of 5.
-[The config](#the-config) says which section each setting goes in, and lists
-the settings with their defaults.
+It changes three settings. Each token's vector has length 512, in place of
+1024. The learning rate is 0.1, in place of 0.2. Training runs for 10 epochs,
+in place of 5. `architecture: static` and `scale: 20` are the defaults,
+written only to show where they go. [The config](#the-config) says which
+section each setting goes in, and where each is listed with its default.
 
-Every setting of every section is also a command-line flag, named after it:
+Every setting is also a command-line flag, named after it:
 `--learning_rate 1e-2`, `--embedding_dim 128` or `--use_cpu`. A flag
 overrides the config. `train --help` lists `train`'s own flags. A flag that
-is not a setting is refused. A flag must be written in full, such as
-`--learning_rate`, not `--learning`. A section or a setting that does not
-exist in the config is refused too.
+is not a setting is refused. A flag for the other architecture's settings is
+refused too. A flag must be written in full, such as `--learning_rate`, not
+`--learning`. A config with an unknown section or setting is refused too.
 
 ## What `train` writes
 
@@ -83,10 +89,10 @@ differs only between two environments.
 ### `config.yaml`
 
 The run's settings, in the config's sections. It holds every setting of
-`data`, `model`, the architecture's section and `loss`. Of `training`, it
-holds the settings that the config or the flags gave. It also holds the
-changed defaults of [The `training` section](#the-training-section), the
-learning rate, the seed
+`data`, `model` and `loss`. In `model`, these are the architecture and the
+run's architecture's settings. Of `training`, it holds the settings that the config or the flags
+gave. It also holds the changed defaults of
+[The `training` section](#the-training-section), the learning rate, the seed
 and `bf16`.
 The other settings are the library's defaults.
 
@@ -145,39 +151,24 @@ pd.DataFrame(json.loads(Path("<run>/trainer_state.json").read_text())["log_histo
 
 ### The config
 
-A config's sections follow the parts that the trainer of
-sentence-transformers takes: the data, the model, the loss and the training's
-settings. The model is a static model or a BERT. The `model` section chooses
-which, by its `architecture`. The model's settings then go in that
-architecture's own section, `static` or `bert`. A config with the other
-architecture's section is refused.
+A config has four sections, and each decides one part of a run, as the table
+shows. The trained model needs `embedding_dim` to be used, so it goes in
+`model`. A trained model does not need its learning rate, so `learning_rate`
+goes in `training`.
 
-A setting goes with what it decides. The trained model needs its shape to be
-used, so `embedding_dim` belongs to the model. It does not need the rate that
-it was trained at, so `learning_rate` belongs to the training.
+| section | what it decides | its settings |
+|---|---|---|
+| `data` | what the model learns from | `corpus`, the [corpus](corpus.md) to train on, and `tokenizer`, the [tokenizer](tokenizer.md), each by the name that it was built under, such as `example` and `example-8k`. Both are required |
+| `model` | what the model is | `architecture`: `static`, the default, or `bert`. Then that architecture's settings: see [`static`](#static-a-static-embedding-model) and [`bert`](#bert-a-transformer-embedding-model-with-berts-architecture) |
+| `loss` | what the model learns to do | `scale`: the factor that multiplies the similarities before the softmax of [MultipleNegativesRankingLoss](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss). 20 by default, as in the library |
+| `training` | how the model learns | the trainer's settings, such as `learning_rate` and `num_train_epochs`: see [The `training` section](#the-training-section) |
 
-| section | what it decides | its settings | listed in |
-|---|---|---|---|
-| `data` | what the model learns from | `corpus` and `tokenizer`, each by its name | [The `data`, `model` and `loss` sections](#the-data-model-and-loss-sections) |
-| `model` | the kind of model | `architecture`: `static` or `bert` | [The `data`, `model` and `loss` sections](#the-data-model-and-loss-sections) |
-| `static` | a static model's shape | `embedding_dim`, its only setting | [`static`](#static-a-static-embedding-model) |
-| `bert` | a BERT's shape | `hidden_size`, `num_hidden_layers` and six more | [`bert`](#bert-a-transformer-embedding-model-with-berts-architecture) |
-| `loss` | what the model learns to do | `scale` | [The `data`, `model` and `loss` sections](#the-data-model-and-loss-sections) |
-| `training` | how the model learns | the trainer's settings, such as `learning_rate`, `num_train_epochs` and `per_device_train_batch_size` | [The `training` section](#the-training-section) |
-
-A setting in the wrong section is refused, and the error names its section:
-`the static section has no setting learning_rate; learning_rate belongs in the training section`.
-
-#### The `data`, `model` and `loss` sections
-
-These sections hold the settings of this pipeline:
-
-| section | setting | what it sets | default here | the library's default |
-|---|---|---|---|---|
-| `data` | `corpus` | the [corpus](corpus.md) to train on, by its name | none: required | — |
-| `data` | `tokenizer` | the [tokenizer](tokenizer.md), by its name | none: required | — |
-| `model` | `architecture` | the [architecture](#architectures): `static` or `bert` | `static` | — |
-| `loss` | `scale` | the factor that multiplies the similarities before the softmax of [MultipleNegativesRankingLoss](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss) | 20 | 20 |
+A setting in the wrong section is refused, and the error names the section
+where the setting belongs:
+`the model section has no setting learning_rate; learning_rate belongs in the training section`.
+The `model` section takes only its own architecture's settings. So a static
+model's config with `hidden_size`, a setting of `bert`, is refused, in the
+config or as a flag.
 
 #### The `training` section
 
@@ -187,7 +178,7 @@ Most are settings of transformers'
 such as `learning_rate` and `num_train_epochs`. sentence-transformers adds a
 few of its own, in
 [`SentenceTransformerTrainingArguments`](https://sbert.net/docs/package_reference/sentence_transformer/training_args.html).
-Both pages give each setting's default. A run refuses three settings:
+Both pages give the library's defaults. A run refuses three settings:
 [`prompts` and `router_mapping`](design_decisions.md#a-run-refuses-the-trainers-prompts-and-router_mapping),
 and
 [`load_best_model_at_end`](design_decisions.md#the-model-kept-is-the-model-at-the-last-step).
@@ -216,10 +207,12 @@ and the same defaults, except the learning rate.
 
 #### `static`: a static embedding model
 
-The default. The model is a table that holds one vector per token. A text's
+`static` is the default architecture. The model is a table that holds one vector per token. A text's
 embedding is the average of its tokens' vectors, as sentence-transformers'
 `StaticEmbedding` computes it. Its learning rate is 0.2, the rate of Hugging
 Face's [recipe for static models](https://huggingface.co/blog/static-embeddings).
+
+With `architecture: static`, the `model` section takes one setting:
 
 | setting | what it sets | default here | the library's default |
 |---|---|---|---|
@@ -241,7 +234,6 @@ data:
   tokenizer: example-8k
 model:
   architecture: bert
-bert:
   hidden_size: 256
   num_hidden_layers: 2
   num_attention_heads: 4
@@ -250,7 +242,7 @@ bert:
 
 This config trains a BERT of 2 layers and 256 dimensions.
 
-The `bert` section takes these settings of
+With `architecture: bert`, the `model` section takes these settings of
 [`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig),
 under its own names. The shape's defaults are BERT-Small's, from Google's
 [release of smaller BERT models](https://github.com/google-research/bert).

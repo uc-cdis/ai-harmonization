@@ -42,7 +42,7 @@ TOKENIZER = "abcd-tokenizer"
 # Two epochs of three batches of four training pairs.
 CONFIG = {
     "data": {"corpus": CORPUS, "tokenizer": TOKENIZER},
-    "static": {"embedding_dim": 16},
+    "model": {"embedding_dim": 16},
     "training": {
         "num_train_epochs": 2,
         "per_device_train_batch_size": 4,
@@ -293,8 +293,17 @@ class TestConfig:
             ("model:\n  dimension: 8\n", "no setting dimension"),
             ("model: 8\n", "holds no settings"),
             (
-                "model:\n  embedding_dim: 8\n",
-                "embedding_dim belongs in the static section",
+                "model:\n  learning_rate: 0.1\n",
+                "the model section has no setting learning_rate;"
+                " learning_rate belongs in the training section",
+            ),
+            (
+                "training:\n  embedding_dim: 8\n",
+                "embedding_dim belongs in the model section, with architecture static",
+            ),
+            (
+                "training:\n  hidden_size: 256\n",
+                "hidden_size belongs in the model section, with architecture bert",
             ),
         ],
     )
@@ -346,15 +355,13 @@ class TestConfig:
         """A value that does not fit its setting's type raises, rather than exiting the process."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
-            yaml.safe_dump(
-                {"data": CONFIG["data"], "static": {"embedding_dim": "abcd"}}
-            )
+            yaml.safe_dump({"data": CONFIG["data"], "model": {"embedding_dim": "abcd"}})
         )
         with pytest.raises(argparse.ArgumentError, match="embedding_dim"):
             train.read_config(path, 0)
 
-    def test_a_bert_config_reads_its_own_section(self, tmp_path):
-        """A BERT run reads the bert section, at BERT-Small's width and the BERT paper's length and rate.
+    def test_a_bert_config_reads_its_settings_from_the_model_section(self, tmp_path):
+        """A BERT run reads its settings from the model section, at BERT-Small's width and the BERT paper's length and rate.
 
         The length, 128 tokens, and the learning rate, 1e-4, are the BERT
         paper's. The other settings are BertConfig's defaults.
@@ -366,8 +373,7 @@ class TestConfig:
             yaml.safe_dump(
                 {
                     "data": CONFIG["data"],
-                    "model": {"architecture": "bert"},
-                    "bert": {"num_hidden_layers": 1},
+                    "model": {"architecture": "bert", "num_hidden_layers": 1},
                 }
             )
         )
@@ -387,8 +393,11 @@ class TestConfig:
             yaml.safe_dump(
                 {
                     "data": CONFIG["data"],
-                    "model": {"architecture": "bert"},
-                    "bert": {"hidden_size": 256, "num_attention_heads": 6},
+                    "model": {
+                        "architecture": "bert",
+                        "hidden_size": 256,
+                        "num_attention_heads": 6,
+                    },
                 }
             )
         )
@@ -405,32 +414,37 @@ class TestConfig:
         "sections, flags, message",
         [
             (
-                {"bert": {"num_hidden_layers": 1}},
+                {"model": {"num_hidden_layers": 1}},
                 [],
-                "the bert section is for the bert",
+                "num_hidden_layers is a setting of the bert architecture",
             ),
-            ({}, ["--num_hidden_layers", "1"], "--num_hidden_layers is for the bert"),
             (
-                {"model": {"architecture": "bert"}, "static": {"embedding_dim": 8}},
+                {},
+                ["--num_hidden_layers", "1"],
+                "--num_hidden_layers is a setting of the bert architecture",
+            ),
+            (
+                {"model": {"architecture": "bert", "embedding_dim": 8}},
                 [],
-                "the static section is for the static",
+                "embedding_dim is a setting of the static architecture",
             ),
         ],
     )
     def test_another_architectures_settings_are_refused(
         self, tmp_path, sections, flags, message
     ):
-        """A setting of another architecture, in its section or as a flag, is refused."""
+        """A setting of another architecture, in the model section or as a flag, is refused."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], **sections}))
         with pytest.raises(ValueError, match=message):
             train.read_config(path, 0, flags)
 
     def test_each_setting_lives_in_one_section(self):
-        """No two sections share a setting's name, since each has one flag."""
+        """No two settings classes share a setting's name, since each setting has one flag."""
         names = [
             setting.name
-            for settings_class in train.sections().values()
+            for classes in train.sections().values()
+            for settings_class in classes.values()
             for setting in fields(settings_class)
         ]
         assert len(names) == len(set(names))
@@ -472,7 +486,7 @@ class TestConfig:
         assert values["corpus"] == CORPUS
 
     def test_the_settings_are_built_from_the_values(self, config):
-        """Each section becomes its own settings, with the values read."""
+        """Each settings class becomes settings, with the values read: the run's own architecture's alone."""
         values, _ = train.read_config(config, 3, ["--use_cpu"])
         settings = train.apply_config(values)
         assert list(settings) == ["data", "model", "static", "loss", "training"]
@@ -558,7 +572,8 @@ class TestTrain:
             run / "model" / "model.safetensors"
         )
         recorded = yaml.safe_load((run / "config.yaml").read_text())
-        assert list(recorded) == ["data", "model", "static", "loss", "training"]
+        assert list(recorded) == ["data", "model", "loss", "training"]
+        assert recorded["model"] == {"architecture": "static", "embedding_dim": 16}
         assert recorded["training"]["seed"] == 0
         assert "output_dir" not in recorded["training"]
         logged = json.loads((run / "trainer_state.json").read_text())["log_history"]
@@ -837,17 +852,14 @@ class TestScoreRun:
 
 
 # The smallest BERT that trains on a CPU in seconds: one layer of 32 dimensions.
-BERT_CONFIG = {
-    **{section: values for section, values in CONFIG.items() if section != "static"},
-    "model": {"architecture": "bert"},
-    "bert": {
-        "hidden_size": 32,
-        "num_hidden_layers": 1,
-        "num_attention_heads": 2,
-        "intermediate_size": 64,
-        "max_position_embeddings": 64,
-    },
+BERT_SETTINGS = {
+    "hidden_size": 32,
+    "num_hidden_layers": 1,
+    "num_attention_heads": 2,
+    "intermediate_size": 64,
+    "max_position_embeddings": 64,
 }
+BERT_CONFIG = {**CONFIG, "model": {"architecture": "bert", **BERT_SETTINGS}}
 
 
 class TestBert:
@@ -863,7 +875,11 @@ class TestBert:
     def test_a_bert_run_writes_its_folder(
         self, inputs, bert_config, tmp_path, monkeypatch
     ):
-        """BERT trains on the texts: a BERT body with mean pooling, recorded as architecture bert."""
+        """BERT trains on the texts: a BERT body with mean pooling, recorded as architecture bert.
+
+        The run's config.yaml holds the BERT's settings in the model section,
+        and reads back as the settings of the config that trained it.
+        """
         from sentence_transformers import SentenceTransformer
 
         monkeypatch.setattr(
@@ -875,7 +891,13 @@ class TestBert:
         record = json.loads((run / "manifest.json").read_text())
         assert record["settings"]["architecture"] == "bert"
         recorded = yaml.safe_load((run / "config.yaml").read_text())
-        assert list(recorded) == ["data", "model", "bert", "loss", "training"]
+        assert list(recorded) == ["data", "model", "loss", "training"]
+        assert recorded["model"]["architecture"] == "bert"
+        assert "embedding_dim" not in recorded["model"]
+        assert (
+            train.read_config(run / "config.yaml", 0)[0]
+            == train.read_config(bert_config, 0)[0]
+        )
         assert recorded["training"]["learning_rate"] == 1e-4
         model = SentenceTransformer(str(run / "model"), device="cpu")
         assert [type(module).__name__ for module in model] == ["Transformer", "Pooling"]
@@ -883,7 +905,7 @@ class TestBert:
 
     def test_a_bert_model_card_looks_up_nothing_on_the_hub(self, inputs):
         """The model card does not look up the temporary folder's path on the Hub."""
-        settings = bert.Settings(**BERT_CONFIG["bert"])
+        settings = bert.Settings(**BERT_SETTINGS)
         model = bert.build(settings, trained_tokenizer(inputs))
         assert model.model_card_data.local_files_only
 

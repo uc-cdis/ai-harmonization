@@ -4,10 +4,10 @@ Each training is a run: one config, trained with one seed. A run trains one
 model on a corpus's training pairs, with sentence-transformers' trainer, and
 evaluates it on the validation pairs. It takes four steps:
 
-1. It reads the config: a YAML file in five sections, ``data``, ``model``,
-   the architecture's own section, ``loss`` and ``training``.
-   ``training`` holds sentence-transformers' training arguments, under
-   their own names. Any setting can also be given as
+1. It reads the config: a YAML file in four sections, ``data``, ``model``,
+   ``loss`` and ``training``. ``model`` holds the architecture and that
+   architecture's settings. ``training`` holds sentence-transformers'
+   training arguments, under their own names. Any setting can also be given as
    a flag, such as ``--learning_rate 1.0e-2``, which overrides the config.
 2. It reads the corpus and the tokenizer, each checked against its manifest.
    For a static model, it turns every text of the pairs into token ids once,
@@ -91,7 +91,12 @@ class DataSettings:
 
 @dataclass
 class ModelSettings:
-    """The model section: the architecture, whose own section holds its settings."""
+    """The model section's own setting: the architecture.
+
+    The model section also holds the chosen architecture's settings, such as
+    ``embedding_dim``. Each architecture's module in ``architectures`` defines
+    them.
+    """
 
     architecture: str = field(
         default="static",
@@ -113,22 +118,27 @@ class LossSettings:
 
 
 def sections():
-    """The config's sections, in order, each with the dataclass of its settings.
+    """The config's sections, in order, each with its settings classes.
 
-    Each architecture has a section of its own, named after it. A run reads
-    only its own architecture's section.
+    A settings class is a dataclass that holds a group of settings. Each
+    section has one, named after the section. The model section also has one
+    for each architecture, named after the architecture. A run takes only its
+    own architecture's settings.
 
     Returns:
-        dict[str, type]: Each section's dataclass, by the section's name.
+        dict[str, dict[str, type]]: Each section's settings classes, by their
+            names, under the section's name.
     """
     from sentence_transformers import SentenceTransformerTrainingArguments
 
     return {
-        "data": DataSettings,
-        "model": ModelSettings,
-        **{name: module.Settings for name, module in ARCHITECTURES.items()},
-        "loss": LossSettings,
-        "training": SentenceTransformerTrainingArguments,
+        "data": {"data": DataSettings},
+        "model": {
+            "model": ModelSettings,
+            **{name: module.Settings for name, module in ARCHITECTURES.items()},
+        },
+        "loss": {"loss": LossSettings},
+        "training": {"training": SentenceTransformerTrainingArguments},
     }
 
 
@@ -170,8 +180,8 @@ def read_config(path, seed, overrides=(), run_name=None):
     be written in full: an abbreviation would change a setting that
     config.yaml then does not record. argparse checks a setting's choices
     only for a flag, so the architecture is checked here too. A setting of
-    another architecture, in its section or as a flag, is refused, and so is
-    a setting of REFUSED_TRAINING. A learning rate that neither the config nor
+    another architecture, in the model section or as a flag, is refused, and
+    so is a setting of REFUSED_TRAINING. A learning rate that neither the config nor
     a flag gives is the architecture's own.
 
     Args:
@@ -197,9 +207,18 @@ def read_config(path, seed, overrides=(), run_name=None):
     from transformers import HfArgumentParser
 
     section_classes = sections()
+    settings_classes = {
+        name: settings_class
+        for classes in section_classes.values()
+        for name, settings_class in classes.items()
+    }
+    class_setting_names = {
+        name: {setting.name for setting in fields(settings_class) if setting.init}
+        for name, settings_class in settings_classes.items()
+    }
     setting_names = {
-        section: {setting.name for setting in fields(settings_class) if setting.init}
-        for section, settings_class in section_classes.items()
+        section: set().union(*(class_setting_names[name] for name in classes))
+        for section, classes in section_classes.items()
     }
     try:
         config_sections = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
@@ -223,10 +242,16 @@ def read_config(path, seed, overrides=(), run_name=None):
         unknown = sorted(set(section_values) - setting_names[section])
         if unknown:
             homes = [
-                f"{name} belongs in the {other} section"
+                f"{name} belongs in the {home} section"
+                + (
+                    f", with architecture {class_name}"
+                    if class_name in ARCHITECTURES
+                    else ""
+                )
                 for name in unknown
-                for other, names in setting_names.items()
-                if name in names
+                for home, classes in section_classes.items()
+                for class_name in classes
+                if name in class_setting_names[class_name]
             ]
             raise ValueError(
                 f"{path}: the {section} section has no setting {', '.join(unknown)}"
@@ -245,7 +270,7 @@ def read_config(path, seed, overrides=(), run_name=None):
         )
 
     parser = HfArgumentParser(
-        list(section_classes.values()),
+        list(settings_classes.values()),
         prog="python -m embedding_model train",
         allow_abbrev=False,
         exit_on_error=False,
@@ -265,13 +290,15 @@ def read_config(path, seed, overrides=(), run_name=None):
             f"{path}: there is no architecture {architecture!r}: the"
             f" architectures are {', '.join(ARCHITECTURES)}"
         )
-    for other in set(ARCHITECTURES) - {architecture}:
-        other_flags = sorted(flags & setting_names[other])
-        if other in config_sections or other_flags:
-            where = f"--{other_flags[0]}" if other_flags else f"the {other} section"
+    model_given = set(config_sections.get("model") or {})
+    for other in sorted(set(ARCHITECTURES) - {architecture}):
+        other_flags = sorted(flags & class_setting_names[other])
+        other_settings = sorted(model_given & class_setting_names[other])
+        if other_flags or other_settings:
+            where = f"--{other_flags[0]}" if other_flags else other_settings[0]
             raise ValueError(
-                f"{path}: {where} is for the {other} architecture, and this"
-                f" run's architecture is {architecture}"
+                f"{path}: {where} is a setting of the {other} architecture, and"
+                f" this run's architecture is {architecture}"
             )
     if "learning_rate" not in training_given:
         values["learning_rate"] = ARCHITECTURES[architecture].LEARNING_RATE
@@ -279,7 +306,7 @@ def read_config(path, seed, overrides=(), run_name=None):
 
 
 def apply_config(values):
-    """Build each section's settings from the config's values.
+    """Build the settings from the config's values: one object per settings class.
 
     Building the training settings sets up the device: transformers picks
     the GPU, or the CPU when ``use_cpu`` is set or no GPU is visible. The run
@@ -289,23 +316,24 @@ def apply_config(values):
         values (dict): Every setting's value, from read_config.
 
     Returns:
-        dict: Each section's settings, by the section's name: the run's own
-            architecture's section, and not the others'.
+        dict: The settings, by the name of their class in sections: the run's
+            own architecture's, and not the others'.
 
     Raises:
         ValueError: If transformers refuses a setting, such as bf16 where no
             GPU supports it.
     """
     return {
-        section: settings_class(
+        name: settings_class(
             **{
                 setting.name: values[setting.name]
                 for setting in fields(settings_class)
                 if setting.init
             }
         )
-        for section, settings_class in sections().items()
-        if section not in ARCHITECTURES or section == values["architecture"]
+        for classes in sections().values()
+        for name, settings_class in classes.items()
+        if name not in ARCHITECTURES or name == values["architecture"]
     }
 
 
@@ -509,7 +537,8 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
     each batch.
 
     Args:
-        settings (dict): Each section's settings, from read_config.
+        settings (dict): The settings, by the name of their class, from
+            apply_config.
         tokenizer (Tokenizer): The tokenizer.
         training_pairs (pd.DataFrame): The training pairs.
         validation_pairs (pd.DataFrame): The validation pairs.
@@ -591,33 +620,33 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
 def recorded_config(settings, training_given):
     """The settings that the run's config.yaml holds, by section.
 
-    Every setting of data, model, the run's architecture and loss is
-    recorded. Of training's settings, those of TRAINING_DEFAULTS, those that
-    the config or the flags gave, the learning rate, the seed and bf16 are
-    recorded. The others are the library's defaults, for
-    the version that the run's record names. The trainer's ``output_dir`` is
-    the run's own, so it is left out. The training settings are written as
-    ``TrainingArguments.to_dict`` gives them: an enum as its value, and a
-    token hidden.
+    Every setting of data, model and loss is recorded, and every setting of
+    the run's architecture, in the model section. Of training's settings,
+    those of TRAINING_DEFAULTS, those that the config or the flags gave, the
+    learning rate, the seed and bf16 are recorded. The others are the
+    library's defaults, for the version that the run's record names. The
+    trainer's ``output_dir`` is the run's own, so it is left out. The training
+    settings are written as ``TrainingArguments.to_dict`` gives them: an enum
+    as its value, and a token hidden.
 
     Args:
-        settings (dict): Each section's settings, from read_config.
+        settings (dict): The settings, by the name of their class, from
+            apply_config.
         training_given (set[str]): The training settings that the config or
             the flags gave.
 
     Returns:
         dict: The config, in the sections that ``--config`` reads.
     """
+    architecture = settings["model"].architecture
     training_values = settings["training"].to_dict()
     names = (
         set(TRAINING_DEFAULTS) | training_given | {"learning_rate", "seed", "bf16"}
     ) - {"output_dir"}
     return {
-        **{
-            section: asdict(section_settings)
-            for section, section_settings in settings.items()
-            if section != "training"
-        },
+        "data": asdict(settings["data"]),
+        "model": {**asdict(settings["model"]), **asdict(settings[architecture])},
+        "loss": asdict(settings["loss"]),
         "training": {name: training_values[name] for name in sorted(names)},
     }
 
@@ -665,7 +694,8 @@ def run_manifest(
 
     Args:
         run_name (str): The run's name.
-        settings (dict): Each section's settings, from read_config.
+        settings (dict): The settings, by the name of their class, from
+            apply_config.
         corpus_manifest (dict): The corpus's manifest.
         tokenizer_manifest (dict): The tokenizer's manifest.
         model_folder (Path): The saved model.

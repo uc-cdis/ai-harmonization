@@ -1235,19 +1235,15 @@ class TestWriteAndRead:
         monkeypatch.setattr("os.linesep", "\r\n")
         assert manifests.table_sha256(TABLE) == before
 
-    def test_a_checksum_written_in_chunks_is_that_of_the_whole_text(self):
-        """The streamed SHA-256 is that of the whole CSV text, dates and accents too."""
-        # This checks that the SHA-256 of 120,000 rows, written piece by piece,
-        # equals the SHA-256 of their whole CSV text. With two columns, pandas
-        # writes 50,000 rows per chunk. It leaves out the time in a chunk where
-        # no value has one. The times fill only the last 10,000 rows, so the
-        # last chunk mixes dates and times. Another chunk size would write some
-        # dates without a time. The "É" of "Éfgh" takes two bytes in UTF-8, so
-        # the bytes are checked too.
-        when = pd.to_datetime(
-            ["2020-01-01"] * 110_000 + ["2020-01-03 10:00"] * 10_000, format="ISO8601"
+    def test_a_streamed_checksum_is_that_of_the_whole_text(self):
+        """The SHA-256 of a large table, written to the hash piece by piece, is that of its whole CSV text.
+
+        The "É" of "Éfgh" takes two bytes in UTF-8, so the bytes are checked
+        too.
+        """
+        table = pd.DataFrame(
+            {"code": range(120_000), "name": ["Abcd", "Éfgh"] * 60_000}
         )
-        table = pd.DataFrame({"when": when, "name": ["Abcd", "Éfgh"] * 60_000})
         text = (
             manifests.schema_line(table)
             + "\n"

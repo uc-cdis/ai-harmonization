@@ -172,8 +172,11 @@ def ranking_evaluator(
         mrr_at_k=[cutoff] if cutoff else sorted({MRR_CUTOFF, len(corpus)}),
         ndcg_at_k=[cutoff] if cutoff else [NDCG_CUTOFF],
         accuracy_at_k=[k for k in ACCURACY_AT_K if cutoff is None or k <= cutoff],
-        # The evaluator always computes precision, recall and MAP too, and
-        # nothing here reads them. So they get the smallest cutoff, 1.
+        # The evaluator keeps each source's hits up to the largest cutoff of
+        # all its metrics. In validation, that is 10, from MRR@10, nDCG@10 and
+        # accuracy@10. Precision, recall and MAP, which nothing here reads,
+        # get the smallest cutoff, 1, so that they do not raise it, as MAP's
+        # default, 100, would.
         precision_recall_at_k=[1],
         map_at_k=[1],
         batch_size=batch_size,

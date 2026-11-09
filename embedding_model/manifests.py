@@ -144,8 +144,8 @@ def table_sha256(frame):
     separator, the quoting and the line ending are set, and lines end with
     ``\\n`` on every system, so the checksum is the same on Windows. pandas
     writes the CSV to the hash piece by piece, through ``Digest``, so the whole
-    text is never held in memory. pandas uses the same pieces for a whole
-    text, so the checksum is that of the whole text.
+    text is never held in memory. Hashed in order, the pieces give the SHA-256
+    of the whole text.
 
     Args:
         frame (pd.DataFrame): The table.

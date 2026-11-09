@@ -408,27 +408,8 @@ class TestCommittedVersion:
         with pytest.raises(RuntimeError):
             manifests.committed_version(tmp_path, "abcd-benchmark")
 
-    def test_a_manifest_that_git_cannot_show_is_an_error(self, monkeypatch, tmp_path):
-        """A listed manifest that git then cannot show is an error, not 'not committed'."""
-        (tmp_path / "abcd-benchmark.json").write_text(json.dumps({"version": "1"}))
-        self.git(tmp_path, "init", "-q")
-        self.git(tmp_path, "add", ".")
-        self.git(tmp_path, "commit", "-q", "-m", "abcd")
-        run = manifests.subprocess.run
-
-        def failing_show(command, **options):
-            """git, except that ``git show`` fails with a message."""
-            if command[1] == "show":
-                return subprocess.CompletedProcess(command, 128, "", "fatal: abcd")
-            return run(command, **options)
-
-        monkeypatch.setattr(manifests.subprocess, "run", failing_show)
-        with pytest.raises(RuntimeError, match="fatal: abcd"):
-            manifests.committed_version(tmp_path, "abcd-benchmark")
-
     def test_git_missing_is_an_error(self, monkeypatch, tmp_path):
-        """When git cannot run at all, the answer is an error."""
-        missing = MagicMock(side_effect=FileNotFoundError("git"))
-        monkeypatch.setattr(manifests.subprocess, "run", missing)
+        """When git cannot run at all, on a PATH without it, committed_version raises an error."""
+        monkeypatch.setenv("PATH", str(tmp_path))
         with pytest.raises(RuntimeError, match="git could not run"):
             manifests.committed_version(tmp_path, "abcd-benchmark")

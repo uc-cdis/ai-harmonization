@@ -375,6 +375,60 @@ check that:
 - a node that gives the property another meaning is left out;
 - a variable mapped to `gender` also expects `demographic.sex_at_birth`.
 
+### GDC's data dictionary is read by a reader of our own
+
+**Described in:** [benchmarks.md](benchmarks.md#the-targets).
+
+**Context.** The GDC benchmark's targets come from a release of
+[gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). The benchmark's
+manifest pins it by its commit, with the SHA-256 of the release's archive.
+Each node is a YAML file, which refers to shared definitions by `$ref`. The
+release's own loader, `GDCDictionary`, needs `jsonschema` and `pyyaml`. On
+PyPI, the name `gdcdictionary` holds another package, a "Gen3 generic data
+dictionary", whose last release came in 2019.
+
+**Decision.** The build reads the schemas from the downloaded archive, as
+data. It resolves each `$ref` with the
+[`referencing`](https://referencing.readthedocs.io/) library, and merges each
+definition over the node's own keys, as `GDCDictionary` merges it.
+
+**Consequences.**
+
+- Good, because the dictionary is pinned like every other input, by its
+  committed manifest. `benchmarks build --gdc --update-manifest` updates it.
+- Good, because the build runs no code from the download.
+- Good, because `referencing` adds no package: `uv.lock` holds it already, as
+  a dependency of `jsonschema`, which
+  [resolves its references with it](https://python-jsonschema.readthedocs.io/en/stable/referencing/).
+- Bad, because the merge rule is copied from `GDCDictionary`. A change to it
+  there must be copied here.
+
+**Alternatives considered.**
+
+- gdcdictionary as a dependency of the `embedding-model` group. Its releases
+  are only on GitHub, so it would need a git source in `tool.uv.sources`,
+  which only uv reads. Installed with pip, the group would get PyPI's
+  package of that name, Gen3's dictionary of 2019, instead. A new dictionary
+  would change both the dependency and the manifest.
+- The loader of the downloaded release, imported from the archive. The build
+  would run code that `uv.lock` does not cover. Each release's loader can
+  need other packages, and can change how it is called.
+- `DataDictionary` of dictionaryutils, the loader of Gen3's data
+  dictionaries. It reads each `$ref` as a single reference, the form that
+  Gen3's dictionaries write, such as BioData Catalyst's. In the pinned
+  release, a node's `$ref` can be a list of references, so version 3.5.1
+  stops with an error. It would also add three packages, dictionaryutils,
+  gen3dictionary and cdislogging, for a few lines of our code. And it requires
+  `jsonschema` 4.23.0 or below, which the repository's lock would then hold.
+
+**Confirmation.** The tests in
+[test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
+check that:
+
+- only the nodes are read as nodes, and not the shared schemas;
+- a list of references, as GDC's nodes give, is merged over the node's own
+  keys, so that the definition's value wins.
+
 ### The TOPMed benchmark's mappings are corrected by a reviewed list
 
 **Described in:** [benchmarks.md](benchmarks.md#corrections).
@@ -2931,8 +2985,10 @@ them, and the one that it keeps.
 
 - DataParallel, the trainer's default: the batch would grow with the number
   of GPUs, and the flat ids and their offsets would be split apart.
-- Stopping, with a message to set `CUDA_VISIBLE_DEVICES`: a user would have
-  to change it, and change it back for other work.
+- Stopping, with a message to set `CUDA_VISIBLE_DEVICES`: on a machine with
+  several GPUs, every run would need it, as
+  `CUDA_VISIBLE_DEVICES=0 python -m embedding_model train ...`. GPU 0 is a
+  sensible default.
 - Looking for a free GPU: "free" has no clear definition, and the run would
   have to ask NVIDIA's management library before CUDA starts.
 - Setting the trainer's `_n_gpu` to 1: `transformers` does not document that

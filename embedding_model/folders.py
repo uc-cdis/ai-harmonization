@@ -6,7 +6,7 @@ all. So a failed step leaves the previous folder of that name as it was.
 
 A run that is stopped with Ctrl-C deletes its staging folder. A run that is
 killed, such as by ``scancel`` or a time limit, cannot clean up. It leaves its
-hidden staging folder, ``.<name>.<random>/``, next to the folder that it
+hidden staging folder, ``.<name>~<random>/``, next to the folder that it
 writes. When it was killed while it swapped the two folders, the staging
 folder holds them both, and the previous folder is its ``.previous``.
 The next run of the step warns about each staging folder that is left, prints
@@ -30,6 +30,9 @@ FOLDER_NAME_RULE = (
 # The name of the previous folder inside a staging folder. It starts with a
 # dot, so no FOLDER_NAME is the same.
 PREVIOUS = ".previous"
+# The mark between a name and the random part of its staging folder's name.
+# No FOLDER_NAME holds it, so a staging folder belongs to one name only.
+STAGING_MARK = "~"
 
 
 def replace(built, destination, staging):
@@ -83,6 +86,22 @@ def left_warning(left, destination):
     return f"{warning} Nothing in it is needed, so delete it."
 
 
+def staging_folders(destination):
+    """The staging folders beside ``destination``: one that a run writes now, or ones that killed runs left.
+
+    A staging folder is ``.<name>~<random>/``. No FOLDER_NAME holds a ``~``,
+    so another name's staging folder never matches, such as ``.abcd.v2~x1y2``
+    for ``abcd.v2``.
+
+    Args:
+        destination (Path): The folder that the staging folders write.
+
+    Returns:
+        list[Path]: The staging folders, sorted.
+    """
+    return sorted(destination.parent.glob(f".{destination.name}{STAGING_MARK}*"))
+
+
 @contextmanager
 def staged(destination):
     """A new, empty folder to write ``destination`` in.
@@ -102,14 +121,13 @@ def staged(destination):
     """
     destination = Path(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    prefix = f".{destination.name}."
-    # The random part that mkdtemp adds after the prefix has no dot. The staging
-    # folder of a longer name, such as .abcd.v2.x1y2 for abcd.v2, has a dot
-    # after the prefix, so it is skipped.
-    for left in sorted(destination.parent.glob(f"{prefix}*")):
-        if "." not in left.name[len(prefix) :]:
-            print(left_warning(left, destination), file=sys.stderr)
-    staging = Path(tempfile.mkdtemp(dir=destination.parent, prefix=prefix))
+    for left in staging_folders(destination):
+        print(left_warning(left, destination), file=sys.stderr)
+    staging = Path(
+        tempfile.mkdtemp(
+            dir=destination.parent, prefix=f".{destination.name}{STAGING_MARK}"
+        )
+    )
     built = staging / destination.name
     try:
         built.mkdir()

@@ -292,7 +292,7 @@ Or open it in VS Code with an extension such as
 A benchmark, a source's tables, a source's pairs, a corpus, a tokenizer, a
 training run and a model's scores are each written whole. For example, `corpus build --name abcd`
 first writes the new corpus into a hidden staging folder,
-`corpora/.abcd.x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
+`corpora/.abcd~x1y2/`, next to `corpora/abcd/`. Only when the new corpus is
 complete does it replace `corpora/abcd/`. So a run that fails leaves the
 previous corpus as it was.
 

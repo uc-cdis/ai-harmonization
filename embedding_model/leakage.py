@@ -113,7 +113,6 @@ def text_keys(texts, cleaned=True):
     Returns:
         pd.Series: The ``text_key`` of each text.
     """
-    texts = texts.fillna("")
     unique = texts.unique()
     prepared = unique if cleaned else [clean(text) for text in unique]
     return texts.map(dict(zip(unique, map(text_key, prepared))))

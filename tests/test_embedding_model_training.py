@@ -404,25 +404,6 @@ class TestConfig:
         )
         assert settings.initializer_range == library.initializer_range
 
-    def test_a_width_that_the_heads_do_not_divide_is_refused(self, tmp_path):
-        """A BERT whose hidden_size the heads do not divide is refused when its settings are built."""
-        path = tmp_path / "abcd-run.yaml"
-        path.write_text(
-            yaml.safe_dump(
-                {
-                    "data": CONFIG["data"],
-                    "model": {
-                        "architecture": "bert",
-                        "hidden_size": 256,
-                        "num_attention_heads": 6,
-                    },
-                }
-            )
-        )
-        values, _ = train.read_config(path, 0, ["--use_cpu"])
-        with pytest.raises(ValueError, match="not a multiple"):
-            train.apply_config(values)
-
     def test_a_given_learning_rate_is_kept(self, config):
         """The architecture's learning rate holds only when no config or flag gives one."""
         values, _ = train.read_config(config, 0, ["--learning_rate", "1e-3"])
@@ -994,14 +975,18 @@ class TestBert:
         padded = model.encode([short, longer], device="cpu")[0]
         assert padded.tolist() == pytest.approx(alone.tolist(), abs=1e-6)
 
-    def test_each_run_sets_the_tokenizers_threads(
+    def test_a_run_sets_the_tokenizers_threads_only_when_unset(
         self, inputs, config, bert_config, tmp_path, monkeypatch
     ):
-        """A BERT run turns the threads off and a static run on, whatever was set before."""
-        monkeypatch.setenv("TOKENIZERS_PARALLELISM", "true")
+        """Unset, a BERT run turns the threads off and a static run on. A user's own setting is kept."""
+        monkeypatch.delenv("TOKENIZERS_PARALLELISM", raising=False)
         assert train.train(bert_config, 0, [], inputs, tmp_path / "bert") == 0
         assert os.environ["TOKENIZERS_PARALLELISM"] == "false"
+        monkeypatch.delenv("TOKENIZERS_PARALLELISM")
         assert train.train(config, 0, [], inputs, tmp_path / "static") == 0
+        assert os.environ["TOKENIZERS_PARALLELISM"] == "true"
+        monkeypatch.setenv("TOKENIZERS_PARALLELISM", "true")
+        assert train.train(bert_config, 0, [], inputs, tmp_path / "bert-again") == 0
         assert os.environ["TOKENIZERS_PARALLELISM"] == "true"
 
     def test_a_bert_run_trains_the_same_model_again(

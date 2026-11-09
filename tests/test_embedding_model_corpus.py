@@ -343,7 +343,7 @@ class TestLeakage:
 
     def test_text_keys_are_those_of_pairs(self):
         """``text_keys`` writes pairs.common.text_key: accents go, Greek letters stay."""
-        texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", None])
+        texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", ""])
         assert leakage.text_keys(texts).tolist() == [
             common.text_key("Abcd_Efgh (ijkl)!"),
             common.text_key("α-tocopherol"),

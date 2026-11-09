@@ -163,12 +163,10 @@ def diagnostics(tokenizer, texts):
             used_ids.update(ids)
     non_special_count = tokenizer.get_vocab_size() - len(special_ids)
     return {
-        "fertility": round(token_count / max(word_count, 1), 3),
-        "words_split": round(split_word_count / max(word_count, 1), 4),
-        "unknown_rate": round(unknown_count / max(token_count, 1), 5),
-        "vocabulary_used": round(
-            len(used_ids - special_ids) / max(non_special_count, 1), 4
-        ),
+        "fertility": round(token_count / word_count, 3),
+        "words_split": round(split_word_count / word_count, 4),
+        "unknown_rate": round(unknown_count / token_count, 5),
+        "vocabulary_used": round(len(used_ids - special_ids) / non_special_count, 4),
     }
 
 

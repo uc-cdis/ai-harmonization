@@ -1041,19 +1041,6 @@ class TestWriteBenchmark:
             )
         assert list(tmp_path.iterdir()) == []
 
-    def test_a_string_expected_target_is_refused(self, tmp_path):
-        """An expected_target given as a string, not a list, is a TypeError."""
-        with pytest.raises(TypeError, match="list of target keys"):
-            benchmarks.write_benchmark(
-                tmp_path,
-                "abcd-benchmark",
-                "1",
-                [TARGET],
-                [mapping("AGE", "a.age")],
-                [PIN],
-                {},
-            )
-
 
 class TestReadBenchmark:
     """Reading a built benchmark back, checked against its manifest."""

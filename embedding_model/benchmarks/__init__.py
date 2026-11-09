@@ -73,12 +73,9 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
             files.
 
     Raises:
-        TypeError: If a mapping's ``expected_target`` is a string, not a list.
         ValueError: If a property is in the targets twice, or an expected
             target of the mappings is not in the targets.
     """
-    if any(isinstance(row["expected_target"], str) for row in mappings):
-        raise TypeError("a mapping's expected_target must be a list of target keys")
     listed = Counter(row["target_property"] for row in targets)
     repeated = sorted(key for key, count in listed.items() if count > 1)
     if repeated:

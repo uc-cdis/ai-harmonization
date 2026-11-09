@@ -399,14 +399,14 @@ def tokenizer_note(corpus_name, tokenizer_name, tokenizer_manifest):
 
     Returns:
         str | None: The note, or None when the tokenizer learned from this
-            corpus, or its manifest names no corpus.
+            corpus.
     """
     learned_from = {
-        source.get("name")
-        for source in tokenizer_manifest.get("sources", [])
-        if source.get("role") == "corpus"
+        source["name"]
+        for source in tokenizer_manifest["sources"]
+        if source["role"] == "corpus"
     }
-    if not learned_from or corpus_name in learned_from:
+    if corpus_name in learned_from:
         return None
     return (
         f"  note: tokenizer {tokenizer_name} learned its vocabulary from"
@@ -573,23 +573,23 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
         name="validation",
         cutoff=MRR_CUTOFF,
     )
-    # The variable is set on each path, not by default: an earlier run in the
-    # same process, or the shell, may have set it otherwise.
     features = getattr(architecture, "features", None)
     if features is None:
-        # The dataloader's workers tokenize, in forked processes. The
-        # tokenizer's threads do not survive a fork, so a worker that uses
-        # them can hang.
-        os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        # An architecture without features, such as bert, trains on the texts,
+        # and the dataloader's workers tokenize each batch. false runs them
+        # without the tokenizer's threads, and without its warning, unless
+        # the user set the variable.
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
         datasets = [
             pairs_dataset(pairs) for pairs in (training_pairs, validation_pairs)
         ]
         collator = None
     else:
-        # The ids are made on all the tokenizer's threads. The dataloader's
-        # workers then only gather them, so the threads are safe there, and
-        # the tokenizer gives no warning in each forked worker.
-        os.environ["TOKENIZERS_PARALLELISM"] = "true"
+        # A static model's texts become token ids once, on all the tokenizer's
+        # threads, before the workers start. The workers only gather the ids,
+        # so true is safe, and it keeps the tokenizer from warning in each
+        # worker, unless the user set the variable.
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "true")
         datasets = [
             token_ids(pairs, tokenizer) for pairs in (training_pairs, validation_pairs)
         ]
@@ -727,10 +727,10 @@ def run_manifest(
                     {
                         "name": source["name"],
                         "version": source["version"],
-                        "files": source.get("files", {}),
+                        "files": source["files"],
                     }
-                    for source in corpus_manifest.get("sources", [])
-                    if source.get("role") == "benchmark"
+                    for source in corpus_manifest["sources"]
+                    if source["role"] == "benchmark"
                 ],
             },
             {

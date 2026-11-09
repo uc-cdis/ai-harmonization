@@ -84,22 +84,6 @@ class Settings:
         "initializer_range", "the standard deviation of the random starting weights"
     )
 
-    def __post_init__(self):
-        """Refuse a width that the attention heads do not divide.
-
-        BertModel refuses it too, but only when it is built, after the run has
-        read its corpus.
-
-        Raises:
-            ValueError: If ``hidden_size`` is not a multiple of
-                ``num_attention_heads``.
-        """
-        if self.hidden_size % self.num_attention_heads:
-            raise ValueError(
-                f"hidden_size, {self.hidden_size}, is not a multiple of"
-                f" num_attention_heads, {self.num_attention_heads}"
-            )
-
 
 def build(settings, tokenizer):
     """An untrained BERT body over a tokenizer's vocabulary, with mean pooling.

@@ -566,7 +566,7 @@ def benchmark_title(benchmark, benchmark_result):
     Returns:
         str: The title, such as ``Benchmark: TOPMed v2 (900 source variables)``.
     """
-    name = benchmarks.TITLES.get(benchmark, benchmark)
+    name = benchmarks.TITLES[benchmark]
     return (
         f"Benchmark: {name} v{benchmark_result['version']}"
         f" ({benchmark_result['n']:,} source variables)"
@@ -652,7 +652,9 @@ def overview_figure(benchmark_results, models, reference, differences):
         figsize=(PRINT_WIDTH, 3.4 * len(benchmark_results)), layout="constrained"
     )
     figure.suptitle("Accuracy@k and MRR of each model")
-    panels = np.atleast_1d(figure.subfigures(len(benchmark_results), 1, hspace=0.08))
+    panels = figure.subfigures(
+        len(benchmark_results), 1, hspace=0.08, squeeze=False
+    ).ravel()
     tested = {
         (row["benchmark"], row["metric"], row["model"]): row["p"]
         for row in differences

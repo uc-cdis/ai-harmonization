@@ -211,23 +211,20 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
     )
     with tempfile.TemporaryDirectory() as folder:
         scores = evaluator(model, output_path=folder)
-        # The evaluator writes one predictions file per score function.
-        files = list(Path(folder).glob("*_predictions_cosine.jsonl"))
-        if len(files) != 1:
-            raise RuntimeError(f"the evaluator wrote {len(files)} predictions files")
-        lines = files[0].read_text(encoding="utf-8").splitlines()
+        # The evaluator writes one predictions file per score function, and it
+        # has one, cosine.
+        (predictions,) = Path(folder).glob("*_predictions_cosine.jsonl")
+        lines = predictions.read_text(encoding="utf-8").splitlines()
         ranked = {}
         for entry in map(json.loads, lines):
             query, results = entry["query_id"], entry["results"]
-            for position, hit in enumerate(results):
-                if hit["corpus_id"] in expected[query]:
-                    break
-            else:
-                raise RuntimeError(
-                    f"no expected target in the ranking of source {query}"
-                )
+            rank = next(
+                position
+                for position, hit in enumerate(results, 1)
+                if hit["corpus_id"] in expected[query]
+            )
             ranked[query] = {
-                "rank": position + 1,
+                "rank": rank,
                 "top1_target": results[0]["corpus_id"],
                 "top1_similarity": round(results[0]["score"], 4),
             }
@@ -690,9 +687,7 @@ def benchmark_scores(
         "device": str(encoder.device),
         "batch_size": batch_size,
         "benchmark_manifest": {
-            key: manifest[key]
-            for key in ("version", "built", "files")
-            if key in manifest
+            key: manifest[key] for key in ("version", "built", "files")
         },
         "ai_harmonization": code_commit(),
         "libraries": library_versions(),

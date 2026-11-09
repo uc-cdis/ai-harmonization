@@ -29,7 +29,7 @@ says why.
   `ai_harmonization.formatters`, which the harmonization approaches use, with
   one change: a description appears only when there is one. So a model is
   trained and evaluated on texts laid out almost as it will see them in use.
-  See [docs/scoring.md](docs/scoring.md#running-score) for the differences.
+  See [docs/scoring.md](docs/scoring.md#text-formats) for the differences.
   [docs/design_decisions.md](docs/design_decisions.md#scoring) says why a
   source's node is left out. Training and benchmark texts share
   their layout. The corpus build drops the pairs that would teach a benchmark's

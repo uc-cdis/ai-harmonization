@@ -78,7 +78,7 @@ A training run's manifest has four more fields:
 - `libraries`: the versions of Python and of the libraries.
 
 Its corpus's entry in `sources` also lists the benchmarks that the corpus was
-checked against for leakage. [training.md](training.md#what-a-run-writes)
+checked against for leakage. [training.md](training.md#what-train-writes)
 describes the run's manifest.
 
 A comparison's manifest also has `ai_harmonization` and `libraries`, as a
@@ -88,7 +88,7 @@ run's has them, and three more fields:
 - `reference`: the reference, or null without `--reference`;
 - `benchmarks`: each benchmark, with its version.
 
-[comparing.md](comparing.md#what-a-comparison-writes) describes the
+[comparing.md](comparing.md#what-compare-writes) describes the
 comparison's manifest.
 
 ## Two checksums
@@ -137,7 +137,7 @@ that:
 - the pairs, a corpus's pairs and a benchmark's files have the columns that
   their step writes;
 - the pairs, a corpus and a run record the text format of their texts, one
-  of those that [scoring.md](scoring.md#running-score) lists.
+  of those that [scoring.md](scoring.md#text-formats) lists.
 
 If a check fails, the step stops. Its message names the file and the
 command that writes it again, such as `run: python -m embedding_model

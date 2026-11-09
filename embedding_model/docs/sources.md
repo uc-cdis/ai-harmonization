@@ -8,11 +8,6 @@ reuse. A survey's data dictionary describes the variables that it collected.
 Eight sources are used, and each is fetched from its publisher and kept on
 your machine:
 
-```
-python -m embedding_model sources fetch                    # every source
-python -m embedding_model sources fetch --source ncit obo  # some of them
-```
-
 | source | what it holds | fetched from | release read |
 |---|---|---|---|
 | [NCIt](#ncit) | biomedical concepts, such as diseases and drugs: their synonyms, definitions and registries' value lists | [EVS](https://evs.nci.nih.gov/)'s [OWL](https://www.w3.org/OWL/) release archive | the version that the manifest pins, such as `26.09d` |
@@ -24,16 +19,31 @@ python -m embedding_model sources fetch --source ncit obo  # some of them
 | [NHANES](#nhanes) | a US health survey's variables: their questions and value labels | the variable-list and codebook pages | their current state, kept after the first fetch |
 | [PhenX](#phenx) | standard study measures' variables, and their mappings to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | the database export | the latest export, kept after the first fetch; its release must match the manifest's pin, such as `Ver 49.0` |
 
+`sources fetch` writes each source's tables to a folder of its own, and
+keeps its downloads beside them.
+[What `sources fetch` writes](#what-sources-fetch-writes) lists them.
+[Details](#details) links the sources' licenses, and gives each source's
+files and tables.
+
+[design_decisions.md](design_decisions.md#sources) gives the reasons for the
+fetch's rules.
+
+## Running `sources fetch`
+
+```
+python -m embedding_model sources fetch                    # every source
+python -m embedding_model sources fetch --source ncit obo  # some of them
+```
+
 A source that cannot be fetched is reported, and the other sources are still
 fetched. LOINC, for one, needs a loinc.org account: without its credentials or
 a zip placed by hand, it cannot be fetched (see [LOINC](#loinc)). The command
 then exits with status 1, so a script can tell that a source is missing.
 
 The manifest holds the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of every file read, and a new fetch is
-compared with it. [design_decisions.md](design_decisions.md#sources) gives the
-reasons for the fetch's rules.
+compared with it.
 
-## What a fetch writes
+## What `sources fetch` writes
 
 `sources fetch` writes each source's tables to
 `embedding_model/inputs/sources/<source>/`, and its downloads to
@@ -95,12 +105,14 @@ it.
 [Manifests](manifests.md) says how, and how to make a new version with
 `sources fetch --update-manifest`.
 
-## Licenses and references
+## Details
+
+### Licenses and references
 
 [licenses.md](licenses.md) gives each source's license or terms, and its
 reference. It also lists the fields that mark single items as restricted.
 
-## NCIt
+### NCIt
 
 The [NCI Thesaurus](https://evsexplore.semantics.cancer.gov/evsexplore/welcome) is read from its [OWL](https://www.w3.org/OWL/) release in
 [EVS's archive](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/), such as
@@ -137,7 +149,7 @@ file of the same release is read with it.
 
 [licenses.md](licenses.md#ncit) gives its license and reference.
 
-## Ontologies
+### Ontologies
 
 Seven [OBO Foundry](https://obofoundry.org/) ontologies are read. Ontologies reuse each other's terms: HP,
 for example, uses Uberon's terms for body parts. Only each ontology's own terms
@@ -156,7 +168,7 @@ Obsolete terms are kept, with the terms that replace them. Each synonym
 keeps its scope, such as `EXACT` or `RELATED`, and its types, such as
 abbreviation.
 
-### Files
+#### Files
 
 | ontology | file read |
 |---|---|
@@ -181,7 +193,7 @@ for example by adding `.old` to their names.
 
 [licenses.md](licenses.md#ontologies) gives its license and reference.
 
-## LOINC
+### LOINC
 
 LOINC's release zip needs a free loinc.org account. There are two ways to
 get it:
@@ -222,7 +234,7 @@ writes the new release's MD5 into it.
 
 [licenses.md](licenses.md#loinc) gives its license and reference.
 
-## CDISC
+### CDISC
 
 CDISC's [controlled terminology](https://www.cdisc.org/standards/terminology/controlled-terminology) is read as
 [NCI EVS publishes it](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc), in four
@@ -257,7 +269,7 @@ has its own date, so a package without a new release keeps its pin.
 
 [licenses.md](licenses.md#cdisc) gives its license and reference.
 
-## NIH CDE
+### NIH CDE
 
 The [NIH Common Data Elements Repository](https://cde.nlm.nih.gov/) serves only its current state. The
 fetch uses the export that `ai_harmonization.cde` uses, with retired elements
@@ -295,7 +307,7 @@ differs from the committed manifest is a new version, as
 
 [licenses.md](licenses.md#nih-cde) gives its license and reference.
 
-## caDSR
+### caDSR
 
 The [Cancer Data Standards Registry and Repository](https://cadsr.cancer.gov/) publishes a daily snapshot
 of its data elements, as a zip of XML files, such as
@@ -322,7 +334,7 @@ version, as [Making a new version](manifests.md#making-a-new-version) says.
 
 [licenses.md](licenses.md#cadsr) gives its license and reference.
 
-## NHANES
+### NHANES
 
 The [National Health and Nutrition Examination Survey](https://wwwn.cdc.gov/nchs/nhanes/) has no downloadable
 variable list. So the fetch reads its web pages: one variable-list page per
@@ -354,7 +366,7 @@ A fetch that differs from the committed manifest is a new version, as
 
 [licenses.md](licenses.md#nhanes) gives its license and reference.
 
-## PhenX
+### PhenX
 
 [PhenX](https://www.phenxtoolkit.org/)'s database export holds its protocols, their variables and their
 availability. It also maps each variable to [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables of real studies.

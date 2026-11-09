@@ -101,7 +101,7 @@ format. Scoring needs ranks and metrics.
 **Described in:**
 [manifests.md](manifests.md#the-committed-manifest-and-the-builds-own),
 [manifests.md](manifests.md#making-a-new-version) and
-[sources.md](sources.md#what-a-fetch-writes).
+[sources.md](sources.md#what-sources-fetch-writes).
 
 **Context.** The repository holds no data from the benchmarks or the sources.
 Much of that data is third-party text under its own license, as
@@ -157,7 +157,7 @@ check that:
 
 ### Downloads are kept for later builds
 
-**Described in:** [sources.md](sources.md#what-a-fetch-writes) and
+**Described in:** [sources.md](sources.md#what-sources-fetch-writes) and
 [manifests.md](manifests.md#making-a-new-version).
 
 **Context.** Each benchmark build and each source fetch downloads its inputs
@@ -276,7 +276,7 @@ files by `sha256`. A step that reads a file checks its `sha256`.
 ### A benchmark is two files: mappings and targets
 
 **Described in:**
-[benchmarks.md](benchmarks.md#what-a-benchmark-holds).
+[benchmarks.md](benchmarks.md#what-benchmarks-build-writes).
 
 **Context.** Harmonizing a real study means searching a whole data model. A
 source variable has a few expected targets among many properties. In the TOPMed
@@ -547,7 +547,7 @@ check that:
 
 ### Models are compared in one text format
 
-**Described in:** [scoring.md](scoring.md#running-score).
+**Described in:** [scoring.md](scoring.md#text-formats).
 
 **Context.** A format writes a source variable or a target as one text, such
 as `compact` or `name_description`. This pipeline's models are trained in
@@ -581,7 +581,7 @@ check that:
 
 ### A source variable's text leaves its node out
 
-**Described in:** [scoring.md](scoring.md#running-score).
+**Described in:** [scoring.md](scoring.md#text-formats).
 
 **Context.** `score` writes each source variable as a text for the model. A
 TOPMed source variable comes from a table of a
@@ -2410,6 +2410,12 @@ that does not exist is refused.
   config. The run's `config.yaml` holds the final values.
 - Good, because argparse reads a default that is text by the setting's type.
   So `1e-3` in a config becomes a number.
+- Good, because the sections follow the parts that the trainer of
+  [sentence-transformers](https://sbert.net/docs/sentence_transformer/training_overview.html)
+  takes: the data, the model, the loss and the training arguments.
+  Hugging Face's transformers also keeps a model's config, saved with its
+  weights, apart from the `TrainingArguments` that only the trainer reads. So the model's
+  shape and the training's settings never mix.
 - Good, because each architecture's settings have a section of their own.
   So a static model's config cannot carry BERT's by mistake.
 - Bad, because the flags have no sections, so each name must be unique

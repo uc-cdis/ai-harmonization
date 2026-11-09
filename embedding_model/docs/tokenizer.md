@@ -4,12 +4,68 @@ A tokenizer cuts a text into tokens: words, pieces of words and punctuation
 marks. Each token in its vocabulary has a number, the token's id. `tokenizer
 train` learns the vocabulary from a [corpus](corpus.md)'s training pairs, by
 [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
-It uses Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers) library:
+It uses Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers) library.
+
+`tokenizer train` writes the tokenizer and its manifest to the tokenizer's
+folder. [What `tokenizer train` writes](#what-tokenizer-train-writes)
+lists them. [Details](#details) describes how a tokenizer cuts a text and
+learns its vocabulary, and its settings, diagnostics and name.
+
+[design_decisions.md](design_decisions.md#tokenizer) gives the reasons for the
+tokenizer's settings.
+
+## Running `tokenizer train`
 
 ```
 python -m embedding_model tokenizer train --corpus all-sources                # 16,000 tokens: all-sources-16k
 python -m embedding_model tokenizer train --corpus example --vocab-size 8000  # a small corpus: example-8k
 ```
+
+The corpus's pairs must have the checksum that the corpus's manifest holds.
+Otherwise the training stops, and asks for the corpus to be built again.
+
+## What `tokenizer train` writes
+
+`tokenizer train` writes to `embedding_model/inputs/tokenizers/<name>/`, or
+under the folder that `--inputs` names. It writes the folder whole, so a
+failed training leaves the previous tokenizer as it was; see
+[Inputs and outputs](../README.md#inputs-and-outputs).
+
+```
+tokenizers/<name>/
+    tokenizer.json    the tokenizer's rules and its vocabulary
+    manifest.json     the tokenizer's manifest
+```
+
+### `tokenizer.json`
+
+The tokenizer's rules and its vocabulary, in one file. Hugging Face
+[`tokenizers`](https://huggingface.co/docs/tokenizers/v0.23.2/en/quicktour) reads it, with `Tokenizer.from_file("tokenizer.json")`, and runs
+its own code for each rule that the file names. The file holds:
+
+| field | what it holds | where it comes from |
+|---|---|---|
+| `normalizer` | [step 1](#step-1-normalize): BERT's tokenizer: cleaning, NFD, lowercase, no accents | the code, fixed |
+| `pre_tokenizer` | [step 2](#step-2-split): `BertPreTokenizer` | the code, fixed |
+| `model` | [step 3](#step-3-cut-into-tokens): BPE's tokens and merges | learned from the training texts |
+| `added_tokens` | the [special tokens](#special-tokens) | the code, fixed |
+
+### `manifest.json`
+
+The tokenizer's manifest, with the fields that
+[manifests.md](manifests.md#its-fields) lists:
+
+- `files`: `tokenizer.json`, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4);
+- `sources`: the corpus, with its kept pairs' checksums;
+- `settings`: the vocabulary size asked for, the minimum frequency, and the
+  version of `tokenizers`, since the bytes of `tokenizer.json` depend on it.
+  `tokenizer.json` itself holds the rules;
+- `counts`: the training texts, the tokens learned, and the
+  [diagnostics](#diagnostics).
+
+## Details
+
+### What a tokenizer does
 
 The tokenizer gives the [model](../README.md#how-the-model-works) one id per
 token, and the model sees only these ids. Each token of the vocabulary has its
@@ -27,12 +83,7 @@ The first two texts get the same ids, so the model cannot tell them apart.
 The last one is cut into the same two tokens when `bodyweight` is not a token
 itself, so it gets the same ids too.
 
-[design_decisions.md](design_decisions.md#tokenizer) gives the reasons for the
-tokenizer's settings.
-
-## What a tokenizer does
-
-It cuts a text into tokens in three steps:
+A tokenizer cuts a text into tokens in three steps:
 
 | step | what it does | example |
 |---|---|---|
@@ -50,9 +101,9 @@ The same rules run at two times:
 
 So a text that the model reads later is normalised and split exactly as the
 training texts were. The section
-[What a tokenizer holds](#what-a-tokenizer-holds) has more details.
+[What `tokenizer train` writes](#what-tokenizer-train-writes) has more details.
 
-### Step 1: normalize
+#### Step 1: normalize
 
 The tokenizer first removes control, format and private-use characters.
 They hold no text, and nobody can see them:
@@ -83,7 +134,7 @@ Lowercasing makes `BMI`, `Bmi` and `bmi` one text. Variable names come in
 any case, and their case carries no meaning. So the three get the same
 tokens, and the model gives them the same embedding.
 
-### Step 2: split
+#### Step 2: split
 
 The split cuts a text into pieces, at whitespace and at punctuation. BPE then
 cuts each piece on its own, so a token never runs across a space or a
@@ -96,12 +147,13 @@ punctuation mark. For example:
 
 Both texts get the tokens `subject` and `id`. The `_` is a token of its own.
 
-### Step 3: cut into tokens
+#### Step 3: cut into tokens
 
-BPE cuts each piece into tokens of the vocabulary. The next section explains
-how BPE learns those tokens.
+BPE cuts each piece into tokens of the vocabulary.
+[How BPE learns its vocabulary](#how-bpe-learns-its-vocabulary) explains how
+BPE learns those tokens.
 
-## How BPE learns its vocabulary
+### How BPE learns its vocabulary
 
 [BPE](https://huggingface.co/learn/llm-course/chapter6/5) starts from the single characters of the training texts. It then finds
 the two adjacent tokens that occur together most often, and merges them into
@@ -111,7 +163,7 @@ still represented. Two tokens that occur together fewer times than the
 minimum frequency are never merged. The minimum frequency is 2 by default, and
 `--min-frequency` sets another.
 
-## The vocabulary size
+### The vocabulary size
 
 The vocabulary size is the main setting of a tokenizer:
 
@@ -130,7 +182,7 @@ MRR@10 on the validation pairs. Each run writes it in its
 A small corpus can give fewer tokens than asked for. `tokenizer train` then
 prints a note, and the manifest holds the size that was reached.
 
-## Special tokens
+### Special tokens
 
 Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
 `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them:
@@ -141,13 +193,13 @@ four: `[PAD]`, for one, fills a short text in a batch. A text that holds
 a special token's name, such as `[PAD]`, is read as that token, as in every
 Hugging Face tokenizer.
 
-## What it learns from
+### What it learns from
 
 The tokenizer learns from the corpus's **training pairs**: their distinct
 texts, the anchors first, then the positives, each once. A text counts once
 in all its spellings: `BMI` and `bmi` are one text.
 
-## Diagnostics
+### Diagnostics
 
 After training, `tokenizer train` checks how the tokenizer cuts its training
 texts. Here a word is a piece of [step 2](#step-2-split), so `SUBJECT_ID`
@@ -173,42 +225,7 @@ share of words split are the measures of [Rust et al. (2021)](https://doi.org/10
 > Natural Language Processing (Volume 1: Long Papers)*, 3118–3135.
 > https://doi.org/10.18653/v1/2021.acl-long.243
 
-## What a tokenizer holds
-
-`tokenizer train` writes to `embedding_model/inputs/tokenizers/<name>/`, or
-under the folder that `--inputs` names. It writes the folder whole, so a
-failed training leaves the previous tokenizer as it was; see
-[Inputs and outputs](../README.md#inputs-and-outputs).
-
-### `tokenizer.json`
-
-The tokenizer's rules and its vocabulary, in one file. Hugging Face
-[`tokenizers`](https://huggingface.co/docs/tokenizers/v0.23.2/en/quicktour) reads it, with `Tokenizer.from_file("tokenizer.json")`, and runs
-its own code for each rule that the file names. The file holds:
-
-| field | what it holds | where it comes from |
-|---|---|---|
-| `normalizer` | [step 1](#step-1-normalize): BERT's tokenizer: cleaning, NFD, lowercase, no accents | the code, fixed |
-| `pre_tokenizer` | [step 2](#step-2-split): `BertPreTokenizer` | the code, fixed |
-| `model` | [step 3](#step-3-cut-into-tokens): BPE's tokens and merges | learned from the training texts |
-| `added_tokens` | the [special tokens](#special-tokens) | the code, fixed |
-
-### `manifest.json`
-
-The tokenizer's manifest, with the fields that
-[manifests.md](manifests.md#its-fields) lists:
-
-- `files`: `tokenizer.json`, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4);
-- `sources`: the corpus, with its kept pairs' checksums;
-- `settings`: the vocabulary size asked for, the minimum frequency, and the
-  version of `tokenizers`, since the bytes of `tokenizer.json` depend on it.
-  `tokenizer.json` itself holds the rules;
-- `counts`: the training texts, the tokens learned, and the diagnostics.
-
-The corpus's pairs must have the checksum that the corpus's manifest holds.
-Otherwise the training stops, and asks for the corpus to be built again.
-
-## Names
+### Names
 
 A tokenizer's default name is its corpus's name and its vocabulary size, in
 thousands when it can be: `all-sources-16k`, `example-8k`, `example-12500`.

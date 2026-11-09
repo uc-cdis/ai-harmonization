@@ -1,12 +1,7 @@
 # Pairs
 
 The model learns from pairs of texts that mean the same thing. `pairs
-prepare` makes them from the [sources](sources.md) that `sources fetch` wrote:
-
-```
-python -m embedding_model pairs prepare                        # every source
-python -m embedding_model pairs prepare --source nhanes phenx  # some of them
-```
+prepare` makes them from the [sources](sources.md) that `sources fetch` wrote.
 
 A pair has two sides. Their names come from
 [sentence-transformers](https://sbert.net), the library that Hugging Face
@@ -19,7 +14,7 @@ maintains and that training uses:
 
 So the anchor plays the source variable of a mapping, and the positive plays
 its target. Both sides are written in `compact`, the format that scoring uses
-(see [scoring.md](scoring.md#running-score)). It writes a description and
+(see [scoring.md](scoring.md#text-formats)). It writes a description and
 values only when a side has them:
 
 ```
@@ -27,41 +22,38 @@ anchor:   SVG (string)
 positive: Saphenous Vein Graft (string): A vessel graft comprised of the saphenous vein.
 ```
 
+`pairs prepare` writes each source's pairs and their manifest to a folder of
+their own. [What `pairs prepare` writes](#what-pairs-prepare-writes) lists
+them. [Details](#details) describes how an item becomes pairs, the rules that
+every source shares, and each source's own rules.
+
 [design_decisions.md](design_decisions.md#pairs) gives the reasons for the
 rules below.
 
-## The shape: a star around each item
+## Running `pairs prepare`
 
-Each source is read into items: a concept, a term, a code, a data element or a
-variable. An item has one **canonical** text, the name that its source prefers,
-such as a thesaurus's preferred name or an ontology's label. Every other text
-of the item that means the same thing becomes one anchor. Its positive is the
-canonical, with the item's type, description and values. Each item is the
-centre of a star: each pair joins the canonical to one other text. For
-example, `BMI` and "Quetelet Index" are both anchors of the canonical "Body
-Mass Index". They are never paired with each other.
+```
+python -m embedding_model pairs prepare                        # every source
+python -m embedding_model pairs prepare --source nhanes phenx  # some of them
+```
 
-There are four kinds of pair:
+A source that is not fetched, or whose tables changed since its fetch, is
+reported. The message gives the `sources fetch` command to run. The other
+sources are still prepared, and the command then exits with status 1.
 
-| kind | anchor | positive |
-|---|---|---|
-| `name` | another text of the item | the canonical, its type and values |
-| `name_description` | another text of the item | the canonical, its type, description and values |
-| `description_description` | another description of the item, such as a second definition | the canonical, its type, its first description and values |
-| `name_to_description` | the canonical, for an item with no other text | the description alone, with the type and values |
-
-When the item has a description, each other text gives two pairs: a `name`
-pair and a `name_description` pair. Another description gives no pair when
-its [`text_key`](leakage.md#how-two-texts-match) equals the canonical's or the
-first description's.
-
-## What a preparation writes
+## What `pairs prepare` writes
 
 `pairs prepare` writes each source's pairs to
 `embedding_model/inputs/pairs/<source>/`, or under the folder that `--inputs`
 names. It writes the folder whole, so a failed preparation leaves the
 source's previous pairs as they were; see
 [Inputs and outputs](../README.md#inputs-and-outputs).
+
+```
+pairs/<source>/
+    pairs.parquet    one row per pair
+    manifest.json    the pairs' manifest
+```
 
 ### `pairs.parquet`
 
@@ -95,7 +87,7 @@ The pairs' manifest, with the fields that
   `content_sha256`;
 - `sources`: the fetch that the pairs come from, with its version and its
   tables' checksums;
-- `settings`: `format`, the [text format](scoring.md#running-score) that the
+- `settings`: `format`, the [text format](scoring.md#text-formats) that the
   pairs' texts are written in;
 - `counts`:
   - the items, and the items not open;
@@ -103,29 +95,56 @@ The pairs' manifest, with the fields that
   - the duplicates removed;
   - the [ambiguous names](#ambiguous-names), as `ambiguous_texts`.
 
-## The rules every source shares
+## Details
 
-The same rules apply to every source. The [next section](#each-source) lists
+### The shape: a star around each item
+
+Each source is read into items: a concept, a term, a code, a data element or a
+variable. An item has one **canonical** text, the name that its source prefers,
+such as a thesaurus's preferred name or an ontology's label. Every other text
+of the item that means the same thing becomes one anchor. Its positive is the
+canonical, with the item's type, description and values. Each item is the
+centre of a star: each pair joins the canonical to one other text. For
+example, `BMI` and "Quetelet Index" are both anchors of the canonical "Body
+Mass Index". They are never paired with each other.
+
+There are four kinds of pair:
+
+| kind | anchor | positive |
+|---|---|---|
+| `name` | another text of the item | the canonical, its type and values |
+| `name_description` | another text of the item | the canonical, its type, description and values |
+| `description_description` | another description of the item, such as a second definition | the canonical, its type, its first description and values |
+| `name_to_description` | the canonical, for an item with no other text | the description alone, with the type and values |
+
+When the item has a description, each other text gives two pairs: a `name`
+pair and a `name_description` pair. Another description gives no pair when
+its [`text_key`](leakage.md#how-two-texts-match) equals the canonical's or the
+first description's.
+
+### The rules every source shares
+
+The same rules apply to every source. [Each source](#each-source) lists
 the fields that each source uses for them.
 
-### Only open items
+#### Only open items
 
 An item is used only when its source's restriction field allows it. The
 source's tables mark this in their `open` column (see
 [Restricted items](licenses.md#restricted-items)).
 
-### The canonical
+#### The canonical
 
 The canonical is the source's own preferred field.
 
-### Texts of the same meaning
+#### Texts of the same meaning
 
 A text is an anchor only when its source marks it as the same thing as the
 canonical. So ontology synonyms that are only related, broader or narrower
 are left out. [LOINC](#loinc)'s related names are left out too. Each source's section
 lists the texts that it uses.
 
-### Names
+#### Names
 
 An anchor must be a name: it has two letters in a row. So ids and bare
 numbers, such as `9999901v3.0:9999902v1.0` or `535`, are not anchors.
@@ -138,7 +157,7 @@ example, `BODY WEIGHT` repeats the canonical `Body Weight`, so it is not used.
 But `body_weight` is an anchor, since the tokenizer reads its `_` as a token
 of its own.
 
-### Expansions and paraphrases
+#### Expansions and paraphrases
 
 Each pair has a `term_group`: `expansion` or `paraphrase`. Only the anchor's
 text decides it, so every kind of pair can have either group.
@@ -159,7 +178,7 @@ A question text is the wording that a form shows for an item. Question texts
 are anchors because studies often word their variables the same way. Each
 source's section names the fields that hold them.
 
-### Retired items
+#### Retired items
 
 Retired items are used too:
 
@@ -177,13 +196,13 @@ by their [`text_key`](leakage.md#how-two-texts-match). So a retired
 Draft items are used like current items. The `status` column keeps them
 apart, so a training run can leave them out.
 
-### Ambiguous names
+#### Ambiguous names
 
 A name can stand for several items, as `MS` stands for multiple sclerosis and
 for mitral stenosis. It is then an anchor of each of them. Each source's
 manifest counts such names, as `ambiguous_texts`.
 
-### Duplicates
+#### Duplicates
 
 Each item is read once, by its source's id. Two pairs are copies when the
 [tokenizer](tokenizer.md) normalises their texts to the same two texts. Only
@@ -202,7 +221,7 @@ two sources share is then kept only in the earlier source.
 `pairs prepare` prints how
 many pairs each source shares with an earlier source in the same run.
 
-### Values
+#### Values
 
 A positive's values are the item's own value list, in the source's order.
 Lists are never merged. Values are labels, such as "Female", not codes, such
@@ -224,7 +243,7 @@ a name.
 An item can have several lists, as an NCIt concept can. It then gives its
 pairs once for each distinct list.
 
-### Types
+#### Types
 
 A source's own type word is kept, such as `Value List`. When a
 source has none, the type is `string/encoded` for an item with values and
@@ -232,7 +251,7 @@ source has none, the type is `string/encoded` for an item with values and
 these same words. An anchor takes its item's type word, or `string` when
 there is none.
 
-### Cleaning
+#### Cleaning
 
 Every text is cleaned the same way:
 
@@ -288,7 +307,7 @@ Executive Order 14168 ...". [CDISC](#cdisc) copies NCIt's notices. A notice says
 nothing about the concept, so it is removed from a description. A description
 that was only a notice, as some retired NCIt concepts have, is dropped.
 
-## Each source
+### Each source
 
 Each source's section below has the same parts: the items, the canonical,
 the anchors, the description, the values and the status. A field, such as
@@ -307,7 +326,7 @@ does not name is read as current, and `pairs prepare` prints it.
 | [NHANES](#nhanes) | the codebook's English Text | the variable's name and labels | none | the value labels | none |
 | [PhenX](#phenx) | the variable's description | the variable's name, and mapped [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) variables | none | the value labels | none |
 
-### NCIt
+#### NCIt
 
 - **Items:** each concept, a row of `concepts`.
 - **Canonical:** `preferred_name`.
@@ -336,7 +355,7 @@ does not name is read as current, and `pairs prepare` prints it.
   drafts. The `replacements` table names a retired concept's replacement:
   the concept that a merge record of the history file names.
 
-### Ontologies
+#### Ontologies
 
 - **Items:** each term of each [ontology](sources.md#ontologies), a row of
   `terms`.
@@ -351,7 +370,7 @@ does not name is read as current, and `pairs prepare` prints it.
   marks its label, synonyms and definitions, and it is removed. `replaced_by`
   names its replacement.
 
-### LOINC
+#### LOINC
 
 - **Items:** each code, a row of `codes`.
 - **Canonical:** `LONG_COMMON_NAME`.
@@ -368,7 +387,7 @@ does not name is read as current, and `pairs prepare` prints it.
   retired code's replacement. A deprecated code's names can start with the
   word "Deprecated", and it is removed.
 
-### CDISC
+#### CDISC
 
 - **Items:** each term and each codelist, from the rows of `terms`. The file
   has a row for each term in each codelist, so a term in several codelists
@@ -391,7 +410,7 @@ does not name is read as current, and `pairs prepare` prints it.
   the file's order. A term has no values.
 - **Status:** every item is current.
 
-### NIH CDE
+#### NIH CDE
 
 - **Items:** each data element, a row of `elements`.
 - **Canonical:** the first `designation` whose `tags` mark a name.
@@ -412,7 +431,7 @@ does not name is read as current, and `pairs prepare` prints it.
   type is the element's `datatype`.
 - **Status:** from `registration_status`. `Retired` elements are retired.
 
-### caDSR
+#### caDSR
 
 - **Items:** each data element, a row of `elements`.
 - **Canonical:** `long_name`. Elements of old software models end it with a
@@ -441,7 +460,7 @@ does not name is read as current, and `pairs prepare` prints it.
   NEW` and `DRAFT MOD` are drafts. `RELEASED` and `RELEASED-NON-CMPLNT` are
   current.
 
-### NHANES
+#### NHANES
 
 - **Items:** each variable of each data file: a `name` in a `data_file` of a
   `cycle`.
@@ -456,7 +475,7 @@ does not name is read as current, and `pairs prepare` prints it.
   the codebook's rows, not a value.
 - **Status:** every item is current.
 
-### PhenX
+#### PhenX
 
 - **Items:** the `variables` whose protocol is visible (`protocol_visible`)
   and available (`open`). A hidden protocol is an older version of a visible

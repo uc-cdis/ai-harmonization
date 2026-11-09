@@ -11,6 +11,17 @@ properties:
 Both are built on your machine from their published inputs. Nothing processed
 is redistributed.
 
+`benchmarks build` writes each benchmark's two files and its manifest to a
+folder of its own.
+[What `benchmarks build` writes](#what-benchmarks-build-writes) lists them.
+[Details](#details) describes how each benchmark is built: its targets, and
+the targets that each variable maps to.
+
+[design_decisions.md](design_decisions.md#benchmarks) gives the reasons for
+the benchmarks' layout and rules.
+
+## Running `benchmarks build`
+
 ```
 python -m embedding_model benchmarks build --topmed
 python -m embedding_model benchmarks build --gdc
@@ -31,10 +42,7 @@ The command then exits with status 1. To build a benchmark from updated sources,
 [Making a new version](manifests.md#making-a-new-version). An updated source
 can be a newer commit of the TOPMed documentation, or a new GDC dictionary.
 
-[design_decisions.md](design_decisions.md#benchmarks) gives the reasons for
-the benchmarks' layout and rules.
-
-## What a benchmark holds
+## What `benchmarks build` writes
 
 `benchmarks build` writes to `embedding_model/inputs/benchmarks/<benchmark>/`,
 or under the folder that `--inputs` names. It writes the folder whole. A
@@ -53,7 +61,7 @@ benchmarks/
 Both benchmarks have the same columns. A column that a benchmark has no data
 for is left empty. Both files keep every value that a variable or property
 has. A text format that shows values keeps the first 12; see
-[scoring.md](scoring.md#running-score).
+[scoring.md](scoring.md#text-formats).
 
 A build checks the two files before it writes them:
 
@@ -106,7 +114,7 @@ experts cited, because their text comes from that release.
 One row per target property. Every source variable is ranked against every
 target of this file, not only against its expected targets. A format turns
 each row into the text that the model reads on the target side.
-[scoring.md](scoring.md#running-score) lists the formats.
+[scoring.md](scoring.md#text-formats) lists the formats.
 
 | column | what it holds | TOPMed | GDC |
 |---|---|---|---|
@@ -142,7 +150,9 @@ GDC-SM ground truth's [Zenodo record](https://doi.org/10.5281/zenodo.14963588).
 Each build is checked against it. [Manifests](manifests.md) says how, and how
 to make a new version.
 
-## TOPMed
+## Details
+
+### TOPMed
 
 [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study variables mapped by the experts of the [TOPMed](https://topmed.nhlbi.nih.gov/) Data Coordinating
 Center to its harmonized variables.
@@ -159,7 +169,7 @@ description and values come from that release's data dictionary. dbGaP
 publishes data dictionaries without controlled access. Only the cited tables
 are downloaded.
 
-### How the targets are composed
+#### How the targets are composed
 
 The documentation keeps one file per harmonized variable, in a folder per
 dataset: `atherosclerosis/cac_score_1.json`. The harmonized data has a column
@@ -174,7 +184,7 @@ column is a target, written `node.property` with the dataset as the node:
   at measurement of cac_score_1 (years)", as the [BioData Catalyst](https://biodatacatalyst.nhlbi.nih.gov/) data model
   describes the same properties.
 
-### Which target a variable maps to
+#### Which target a variable maps to
 
 The documentation lists a unit's variables without saying which is the
 phenotype and which is the age. Its README says only that there is "at least
@@ -203,7 +213,7 @@ The rule reads only the description. The [corrections](#corrections) fix the
 mappings that it gets wrong. They also leave out the variables that do not
 carry the target's value.
 
-### Corrections
+#### Corrections
 
 The documentation cites every variable that a unit's function reads. Some of
 them do not carry the target's value. A consent group selects the subjects,
@@ -240,7 +250,7 @@ so it is not a row.
 A correction that does not match the documentation fails the build, and the
 build names it.
 
-### One row per variable
+#### One row per variable
 
 - A variable that several harmonized variables use appears once, with all
   its targets. Many rows have more than one target.
@@ -263,7 +273,7 @@ against it. The build names each correction that does not match.
 
 [licenses.md](licenses.md#topmed) gives its license and reference.
 
-## GDC
+### GDC
 
 Variables from the supplementary tables of cancer papers, mapped by experts
 to the [GDC data dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/).
@@ -307,7 +317,7 @@ Each variable's study is the [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study of
 The patients in each paper's table are all cases of that GDC project. This was
 checked through the GDC API, by looking up the tables' case ids.
 
-### The targets
+#### The targets
 
 Every data property of the dictionary is a target, as `node.property`, with its
 type, description and values. `SimpleDataModel.from_gdc_model` reads the
@@ -328,7 +338,7 @@ refers to shared definitions by `$ref`. The build resolves the references as
 gdcdictionary's own loader does. A definition is merged over the node's own
 keys, so where both hold a key, the definition's wins.
 
-### Which targets a variable maps to
+#### Which targets a variable maps to
 
 The ground truth names a property without its node: `race`, not
 `demographic.race`. The targets, though, are `node.property`. Where two nodes

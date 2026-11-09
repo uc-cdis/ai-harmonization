@@ -79,7 +79,7 @@ has a mark:
 | a name's words, with a description on the other side | `>=` | a name of two words or more |
 
 The marks show in `dropped.parquet`, the corpus's file of dropped pairs (see
-[What a corpus holds](corpus.md#what-a-corpus-holds)). There, the column `fields` names
+[What `corpus build` writes](corpus.md#what-corpus-build-writes)). There, the column `fields` names
 each pair's two matches, the source's first. Each match reads as follows:
 
 | in `fields` | it reads |
@@ -179,5 +179,5 @@ counts the text as shared vocabulary.
 
 Each dropped pair has a row in `dropped.parquet`, with its finding. The
 corpus's manifest counts the findings and the shared vocabulary.
-[What a corpus holds](corpus.md#what-a-corpus-holds) lists the columns and the
+[What `corpus build` writes](corpus.md#what-corpus-build-writes) lists the columns and the
 counts.

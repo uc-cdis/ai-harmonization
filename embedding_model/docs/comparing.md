@@ -3,7 +3,10 @@
 `python -m embedding_model compare` compares models that are already scored.
 It reads the scores that [`score`](scoring.md) wrote for each model. It
 writes a table of metrics, the differences between the models, and four
-figures. [What a comparison writes](#what-a-comparison-writes) lists them.
+figures. [What `compare` writes](#what-compare-writes) lists them.
+[Details](#details) explains what each figure and table shows, and how it is
+computed.
+
 [design_decisions.md](design_decisions.md#comparing) gives the reasons for
 the choices below.
 
@@ -28,7 +31,7 @@ python -m embedding_model compare --name example \
 | `--model` | one or more models, up to 8: a Hugging Face model id, a model folder or a run's folder. |
 | `--reference` | one of the models: the reference, which each other model is measured against by paired tests. Without it, `compare` gives each model's metrics, without tests. |
 | `--benchmark` | one or more benchmarks that every model was scored on. A benchmark named twice is compared once. |
-| `--format` | the [text format](scoring.md#running-score) of the scores, `compact` by default. |
+| `--format` | the [text format](scoring.md#text-formats) of the scores, `compact` by default. |
 
 `compare` stops, and names the `score` command to run, when a model:
 
@@ -46,7 +49,7 @@ It also stops when:
 - two models' scores list other source variables, or list them in another
   order. Then the paired tests cannot match their variables.
 
-## What a comparison writes
+## What `compare` writes
 
 `compare` writes to `embedding_model/outputs/comparisons/<name>/`, or under
 the folder that `--outputs` names. It writes the folder whole, so a
@@ -115,7 +118,9 @@ It also has five fields of its own:
 - `libraries`: the versions of Python and of the libraries that compared
   the models.
 
-## What it shows
+## Details
+
+### What it shows
 
 | in the figure or table | what it shows | how it is computed |
 |---|---|---|
@@ -132,7 +137,7 @@ It also has five fields of its own:
 | `metrics.csv` | each model's metrics on each benchmark, with their intervals | each metric as `score` reports it, with its interval, as for an error bar |
 | `differences.csv` | each other model minus the reference: the difference, its interval and p | accuracy@k: Newcombe's interval for paired shares, and McNemar's exact test. MRR: the t interval of the source variables' differences, and the paired t-test |
 
-### Where the numbers come from
+#### Where the numbers come from
 
 Every metric is a fraction from 0 to 1, as `score` reports it.
 
@@ -157,7 +162,7 @@ nDCG@10 and the median rank are in `metrics.csv` as plain numbers, as `score`
 reports them. They have no interval and no test, and the figures do not show
 them. See [scoring.md](scoring.md#the-metrics) for each metric.
 
-### Intervals and tests
+#### Intervals and tests
 
 In `accuracy_and_mrr`, two error bars can overlap while a bracket still marks
 a difference. The design entries for [accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test) and for
@@ -174,7 +179,7 @@ reverse. The design entry for
 [accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test)
 says why.
 
-### Colors
+#### Colors
 
 Each model keeps one color in every figure: the color of its place in
 `--model`. So models given in the same order keep their colors from one

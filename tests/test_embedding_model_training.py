@@ -978,6 +978,22 @@ class TestBert:
         model = bert.build(settings, trained_tokenizer(inputs))
         assert model.model_card_data.local_files_only
 
+    def test_padding_leaves_a_texts_embedding_unchanged(self, inputs):
+        """A text's embedding is the same alone and beside a longer text, which pads it.
+
+        The attention mask keeps the padding out of the attention and out of
+        the mean of the token vectors.
+        """
+        settings = bert.Settings(**BERT_SETTINGS)
+        model = bert.build(settings, trained_tokenizer(inputs))
+        short = "Body weight"
+        longer = (
+            "Body weight in kilograms, measured at the visit after an overnight fast"
+        )
+        alone = model.encode([short], device="cpu")[0]
+        padded = model.encode([short, longer], device="cpu")[0]
+        assert padded.tolist() == pytest.approx(alone.tolist(), abs=1e-6)
+
     def test_each_run_sets_the_tokenizers_threads(
         self, inputs, config, bert_config, tmp_path, monkeypatch
     ):

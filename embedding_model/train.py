@@ -753,11 +753,87 @@ def run_manifest(
     }
 
 
+def setting_values(settings):
+    """Every setting's value, by its name, as the built settings hold it.
+
+    The training settings come from ``TrainingArguments.to_dict``, as
+    config.yaml records them. So a value that the trainer turns into another
+    form, such as ``report_to: wandb`` into a list, compares in that form.
+
+    Args:
+        settings (dict): The settings, by the name of their class, from
+            apply_config.
+
+    Returns:
+        dict: Each setting's value, by the setting's name.
+    """
+    return {
+        **{
+            name: value
+            for class_name, class_settings in settings.items()
+            if class_name != "training"
+            for name, value in asdict(class_settings).items()
+        },
+        **settings["training"].to_dict(),
+    }
+
+
+def check_earlier_run(destination, settings, seed, run_name):
+    """Refuse to replace an earlier run of the same name that other settings trained.
+
+    A run is named after its config and its seed, so a flag or a changed
+    config keeps its name. The earlier run's config.yaml holds the settings
+    that trained it. A run with the same settings replaces it, as a run
+    trained again does.
+
+    Args:
+        destination (Path): The run's folder.
+        settings (dict): The new run's settings, by the name of their class,
+            from apply_config.
+        seed (int): The run's seed.
+        run_name (str): The run's name.
+
+    Raises:
+        ValueError: If the folder holds a run whose settings differ from
+            the new run's, or whose config.yaml cannot be read.
+    """
+    if not destination.exists():
+        return
+    ways_on = (
+        f"to train this run, delete {destination}, or save the changed config"
+        " under a new name"
+    )
+    try:
+        earlier_values, _ = read_config(destination / "config.yaml", seed, [], run_name)
+        earlier = setting_values(apply_config(earlier_values))
+    except Exception as error:
+        raise ValueError(
+            f"run {run_name} exists, and its config.yaml cannot be read"
+            f" ({type(error).__name__}: {error}); {ways_on}"
+        ) from error
+    now = setting_values(settings)
+    changed = [
+        name
+        for name in sorted(set(earlier) | set(now))
+        if earlier.get(name) != now.get(name)
+    ]
+    if changed:
+        shown = ", ".join(
+            f"{name} {earlier.get(name)}, here {now.get(name)}" for name in changed[:3]
+        )
+        more = f", and {len(changed) - 3} more" if len(changed) > 3 else ""
+        raise ValueError(
+            f"run {run_name} exists, trained with other settings: {shown}{more};"
+            f" {ways_on}"
+        )
+
+
 def train(config, seed, overrides, inputs, outputs):
     """Train one model, and write its run's folder.
 
     The run is written to a staging folder first. It replaces the previous run
-    of that name only once it is complete.
+    of that name only once it is complete, and only if the same settings
+    trained it.
 
     Args:
         config (Path): The config, a YAML file.
@@ -768,8 +844,9 @@ def train(config, seed, overrides, inputs, outputs):
             ``runs/<config>_s<seed>/``.
 
     Returns:
-        int: 0 if the run was written, 1 if the seed, the config, the
-            corpus, the tokenizer or the GPUs stop it.
+        int: 0 if the run was written, 1 if the seed, the config, an
+            earlier run of that name, the corpus, the tokenizer or the GPUs
+            stop it.
 
     Raises:
         Exception: If training fails or the run cannot be written. The
@@ -785,6 +862,7 @@ def train(config, seed, overrides, inputs, outputs):
         print(f"--seed must be 0 or more, not {seed}", file=sys.stderr)
         return 1
     first_gpu_only()
+    destination = Path(outputs) / RUNS / run_name
     try:
         values, training_given = read_config(config, seed, overrides, run_name)
         training_pairs, validation_pairs, corpus_manifest = read_splits(
@@ -792,6 +870,7 @@ def train(config, seed, overrides, inputs, outputs):
         )
         tokenizer, tokenizer_manifest = read_tokenizer(inputs, values["tokenizer"])
         settings = apply_config(values)
+        check_earlier_run(destination, settings, seed, run_name)
     except Exception as error:
         print(f"{type(error).__name__}: {error}", file=sys.stderr)
         return 1
@@ -811,7 +890,6 @@ def train(config, seed, overrides, inputs, outputs):
     # Read before training, so that a change to the checkout during a long run
     # does not change the commit that the run writes.
     commit = code_commit()
-    destination = Path(outputs) / RUNS / run_name
     with staged(destination) as built:
         training.output_dir = str(built / "trainer")
         model, trainer, evaluated, seconds = fit(

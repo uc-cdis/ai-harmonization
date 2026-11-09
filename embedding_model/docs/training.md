@@ -58,6 +58,15 @@ is not a setting is refused. A flag for the other architecture's settings is
 refused too. A flag must be written in full, such as `--learning_rate`, not
 `--learning`. A config with an unknown section or setting is refused too.
 
+A run is named after its config and its seed, so a flag keeps the run's name.
+A run replaces an earlier run of the same name only when the same settings
+trained it. Otherwise `train` stops before it trains, and names the settings
+that differ. The message gives the run's full path:
+
+```
+ValueError: run my_run_s1 exists, trained with other settings: learning_rate 0.2, here 0.01; to train this run, delete .../embedding_model/outputs/runs/my_run_s1, or save the changed config under a new name
+```
+
 ## What `train` writes
 
 `train` writes to `embedding_model/outputs/runs/<run>/`, or under the folder

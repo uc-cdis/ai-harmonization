@@ -611,6 +611,57 @@ class TestTrain:
             == 1
         )
 
+    def test_a_run_with_other_settings_keeps_the_earlier_run(
+        self, inputs, config, tmp_path, monkeypatch, capsys
+    ):
+        """A flag keeps the run's name, so --learning_rate 0.05 is refused before it trains.
+
+        The earlier run trained at the static architecture's rate, 0.2.
+        """
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        manifest = outputs / train.RUNS / "abcd-run_s0" / "manifest.json"
+        earlier = manifest.read_text()
+        monkeypatch.setattr(train, "fit", lambda *args: pytest.fail("the run trained"))
+        assert train.train(config, 0, ["--learning_rate", "0.05"], inputs, outputs) == 1
+        error = capsys.readouterr().err
+        assert "run abcd-run_s0 exists, trained with other settings" in error
+        assert "learning_rate 0.2, here 0.05" in error
+        assert manifest.read_text() == earlier
+
+    def test_a_run_with_the_same_settings_replaces_the_earlier_run(
+        self, inputs, tmp_path, monkeypatch
+    ):
+        """A run trained again with the same settings trains, and replaces the earlier one.
+
+        config.yaml records report_to "none" as the list that the trainer
+        makes of it, [], and the two still compare equal.
+        """
+        path = tmp_path / "abcd-run.yaml"
+        config = {**CONFIG, "training": {**CONFIG["training"], "report_to": "none"}}
+        path.write_text(yaml.safe_dump(config))
+        outputs = tmp_path / "outputs"
+        assert train.train(path, 0, [], inputs, outputs) == 0
+        recorded = outputs / train.RUNS / "abcd-run_s0" / "config.yaml"
+        assert yaml.safe_load(recorded.read_text())["training"]["report_to"] == []
+        trained = []
+        fit = train.fit
+        monkeypatch.setattr(
+            train, "fit", lambda *args: trained.append(True) or fit(*args)
+        )
+        assert train.train(path, 0, [], inputs, outputs) == 0
+        assert trained == [True]
+
+    def test_an_earlier_run_whose_config_cannot_be_read_is_kept(
+        self, inputs, config, tmp_path, capsys
+    ):
+        """An earlier run of the same name whose config.yaml is broken is not replaced."""
+        outputs = tmp_path / "outputs"
+        assert train.train(config, 0, [], inputs, outputs) == 0
+        (outputs / train.RUNS / "abcd-run_s0" / "config.yaml").write_text("abcd: [")
+        assert train.train(config, 0, [], inputs, outputs) == 1
+        assert "its config.yaml cannot be read" in capsys.readouterr().err
+
     def test_the_last_evaluation_is_not_repeated(
         self, inputs, config, tmp_path, monkeypatch
     ):

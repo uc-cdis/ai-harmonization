@@ -2490,6 +2490,58 @@ check that:
 - a run's `config.yaml` holds its architecture's settings in the model
   section, and reads back as the settings that trained it.
 
+### A run of the same name with other settings is refused
+
+**Described in:** [training.md](training.md#running-train).
+
+**Context.** Every step's new folder replaces an earlier one of the same
+name. `corpus build` and `compare` take that name on the command line. A run
+takes it from its config's file and its seed. So a flag, or an edit to the
+config, changes a run's settings but not its name. A run's `config.yaml`
+records the settings that trained it, as `TrainingArguments.to_dict` gives
+them.
+
+**Decision.** Before it trains, a run compares its settings with the
+`config.yaml` of an earlier run of the same name. With the same settings,
+the new run replaces the earlier one. With other settings, or a
+`config.yaml` that cannot be read, the run stops and names the settings that
+differ.
+
+**Consequences.**
+
+- Good, because a run with a flag cannot replace a run that other settings
+  trained, without a word.
+- Good, because the check comes before training, so it costs no training
+  time.
+- Good, because a run trained again with the same settings replaces the
+  earlier one, as a build of the same name does in every step.
+- Good, because the settings are compared as built, in the form that
+  `config.yaml` records. So `report_to: wandb`, which the trainer turns into
+  a list, still matches.
+- Bad, because any changed setting stops the run, even one that leaves the
+  model the same, such as `logging_steps`.
+
+**Alternatives considered.**
+
+- Only the docs say that a flag keeps the name. A run trained with a flag
+  would still replace the earlier one, without a word.
+- A run named after its flags, such as `my_run_s1_learning_rate0.01`. Names
+  would grow long and depend on the flags' order, unlike every other name of
+  the pipeline.
+- An option such as `--overwrite`, without which any earlier run is refused.
+  A run trained again with the same settings would need it too, unlike the
+  other steps' builds.
+
+**Confirmation.** The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- a run with other settings stops before it trains, and keeps the earlier
+  run;
+- a run with the same settings trains and replaces the earlier one, though
+  `config.yaml` records `report_to` as a list;
+- an earlier run whose `config.yaml` cannot be read is kept.
+
 ### A run refuses the trainer's prompts and router_mapping
 
 **Described in:** [training.md](training.md#the-config).

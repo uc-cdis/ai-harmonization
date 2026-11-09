@@ -361,13 +361,7 @@ class TestConfig:
             train.read_config(path, 0)
 
     def test_a_bert_config_reads_its_settings_from_the_model_section(self, tmp_path):
-        """A BERT run reads its settings from the model section, at BERT-Small's width and the BERT paper's length and rate.
-
-        The length, 128 tokens, and the learning rate, 1e-4, are the BERT
-        paper's. The other settings are BertConfig's defaults.
-        """
-        from transformers import BertConfig
-
+        """A BERT run reads its settings from the model section, at the BERT paper's learning rate, 1e-4."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump(
@@ -382,9 +376,33 @@ class TestConfig:
         settings = train.apply_config(values)
         assert "static" not in settings
         assert settings["bert"].num_hidden_layers == 1
-        assert settings["bert"].hidden_size == 512
-        assert settings["bert"].max_position_embeddings == 128
-        assert settings["bert"].initializer_range == BertConfig().initializer_range
+
+    def test_a_bert_defaults_to_bert_smalls_shape(self, tmp_path):
+        """A BERT without settings has BERT-Small's shape, 128 tokens and BertConfig's other defaults.
+
+        BERT-Small has 4 layers of 512, with 8 heads, and a feed-forward part
+        4 times the width. The length, 128 tokens, is the BERT paper's.
+        """
+        from transformers import BertConfig
+
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(
+            yaml.safe_dump({"data": CONFIG["data"], "model": {"architecture": "bert"}})
+        )
+        values, _ = train.read_config(path, 0, ["--use_cpu"])
+        settings = train.apply_config(values)["bert"]
+        assert settings.num_hidden_layers == 4
+        assert settings.hidden_size == 512
+        assert settings.num_attention_heads == 8
+        assert settings.intermediate_size == 4 * 512
+        assert settings.max_position_embeddings == 128
+        library = BertConfig()
+        assert settings.hidden_dropout_prob == library.hidden_dropout_prob
+        assert (
+            settings.attention_probs_dropout_prob
+            == library.attention_probs_dropout_prob
+        )
+        assert settings.initializer_range == library.initializer_range
 
     def test_a_width_that_the_heads_do_not_divide_is_refused(self, tmp_path):
         """A BERT whose hidden_size the heads do not divide is refused when its settings are built."""

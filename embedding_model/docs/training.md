@@ -7,8 +7,8 @@ from a config, a YAML file.
 Each training is a **run**: one config, trained with one seed. Its folder
 holds the trained model, and the record of how it was trained. A run is named
 after its config and its seed: `run_example.yaml` with `--seed 0` gives the run
-`run_example_s0`. Two runs of one config with different seeds train two models
-that differ only by their seed. A series compares many runs: each of its arms
+`run_example_s0`. Runs of one config differ only in their seed. A series
+compares many runs: each of its arms
 is one config, trained at several seeds.
 
 A run's folder holds the model, the run's config, its manifest and the
@@ -53,7 +53,8 @@ section each setting goes in, and where each is listed with its default.
 
 Every setting is also a command-line flag, named after it:
 `--learning_rate 1e-2`, `--embedding_dim 128` or `--use_cpu`. A flag
-overrides the config. `train --help` lists `train`'s own flags. A flag that
+overrides the config. `train --help` lists only `train`'s own flags, such as
+`--config` and `--seed`. [The config](#the-config) lists the settings. A flag that
 is not a setting is refused. A flag for the other architecture's settings is
 refused too. A flag must be written in full, such as `--learning_rate`, not
 `--learning`. A config with an unknown section or setting is refused too.
@@ -229,10 +230,10 @@ With `architecture: static`, the `model` section takes one setting:
 
 #### `bert`: a transformer embedding model with BERT's architecture
 
-The model is a BERT body, as `BertModel` of
-[transformers](https://huggingface.co/docs/transformers) builds it, trained
-from scratch. It starts from random weights, not from a pretrained BERT. Its
-attention layers let each token's vector depend on the other tokens of the
+The model is BERT's encoder, as `BertModel` of
+[transformers](https://huggingface.co/docs/transformers) builds it, without
+BERT's pretraining heads. It is trained from scratch: it starts from random
+weights, not from a pretrained BERT. Its attention layers let each token's vector depend on the other tokens of the
 text. Mean pooling over the token vectors gives the text's embedding. Its
 learning rate is 1e-4, the rate at which the BERT paper
 ([Devlin et al., 2019](https://doi.org/10.18653/v1/N19-1423)) pretrains.
@@ -253,24 +254,27 @@ This config trains a BERT of 2 layers and 256 dimensions.
 
 With `architecture: bert`, the `model` section takes these settings of
 [`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig),
-under its own names. The shape's defaults are BERT-Small's, from Google's
-[release of smaller BERT models](https://github.com/google-research/bert).
-A text is cut at 128 tokens, the length at which the BERT paper pretrains for
-most of its steps. The other defaults are `BertConfig`'s:
+under its own names. The first four set the model's shape. Their defaults
+are BERT-Small's, from Google's release of smaller BERT models
+([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)): 4 layers of
+512, with 8 heads. A text is cut at 128 tokens. The other defaults are
+`BertConfig`'s:
 
-| setting | what it sets | default |
-|---|---|---|
-| `hidden_size` | the length of each token's vector, and of the embedding | 512 |
-| `num_hidden_layers` | the number of transformer layers | 4 |
-| `num_attention_heads` | the attention heads of each layer; their number must divide `hidden_size` | 8 |
-| `intermediate_size` | the size of each layer's feed-forward part | 2048 |
-| `hidden_dropout_prob` | the dropout on the embeddings and on each layer's output | 0.1 |
-| `attention_probs_dropout_prob` | the dropout on the attention weights | 0.1 |
-| `max_position_embeddings` | the longest text, in tokens; a longer text is cut | 128 |
-| `initializer_range` | the standard deviation of the random starting weights | 0.02 |
+| setting | what it sets | default here | `BertConfig`'s default |
+|---|---|---|---|
+| `hidden_size` | the length of each token's vector, and of the embedding | 512 | 768 |
+| `num_hidden_layers` | the number of transformer layers | 4 | 12 |
+| `num_attention_heads` | the attention heads of each layer; their number must divide `hidden_size` | 8 | 12 |
+| `intermediate_size` | the size of each layer's feed-forward part | 2048 | 3072 |
+| `hidden_dropout_prob` | the dropout on the embeddings and on each layer's output | 0.1 | 0.1 |
+| `attention_probs_dropout_prob` | the dropout on the attention weights | 0.1 | 0.1 |
+| `max_position_embeddings` | the longest text, in tokens; a longer text is cut. It is also the model's `max_seq_length` | 128 | 512 |
+| `initializer_range` | the standard deviation of the random starting weights | 0.02 | 0.02 |
 
-The vocabulary is the tokenizer's. No special token is added to a text, as
-for a static model.
+The vocabulary is the tokenizer's. A BERT reads a text without special
+tokens, as a static model does: no `[CLS]` and no `[SEP]`.
+[design_decisions.md](design_decisions.md#a-second-architecture-bert-trained-from-scratch)
+says why.
 
 ### What a run does
 

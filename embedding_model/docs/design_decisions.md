@@ -2405,9 +2405,9 @@ refused.
 **Consequences.**
 
 - Good, because the trainer's settings work without code of ours, under the
-  names that the trainer's documentation gives them. A run
-  [refuses](#a-run-refuses-the-trainers-prompts-and-router_mapping) two of
-  them: `prompts` and `router_mapping`.
+  names that the trainer's documentation gives them. A run refuses three of
+  them: [`prompts` and `router_mapping`](#a-run-refuses-the-trainers-prompts-and-router_mapping),
+  and [`load_best_model_at_end`](#the-model-kept-is-the-model-at-the-last-step).
 - Good, because a flag changes one setting for one run, without a new
   config. The run's `config.yaml` holds the final values.
 - Good, because argparse reads a default that is text by the setting's type.
@@ -2712,8 +2712,8 @@ added to a text, as for the static model.
 - A pretrained BERT, fine-tuned on the corpus: its pretraining texts are
   outside the leakage check.
 - Masked-language pretraining on the corpus's own texts before the pair
-  loss, as the BERT paper pretrains: not done yet. A series can test it as an
-  arm, and the tokenizer keeps `[MASK]` for it.
+  loss, as the BERT paper pretrains: not built yet. Once it is built, a
+  series can compare it as an arm. The tokenizer keeps `[MASK]` for it.
 - CLS pooling, as BERT's own classifiers use: a `[CLS]` token goes before
   each text, and its output vector is the embedding. A static model cannot
   pool this way: its `[CLS]` vector is the same for every text. So a BERT
@@ -2735,9 +2735,10 @@ check that:
 **Context.** `BertConfig`'s documentation says that its defaults "will yield a
 similar configuration to that of the google-bert/bert-base-uncased" model: 12
 layers of 768 dimensions. Google's release of smaller BERT models names
-BERT-Small: 4 layers of 512. A batch is padded to its longest text, up to
-`max_position_embeddings`, 512 in `BertConfig`. The BERT paper notes that
-"attention is quadratic to the sequence length".
+BERT-Small: 4 layers of 512. The default batch is 2,048 pairs. A batch is
+padded to its longest text, up to `max_position_embeddings`, 512 in
+`BertConfig`. The BERT paper notes that "attention is quadratic to the
+sequence length".
 
 **Decision.** A BERT's shape defaults to BERT-Small's, and its length to 128
 tokens. Its other settings default to `BertConfig`'s.
@@ -2748,12 +2749,13 @@ tokens. Its other settings default to `BertConfig`'s.
   Google's release ([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)).
   Its feed-forward part is 4 times the width, as the BERT paper sets it.
 - Good, because the BERT paper pretrains with "sequence length of 128 for
-  90% of the steps" (Appendix A.2). At 128 tokens, BERT-Small trains at a
-  batch of 2,048 pairs on one GPU.
+  90% of the steps" (Appendix A.2). Attention is quadratic in the length,
+  so at 128 tokens the attention scores take a sixteenth of the memory that
+  they take at 512.
 - Good, because BERT's other defaults are read from `BertConfig` itself, so
   the code copies none of its numbers.
 - Bad, because BERT-Small is a guess at a size that suits a corpus of short
-  texts. A series tests other shapes as arms.
+  texts. Other shapes still need to be tested.
 - Bad, because a text longer than 128 tokens is cut, in training and in
   scoring.
 
@@ -2761,8 +2763,9 @@ tokens. Its other settings default to `BertConfig`'s.
 
 - `BertConfig`'s own shape, BERT-base: 12 layers of 768 dimensions are large
   and slow to train from scratch, at a batch of 2,048 pairs.
-- `BertConfig`'s own length, 512 tokens: a batch of 2,048 pairs padded to
-  512 does not fit on one GPU, even for BERT-Small.
+- `BertConfig`'s own length, 512 tokens. One long text pads its whole batch
+  of 2,048 pairs to 512 tokens, so a run's memory would depend on the
+  corpus's longest text.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)

@@ -2799,17 +2799,13 @@ check that:
 **Context.** With several GPUs, the `transformers` Trainer wraps the model in
 `nn.DataParallel`, which splits each input tensor between them.
 `StaticEmbedding` reads a batch as one flat tensor of ids, and the offsets
-where each text starts. Building the trainer's settings, `TrainingArguments`,
-picks the device and starts CUDA. Until then, PyTorch
-counts the visible GPUs with NVIDIA's management library, which reads
-`CUDA_VISIBLE_DEVICES` each time. Without that library, the CUDA driver
-counts them, and reads the list once.
+where each text starts. CUDA reads `CUDA_VISIBLE_DEVICES` when it starts. The
+command line imports torch only when a run reads its config.
 
-**Decision.** When a run sees several GPUs and `use_cpu` is off, it keeps the
-first one. Before it builds its training settings, it sets
-`CUDA_VISIBLE_DEVICES` to that GPU, for its own process. It names the visible
-GPUs, and says how to choose another. If the list is already fixed, the run
-stops, and asks for `CUDA_VISIBLE_DEVICES` to name one GPU.
+**Decision.** Before it reads its config, a run sets `CUDA_VISIBLE_DEVICES`
+for its own process. It keeps the first GPU that the variable lists, or GPU 0
+when the variable is unset. When the variable lists several, the run names
+them, and the one that it keeps.
 
 **Consequences.**
 
@@ -2817,8 +2813,13 @@ stops, and asks for `CUDA_VISIBLE_DEVICES` to name one GPU.
   depend on the number of GPUs.
 - Good, because a user changes nothing. Other processes keep their own
   `CUDA_VISIBLE_DEVICES`.
+- Good, because the setting comes before CUDA starts, so it always takes
+  effect, and nothing needs to check it.
 - Bad, because the first GPU may be busy with another process. The run does
-  not look for a free one; its message says how to choose another.
+  not look for a free one; `CUDA_VISIBLE_DEVICES` chooses another.
+- Bad, because a notebook that has used CUDA before it calls `train` keeps
+  every GPU that CUDA saw. Such a notebook sets `CUDA_VISIBLE_DEVICES`
+  itself, before it imports torch.
 
 **Alternatives considered.**
 
@@ -2835,18 +2836,21 @@ stops, and asks for `CUDA_VISIBLE_DEVICES` to name one GPU.
   `gather_across_devices` joins the batches, and it is off by default. Its
   docstring warns that it may slow training and run out of memory. One GPU
   already trains the models here at a batch of 2,048 pairs.
+- Counting the GPUs first, and narrowing the list when there are several.
+  Whether the list can still change after a count depends on how torch
+  counts. NVIDIA's management library reads the list again, and the CUDA
+  driver keeps the first one it read. So the count needed two checks of its
+  own, for cases that the command line does not reach.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- with `CUDA_VISIBLE_DEVICES=2,3`, the run keeps GPU 2;
+- with `CUDA_VISIBLE_DEVICES=2,3`, the run keeps GPU 2, and names both;
 - without a list, it keeps GPU 0;
-- one GPU changes nothing;
-- with `use_cpu`, every GPU stays visible;
-- reading a config builds no training settings;
-- several GPUs after CUDA has started stop the run;
-- a count that stays above one stops the run.
+- a list of one GPU, or an empty one, stays as it is;
+- `train` keeps to one GPU before it reads its config;
+- reading a config builds no training settings.
 
 ## References
 

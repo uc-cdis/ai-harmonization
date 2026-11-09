@@ -169,11 +169,12 @@ corpus.
 
 ## GPUs and CPUs
 
-A run trains on one GPU. When it sees several, it keeps the first one, for
-its own process only, and says so:
+A run trains on one GPU: the first that `CUDA_VISIBLE_DEVICES` lists, or GPU
+0. When the variable lists several, the run says which one it keeps, for its
+own process only:
 
 ```
-GPUs 2, 3 are visible: this run trains on GPU 2 only. To choose another, set CUDA_VISIBLE_DEVICES, for example CUDA_VISIBLE_DEVICES=3
+GPUs 2, 3 are listed: this run trains on GPU 2 only. To choose another, set CUDA_VISIBLE_DEVICES, for example CUDA_VISIBLE_DEVICES=3
 ```
 
 Without a GPU, a run trains on the CPU. `--use_cpu`, or `use_cpu: true` in the

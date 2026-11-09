@@ -482,73 +482,45 @@ class TestConfig:
 
 
 class TestFirstGpuOnly:
-    """A process that sees several GPUs keeps to the first one."""
+    """A run keeps its process to one GPU, before torch is imported."""
 
-    @pytest.fixture
-    def gpus(self, monkeypatch):
-        """Fake the number of visible GPUs, before CUDA starts."""
-
-        def set_count(count, initialized=False, fixed=False):
-            """Make torch see this many GPUs, then the ones that the list names.
-
-            ``fixed`` makes the count stay the same, as when the CUDA driver
-            has read the list.
-            """
-
-            def device_count():
-                """The GPUs that torch would count."""
-                listed = os.environ.get("CUDA_VISIBLE_DEVICES")
-                if fixed or not listed:
-                    return count
-                return min(count, len(listed.split(",")))
-
-            monkeypatch.setattr(torch.cuda, "device_count", device_count)
-            monkeypatch.setattr(torch.cuda, "is_initialized", lambda: initialized)
-
-        return set_count
-
-    def test_the_first_listed_gpu_is_kept(self, gpus, monkeypatch, capsys):
-        """With CUDA_VISIBLE_DEVICES=2,3, the run keeps GPU 2."""
+    def test_the_first_listed_gpu_is_kept(self, monkeypatch, capsys):
+        """With CUDA_VISIBLE_DEVICES=2,3, the run keeps GPU 2, and names both."""
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
-        gpus(2)
         assert train.first_gpu_only() == ["2", "3"]
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "2"
         assert "trains on GPU 2 only" in capsys.readouterr().out
 
-    def test_without_a_list_gpu_0_is_kept(self, gpus, monkeypatch):
-        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0."""
+    def test_without_a_list_gpu_0_is_kept(self, monkeypatch):
+        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0, or no GPU where there is none."""
         monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
-        gpus(2)
-        assert train.first_gpu_only() == ["0", "1"]
+        assert train.first_gpu_only() == []
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
 
-    def test_one_gpu_changes_nothing(self, gpus, monkeypatch):
-        """With one GPU, CUDA_VISIBLE_DEVICES stays as it is."""
-        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "3")
-        gpus(1)
+    @pytest.mark.parametrize("listed", ["3", ""])
+    def test_one_gpu_or_none_changes_nothing(self, monkeypatch, listed):
+        """A list of one GPU, or an empty one, stays as it is."""
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", listed)
         assert train.first_gpu_only() == []
-        assert os.environ["CUDA_VISIBLE_DEVICES"] == "3"
+        assert os.environ["CUDA_VISIBLE_DEVICES"] == listed
 
-    def test_a_count_that_stays_above_one_is_refused(self, gpus, monkeypatch):
-        """When the driver has read the list, narrowing it changes nothing, so the run stops."""
-        monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
-        gpus(2, fixed=True)
-        with pytest.raises(RuntimeError, match="could not keep to one"):
-            train.first_gpu_only()
-
-    def test_a_cpu_run_keeps_every_gpu_visible(self, gpus, monkeypatch, config):
-        """With use_cpu, the run uses no GPU, so CUDA_VISIBLE_DEVICES stays as it is."""
+    def test_the_gpu_is_kept_before_the_config_is_read(
+        self, monkeypatch, config, tmp_path
+    ):
+        """train keeps to one GPU before it reads its config, which first imports torch."""
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
-        gpus(2)
-        values, _ = train.read_config(config, 0, ["--use_cpu"])
-        train.apply_config(values)
-        assert os.environ["CUDA_VISIBLE_DEVICES"] == "2,3"
+        seen = []
 
-    def test_several_gpus_after_cuda_started_are_refused(self, gpus):
-        """Once CUDA has started, it has fixed the visible GPUs, so the run stops."""
-        gpus(2, initialized=True)
-        with pytest.raises(RuntimeError, match="CUDA_VISIBLE_DEVICES"):
-            train.first_gpu_only()
+        def read_config(*args, **kwargs):
+            """Record the GPUs listed when the config is read, then stop the run."""
+            seen.append(os.environ["CUDA_VISIBLE_DEVICES"])
+            raise ValueError("stop here")
+
+        monkeypatch.setattr(train, "read_config", read_config)
+        assert (
+            train.train(config, 0, [], tmp_path / "inputs", tmp_path / "outputs") == 1
+        )
+        assert seen == ["2"]
 
 
 class TestTrain:

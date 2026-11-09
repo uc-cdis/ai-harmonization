@@ -279,11 +279,11 @@ def read_config(path, seed, overrides=(), run_name=None):
 
 
 def apply_config(values):
-    """Build each section's settings from the config's values, on one device.
+    """Build each section's settings from the config's values.
 
     Building the training settings sets up the device: transformers picks
-    the GPU, or the CPU when ``use_cpu`` is set or no GPU is visible. So a run
-    that may use a GPU first keeps its process to one, with first_gpu_only.
+    the GPU, or the CPU when ``use_cpu`` is set or no GPU is visible. The run
+    has kept its process to one GPU before, with first_gpu_only.
 
     Args:
         values (dict): Every setting's value, from read_config.
@@ -293,13 +293,9 @@ def apply_config(values):
             architecture's section, and not the others'.
 
     Raises:
-        RuntimeError: If several GPUs are visible and the run cannot keep to
-            one.
         ValueError: If transformers refuses a setting, such as bf16 where no
             GPU supports it.
     """
-    if not values["use_cpu"]:
-        first_gpu_only()
     return {
         section: settings_class(
             **{
@@ -314,58 +310,36 @@ def apply_config(values):
 
 
 def first_gpu_only():
-    """Keep this process to the first visible GPU, when it sees several, and say so.
+    """Keep this process to one GPU: the first that CUDA_VISIBLE_DEVICES lists, or GPU 0.
 
     With several GPUs, the trainer would wrap the model in ``nn.DataParallel``.
     That multiplies the batch, and so the loss's in-batch negatives, by the
     number of GPUs. It also cuts each input tensor apart on its own, and
     StaticEmbedding's ``offsets`` then point at tokens on another GPU. So the
-    run narrows ``CUDA_VISIBLE_DEVICES``, for its own process only, before
-    CUDA starts. torch counts the GPUs again until CUDA starts, so the
-    trainer then sees one.
+    run sets ``CUDA_VISIBLE_DEVICES`` to one GPU, for its own process only.
+    CUDA reads the variable when it starts, so this comes first, before torch
+    is imported: the command line imports it only when a run reads its
+    config. Where the variable is unset, GPU 0 is the first GPU, and no GPU on
+    a machine without one.
 
     Returns:
-        list[str]: The GPUs that were visible, when there were several, and
-            otherwise an empty list.
-
-    Raises:
-        RuntimeError: If several GPUs are visible and the list of visible GPUs
-            cannot change: CUDA has already started, or the CUDA driver has
-            read the list.
+        list[str]: The GPUs that CUDA_VISIBLE_DEVICES listed, when it listed
+            several, and otherwise an empty list.
     """
-    import torch
-
-    count = torch.cuda.device_count()
-    if count <= 1:
-        return []
-    if torch.cuda.is_initialized():
-        raise RuntimeError(
-            f"{count} GPUs are visible and CUDA has already started, so this"
-            " run cannot keep to one GPU. Set CUDA_VISIBLE_DEVICES to one GPU,"
-            " such as CUDA_VISIBLE_DEVICES=0"
-        )
     listed = os.environ.get("CUDA_VISIBLE_DEVICES")
-    visible = (
-        [part.strip() for part in listed.split(",") if part.strip()]
-        if listed
-        else [str(number) for number in range(count)]
-    )
-    os.environ["CUDA_VISIBLE_DEVICES"] = visible[0]
-    # Until CUDA starts, torch counts the GPUs with NVIDIA's management library
-    # (NVML). Without it, torch asks the CUDA driver, which reads the list
-    # once. Then the count stays the same.
-    if torch.cuda.device_count() != 1:
-        raise RuntimeError(
-            f"{count} GPUs are visible, and this run could not keep to one of"
-            " them. Set CUDA_VISIBLE_DEVICES to one GPU, such as"
-            f" CUDA_VISIBLE_DEVICES={visible[0]}"
-        )
+    ids = [part.strip() for part in (listed or "").split(",") if part.strip()]
+    if listed is None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+        return []
+    if len(ids) <= 1:
+        return []
+    os.environ["CUDA_VISIBLE_DEVICES"] = ids[0]
     print(
-        f"  GPUs {', '.join(visible)} are visible: this run trains on GPU"
-        f" {visible[0]} only. To choose another, set CUDA_VISIBLE_DEVICES,"
-        f" for example CUDA_VISIBLE_DEVICES={visible[1]}"
+        f"  GPUs {', '.join(ids)} are listed: this run trains on GPU {ids[0]}"
+        " only. To choose another, set CUDA_VISIBLE_DEVICES, for example"
+        f" CUDA_VISIBLE_DEVICES={ids[1]}"
     )
-    return visible
+    return ids
 
 
 def device_name(training):
@@ -780,6 +754,7 @@ def train(config, seed, overrides, inputs, outputs):
     if seed < 0:
         print(f"--seed must be 0 or more, not {seed}", file=sys.stderr)
         return 1
+    first_gpu_only()
     try:
         values, training_given = read_config(config, seed, overrides, run_name)
         training_pairs, validation_pairs, corpus_manifest = read_splits(

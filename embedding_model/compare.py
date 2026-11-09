@@ -273,54 +273,73 @@ def wilson_interval(values):
     return float(result.low), float(result.high)
 
 
-def newcombe_interval(model, reference):
+def newcombe_interval(model_values, reference_values):
     """Newcombe's 95% interval for a paired difference of shares: model minus reference.
 
     This is Newcombe's method 10 (1998). It combines the two shares' Wilson
     intervals with the correlation of the two models' values. Two models that
     agree on many variables get a narrower interval than their two Wilson
-    intervals would give apart. The correlation is Newcombe's: a positive
-    covariance is lowered by n / 2, and the correlation is 0 when a margin of
-    the two models' 2 x 2 table is 0. scipy has no such interval. statsmodels
-    has added it as ``confint_proportions_paired``, but has no release with it
-    yet.
+    intervals would give apart. The correlation is Newcombe's phi, from the
+    2 x 2 table of the two models' values, with his correction of a positive
+    numerator by n / 2. scipy has no such interval. statsmodels has added it
+    as ``confint_proportions_paired``, but has no release with it yet.
 
     Args:
-        model (np.ndarray): The model's value, 1 or 0, for each variable.
-        reference (np.ndarray): The reference model's value for each
+        model_values (np.ndarray): The model's value for each variable: 1
+            where an expected target is among its first k, and 0 otherwise.
+        reference_values (np.ndarray): The reference model's value for each
             variable, in the same order.
 
     Returns:
         tuple[float, float]: The interval's low and high ends.
     """
-    model, reference = np.asarray(model), np.asarray(reference)
-    count = len(model)
-    both = int(((model == 1) & (reference == 1)).sum())
-    only_model = int(((model == 1) & (reference == 0)).sum())
-    only_reference = int(((model == 0) & (reference == 1)).sum())
+    model_values = np.asarray(model_values)
+    reference_values = np.asarray(reference_values)
+    count = len(model_values)
+    # The 2 x 2 table of the two models' values over the source variables:
+    # Newcombe's a, b, c and d.
+    both = int(((model_values == 1) & (reference_values == 1)).sum())
+    only_model = int(((model_values == 1) & (reference_values == 0)).sum())
+    only_reference = int(((model_values == 0) & (reference_values == 1)).sum())
     neither = count - both - only_model - only_reference
-    margins = (
+    # Newcombe's phi, the correlation of the two models' values. A positive
+    # numerator, ad - bc, is lowered by count / 2, his correction. phi is 0
+    # when a row or a column of the table is empty.
+    phi_numerator = both * neither - only_model * only_reference
+    if phi_numerator > 0:
+        phi_numerator = max(phi_numerator - count / 2, 0)
+    totals_product = (
         (both + only_model)
         * (only_reference + neither)
         * (both + only_reference)
         * (only_model + neither)
     )
-    covariance = both * neither - only_model * only_reference
-    if covariance > 0:
-        covariance = max(covariance - count / 2, 0)
-    correlation = covariance / np.sqrt(margins) if margins else 0.0
-    share, reference_share = model.mean(), reference.mean()
-    model_low, model_high = wilson_interval(model)
-    reference_low, reference_high = wilson_interval(reference)
-    below, above = share - model_low, reference_high - reference_share
-    down = np.sqrt(below**2 - 2 * correlation * below * above + above**2)
-    below, above = model_high - share, reference_share - reference_low
-    up = np.sqrt(below**2 - 2 * correlation * below * above + above**2)
-    difference = share - reference_share
-    return float(difference - down), float(difference + up)
+    phi = phi_numerator / np.sqrt(totals_product) if totals_product else 0.0
+    # Each model's share of 1s, and its Wilson interval.
+    model_share, reference_share = model_values.mean(), reference_values.mean()
+    model_low, model_high = wilson_interval(model_values)
+    reference_low, reference_high = wilson_interval(reference_values)
+    # How far each Wilson interval reaches from its share, down and up.
+    model_down, model_up = model_share - model_low, model_high - model_share
+    reference_down = reference_share - reference_low
+    reference_up = reference_high - reference_share
+    # The lower end takes the model's reach down and the reference's reach
+    # up, since both make the difference smaller. The upper end takes the
+    # other two. Each pair combines as the errors of two independent
+    # estimates do, the square root of the sum of their squares, less a
+    # term for phi. Two models that succeed on the same variables move
+    # together, so their difference moves less.
+    lower_distance = np.sqrt(
+        model_down**2 - 2 * phi * model_down * reference_up + reference_up**2
+    )
+    upper_distance = np.sqrt(
+        model_up**2 - 2 * phi * model_up * reference_down + reference_down**2
+    )
+    difference = model_share - reference_share
+    return float(difference - lower_distance), float(difference + upper_distance)
 
 
-def paired_test(metric, model, reference):
+def paired_test(metric, model_values, reference_values):
     """The paired test of two models' values of a metric, on the same variables.
 
     For accuracy@k, each variable's value is 1 or 0. McNemar's exact test
@@ -333,24 +352,26 @@ def paired_test(metric, model, reference):
 
     Args:
         metric (str): A metric of TESTED_METRICS.
-        model (np.ndarray): A model's value for each variable.
-        reference (np.ndarray): The reference model's value for each variable,
-            in the same order.
+        model_values (np.ndarray): A model's value for each variable.
+        reference_values (np.ndarray): The reference model's value for each
+            variable, in the same order.
 
     Returns:
         tuple[str, float]: The test's name and its two-sided p.
     """
     if TESTS[metric] == MCNEMAR:
-        only_model = int(((model == 1) & (reference == 0)).sum())
-        only_reference = int(((model == 0) & (reference == 1)).sum())
+        only_model = int(((model_values == 1) & (reference_values == 0)).sum())
+        only_reference = int(((model_values == 0) & (reference_values == 1)).sum())
         if only_model + only_reference == 0:
             return MCNEMAR, 1.0
         result = stats.binomtest(only_model, only_model + only_reference, 0.5)
         return MCNEMAR, float(result.pvalue)
-    differences = np.asarray(model, dtype=float) - np.asarray(reference, dtype=float)
+    differences = np.asarray(model_values, dtype=float) - np.asarray(
+        reference_values, dtype=float
+    )
     if differences.min() == differences.max():
         return PAIRED_T, 1.0 if differences[0] == 0 else 0.0
-    return PAIRED_T, float(stats.ttest_rel(model, reference).pvalue)
+    return PAIRED_T, float(stats.ttest_rel(model_values, reference_values).pvalue)
 
 
 def stars(p):
@@ -428,19 +449,22 @@ def difference_rows(benchmark, reference, others, values):
     rows = []
     for other in others:
         for metric in TESTED_METRICS:
-            first, second = values[other][metric], values[reference][metric]
+            model_values = values[other][metric]
+            reference_values = values[reference][metric]
             if DIFFERENCE_INTERVALS[metric] == NEWCOMBE:
-                low, high = newcombe_interval(first, second)
+                low, high = newcombe_interval(model_values, reference_values)
             else:
-                low, high = t_interval(first - second)
-            test, p = paired_test(metric, first, second)
+                low, high = t_interval(model_values - reference_values)
+            test, p = paired_test(metric, model_values, reference_values)
             rows.append(
                 {
                     "benchmark": benchmark,
                     "metric": metric,
                     "reference": reference,
                     "model": other,
-                    "difference": round(float(np.mean(first - second)), 4),
+                    "difference": round(
+                        float(np.mean(model_values - reference_values)), 4
+                    ),
                     "low": round(low, 4),
                     "high": round(high, 4),
                     "test": test,

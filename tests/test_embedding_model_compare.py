@@ -792,6 +792,25 @@ class TestFigures:
         assert [float(point.get_xdata()[0]) for point in points] == [-1, 0, 0, -0.5]
         assert [float(point.get_ydata()[0]) for point in points] == [0, 1, 2, 3]
 
+    def test_the_differences_panels_share_one_x_axis(self):
+        """Each benchmark's panel of differences_from_reference has the same x axis.
+
+        So the panels' 0s line up, and a difference has the same length in
+        each. GDC's accuracy@1 interval is widened here to reach -3, so
+        TOPMed's panel reaches past -3 too, though its own rows end at -1.
+        """
+        models, benchmark_results, differences = figure_results(2)
+        for row in differences:
+            if row["benchmark"] == "gdc" and row["metric"] == "accuracy@1":
+                row["low"] = -3.0
+        with rc_context(compare.STYLE):
+            figure = compare.differences_figure(
+                benchmark_results, models, REFERENCE, differences
+            )
+        topmed_axes, gdc_axes = figure.get_axes()[:2]
+        assert topmed_axes.get_xlim() == gdc_axes.get_xlim()
+        assert topmed_axes.get_xlim()[0] < -3
+
     def test_the_bars_fill_their_panel(self):
         """Without brackets too, each bar panel ends half a group beyond its groups."""
         models, benchmark_results, _ = figure_results(2)

@@ -92,7 +92,7 @@ reference), `low`, `high`, `test` and `p`.
   of parameters.
 - `differences_from_reference`, with `--reference` only: a panel per
   benchmark, with each model's difference from the reference on the metrics
-  of `accuracy_and_mrr`.
+  of `accuracy_and_mrr`. The panels share one x axis.
 
 Each figure is 7.2 inches wide, and comes in three files: a `.png`, at 300
 dpi, and a `.pdf` and an `.eps`. The `.pdf` and the `.eps` are vector images,
@@ -168,9 +168,10 @@ In `accuracy_and_mrr`, two error bars can overlap while a bracket still marks
 a difference. The design entries for [accuracy@k](design_decisions.md#accuracyk-wilson-intervals-newcombes-paired-interval-and-mcnemars-exact-test) and for
 [MRR](design_decisions.md#mrr-and-mrr10-the-t-interval-and-the-paired-t-test) say why.
 
-`differences_from_reference` shows a small difference at its own scale. An
-interval that crosses 0 means that the benchmark cannot tell the model from
-the reference.
+`differences_from_reference` shows a small difference at its own scale. Its
+panels share one x axis, so their 0s line up, and a difference has the same
+length in each benchmark's panel. An interval that crosses 0 means that the
+benchmark cannot tell the model from the reference.
 
 For MRR, a difference's interval and its p always agree: the interval
 excludes 0 exactly when p is below 0.05. For accuracy@k, the two can disagree

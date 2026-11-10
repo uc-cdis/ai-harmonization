@@ -837,8 +837,9 @@ def differences_figure(benchmark_results, models, reference, differences):
 
     Each benchmark has a panel, and each metric of accuracy_and_mrr a row. Each model
     is a point at its difference from the reference, which is the line at 0.
-    Right of 0, the model does better than the reference. Draw it under
-    STYLE.
+    Right of 0, the model does better than the reference. The panels share
+    one x axis, so their 0s line up, and a difference has the same length in
+    each. Draw it under STYLE.
 
     Args:
         benchmark_results (dict): Each benchmark's results, as for
@@ -868,8 +869,11 @@ def differences_figure(benchmark_results, models, reference, differences):
         (row["benchmark"], row["metric"], row["model"]): row for row in differences
     }
     spread = 0.6 / len(others)
+    drawn_rows = [row for row in differences if row["metric"] in FIGURE_METRICS]
+    lowest = min([0.0] + [row["low"] for row in drawn_rows])
+    highest = max([0.0] + [row["high"] for row in drawn_rows])
+    margin = 0.08 * (highest - lowest) or 0.01
     for (axes,), (benchmark, result) in zip(rows, benchmark_results.items()):
-        lowest = highest = 0.0
         for line, metric in enumerate(FIGURE_METRICS):
             for index, (model, legend_label, place) in enumerate(others):
                 row = differences_by_key[(benchmark, metric, model)]
@@ -898,9 +902,7 @@ def differences_figure(benchmark_results, models, reference, differences):
                     zorder=3,
                     label=legend_label if line == 0 else None,
                 )
-                lowest, highest = min(lowest, row["low"]), max(highest, row["high"])
         axes.axvline(0, color=TEXT, linewidth=0.8, zorder=1)
-        margin = 0.08 * (highest - lowest) or 0.01
         axes.set_xlim(lowest - margin, highest + margin)
         # matplotlib picks the ticks, by steps of 1, 2 or 5 times a power of ten.
         axes.xaxis.set_major_locator(MaxNLocator(steps=[1, 2, 5, 10]))

@@ -33,6 +33,11 @@ python -m embedding_model compare --name example \
 | `--benchmark` | one or more benchmarks that every model was scored on. A benchmark named twice is compared once. |
 | `--format` | the [text format](scoring.md#text-formats) of the scores, `compact` by default. |
 
+`compare` prints each model's MRR and accuracy@1 on each benchmark. Then it
+prints its folder, after `->`, and the full path of each figure and table,
+one per line. In a terminal that links paths, such as VS Code's, each opens
+with a click.
+
 `compare` stops, and names the `score` command to run, when a model:
 
 - has no scores on a benchmark in that format;

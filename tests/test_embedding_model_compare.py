@@ -451,7 +451,12 @@ class TestCompare:
         assert manifest["settings"]["tests"]["mrr"] == compare.PAIRED_T
         assert manifest["built"] == date.today().isoformat()
         assert [source["name"] for source in manifest["sources"]] == [REFERENCE, OTHER]
-        assert "-> " in capsys.readouterr().out
+        printed = capsys.readouterr().out
+        assert f"  -> {folder}\n" in printed
+        assert (
+            f"     figure: {folder / 'figures' / 'accuracy_and_mrr.png'}\n" in printed
+        )
+        assert f"     table: {folder / 'differences.csv'}\n" in printed
 
     def test_without_a_reference_no_differences_are_written(self, built, capsys):
         """A comparison with no reference writes the metrics and three figures, no differences, and says why."""

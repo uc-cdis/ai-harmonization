@@ -1169,6 +1169,23 @@ def write_comparison(comparison, destination):
         )
 
 
+def print_destination(destination):
+    """Print where a comparison went: its folder, then each figure and table by its full path.
+
+    One path per line, so that a terminal that links paths, such as VS
+    Code's, opens each with a click. Each figure is a PNG, with its PDF and
+    EPS beside it.
+
+    Args:
+        destination (Path): The comparison's folder.
+    """
+    print(f"  -> {destination}")
+    for path in sorted((destination / FIGURES).glob("*.png")):
+        print(f"     figure: {path}")
+    for path in sorted(destination.glob("*.csv")):
+        print(f"     table: {path}")
+
+
 def print_summary(comparison, destination):
     """Print each model's MRR and accuracy@1 on each benchmark, and where the folder went.
 
@@ -1192,7 +1209,7 @@ def print_summary(comparison, destination):
             "  no --reference: no paired tests and no brackets. To test the"
             " differences, name one model with --reference."
         )
-    print(f"  -> {destination}")
+    print_destination(destination)
 
 
 def compare(

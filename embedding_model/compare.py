@@ -832,6 +832,39 @@ def size_figure(benchmark_results, models, reference):
     return figure
 
 
+def mark_sides(axes, compared_with):
+    """Label the sides of a differences axis: worse, and better, than what each point is measured against.
+
+    The labels sit under the tick labels, on either side of 0, and the axis's
+    own label below them, as forest plots place them. Every figure of
+    differences labels its axis here, so that the labels sit in one place in
+    each.
+
+    Args:
+        axes (Axes): The panel, whose x axis holds the differences, with 0 in
+            view.
+        compared_with (str): What each point is measured against, such as
+            ``the reference``.
+    """
+    for offset, text, align in (
+        (-4, f"\u2190 worse than {compared_with}", "right"),
+        (4, f"better than {compared_with} \u2192", "left"),
+    ):
+        axes.annotate(
+            text,
+            (0, 0),
+            xycoords=axes.get_xaxis_transform(),
+            xytext=(offset, -16),
+            textcoords="offset points",
+            ha=align,
+            va="top",
+            fontsize=7,
+            color=MUTED,
+            annotation_clip=False,
+        )
+    axes.xaxis.labelpad = 14
+
+
 def differences_figure(benchmark_results, models, reference, differences):
     """``differences_from_reference``: each model minus the reference, per benchmark.
 
@@ -911,21 +944,7 @@ def differences_figure(benchmark_results, models, reference, differences):
         axes.grid(axis="y", visible=False)
         axes.grid(axis="x", visible=True)
         axes.set_xlabel("Model minus the reference, with 95% confidence intervals")
-        for side, text, align in (
-            (0, "\u2190 worse than the reference", "left"),
-            (1, "better than the reference \u2192", "right"),
-        ):
-            axes.annotate(
-                text,
-                (side, 0),
-                xycoords="axes fraction",
-                xytext=(0, -24),
-                textcoords="offset points",
-                ha=align,
-                va="top",
-                fontsize=7,
-                color=MUTED,
-            )
+        mark_sides(axes, "the reference")
         axes.set_title(benchmark_title(benchmark, result))
     legend(figure, rows[0][0], len(others))
     return figure

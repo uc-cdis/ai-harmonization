@@ -186,6 +186,24 @@ longer loads. The license is now at the address in the table.
 attribution. Content that belongs to a third party carries a notice, and is not
 open (see [Restricted items](#restricted-items)).
 
+**A model trained on LOINC:** the license allows training a model on LOINC
+content and publishing the model's weights, as Regenstrief has confirmed. A
+published model's card, and any license file beside the weights, then carry:
+
+- LOINC's notice: "This material contains content from LOINC
+  (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the
+  Logical Observation Identifiers Names and Codes (LOINC) Committee and is
+  available at no cost under the license at http://loinc.org/license. LOINC®
+  is a registered United States trademark of Regenstrief Institute, Inc.";
+- the LOINC version that the model was trained on, from the sources
+  manifest;
+- a statement that Regenstrief Institute and the LOINC Committee did not
+  develop, review or endorse the model. Its outputs are suggestions for
+  experts to verify, not authoritative LOINC mappings.
+
+A file that holds LOINC codes, such as a label set, gives each code with a
+LOINC display name. The repository shares no such file.
+
 **SPDX:** `LicenseRef-LOINC`.
 
 **Reference:**

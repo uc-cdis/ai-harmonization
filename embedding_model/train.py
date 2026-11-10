@@ -799,7 +799,7 @@ def check_earlier_run(destination, settings, seed, run_name):
     """
     if not destination.exists():
         return
-    ways_on = (
+    next_steps = (
         f"to train this run, delete {destination}, or save the changed config"
         " under a new name"
     )
@@ -809,7 +809,7 @@ def check_earlier_run(destination, settings, seed, run_name):
     except Exception as error:
         raise ValueError(
             f"run {run_name} exists, and its config.yaml cannot be read"
-            f" ({type(error).__name__}: {error}); {ways_on}"
+            f" ({type(error).__name__}: {error}); {next_steps}"
         ) from error
     now = setting_values(settings)
     changed = [
@@ -824,7 +824,7 @@ def check_earlier_run(destination, settings, seed, run_name):
         more = f", and {len(changed) - 3} more" if len(changed) > 3 else ""
         raise ValueError(
             f"run {run_name} exists, trained with other settings: {shown}{more};"
-            f" {ways_on}"
+            f" {next_steps}"
         )
 
 

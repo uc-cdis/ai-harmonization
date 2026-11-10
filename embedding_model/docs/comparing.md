@@ -76,8 +76,8 @@ comparisons/<name>/
 ### `metrics.csv`
 
 One row per model and benchmark: `model`, `benchmark`, `benchmark_version`,
-`format`, `n` (the source variables), `parameters` (the model's number of
-parameters). Then each of `mrr`, `mrr@10`, `accuracy@1`, `accuracy@3`,
+`format`, `n` (the source variables), `targets` (the benchmark's targets),
+`parameters` (the model's number of parameters). Then each of `mrr`, `mrr@10`, `accuracy@1`, `accuracy@3`,
 `accuracy@5` and `accuracy@10`, with its interval as `<metric>_low` and
 `<metric>_high`, then `ndcg@10` and `median_rank`.
 
@@ -129,7 +129,7 @@ It also has five fields of its own:
 
 | in the figure or table | what it shows | how it is computed |
 |---|---|---|
-| a benchmark's title | the benchmark, its version and its number of source variables | from the benchmark that is built |
+| a benchmark's title | the benchmark, its version, its number of source variables and its number of targets. The source variables set how precise each number is, and the targets how many candidates each variable is ranked among | the version from the benchmark that is built; both numbers from the scores' `metrics.csv` |
 | a model's name, in the legends and the tables | which model it is | a run's name, such as `run_example_s0`; a model folder's name; or a Hugging Face model's id |
 | the first bar of each group, in `accuracy_and_mrr` | the reference, marked "(reference)" in the legends | |
 | a bar of accuracy@k, in `accuracy_and_mrr` | the share of source variables whose expected target is among the model's first k suggestions | the accuracy@k that `score` reports, in the scores' `metrics.csv` |

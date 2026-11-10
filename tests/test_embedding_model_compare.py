@@ -673,6 +673,7 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
         result = {
             "version": "1",
             "n": len(reference_ranks),
+            "targets": 3,
             "metrics": {},
             "values": {},
         }
@@ -682,6 +683,7 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
             row = {
                 **score_means(ranks),
                 "median_rank": float(np.median(ranks)),
+                "targets": 3,
                 "parameters": 1,
             }
             result["metrics"][model] = compare.metrics_row(
@@ -814,6 +816,9 @@ class TestFigures:
             )
         topmed_axes, gdc_axes = figure.get_axes()[:2]
         assert topmed_axes.get_xlim() == gdc_axes.get_xlim()
+        assert topmed_axes.get_title() == (
+            "Benchmark: TOPMed v1 (6 source variables, 3 targets)"
+        )
         assert topmed_axes.get_xlim()[0] < -3
 
     def test_the_bars_fill_their_panel(self):
@@ -835,6 +840,7 @@ class TestFigures:
             "topmed": {
                 "version": "1",
                 "n": 6,
+                "targets": 3,
                 "ranks": {REFERENCE: np.array(RANKS[REFERENCE])},
             }
         }
@@ -853,6 +859,7 @@ class TestFigures:
             "topmed": {
                 "version": "1",
                 "n": 6,
+                "targets": 3,
                 "ranks": {model: np.array(ranks) for model, ranks in RANKS.items()},
             }
         }
@@ -881,7 +888,9 @@ class TestFigures:
             }
             for model in (REFERENCE, OTHER)
         }
-        benchmark_results = {"topmed": {"version": "1", "n": 6, "metrics": metrics}}
+        benchmark_results = {
+            "topmed": {"version": "1", "n": 6, "targets": 3, "metrics": metrics}
+        }
         with rc_context(compare.STYLE):
             figure = compare.size_figure(benchmark_results, [REFERENCE, OTHER], None)
             assert figure.get_axes()[0].get_xlim() == pytest.approx((1, 1000))

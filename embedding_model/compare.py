@@ -414,6 +414,7 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
         "benchmark_version": built_version,
         "format": text_format,
         "n": len(values["mrr"]),
+        "targets": int(row["targets"]),
         "parameters": int(row["parameters"]),
     }
     for metric in TESTED_METRICS:
@@ -556,20 +557,25 @@ def bars(axes, groups, legend_labels, heights, errors, bar_colors):
 
 
 def benchmark_title(benchmark, benchmark_result):
-    """A benchmark's title in a figure: its name, its version and its source variables.
+    """A benchmark's title in a figure: its name, its version, its source variables and its targets.
+
+    The source variables set how precise each number is, and the targets how
+    many candidates each variable is ranked among.
 
     Args:
         benchmark (str): The benchmark's name, such as ``topmed``.
-        benchmark_result (dict): The benchmark's results, with its version and
-            its number of source variables.
+        benchmark_result (dict): The benchmark's results, with its version, its
+            number of source variables and its number of targets.
 
     Returns:
-        str: The title, such as ``Benchmark: TOPMed v2 (900 source variables)``.
+        str: The title, such as ``Benchmark: TOPMed v2 (900 source variables,
+            120 targets)``.
     """
     name = benchmarks.TITLES[benchmark]
     return (
         f"Benchmark: {name} v{benchmark_result['version']}"
-        f" ({benchmark_result['n']:,} source variables)"
+        f" ({benchmark_result['n']:,} source variables,"
+        f" {benchmark_result['targets']:,} targets)"
     )
 
 
@@ -1092,6 +1098,7 @@ def benchmark_result(comparison, benchmark, inputs, outputs):
                 " though both were scored on this build of it. Score both again."
             )
         values = variable_values(ranks["rank"].to_numpy())
+        result["targets"] = int(row["targets"])
         result["metrics"][label] = metrics_row(
             label, benchmark, version, comparison.text_format, row, values
         )

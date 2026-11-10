@@ -53,14 +53,14 @@ class TestDifferences:
 
     def test_dates_and_release_labels_do_not_count(self):
         """A rebuild on another day, from a source with the same SHA-256, matches."""
-        later = {
+        later_manifest = {
             **self.MANIFEST,
             "built": "2026-02-01",
             "sources": [
                 {**PIN, "sha256": "cc", "version": "2", "fetched": "2026-02-01"}
             ],
         }
-        assert manifests.differences(self.MANIFEST, later) == []
+        assert manifests.differences(self.MANIFEST, later_manifest) == []
 
     def test_changed_file_and_source_are_named(self):
         """A file and a source with another SHA-256 are each named."""

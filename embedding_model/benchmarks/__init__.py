@@ -159,15 +159,17 @@ def read_benchmark(inputs, name):
     manifests.warn_if_not_committed(
         f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
     )
-    data = {path: path.read_bytes() for path in paths}
-    changed = [path.name for path in paths if sha256(data[path]) != recorded[path.name]]
+    file_bytes = {path: path.read_bytes() for path in paths}
+    changed = [
+        path.name for path in paths if sha256(file_bytes[path]) != recorded[path.name]
+    ]
     if changed:
         raise ValueError(
             f"{manifest_path.name} holds another SHA-256 for"
             f" {', '.join(changed)}; run: {command}"
         )
     targets, mappings = (
-        pd.read_csv(io.BytesIO(data[path]), dtype=str, keep_default_na=False)
+        pd.read_csv(io.BytesIO(file_bytes[path]), dtype=str, keep_default_na=False)
         for path in paths
     )
     columns = (list(targets.columns), list(mappings.columns))

@@ -27,7 +27,7 @@ import pyarrow as pa
 from embedding_model.folders import staged
 
 
-def sha256(data):
+def sha256(file_bytes):
     """The SHA-256 of bytes that are in memory already, as hex.
 
     It gives the same value as ``file_sha256`` of a file with these bytes. Use
@@ -35,12 +35,12 @@ def sha256(data):
     For a file on disk, use ``file_sha256``, which never holds the file whole.
 
     Args:
-        data (bytes): The bytes.
+        file_bytes (bytes): The bytes.
 
     Returns:
         str: The SHA-256, as hex.
     """
-    return hashlib.sha256(data).hexdigest()
+    return hashlib.sha256(file_bytes).hexdigest()
 
 
 def file_digest(path, algorithm):
@@ -263,14 +263,14 @@ def git(folder, *args):
             git repository``.
     """
     try:
-        result = subprocess.run(
+        completed = subprocess.run(
             ["git", *args], cwd=folder, capture_output=True, text=True
         )
     except Exception as error:
         raise RuntimeError(f"git could not run: {error}") from error
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"git {args[0]} failed")
-    return result.stdout
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or f"git {args[0]} failed")
+    return completed.stdout
 
 
 def committed_version(folder, name):
@@ -293,11 +293,11 @@ def committed_version(folder, name):
             without a commit. The error holds git's own message.
     """
     listed = git(folder, "ls-tree", "--name-only", "HEAD").splitlines()
-    wanted = f"{name}.json"
-    entry = next((e for e in listed if e == wanted), None)
-    if entry is None:
+    manifest_file = f"{name}.json"
+    listed_file = next((file for file in listed if file == manifest_file), None)
+    if listed_file is None:
         return None
-    return json.loads(git(folder, "show", f"HEAD:./{entry}"))["version"]
+    return json.loads(git(folder, "show", f"HEAD:./{listed_file}"))["version"]
 
 
 def pinned(manifest, name):
@@ -490,8 +490,8 @@ def record(committed_path, built_manifest, differing, directory):
         differing (list[str]): The differences that ``decide`` returned.
         directory (Path): Where the build now is.
     """
-    for file, entry in built_manifest["files"].items():
-        print(f"  {directory / file}: {entry['rows']:,} rows")
+    for file, file_record in built_manifest["files"].items():
+        print(f"  {directory / file}: {file_record['rows']:,} rows")
     if differing:
         write(committed_path, built_manifest)
         print(f"  accepted, and recorded in {committed_path}")

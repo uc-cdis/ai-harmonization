@@ -343,14 +343,14 @@ class TestLeakage:
 
     def test_text_keys_are_those_of_pairs(self):
         """``text_keys`` writes pairs.common.text_key: accents go, Greek letters stay."""
-        texts = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", ""])
-        assert leakage.text_keys(texts).tolist() == [
+        spellings = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", ""])
+        assert leakage.text_keys(spellings).tolist() == [
             common.text_key("Abcd_Efgh (ijkl)!"),
             common.text_key("α-tocopherol"),
             common.text_key("Größe"),
             "",
         ]
-        assert leakage.text_keys(texts).tolist()[1] == "α tocopherol"
+        assert leakage.text_keys(spellings).tolist()[1] == "α tocopherol"
 
 
 def write_pairs(inputs, source, rows):
@@ -443,7 +443,7 @@ class TestBuild:
             "sha256": file_sha256(folder / "dropped.parquet"),
             "content_sha256": pairs_sha256(dropped),
         }
-        assert [(entry["role"], entry["name"]) for entry in written["sources"]] == [
+        assert [(source["role"], source["name"]) for source in written["sources"]] == [
             ("pairs", "ncit"),
             ("pairs", "cdisc"),
             ("benchmark", "abcd-benchmark"),

@@ -219,17 +219,17 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
         (predictions,) = Path(folder).glob("*_predictions_cosine.jsonl")
         lines = predictions.read_text(encoding="utf-8").splitlines()
         ranked = {}
-        for entry in map(json.loads, lines):
-            query, results = entry["query_id"], entry["results"]
+        for prediction in map(json.loads, lines):
+            query, hits = prediction["query_id"], prediction["results"]
             rank = next(
                 position
-                for position, hit in enumerate(results, 1)
+                for position, hit in enumerate(hits, 1)
                 if hit["corpus_id"] in expected[query]
             )
             ranked[query] = {
                 "rank": rank,
-                "top1_target": results[0]["corpus_id"],
-                "top1_similarity": round(results[0]["score"], 4),
+                "top1_target": hits[0]["corpus_id"],
+                "top1_similarity": round(hits[0]["score"], 4),
             }
 
     # The evaluator names each metric after its score function, as in
@@ -498,9 +498,9 @@ def check_run_files(run_folder, record):
     Raises:
         ValueError: If a file is missing or differs from the record.
     """
-    for name, entry in record["files"].items():
+    for name, file_record in record["files"].items():
         path = run_folder / name
-        if not path.exists() or file_sha256(path) != entry.get("sha256"):
+        if not path.exists() or file_sha256(path) != file_record.get("sha256"):
             raise ValueError(
                 f"{path} differs from the run's record, so it is not the model"
                 f" that run {record['run']} trained"

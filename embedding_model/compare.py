@@ -267,10 +267,10 @@ def wilson_interval(values):
         tuple[float, float]: The interval's low and high ends.
     """
     values = np.asarray(values)
-    result = stats.binomtest(int(values.sum()), len(values)).proportion_ci(
+    interval = stats.binomtest(int(values.sum()), len(values)).proportion_ci(
         confidence_level=CONFIDENCE, method="wilson"
     )
-    return float(result.low), float(result.high)
+    return float(interval.low), float(interval.high)
 
 
 def newcombe_interval(model_values, reference_values):
@@ -364,8 +364,8 @@ def paired_test(metric, model_values, reference_values):
         only_reference = int(((model_values == 0) & (reference_values == 1)).sum())
         if only_model + only_reference == 0:
             return MCNEMAR, 1.0
-        result = stats.binomtest(only_model, only_model + only_reference, 0.5)
-        return MCNEMAR, float(result.pvalue)
+        binomial_test = stats.binomtest(only_model, only_model + only_reference, 0.5)
+        return MCNEMAR, float(binomial_test.pvalue)
     differences = np.asarray(model_values, dtype=float) - np.asarray(
         reference_values, dtype=float
     )
@@ -408,7 +408,7 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
     Returns:
         dict: The row of the comparison's ``metrics.csv``.
     """
-    result = {
+    comparison_row = {
         "model": label,
         "benchmark": benchmark,
         "benchmark_version": built_version,
@@ -421,12 +421,12 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
             low, high = wilson_interval(values[metric])
         else:
             low, high = t_interval(values[metric])
-        result[metric] = float(row[metric])
-        result[f"{metric}_low"] = round(low, 4)
-        result[f"{metric}_high"] = round(high, 4)
-    result[f"ndcg@{NDCG_CUTOFF}"] = float(row[f"ndcg@{NDCG_CUTOFF}"])
-    result["median_rank"] = float(row["median_rank"])
-    return result
+        comparison_row[metric] = float(row[metric])
+        comparison_row[f"{metric}_low"] = round(low, 4)
+        comparison_row[f"{metric}_high"] = round(high, 4)
+    comparison_row[f"ndcg@{NDCG_CUTOFF}"] = float(row[f"ndcg@{NDCG_CUTOFF}"])
+    comparison_row["median_rank"] = float(row["median_rank"])
+    return comparison_row
 
 
 def difference_rows(benchmark, reference, others, values):
@@ -864,7 +864,7 @@ def differences_figure(benchmark_results, models, reference, differences):
         for drawn_model in drawn(models, reference)
         if drawn_model[0] != reference
     ]
-    found = {
+    differences_by_key = {
         (row["benchmark"], row["metric"], row["model"]): row for row in differences
     }
     spread = 0.6 / len(others)
@@ -872,7 +872,7 @@ def differences_figure(benchmark_results, models, reference, differences):
         lowest = highest = 0.0
         for line, metric in enumerate(FIGURE_METRICS):
             for index, (model, legend_label, place) in enumerate(others):
-                row = found[(benchmark, metric, model)]
+                row = differences_by_key[(benchmark, metric, model)]
                 height = line + (index - (len(others) - 1) / 2) * spread
                 axes.errorbar(
                     row["difference"],

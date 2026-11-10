@@ -110,8 +110,8 @@ def write_corpus(
 
 def corpus_rows():
     """The fictional corpus's pairs: the training pairs, then the validation pairs."""
-    rows = [pair(*texts, corpus.TRAIN) for texts in TRAINING]
-    return rows + [pair(*texts, corpus.VALIDATION) for texts in VALIDATION]
+    rows = [pair(*pair_texts, corpus.TRAIN) for pair_texts in TRAINING]
+    return rows + [pair(*pair_texts, corpus.VALIDATION) for pair_texts in VALIDATION]
 
 
 @pytest.fixture(autouse=True)
@@ -191,14 +191,16 @@ class TestFeatures:
 
     def test_ids_give_what_staticembedding_preprocess_gives(self, inputs):
         """features() on the ids equals StaticEmbedding.preprocess() on the texts."""
-        trained = trained_tokenizer(inputs)
-        model = static.build(static.Settings(embedding_dim=8), trained)
-        texts = [anchor for anchor, _ in TRAINING]
+        corpus_tokenizer = trained_tokenizer(inputs)
+        model = static.build(static.Settings(embedding_dim=8), corpus_tokenizer)
+        anchors = [anchor for anchor, _ in TRAINING]
         ids = [
             encoding.ids
-            for encoding in trained.encode_batch(texts, add_special_tokens=False)
+            for encoding in corpus_tokenizer.encode_batch(
+                anchors, add_special_tokens=False
+            )
         ]
-        expected = model[0].preprocess(texts)
+        expected = model[0].preprocess(anchors)
         found = static.features(ids)
         assert found.keys() == expected.keys()
         for key in expected:
@@ -210,10 +212,10 @@ class TestFeatures:
             SentenceTransformerDataCollator,
         )
 
-        trained = trained_tokenizer(inputs)
-        model = static.build(static.Settings(embedding_dim=8), trained)
+        corpus_tokenizer = trained_tokenizer(inputs)
+        model = static.build(static.Settings(embedding_dim=8), corpus_tokenizer)
         pairs = pd.DataFrame(TRAINING, columns=["anchor", "positive"])
-        ids = train.token_ids(pairs, trained)
+        ids = train.token_ids(pairs, corpus_tokenizer)
         live = SentenceTransformerDataCollator(preprocess_fn=model.preprocess)
         cached = SentenceTransformerDataCollator(preprocess_fn=static.features)
         expected = live(pairs.to_dict("records"))
@@ -230,10 +232,10 @@ class TestFeatures:
              ("BMI", full), ("bmi", "Body Mass Index")],
             columns=["anchor", "positive"],
         )  # fmt: skip
-        queries, corpus, relevant = train.validation_texts(pairs)
+        queries, corpus_texts, relevant = train.validation_texts(pairs)
         full_key = "body mass index: weight divided by height squared"
         assert queries == {"bmi": "BMI", "quetelet index": "Quetelet index"}
-        assert corpus == {"body mass index": "Body mass index", full_key: full}
+        assert corpus_texts == {"body mass index": "Body mass index", full_key: full}
         assert relevant == {
             "bmi": {"body mass index", full_key},
             "quetelet index": {"body mass index"},
@@ -583,10 +585,10 @@ class TestTrain:
         assert recorded["training"]["seed"] == 0
         assert "output_dir" not in recorded["training"]
         logged = json.loads((run / "trainer_state.json").read_text())["log_history"]
-        assert [entry["step"] for entry in logged if "loss" in entry] == list(
-            range(1, 7)
-        )
-        assert any("eval_validation_cosine_mrr@10" in entry for entry in logged)
+        assert [
+            log_entry["step"] for log_entry in logged if "loss" in log_entry
+        ] == list(range(1, 7))
+        assert any("eval_validation_cosine_mrr@10" in log_entry for log_entry in logged)
 
     def test_the_recorded_config_trains_the_same_model(self, inputs, config, tmp_path):
         """The run's own config.yaml, with the same seed, gives the same model."""
@@ -627,13 +629,13 @@ class TestTrain:
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
         manifest = outputs / train.RUNS / "abcd-run_s0" / "manifest.json"
-        earlier = manifest.read_text()
+        earlier_manifest = manifest.read_text()
         monkeypatch.setattr(train, "fit", lambda *args: pytest.fail("the run trained"))
         assert train.train(config, 0, ["--learning_rate", "0.05"], inputs, outputs) == 1
         error = capsys.readouterr().err
         assert "run abcd-run_s0 exists, trained with other settings" in error
         assert "learning_rate 0.2, here 0.05" in error
-        assert manifest.read_text() == earlier
+        assert manifest.read_text() == earlier_manifest
 
     def test_a_run_with_the_same_settings_replaces_the_earlier_run(
         self, inputs, tmp_path, monkeypatch
@@ -650,13 +652,13 @@ class TestTrain:
         assert train.train(path, 0, [], inputs, outputs) == 0
         recorded = outputs / train.RUNS / "abcd-run_s0" / "config.yaml"
         assert yaml.safe_load(recorded.read_text())["training"]["report_to"] == []
-        trained = []
+        fit_calls = []
         fit = train.fit
         monkeypatch.setattr(
-            train, "fit", lambda *args: trained.append(True) or fit(*args)
+            train, "fit", lambda *args: fit_calls.append(True) or fit(*args)
         )
         assert train.train(path, 0, [], inputs, outputs) == 0
-        assert trained == [True]
+        assert fit_calls == [True]
 
     def test_an_earlier_run_whose_config_cannot_be_read_is_kept(
         self, inputs, config, tmp_path, capsys
@@ -696,21 +698,21 @@ class TestTrain:
         """The run records the commit of the code that it started with."""
         from sentence_transformers import SentenceTransformerTrainer
 
-        trained = []
+        train_calls = []
         fit = SentenceTransformerTrainer.train
 
         def marked(trainer, *args, **kwargs):
             """The trainer's train, marked as done."""
-            result = fit(trainer, *args, **kwargs)
-            trained.append(True)
-            return result
+            train_output = fit(trainer, *args, **kwargs)
+            train_calls.append(True)
+            return train_output
 
         monkeypatch.setattr(SentenceTransformerTrainer, "train", marked)
         monkeypatch.setattr(
             train,
             "code_commit",
             lambda: {
-                "commit": "abcd456" if trained else "abcd123",
+                "commit": "abcd456" if train_calls else "abcd123",
                 "uncommitted_changes": False,
             },
         )
@@ -775,7 +777,9 @@ class TestTrain:
         self, inputs, config, tmp_path, capsys
     ):
         """A run evaluates on validation pairs, so a corpus needs them."""
-        write_corpus(inputs, [pair(*texts, corpus.TRAIN) for texts in TRAINING])
+        write_corpus(
+            inputs, [pair(*pair_texts, corpus.TRAIN) for pair_texts in TRAINING]
+        )
         assert train.train(config, 0, [], inputs, tmp_path / "outputs") == 1
         assert "no validation pairs" in capsys.readouterr().err
 

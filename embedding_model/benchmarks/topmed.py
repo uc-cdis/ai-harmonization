@@ -98,8 +98,8 @@ def read_documentation(archive):
                     "type": document.get("data_type") or "",
                     "description": (document.get("description") or "").strip(),
                     "values": [
-                        str(entry["value"])
-                        for entry in document.get("encoded_values") or []
+                        str(encoded_value["value"])
+                        for encoded_value in document.get("encoded_values") or []
                     ],
                     "has_age": bool(document.get("has_age_variable")),
                     "components": references,

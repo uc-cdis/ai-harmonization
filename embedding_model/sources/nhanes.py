@@ -178,9 +178,9 @@ def page(url, path, marker):
             fetch downloads it again.
     """
 
-    def check(data):
+    def check(file_bytes):
         """Raise unless the page holds its marker."""
-        if marker not in data:
+        if marker not in file_bytes:
             raise ValueError(f"{url} answered with another page; nothing was kept")
 
     return downloaded(url, path, check=check).read_bytes()
@@ -294,9 +294,9 @@ def fetch_source(downloads, manifest):
     codebook, values, missing = [], [], []
     digest, read = hashlib.sha256(), []
     for index, (first_year, data_file) in enumerate(files, start=1):
-        entry = f"{first_year}/{data_file}"
-        if entry in known:
-            missing.append(entry)
+        codebook_name = f"{first_year}/{data_file}"
+        if codebook_name in known:
+            missing.append(codebook_name)
             continue
         url = CODEBOOK.format(cycle=first_year, data_file=data_file)
         path = downloads / "codebooks" / str(first_year) / f"{data_file}.htm"
@@ -304,7 +304,7 @@ def fetch_source(downloads, manifest):
             text = page(url, path, CODEBOOK_MARKER)
         except Exception as error:
             if not_found(error):
-                missing.append(entry)
+                missing.append(codebook_name)
                 continue
             # The pages not found so far are listed, with those known before,
             # so the next fetch does not ask for them again.
@@ -314,7 +314,7 @@ def fetch_source(downloads, manifest):
                 " Fetch again: the pages kept are not asked for again."
             ) from error
         read.append(path)
-        digest.update(f"{entry}:".encode() + hashlib.sha256(text).digest())
+        digest.update(f"{codebook_name}:".encode() + hashlib.sha256(text).digest())
         codebook_rows, labels = read_codebook(text)
         key = {"cycle": str(first_year), "data_file": data_file}
         codebook += [{**key, **row} for row in codebook_rows]

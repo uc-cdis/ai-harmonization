@@ -210,7 +210,7 @@ def read_history(path):
                 " python -m embedding_model sources fetch --source ncit"
             )
         with bundle.open(members[0]) as stream:
-            records = pd.read_csv(
+            history = pd.read_csv(
                 stream,
                 sep="|",
                 header=None,
@@ -218,14 +218,14 @@ def read_history(path):
                 keep_default_na=False,
                 quoting=csv.QUOTE_NONE,
             )
-    if records.shape[1] != 6:
+    if history.shape[1] != 6:
         raise ValueError(
             f"{path}: a history record has 6 fields, and these lines have"
-            f" {records.shape[1]}"
+            f" {history.shape[1]}"
         )
-    records = records[[0, 2, 3, 4]]
-    records.columns = ["code", "action", "date", "reference"]
-    return records
+    history = history[[0, 2, 3, 4]]
+    history.columns = ["code", "action", "date", "reference"]
+    return history
 
 
 def replacements(codes, history, names):
@@ -249,22 +249,22 @@ def replacements(codes, history, names):
             ``replacement_code`` and ``replacement_name`` where the record
             names a replacement.
     """
-    records = history[
+    merged_or_retired = history[
         history.code.isin(set(codes)) & history.action.isin(["merge", "retire"])
     ]
     merged = (
-        (records.action == "merge")
-        & ~records.reference.isin(["", "null"])
-        & (records.reference != records.code)
+        (merged_or_retired.action == "merge")
+        & ~merged_or_retired.reference.isin(["", "null"])
+        & (merged_or_retired.reference != merged_or_retired.code)
     )
-    replacement = records.reference.where(merged, "")
+    replacement = merged_or_retired.reference.where(merged, "")
     frame = pd.DataFrame(
         {
-            "code": records.code,
-            "action": records.action,
-            "date": pd.to_datetime(records.date, format="%d-%b-%y").dt.strftime(
-                "%Y-%m-%d"
-            ),
+            "code": merged_or_retired.code,
+            "action": merged_or_retired.action,
+            "date": pd.to_datetime(
+                merged_or_retired.date, format="%d-%b-%y"
+            ).dt.strftime("%Y-%m-%d"),
             "replacement_code": replacement,
             "replacement_name": replacement.map(names).fillna(""),
         }

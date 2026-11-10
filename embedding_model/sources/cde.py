@@ -59,9 +59,9 @@ def export(path, url, query):
     total = search_total()
     read = []
 
-    def check(data):
+    def check(file_bytes):
         """Read the export, and raise unless it holds the search's total."""
-        read.append(json.loads(data))
+        read.append(json.loads(file_bytes))
         if len(read[0]) != total:
             raise ValueError(
                 f"the export holds {len(read[0]):,} elements and the search "

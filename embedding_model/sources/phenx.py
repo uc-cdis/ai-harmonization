@@ -248,10 +248,10 @@ def read_export(dump):
     }
 
 
-def check_export(data):
-    """Raise unless the data is a zip holding PhenX's dump."""
+def check_export(file_bytes):
+    """Raise unless the file's bytes are a zip holding PhenX's dump."""
     try:
-        with zipfile.ZipFile(io.BytesIO(data)) as bundle:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as bundle:
             names = bundle.namelist()
     except Exception as error:
         raise ValueError(

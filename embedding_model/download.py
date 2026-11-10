@@ -36,19 +36,19 @@ def modified(path):
     return date.fromtimestamp(Path(path).stat().st_mtime).isoformat()
 
 
-def keep(path, data):
+def keep(path, file_bytes):
     """Write a file whole, or not at all.
 
-    The data is written under a temporary name and renamed when complete, so
+    The bytes are written under a temporary name and renamed when complete, so
     an interrupted write never leaves a truncated copy to be read later.
 
     Args:
         path (Path): Where the file is kept.
-        data (bytes): Its contents.
+        file_bytes (bytes): Its contents.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(path.name + ".part")
-    partial.write_bytes(data)
+    partial.write_bytes(file_bytes)
     partial.replace(path)
 
 
@@ -129,10 +129,12 @@ def downloaded(url, path, json=None, auth=None, check=None):
     """
     path = Path(path)
     if not path.exists():
-        data = fetch(url, json=json, auth=auth, html_ok=path.suffix in HTML_SUFFIXES)
+        file_bytes = fetch(
+            url, json=json, auth=auth, html_ok=path.suffix in HTML_SUFFIXES
+        )
         if check is not None:
-            check(data)
-        keep(path, data)
+            check(file_bytes)
+        keep(path, file_bytes)
     return path
 
 

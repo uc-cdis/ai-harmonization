@@ -108,9 +108,15 @@ class TestTokenizer:
 
     def test_decoding_shows_the_tokens(self):
         """Without a decoder, decoding joins the tokens with spaces, words kept apart."""
-        trained = tokenizer.learn(["body weight", "body_weight"], 100, 2)
-        assert trained.decode(trained.encode("Body Weight").ids) == "body weight"
-        assert trained.decode(trained.encode("body_weight").ids) == "body _ weight"
+        trained_tokenizer = tokenizer.learn(["body weight", "body_weight"], 100, 2)
+        assert (
+            trained_tokenizer.decode(trained_tokenizer.encode("Body Weight").ids)
+            == "body weight"
+        )
+        assert (
+            trained_tokenizer.decode(trained_tokenizer.encode("body_weight").ids)
+            == "body _ weight"
+        )
 
     def test_the_same_texts_give_the_same_tokenizer(self):
         """BPE training is reproducible, ids included."""
@@ -121,23 +127,23 @@ class TestTokenizer:
 
     def test_the_diagnostics(self):
         """Whole words give fertility 1; a word cut into 4 tokens gives 4; unknown characters show."""
-        trained = tokenizer.learn(["abcd abcd", "abcd abcd"], 100, 2)
-        whole = tokenizer.diagnostics(trained, ["abcd abcd"])
+        trained_tokenizer = tokenizer.learn(["abcd abcd", "abcd abcd"], 100, 2)
+        whole = tokenizer.diagnostics(trained_tokenizer, ["abcd abcd"])
         assert (whole["fertility"], whole["words_split"]) == (1.0, 0.0)
         assert whole["unknown_rate"] == 0.0
-        tokens = trained.get_vocab_size() - len(tokenizer.SPECIAL_TOKENS)
+        tokens = trained_tokenizer.get_vocab_size() - len(tokenizer.SPECIAL_TOKENS)
         assert whole["vocabulary_used"] == round(1 / tokens, 4)
-        split = tokenizer.diagnostics(trained, ["dcba"])
+        split = tokenizer.diagnostics(trained_tokenizer, ["dcba"])
         assert (split["fertility"], split["words_split"]) == (4.0, 1.0)
-        assert tokenizer.diagnostics(trained, ["wxyz"])["unknown_rate"] == 1.0
+        assert tokenizer.diagnostics(trained_tokenizer, ["wxyz"])["unknown_rate"] == 1.0
 
     def test_the_diagnostics_are_the_same_in_batches(self, monkeypatch):
         """Texts encoded in several batches give the same diagnostics as one batch."""
         texts = [text for row in TRAINING for text in row]
-        trained = tokenizer.learn(texts, 100, 2)
-        whole = tokenizer.diagnostics(trained, texts)
+        trained_tokenizer = tokenizer.learn(texts, 100, 2)
+        whole = tokenizer.diagnostics(trained_tokenizer, texts)
         monkeypatch.setattr(tokenizer, "BATCH_SIZE", 2)
-        assert tokenizer.diagnostics(trained, texts) == whole
+        assert tokenizer.diagnostics(trained_tokenizer, texts) == whole
 
     def test_default_names(self):
         """A default name is the corpus and the size, in thousands when it can be."""
@@ -153,7 +159,7 @@ class TestTrain:
         """The tokenizer is written with a manifest of its corpus, settings and counts."""
         assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
         folder = inputs / "tokenizers" / "abcd-corpus-100"
-        trained = Tokenizer.from_file(str(folder / "tokenizer.json"))
+        trained_tokenizer = Tokenizer.from_file(str(folder / "tokenizer.json"))
         written = json.loads((folder / "manifest.json").read_text())
         corpus_manifest = json.loads(
             (inputs / "corpora" / "abcd-corpus" / "manifest.json").read_text()
@@ -177,21 +183,22 @@ class TestTrain:
             "tokenizers": tokenizers.__version__,
         }
         assert [
-            token.content for token in trained.get_added_tokens_decoder().values()
+            token.content
+            for token in trained_tokenizer.get_added_tokens_decoder().values()
         ] == tokenizer.SPECIAL_TOKENS
         assert written["counts"]["training_texts"] == 9
-        assert written["counts"]["vocabulary"] == trained.get_vocab_size()
+        assert written["counts"]["vocabulary"] == trained_tokenizer.get_vocab_size()
         assert written["counts"]["diagnostics"]["unknown_rate"] == 0.0
         assert "9 distinct training texts" in capsys.readouterr().out
 
     def test_only_training_texts_shape_the_vocabulary(self, inputs):
         """A validation pair's letters are not in the vocabulary."""
         assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
-        trained = Tokenizer.from_file(
+        trained_tokenizer = Tokenizer.from_file(
             str(inputs / "tokenizers" / "abcd-corpus-100" / "tokenizer.json")
         )
-        assert trained.token_to_id("q") is None
-        assert set(trained.encode("qwkz").tokens) == {tokenizer.UNKNOWN}
+        assert trained_tokenizer.token_to_id("q") is None
+        assert set(trained_tokenizer.encode("qwkz").tokens) == {tokenizer.UNKNOWN}
 
     def test_a_retrain_replaces_the_previous_tokenizer(self, inputs):
         """A second training of one name replaces the first, and leaves no work folder."""

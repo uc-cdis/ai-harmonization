@@ -55,12 +55,12 @@ def documentation_archive(documents):
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         for path, content in documents.items():
-            data = (
+            file_bytes = (
                 content if isinstance(content, bytes) else json.dumps(content).encode()
             )
-            info = tarfile.TarInfo(f"{COMMIT_FOLDER}/{path}")
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
+            member = tarfile.TarInfo(f"{COMMIT_FOLDER}/{path}")
+            member.size = len(file_bytes)
+            tar.addfile(member, io.BytesIO(file_bytes))
     return buffer.getvalue()
 
 
@@ -482,12 +482,12 @@ def dictionary_archive(schemas):
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
         for name, schema in schemas.items():
-            data = yaml.safe_dump(schema).encode()
+            file_bytes = yaml.safe_dump(schema).encode()
             member = tarfile.TarInfo(
                 f"gdcdictionary-abcd1234/src/gdcdictionary/schemas/{name}"
             )
-            member.size = len(data)
-            tar.addfile(member, io.BytesIO(data))
+            member.size = len(file_bytes)
+            tar.addfile(member, io.BytesIO(file_bytes))
     return buffer.getvalue()
 
 
@@ -775,26 +775,28 @@ class TestReadSourceTable:
     def test_mcdermott_column_loses_its_tab(self):
         """McDermott's column name ending in a tab is renamed; other names are kept as published."""
         tabbed = "Age in Months at Time of Tissue Procurement \t"
-        data = spreadsheet({tabbed: [820], "Site ": ["Ovary"]})
-        assert list(gdc.read_source_table(data, "Clinical", "McDermott").columns) == [
+        file_bytes = spreadsheet({tabbed: [820], "Site ": ["Ovary"]})
+        assert list(
+            gdc.read_source_table(file_bytes, "Clinical", "McDermott").columns
+        ) == [
             "Age in Months at Time of Tissue Procurement",
             "Site ",
         ]
-        assert tabbed in gdc.read_source_table(data, "Clinical", "Abcd").columns
+        assert tabbed in gdc.read_source_table(file_bytes, "Clinical", "Abcd").columns
 
     def test_column_types_are_those_of_its_csv(self):
         """Numbers stored as text in the sheet read as numbers, as GDC-SM's CSV tables do."""
-        data = spreadsheet({"Age": ["61", "70"], "Site": ["Ovary", "Lung"]})
-        table = gdc.read_source_table(data, "Clinical", "Abcd")
+        file_bytes = spreadsheet({"Age": ["61", "70"], "Site": ["Ovary", "Lung"]})
+        table = gdc.read_source_table(file_bytes, "Clinical", "Abcd")
         assert table["Age"].tolist() == [61, 70]
         assert table["Site"].tolist() == ["Ovary", "Lung"]
 
     def test_vasaikar_loses_its_label_and_count_rows(self):
         """As GDC-SM's script does, Vasaikar's first (type labels) and last (counts) rows go."""
-        data = spreadsheet(
+        file_bytes = spreadsheet(
             {"Gender": ["BIN", "Male", "Female", 2], "Age": ["CON", 61, 70, 2]}
         )
-        table = gdc.read_source_table(data, "Clinical", "Vasaikar")
+        table = gdc.read_source_table(file_bytes, "Clinical", "Vasaikar")
         assert table["Gender"].tolist() == ["Male", "Female"]
         assert pd.api.types.is_numeric_dtype(table["Age"])
 
@@ -858,9 +860,9 @@ class TestGdcPapers:
             if source["role"] == "source text"
         }
         assert set(cited) == set(gdc.PAPERS)
-        for paper, entry in gdc.PAPERS.items():
-            assert cited[paper] == f"https://doi.org/{entry['doi']}"
-            assert entry["license"] in {"CC-BY-4.0", "CC-BY-NC-ND-4.0"}
+        for paper, paper_details in gdc.PAPERS.items():
+            assert cited[paper] == f"https://doi.org/{paper_details['doi']}"
+            assert paper_details["license"] in {"CC-BY-4.0", "CC-BY-NC-ND-4.0"}
 
 
 class TestGdcMappingRows:
@@ -1151,16 +1153,16 @@ class TestBuild:
                 {},
             ),
         )
-        manifests = tmp_path / "manifests"
-        manifests.mkdir()
-        (manifests / "topmed.json").write_text(
+        manifests_folder = tmp_path / "manifests"
+        manifests_folder.mkdir()
+        (manifests_folder / "topmed.json").write_text(
             json.dumps({"version": "1", "files": {}, "sources": [PIN]})
         )
-        monkeypatch.setattr(benchmarks, "MANIFESTS", manifests)
+        monkeypatch.setattr(benchmarks, "MANIFESTS", manifests_folder)
         monkeypatch.setattr(benchmarks.manifests, "committed_version", lambda *_: None)
         return (
             built,
-            manifests / "topmed.json",
+            manifests_folder / "topmed.json",
             tmp_path / "inputs" / "benchmarks" / "topmed",
         )
 

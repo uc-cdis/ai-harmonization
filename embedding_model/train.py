@@ -295,9 +295,9 @@ def read_config(path, seed, overrides=(), run_name=None):
         other_flags = sorted(flags & class_setting_names[other])
         other_settings = sorted(model_given & class_setting_names[other])
         if other_flags or other_settings:
-            where = f"--{other_flags[0]}" if other_flags else other_settings[0]
+            setting = f"--{other_flags[0]}" if other_flags else other_settings[0]
             raise ValueError(
-                f"{path}: {where} is a setting of the {other} architecture, and"
+                f"{path}: {setting} is a setting of the {other} architecture, and"
                 f" this run's architecture is {architecture}"
             )
     if "learning_rate" not in training_given:
@@ -619,9 +619,9 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
     seconds = trainer.train().metrics["train_runtime"]
     evaluated = next(
         (
-            entry
-            for entry in reversed(trainer.state.log_history)
-            if "eval_loss" in entry
+            log_entry
+            for log_entry in reversed(trainer.state.log_history)
+            if "eval_loss" in log_entry
         ),
         None,
     )
@@ -818,21 +818,23 @@ def check_earlier_run(destination, settings, seed, run_name):
     )
     try:
         earlier_values, _ = read_config(destination / "config.yaml", seed, [], run_name)
-        earlier = setting_values(apply_config(earlier_values))
+        earlier_setting_values = setting_values(apply_config(earlier_values))
     except Exception as error:
         raise ValueError(
             f"run {run_name} exists, and its config.yaml cannot be read"
             f" ({type(error).__name__}: {error}); {next_steps}"
         ) from error
-    now = setting_values(settings)
+    this_run_setting_values = setting_values(settings)
     changed = [
         name
-        for name in sorted(set(earlier) | set(now))
-        if earlier.get(name) != now.get(name)
+        for name in sorted(set(earlier_setting_values) | set(this_run_setting_values))
+        if earlier_setting_values.get(name) != this_run_setting_values.get(name)
     ]
     if changed:
         shown = ", ".join(
-            f"{name} {earlier.get(name)}, here {now.get(name)}" for name in changed[:3]
+            f"{name} {earlier_setting_values.get(name)},"
+            f" here {this_run_setting_values.get(name)}"
+            for name in changed[:3]
         )
         more = f", and {len(changed) - 3} more" if len(changed) > 3 else ""
         raise ValueError(
@@ -888,15 +890,17 @@ def train(config, seed, overrides, inputs, outputs):
         print(f"{type(error).__name__}: {error}", file=sys.stderr)
         return 1
 
-    data, training = settings["data"], settings["training"]
-    device = device_name(training)
+    data_settings, training_arguments = settings["data"], settings["training"]
+    device = device_name(training_arguments)
     print(
         f"  run {run_name}: {settings['model'].architecture} model, corpus"
-        f" {data.corpus}, tokenizer {data.tokenizer}, on {device}\n"
+        f" {data_settings.corpus}, tokenizer {data_settings.tokenizer}, on {device}\n"
         f"  {len(training_pairs):,} training pairs,"
         f" {len(validation_pairs):,} validation pairs"
     )
-    note = tokenizer_note(data.corpus, data.tokenizer, tokenizer_manifest)
+    note = tokenizer_note(
+        data_settings.corpus, data_settings.tokenizer, tokenizer_manifest
+    )
     if note:
         print(note)
 
@@ -904,7 +908,7 @@ def train(config, seed, overrides, inputs, outputs):
     # does not change the commit that the run writes.
     commit = code_commit()
     with staged(destination) as built:
-        training.output_dir = str(built / "trainer")
+        training_arguments.output_dir = str(built / "trainer")
         model, trainer, evaluated, seconds = fit(
             settings, tokenizer, training_pairs, validation_pairs
         )

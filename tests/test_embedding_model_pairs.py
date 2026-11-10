@@ -299,10 +299,12 @@ class TestNamesAndTypes:
     def test_a_copy_in_an_earlier_source_is_found_once_normalised(self):
         """A later source's pair is not new when only its case or accents differ."""
         seen = set()
-        earlier = pd.DataFrame({"anchor": ["Abcd"], "positive": ["Éfgh"]})
-        later = pd.DataFrame({"anchor": ["ABCD", "Ijkl"], "positive": ["efgh", "Mnop"]})
-        assert pairs.new_pairs(earlier, seen).tolist() == [True]
-        assert pairs.new_pairs(later, seen).tolist() == [False, True]
+        earlier_pairs = pd.DataFrame({"anchor": ["Abcd"], "positive": ["Éfgh"]})
+        later_pairs = pd.DataFrame(
+            {"anchor": ["ABCD", "Ijkl"], "positive": ["efgh", "Mnop"]}
+        )
+        assert pairs.new_pairs(earlier_pairs, seen).tolist() == [True]
+        assert pairs.new_pairs(later_pairs, seen).tolist() == [False, True]
 
 
 class TestStar:

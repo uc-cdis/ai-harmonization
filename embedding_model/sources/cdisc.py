@@ -45,7 +45,7 @@ def release_name(package):
     return f"CDISC {PACKAGES[package][0]} release"
 
 
-def read_package(data, package):
+def read_package(file_bytes, package):
     """One package's rows, with every cell a string.
 
     ``keep_default_na=False`` keeps submission values such as ``NA`` and
@@ -53,7 +53,7 @@ def read_package(data, package):
     so a double quote is read as text.
 
     Args:
-        data (bytes): The package's tab-separated file.
+        file_bytes (bytes): The package's tab-separated file.
         package (str): The package's key in PACKAGES.
 
     Returns:
@@ -63,7 +63,7 @@ def read_package(data, package):
         ValueError: If the file lacks one of COLUMNS.
     """
     frame = pd.read_csv(
-        io.BytesIO(data),
+        io.BytesIO(file_bytes),
         sep="\t",
         dtype=str,
         keep_default_na=False,
@@ -92,8 +92,8 @@ def fetch_source(downloads, manifest):
         released = pinned(manifest, release_name(package))["version"]
         name = f"{stem} {released}.txt"
         url = ARCHIVE.format(folder=folder, file=quote(name))
-        data = cached(url, downloads / name)
-        frame = read_package(data, package)
+        file_bytes = cached(url, downloads / name)
+        frame = read_package(file_bytes, package)
         rows[package] = len(frame)
         print(f"  {package:<9}{rows[package]:>8,} rows")
         frames.append(frame)
@@ -103,7 +103,7 @@ def fetch_source(downloads, manifest):
                 "name": release_name(package),
                 "location": url,
                 "version": released,
-                "sha256": sha256(data),
+                "sha256": sha256(file_bytes),
                 "license": LICENSE,
                 "citation": CITATION,
             }

@@ -246,13 +246,13 @@ def md5_check(expected):
         Callable[[bytes], None]: The check.
     """
 
-    def check(data):
-        """Raise unless the data has each expected MD5.
+    def check(file_bytes):
+        """Raise unless the file's bytes have each expected MD5.
 
         LOINC publishes MD5 checksums, so the check uses MD5. It finds a
         corrupt or wrong download, and is not used for security.
         """
-        digest = hashlib.md5(data, usedforsecurity=False).hexdigest()
+        digest = hashlib.md5(file_bytes, usedforsecurity=False).hexdigest()
         for whose, md5 in expected.items():
             if md5 and digest != md5:
                 raise ValueError(

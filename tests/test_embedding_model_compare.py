@@ -529,7 +529,7 @@ class TestCompare:
             parameters=PARAMETERS[REFERENCE],
         )
         monkeypatch.chdir(tmp_path)
-        result = compare.compare(
+        comparison_folder = compare.compare(
             "abcd-comparison",
             [str(folder.resolve()), OTHER],
             ["topmed"],
@@ -537,7 +537,7 @@ class TestCompare:
             outputs,
             reference="./abcd-model",
         )
-        differences = pd.read_csv(result / "differences.csv")
+        differences = pd.read_csv(comparison_folder / "differences.csv")
         assert set(differences.reference) == {"abcd-model"}
 
     def test_the_reference_is_matched_by_its_folder(self, built, tmp_path):

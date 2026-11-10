@@ -195,12 +195,12 @@ def require_papers(listed, mapped, papers):
         raise ValueError("; ".join(problems))
 
 
-def paper_source(paper, info, spreadsheet, papers):
+def paper_source(paper, paper_info, spreadsheet, papers):
     """The manifest entry for a paper's supplementary table, cited by its DOI.
 
     Args:
         paper (str): The paper's name in GDC-SM, such as ``Clark``.
-        info (dict): The paper's entry in ``papers_info.json``.
+        paper_info (dict): The paper's entry in ``papers_info.json``.
         spreadsheet (bytes): The table's file, as downloaded.
         papers (dict): Each paper's dbGaP study, DOI and license, as in PAPERS.
 
@@ -210,7 +210,7 @@ def paper_source(paper, info, spreadsheet, papers):
     return {
         "role": "source text",
         "name": f"{paper}, supplementary table",
-        "location": info["Dataset URL"],
+        "location": paper_info["Dataset URL"],
         "sha256": sha256(spreadsheet),
         "license": papers[paper]["license"],
         "citation": f"https://doi.org/{papers[paper]['doi']}",
@@ -386,13 +386,13 @@ def mapping_rows(truth, tables, targets, papers):
             "source_table_id": paper,
             "source_variable_id": "",
             "source_variable_name": source,
-            "source_type": entry["type"],
+            "source_type": variable["type"],
             # GDC-SM describes no variable, so the description is left empty.
             "source_description": "",
-            "source_values": VALUE_SEPARATOR.join(entry["values"]),
-            "expected_target": sorted(entry["keys"]),
+            "source_values": VALUE_SEPARATOR.join(variable["values"]),
+            "expected_target": sorted(variable["keys"]),
         }
-        for (paper, source), entry in sorted(variables.items())
+        for (paper, source), variable in sorted(variables.items())
     ]
 
 
@@ -419,8 +419,8 @@ def resolved(schema, resolver):
     merged = {key: part for key, part in schema.items() if key != "$ref"}
     references = schema.get("$ref", [])
     for reference in references if isinstance(references, list) else [references]:
-        found = resolver.lookup(reference)
-        merged.update(resolved(found.contents, found.resolver))
+        referenced = resolver.lookup(reference)
+        merged.update(resolved(referenced.contents, referenced.resolver))
     return {key: resolved(part, resolver) for key, part in merged.items()}
 
 
@@ -492,13 +492,14 @@ def build(downloads, manifest):
     require_papers((name.removesuffix(".csv") for name in papers_info), truth, PAPERS)
 
     tables, sources = {}, []
-    for name, info in sorted(papers_info.items()):
+    for name, paper_info in sorted(papers_info.items()):
         paper = name.removesuffix(".csv")
         spreadsheet = cached(
-            info["Dataset URL"], downloads / PurePosixPath(info["Dataset URL"]).name
+            paper_info["Dataset URL"],
+            downloads / PurePosixPath(paper_info["Dataset URL"]).name,
         )
-        tables[paper] = read_source_table(spreadsheet, info["Sheet Name"], paper)
-        sources.append(paper_source(paper, info, spreadsheet, PAPERS))
+        tables[paper] = read_source_table(spreadsheet, paper_info["Sheet Name"], paper)
+        sources.append(paper_source(paper, paper_info, spreadsheet, PAPERS))
 
     release = manifests.pinned(manifest, DICTIONARY)
     commit = release["version"]

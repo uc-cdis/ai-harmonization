@@ -253,12 +253,12 @@ def read_tokenizer(inputs, name):
     record = manifests.read(manifest_path, command, "tokenizer", name)
     manifests.check_file(path, record, manifest_path, command)
     try:
-        trained = Tokenizer.from_file(str(path))
+        tokenizer = Tokenizer.from_file(str(path))
     except Exception as error:
         raise ValueError(
             f"{path} cannot be read ({type(error).__name__}: {error}); run: {command}"
         ) from error
-    return trained, record
+    return tokenizer, record
 
 
 def train(corpus, name, vocab_size, min_frequency, inputs):

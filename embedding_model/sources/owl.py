@@ -34,16 +34,20 @@ def statements(element):
     Returns:
         list[tuple[str, str]]: The statements, in the file's order.
     """
-    entries = []
+    element_statements = []
     for child in element:
         if not len(child):
-            entries.append((child.tag, child.get(RDF + "resource") or child.text or ""))
+            element_statements.append(
+                (child.tag, child.get(RDF + "resource") or child.text or "")
+            )
         elif child.tag == OWL + "equivalentClass":
             members = child.find(f"{OWL}Class/{OWL}intersectionOf")
             for member in members if members is not None else []:
                 if member.tag == RDF + "Description" and member.get(RDF + "about"):
-                    entries.append((DEFINED_PARENT, member.get(RDF + "about")))
-    return entries
+                    element_statements.append(
+                        (DEFINED_PARENT, member.get(RDF + "about"))
+                    )
+    return element_statements
 
 
 def read_owl(stream):

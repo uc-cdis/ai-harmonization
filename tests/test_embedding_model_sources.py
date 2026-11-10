@@ -511,8 +511,8 @@ class TestLoinc:
 
     def test_a_new_column_is_reported(self, capsys):
         """A column in neither list is printed and not read; a known column is not printed."""
-        data = loinc_zip({"ABCD_NEW": "abcd", "FORMULA": ""})
-        tables = loinc.read_release(io.BytesIO(data))
+        file_bytes = loinc_zip({"ABCD_NEW": "abcd", "FORMULA": ""})
+        tables = loinc.read_release(io.BytesIO(file_bytes))
         assert "ABCD_NEW" not in tables["codes"].columns
         printed = capsys.readouterr().out
         assert "new column in LoincTable/Loinc.csv: 'ABCD_NEW'; not read" in printed
@@ -560,17 +560,21 @@ class TestLoinc:
         self, monkeypatch, tmp_path
     ):
         """A download with LOINC's MD5 is refused, and not kept, when the manifest pins another."""
-        data = loinc_zip()
+        file_bytes = loinc_zip()
         monkeypatch.setenv("LOINC_USERNAME", "abcd")
         monkeypatch.setenv("LOINC_PASSWORD", "efgh")
         published = {
-            "downloadMD5Hash": hashlib.md5(data, usedforsecurity=False).hexdigest()
+            "downloadMD5Hash": hashlib.md5(
+                file_bytes, usedforsecurity=False
+            ).hexdigest()
         }
         monkeypatch.setattr(
             loinc, "fetch", lambda url, **request: json.dumps(published).encode()
         )
         monkeypatch.setattr(
-            loinc, "downloaded", served({loinc.DOWNLOAD.format(version="9.99"): data})
+            loinc,
+            "downloaded",
+            served({loinc.DOWNLOAD.format(version="9.99"): file_bytes}),
         )
         manifest = {
             "sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": "abcd"}]
@@ -581,9 +585,9 @@ class TestLoinc:
 
     def test_a_zip_with_the_pinned_md5_is_read(self, tmp_path):
         """A zip placed by hand with the pinned MD5 is read, and its MD5 recorded."""
-        data = loinc_zip()
-        (tmp_path / "Loinc_9.99.zip").write_bytes(data)
-        md5 = hashlib.md5(data, usedforsecurity=False).hexdigest()
+        file_bytes = loinc_zip()
+        (tmp_path / "Loinc_9.99.zip").write_bytes(file_bytes)
+        md5 = hashlib.md5(file_bytes, usedforsecurity=False).hexdigest()
         manifest = {"sources": [{"name": loinc.RELEASE, "version": "9.99", "md5": md5}]}
         tables, found, counts = loinc.fetch_source(tmp_path, manifest)
         assert len(tables["codes"]) == 3
@@ -597,7 +601,7 @@ class TestCdisc:
 
     def test_na_is_a_value_not_missing(self):
         """A submission value of NA stays the text NA."""
-        data = (
+        package_text = (
             "\t".join(cdisc.COLUMNS)
             + "\n"
             + "\t".join(
@@ -613,17 +617,17 @@ class TestCdisc:
                 ]
             )
         )
-        frame = cdisc.read_package(data.encode(), "sdtm")
+        frame = cdisc.read_package(package_text.encode(), "sdtm")
         assert frame["CDISC Submission Value"].tolist() == ["NA"]
         assert frame.package.tolist() == ["sdtm"]
 
     def test_quotes_are_text_and_a_lost_column_is_an_error(self):
         """A cell starting with a quote is read as written; a missing column raises."""
         row = ["C99999", "C99998", "", "Abcd", '"Abcd', "", "Abcd", "Abcd"]
-        data = "\t".join(cdisc.COLUMNS) + "\n" + "\t".join(row)
-        frame = cdisc.read_package(data.encode(), "sdtm")
+        package_text = "\t".join(cdisc.COLUMNS) + "\n" + "\t".join(row)
+        frame = cdisc.read_package(package_text.encode(), "sdtm")
         assert frame["CDISC Submission Value"].tolist() == ['"Abcd']
-        renamed = data.replace("CDISC Synonym(s)", "CDISC Synonyms")
+        renamed = package_text.replace("CDISC Synonym(s)", "CDISC Synonyms")
         with pytest.raises(ValueError):
             cdisc.read_package(renamed.encode(), "sdtm")
 
@@ -992,9 +996,9 @@ class TestNhanes:
     def test_a_failed_page_stops_the_fetch_at_once(self, pages, monkeypatch, tmp_path):
         """The fetch stops at the first page that fails, and asks for no page after it."""
         first = nhanes.CODEBOOK.format(cycle=2017, data_file="ABCD_J")
-        later = nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")
+        later_url = nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")
         pages[first] = requests.ConnectionError("connection reset")
-        pages[later] = CODEBOOK
+        pages[later_url] = CODEBOOK
         asked, serve = [], served(pages)
 
         def downloaded(url, path, **request):
@@ -1005,7 +1009,7 @@ class TestNhanes:
         monkeypatch.setattr(nhanes, "downloaded", downloaded)
         with pytest.raises(RuntimeError, match="ABCD_J"):
             nhanes.fetch_source(tmp_path, {"sources": []})
-        assert later not in asked
+        assert later_url not in asked
 
     def test_pages_not_found_before_a_failure_are_kept(
         self, pages, monkeypatch, tmp_path

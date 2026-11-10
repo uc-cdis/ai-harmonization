@@ -337,6 +337,20 @@ def apply_config(values):
     }
 
 
+def listed_gpus():
+    """The GPUs that CUDA_VISIBLE_DEVICES lists, by their ids, or None when it is unset.
+
+    An empty value lists no GPU.
+
+    Returns:
+        list[str] | None: Each GPU's id, as the variable gives it, or None.
+    """
+    listed = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if listed is None:
+        return None
+    return [gpu.strip() for gpu in listed.split(",") if gpu.strip()]
+
+
 def first_gpu_only():
     """Keep this process to one GPU: the first that CUDA_VISIBLE_DEVICES lists, or GPU 0.
 
@@ -354,9 +368,8 @@ def first_gpu_only():
         list[str]: The GPUs that CUDA_VISIBLE_DEVICES listed, when it listed
             several, and otherwise an empty list.
     """
-    listed = os.environ.get("CUDA_VISIBLE_DEVICES")
-    ids = [part.strip() for part in (listed or "").split(",") if part.strip()]
-    if listed is None:
+    ids = listed_gpus()
+    if ids is None:
         os.environ["CUDA_VISIBLE_DEVICES"] = "0"
         return []
     if len(ids) <= 1:

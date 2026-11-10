@@ -34,6 +34,7 @@ earlier text.
 - [Corpus](#corpus)
 - [Tokenizer](#tokenizer)
 - [Training](#training)
+- [Experiments](#experiments)
 - [References](#references)
 
 ## All steps
@@ -3013,6 +3014,314 @@ check that:
 - a list of one GPU, or an empty one, stays as it is;
 - `train` keeps to one GPU before it reads its config;
 - reading a config builds no training settings.
+
+### A run's seed is given on the command line, not in the config
+
+**Described in:** [training.md](training.md).
+
+**Context.** Runs of one config at several seeds differ only by their seed.
+A run is named after its config and its seed. An experiment trains each of
+its arms at several seeds.
+
+**Decision.** `train` takes the seed as `--seed`, which it needs. It overrides
+a seed in the config. An experiment lists its seeds, and refuses
+`training.seed` in its base and its arms.
+
+**Consequences.**
+
+- Good, because one config trains at many seeds, with no copy of it for each
+  seed.
+- Good, because a run's name says its seed, as in `run_example_s0`.
+- Bad, because a config alone does not say how to train a run: the seed is
+  needed too.
+
+**Alternatives considered.**
+
+- The seed in the config: a copy of the config for every seed.
+- A default seed: two runs of one config could share a seed by accident.
+
+**Confirmation.** The tests check that:
+
+- the seed given reaches the run's settings, and a seed below 0 is refused
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
+- the run is named after its config and its seed
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
+- an experiment refuses `training.seed` in its base and in an arm
+  ([test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)).
+
+## Experiments
+
+### One experiment asks one question, in one file
+
+**Described in:** [experiments.md](experiments.md#the-experiments-file).
+
+**Context.** Model development compares versions of a run's config, each at
+several seeds. Which change to try next depends on what the last comparison
+found. It also takes judgement, after a tie, a result near the margin, or a
+change that costs more. A comparison is fair when its arms, its seeds and its decision rule are
+fixed before its runs are read.
+
+**Decision.** An experiment is one file: a base, its arms, its seeds and its
+decision rule. It asks one question. The next experiment is another file,
+whose base names an arm of the one before.
+
+**Consequences.**
+
+- Good, because each question keeps its record, its file, beside its runs.
+- Good, because the person who runs the experiments chooses the next
+  question, from what the results show.
+- Good, because the rule is written before the runs are read, and stays
+  fixed for them: a [changed file is refused](#a-changed-experiment-file-is-refused-rather-than-trained-again).
+- Bad, because a series of experiments is many small files.
+
+**Alternatives considered.**
+
+- One file for a whole series, which trains each next comparison by the
+  rule: it would need a workflow engine. And the next question often needs a
+  person, after a tie or a result near the margin.
+- No file: each arm trained by hand, and compared when asked. The rule would
+  be given again at each comparison, and could change between them.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- a file is read with the decision rule's defaults, or its own;
+- the experiment is named after its file.
+
+### An experiment's file is checked with pydantic
+
+**Described in:** [experiments.md](experiments.md#the-experiments-file).
+
+**Context.** Users write an experiment's file by hand. It is nested YAML: the
+decision rule's fields, and each arm's test and settings by section. Most of
+its checks are of form: a field's type, its allowed values and its default. A
+few are rules of an experiment, such as different seeds. ai-harmonization
+depends on [pydantic](https://docs.pydantic.dev/), and its `SimpleDataModel`
+is a pydantic model. A run's config is read by `HfArgumentParser`.
+
+**Decision.** pydantic models check the file. What pydantic can declare is
+declared: a field's type, its values, its bounds, its length and its default.
+A validator in the same model holds each rule that pydantic cannot declare,
+such as different seeds. Each problem is reported with the file and the field.
+
+**Consequences.**
+
+- Good, because a field's type, values and default are written once, in the
+  model, and pydantic checks them.
+- Good, because every message has one form: the field, what is wrong, and
+  what was given.
+- Good, because pydantic is a dependency already, which ai-harmonization uses
+  for its own data model.
+- Good, because each validator holds one rule of an experiment, and nothing
+  that pydantic checks itself.
+- Bad, because pydantic's messages are in its own words, such as "Input should
+  be a valid integer".
+- Bad, because some rules of form still need a validator. pydantic 2 has no
+  check that a list's items differ. YAML reads an empty field as None, and
+  pydantic does not replace None with the field's default.
+
+**Alternatives considered.**
+
+- A check of our own for each field: a check and a message for each mistake,
+  in as many forms.
+- A JSON Schema, checked with jsonschema: a schema file beside the code, from
+  a package that ai-harmonization does not depend on directly.
+- `HfArgumentParser`, as for a run's config: it reads flat settings, while the
+  file nests its arms and their sections.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- a file that breaks a rule of an experiment, or of its fields, is refused,
+  with the file, the field and what is wrong;
+- an empty section, question or decision rule is read as its default.
+
+### The base can be an arm of an earlier experiment, whose runs are reused
+
+**Described in:** [experiments.md](experiments.md#building-on-an-earlier-experiment).
+
+**Context.** The next experiment most often starts from an arm of the last
+one. That arm's runs, at the same seeds, are already trained, from the same
+config.
+
+**Decision.** An experiment's base can name an arm of an earlier experiment,
+as `<experiment>/<arm>`. The base is then that arm's full config, and the
+arm's runs at the same seeds are reused. The other seeds train in the new
+experiment.
+
+**Consequences.**
+
+- Good, because no config is trained twice at the same seed.
+- Good, because the selection is written in the new file, by name, where a
+  reader sees which arm was chosen.
+- Bad, because the earlier experiment's folder must stay, since the new one
+  reads its runs. Without it, a base can still give the arm's settings in
+  full, from a copy of the arm's `configs/<arm>.yaml`. Its runs then train
+  again.
+- Bad, because a base run that the earlier experiment is still training
+  stops the new one, until it ends.
+
+**Alternatives considered.**
+
+- Training the base again in each experiment: the same runs, twice.
+- A path to a run config as the base: its runs could not be found, and a
+  first experiment would need two files. The first experiment gives its
+  base's settings in its own file instead.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- the earlier arm's runs are reused, and a seed that it lacks trains here,
+  from the earlier arm's config;
+- a base run that the earlier experiment is still training stops the new
+  one;
+- an earlier experiment or arm that does not exist is refused.
+
+### An experiment queues its runs itself, rather than submitting each as a job
+
+**Described in:** [experiments.md](experiments.md#gpus-and-cpus).
+
+**Context.** An experiment trains many runs, and something must decide when
+and where each one trains. Users train on a laptop with a GPU, on CPUs alone,
+or on a cluster with SLURM. `train` trains on the machine where it runs, and
+a cluster user runs it inside a job. A SLURM job can hold several GPUs of one
+node. A run trains on one GPU, as
+[its entry](#a-run-trains-on-one-gpu-the-first-one-it-sees) decides.
+
+**Decision.** `experiment train` queues its runs itself. Whenever one of its
+GPUs is free, it starts the next run, as `train` with that GPU in
+`CUDA_VISIBLE_DEVICES`. Without a GPU, one run trains at a time. On a
+cluster, the experiment is submitted as
+[one job](experiments.md#on-a-cluster-with-slurm), and its runs train inside
+it, not as jobs of their own.
+
+**Consequences.**
+
+- Good, because one command trains on a laptop and on a cluster. On a
+  cluster, it runs inside a job, as `train` does.
+- Good, because each run is the public `train` command, which can be run
+  again by hand.
+- Good, because it works with any scheduler, or none: the code holds none.
+- Good, because the experiment uses only the GPUs of its job, so it cannot
+  fill a shared cluster.
+- Bad, because the experiment's job holds all its GPUs until the last run
+  ends, although the GPUs of finished runs then wait.
+- Bad, because the experiment's job holds the GPUs of one node. One job per
+  run could train on many nodes at once, so on a large cluster it would
+  finish sooner.
+
+**Alternatives considered.**
+
+- One SLURM job per run, through an option such as `--slurm`: faster on a
+  large cluster. But it is code for SLURM alone, and its command has another
+  shape than `train`'s. It can also take every free GPU of the cluster at
+  once.
+- [submitit](https://github.com/facebookincubator/submitit): it submits
+  pickled Python functions, so a job would not be a public command, and its
+  requeues are not needed.
+- A SLURM job array: each task would look up its run from a number, so a job
+  would not be a public command either.
+- [Hydra](https://hydra.cc)'s multirun, with its submitit launcher: a second
+  config system beside `train`'s, whose sweeps do not express arms against a
+  base.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- with GPUs 2 and 3 visible, each run sees one of them;
+- without a GPU, each run keeps this process's environment;
+- each run is `train`'s public command, with its arm's config and its seed;
+- a failed run does not stop the others, and the next training retries only
+  it.
+
+### A changed experiment file is refused, rather than trained again
+
+**Described in:** [experiments.md](experiments.md#a-changed-file).
+
+**Context.** An experiment's runs are trained from its file, and can take
+hours of GPU time. `corpus build` and `compare` replace an output of the
+same name. `train` refuses a run of the same name that other settings
+trained. A file can be edited after its results are seen.
+
+**Decision.** The first training keeps a copy of the file. Each command reads
+the file and the copy, with the decision rule's defaults, and refuses a file
+whose fields differ. The message names those fields, and says to delete the
+experiment's folder to start again, or to give the file a new name.
+
+**Consequences.**
+
+- Good, because an experiment's folder holds the runs of one question.
+- Good, because the rule cannot change after the results are read.
+- Good, because a comment, another order of the fields, or a default
+  written out changes nothing.
+- Good, because `train` keeps a run the same way. It compares settings, not
+  bytes, and
+  [refuses a run of the same name](#a-run-of-the-same-name-with-other-settings-is-refused)
+  that other settings trained.
+- Bad, because the comparison is code of ours. Other checks of a file here
+  compare SHA-256s.
+
+**Alternatives considered.**
+
+- Training the changed file again from the start, as `corpus build`
+  replaces a corpus of the same name: one edited line would discard the
+  experiment's runs. It could also change the question after its results
+  were seen.
+- Comparing the two files' SHA-256s, as other checks of a file here do: a
+  changed comment would need a new name, or a deleted folder.
+- Comparing the two files as YAML reads them, without the defaults: a default
+  written out would count as a change.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- the first training keeps a copy of the file;
+- a file of the same name whose seeds differ is refused, and the message
+  names the seeds and both ways out;
+- a comment, another order of the fields, or a default written out is no
+  change.
+
+### An experiment's status comes from its run folders
+
+**Described in:** [experiments.md](experiments.md#following-it).
+
+**Context.** An experiment's runs train over hours, inside a job or on a
+laptop. A run that `train` finished has its manifest. A run that is training
+has a staging folder beside its folder.
+
+**Decision.** `experiment status` reads each run's folder: done with its
+manifest, started with a staging folder, and not started otherwise.
+`experiment train` trains the runs that are not done.
+
+**Consequences.**
+
+- Good, because there is no record of jobs to keep, and it works without a
+  scheduler.
+- Good, because training again uses the same states, so only the runs that
+  are not done train.
+- Bad, because a run that was stopped looks the same as one that is
+  training. A later experiment whose base run has started waits, until the
+  run finishes or its staging folder is deleted.
+
+**Alternatives considered.**
+
+- A stored table of the runs, a ledger: it can fall out of step with the
+  folders, which hold the runs themselves.
+- Asking the scheduler for the jobs, as with `squeue`: code for one
+  scheduler, which knows nothing of runs on a laptop.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
+check that:
+
+- a run is done with its manifest, started with a staging folder, and not
+  started otherwise;
+- `experiment status` counts each arm's runs by state.
 
 ## References
 

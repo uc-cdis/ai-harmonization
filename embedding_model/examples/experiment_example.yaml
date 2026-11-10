@@ -1,0 +1,21 @@
+# A small experiment on the README's example corpus: does a smaller table lose
+# validation MRR@10, or a larger one gain it? The base is run_example.yaml's
+# config, and each arm changes the table's dimension. Five seeds make fifteen
+# runs, which train on a CPU in a few minutes.
+# docs/experiments.md lists every field and its default.
+question: Does a smaller table lose validation MRR@10, or a larger one gain it?
+base:
+  data:
+    corpus: example
+    tokenizer: example-8k
+  training:
+    # The example is small enough for a CPU, where pinned memory has no use.
+    dataloader_pin_memory: false
+seeds: [0, 1, 2, 3, 4]
+arms:
+  dim256:
+    test: non-inferiority
+    model: {embedding_dim: 256}
+  dim2048:
+    test: superiority
+    model: {embedding_dim: 2048}

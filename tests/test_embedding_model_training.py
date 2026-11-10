@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from dataclasses import fields
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -241,6 +242,12 @@ class TestFeatures:
 
 class TestConfig:
     """The config's sections, the defaults under them and the flags over them."""
+
+    def test_the_readme_example_reads(self):
+        """The README's run_example.yaml is a config that train reads, on the example corpus and tokenizer."""
+        path = Path(train.__file__).parent / "examples" / "run_example.yaml"
+        values, _ = train.read_config(path, 0)
+        assert (values["corpus"], values["tokenizer"]) == ("example", "example-8k")
 
     def test_flags_override_the_config_and_the_config_the_defaults(self, config):
         """A flag wins over the config, and the config over TRAINING_DEFAULTS."""

@@ -56,41 +56,36 @@ of `pyproject.toml`, so installing `ai_harmonization` as a package leaves them
 out. With pip 25.1 or later, `pip install --group embedding-model` installs
 them.
 
-Everything runs on a CPU, model training included. A GPU matters for training.
-Training and scoring use a GPU if the machine has one. `train --use_cpu` and
-`score --device cpu` keep them on the CPU. The [quick start](#quick-start)
-examples train on a CPU in a few minutes.
-A model trained on all the sources takes minutes on a GPU or hours on a CPU,
-and a series of experiments trains many models.
+Everything runs on a CPU, model training included. Training and scoring use a
+GPU if the machine has one. `train --use_cpu` and `score --device cpu` keep
+them on the CPU. The [quick start](#quick-start) examples train on a CPU in a
+few minutes. A static model on all the sources trains in minutes too, even on a
+laptop's CPU. A BERT trains far more slowly, and needs a GPU for all the
+sources.
 
-A series' runs are trained in one of two ways:
-
-- `experiment submit` queues each run as its own [SLURM](https://slurm.schedmd.com/) job (`sbatch`), with
-  one GPU each, so they train in parallel. Use it on a cluster. Pass your
-  cluster's settings, such as partition and time limit, through `--slurm`.
-- `experiment submit --local` trains them one after another on the machine that
-  runs the command. It uses that machine's GPU if it has one, and otherwise the
-  CPU. The machine can be a laptop, a workstation, or a cluster node that you
-  have been allocated, such as inside `srun --gpus=1 --pty bash`. Do not use a
-  shared login node. Use `--local` for small series and quick tests.
+`train` trains one model. An [experiment](docs/experiments.md) asks whether a
+change to the settings helps. So `experiment train` trains many models: one
+with the settings, and one with each change, each several times with different
+seeds. Both train on the machine where they run. An experiment trains one
+model per GPU at a time, or one at a time without a GPU. On a cluster, either
+command runs inside a job that asks for its GPUs.
+[docs/training.md](docs/training.md#on-a-cluster-with-slurm) and
+[docs/experiments.md](docs/experiments.md#on-a-cluster-with-slurm) show how
+with [SLURM](https://slurm.schedmd.com/).
 
 ## Quick start
 
 All commands here, and in the rest of this guide, run from the repository
 root.
 
-`embedding_model/examples/` holds two files to start from. Each stands on its
-own:
-
-- `run_example.yaml`: the config of one run, which trains one model;
-- `small_series_example.yaml`: a small series of experiments.
-
-Both use one benchmark, the [TOPMed benchmark](docs/benchmarks.md#topmed), and
-one training source, [NHANES](docs/sources.md#nhanes). NHANES gives pairs of variable
-names, descriptions and values from CDC's public codebooks. The examples use
-a small vocabulary and a short run, so they finish in minutes.
-They are small examples to see every step work. A model meant for use should
-be trained on more sources.
+`embedding_model/examples/run_example.yaml` is the config of one run, which
+trains one model, to start from. It uses one benchmark, the
+[TOPMed benchmark](docs/benchmarks.md#topmed), and one training source,
+[NHANES](docs/sources.md#nhanes). NHANES gives pairs of variable names,
+descriptions and values from CDC's public codebooks. The example uses a small
+vocabulary and a short run, so it finishes in minutes. It is a small example
+to see every step work. A model meant for use should be trained on more
+sources.
 
 ### Train and score one model
 
@@ -128,29 +123,29 @@ scores it. `compare` writes to `outputs/comparisons/example/`:
 
 [docs/comparing.md](docs/comparing.md) says what each figure shows.
 
-### Run a small series
+### Run a small experiment
 
-`small_series_example.yaml` declares a base configuration and two arms at five
-seeds. Each arm changes one setting, so the series has fifteen runs. The
-example shows how a series of experiments is run and read. A series meant to
-decide something needs more seeds, as [docs/process.md](docs/process.md) explains.
+`embedding_model/examples/experiment_example.yaml` is a small experiment on the
+same data. Its base is the example run's config, and its two arms make the
+table smaller and larger, at five seeds: fifteen runs.
 
 ```
-# The same data as the example above: skip these if you have run it.
+# The same data as the first example: skip these if you have run it.
 python -m embedding_model benchmarks build --topmed
 python -m embedding_model sources fetch --source nhanes
 python -m embedding_model pairs prepare --source nhanes
 python -m embedding_model corpus build --name example --source nhanes
 python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 
-python -m embedding_model experiment submit embedding_model/examples/small_series_example.yaml --local
-python -m embedding_model experiment status embedding_model/examples/small_series_example.yaml
-python -m embedding_model experiment report embedding_model/examples/small_series_example.yaml
+python -m embedding_model experiment train --config embedding_model/examples/experiment_example.yaml
+python -m embedding_model experiment status --config embedding_model/examples/experiment_example.yaml
 ```
 
-`--local` trains the fifteen runs on the machine, one after another. That is
-useful for a quick test on a laptop. Without `--local`, each run is submitted
-to [SLURM](https://slurm.schedmd.com/) as its own job, and they train at the same time.
+`experiment train` trains the fifteen runs, one after another on a CPU, or one
+per GPU at a time. `experiment status` then shows each arm's runs as done. Both
+use `outputs/experiments/experiment_example/`. It is a small example to see the
+experiment tools work. [docs/experiments.md](docs/experiments.md) says how to
+write your own.
 
 ## How the model works
 
@@ -224,15 +219,12 @@ rerun on its own.
 | | `corpus build --name <corpus> [--source <source> ...] [--validation-share <share>]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |
 | | `tokenizer train --corpus <corpus> [--vocab-size <size>] [--min-frequency <n>] [--name <tokenizer>]` | learns the [tokenizer](docs/tokenizer.md)'s vocabulary from the corpus's training pairs | `inputs/tokenizers/<tokenizer>/` |
 | one model | `train --config <config.yaml> --seed <seed>` | [trains](docs/training.md) one model, as one run | `outputs/runs/` |
-| a series | `experiment submit <series.yaml> [--local]` | trains every run that the series declares -- each arm at each seed: one [SLURM](https://slurm.schedmd.com/) job per run, so many train at once, or with `--local` one after another on the machine that runs the command | `outputs/series/<series>/runs/` |
-| | `experiment status <series.yaml>` | says which runs are done, running or missing | -- |
-| | `experiment report <series.yaml>` | builds tables and figures, with each comparison's verdict | `outputs/series/<series>/` |
-| | `experiment pick <series.yaml>` | writes the series' pick record | `outputs/series/<series>/pick.md` |
+| experiments | `experiment train --config <experiment.yaml>` | trains each run of an [experiment](docs/experiments.md) that is not done: the base and each arm, at each seed, one run per GPU at a time | `outputs/experiments/<experiment>/` |
+| | `experiment status --config <experiment.yaml>` | says which runs are done, started or not started | -- |
 
-`<series.yaml>` is an experiment file: the arms of a series, the seeds, and
-the comparisons to make.
-[examples/small_series_example.yaml](examples/small_series_example.yaml) is
-one.
+`<experiment.yaml>` is an experiment's file: its base, its arms, its seeds and
+its decision rule. [docs/experiments.md](docs/experiments.md#writing-an-experiments-file)
+says how to write one.
 
 `corpus build` checks the pairs against every benchmark built so far, and drops
 those that would leak one ([docs/leakage.md](docs/leakage.md)). Each corpus's
@@ -323,23 +315,15 @@ outputs/
             trainer_state.json   the trainer's log: the training loss and the validation metrics, step by step
             model/               the trained model, loadable with sentence-transformers
             scores/<benchmark>/<format>/  metrics.csv, per_variable.csv and config.yaml: the metrics, every source variable's rank, and what they were computed with
-        ledger.csv               one row per run: its settings, validation loss and training time
-        index.csv                one row per scoring: the run, the benchmark and the metrics
-    series/<series>/
-        runs/<run>/              as above
-        ledger.csv, index.csv    as above, for the series' runs
-        tables/                  the comparison tables `experiment report` writes
-        figures/                 its figures, one per comparison family
-        pick.md                  the record `experiment pick` writes
+    experiments/<experiment>/
+        experiment.yaml          the experiment's file, as it was first trained
+        configs/                 each arm's full config, the base's first
+        runs/<arm>_s<seed>/      each run, as above
+        logs/                    each run's output
     scores/<model>/              the scores of a model trained elsewhere, such as uc-ctds/bge-large-en-v1.5-bio-mapping
         <benchmark>/<format>/    one folder per benchmark and text format
     comparisons/<comparison>/    what `compare` writes: metrics.csv, differences.csv, manifest.json, and figures/ with the figures
 ```
-
-A series is read from two tables: the ledger, with one row per training run,
-and the index, with one row per scoring. Both can be rebuilt from the run
-folders. A run trained on its own has the same ledger and index. It has no
-comparison tables or figures, since those come from comparing a series' runs.
 
 Of the files that the tools write, only the manifests of the benchmarks and the
 training sources are committed. They are under
@@ -355,33 +339,14 @@ reference of each benchmark and source.
 
 ## Running experiments
 
-Model development is a series of experiments. Each experiment is a set of
-arms: versions of the training configuration that differ in one setting. Each
-arm is trained at several seeds, so that a difference between arms can be told
-apart from the difference between seeds.
-
-An experiment file, such as
-[examples/small_series_example.yaml](examples/small_series_example.yaml),
-lists the arms and the comparisons to make between them. Each arm is a change
-from a base configuration, and the comparisons are grouped into families.
-`experiment report` gives each comparison's verdict: which arm the decision
-rule keeps. The next family is declared against that arm.
-
-`experiment pick` writes the series' pick record once the series is complete.
-The record holds:
-
-- the reproduction;
-- the confirmation on fresh seeds;
-- the run that ships;
-- how it compares with the model in use.
-
-[docs/process.md](docs/process.md) describes how a series is planned, run, read and
-decided. It covers:
-
-- the stages a series goes through, from choosing the corpus to confirming
-  the pick on fresh seeds;
-- the decision rule;
-- how many seeds a comparison needs.
+Model development is a series of experiments. Each experiment asks one
+question: does a change to the base help? Its arms are versions of the base
+that change a setting. Each is trained at several seeds, so that a difference
+between the arms can be told apart from the difference between seeds. Each
+experiment builds on an arm of the one before, which the person running them
+selects. The [guide to experiments](docs/experiments.md) says how to write an
+experiment's file, train it and follow it. The quick start's
+[small experiment](#run-a-small-experiment) shows one.
 
 ## Tests
 

@@ -7,14 +7,15 @@ from a config, a YAML file.
 Each training is a **run**: one config, trained with one seed. Its folder
 holds the trained model, and the record of how it was trained. A run is named
 after its config and its seed: `run_example.yaml` with `--seed 0` gives the run
-`run_example_s0`. Runs of one config differ only in their seed. A series
-compares many runs: each of its arms
-is one config, trained at several seeds.
+`run_example_s0`. Runs of one config differ only in their seed. An
+[experiment](experiments.md) compares many runs: each of its arms is one
+config, trained at several seeds.
 
 A run's folder holds the model, the run's config, its manifest and the
 trainer's log. [What `train` writes](#what-train-writes) lists them.
 [Details](#details) describes the config's settings, the architectures, what
-a run does, GPUs and CPUs, Weights & Biases, and scoring a run.
+a run does, GPUs and CPUs, a cluster with SLURM, Weights & Biases, and
+scoring a run.
 
 [design_decisions.md](design_decisions.md#training) gives the reasons for the
 rules below.
@@ -23,8 +24,11 @@ rules below.
 
 ```
 python -m embedding_model train --config embedding_model/examples/run_example.yaml --seed 0
-python -m embedding_model train --config my_run.yaml --seed 1 --learning_rate 1e-2   # a flag overrides the config
+python -m embedding_model train --config embedding_model/configs/runs/my_run.yaml --seed 1 --learning_rate 1e-2   # a flag overrides the config
 ```
+
+Keep your runs' configs in `embedding_model/configs/runs/`, apart from
+`inputs/` and `outputs/`, which the tools write. Git ignores all three.
 
 A config has four sections: `data`, `model`, `loss` and `training`. Every
 setting but the corpus and the tokenizer has a default. So a config names
@@ -303,34 +307,51 @@ corpus.
 
 ### GPUs and CPUs
 
-A run trains on one GPU: the first that `CUDA_VISIBLE_DEVICES` lists, or GPU
-0. When the variable lists several, the run says which one it keeps, for its
-own process only:
+A run trains on one device, which `transformers` picks:
+
+| where the run starts | the run trains on |
+|---|---|
+| a machine with one NVIDIA GPU | that GPU |
+| a machine with several | GPU 0, or the first that `CUDA_VISIBLE_DEVICES` lists. `CUDA_VISIBLE_DEVICES=2` chooses another |
+| a Mac with Apple silicon | its GPU, through PyTorch's MPS backend, which `transformers` picks by itself |
+| a machine with neither | the CPU |
+| a SLURM job with `--gpus=1` | the GPU that SLURM gives the job |
+| anywhere, with `use_cpu: true` in the config, or `--use_cpu` | the CPU |
+
+A run whose `CUDA_VISIBLE_DEVICES` lists several GPUs says which one it keeps:
 
 ```
 GPUs 2, 3 are listed: this run trains on GPU 2 only. To choose another, set CUDA_VISIBLE_DEVICES, for example CUDA_VISIBLE_DEVICES=3
 ```
 
-Without a GPU, a run trains on the CPU. `--use_cpu`, or `use_cpu: true` in the
-config, trains on the CPU on a machine that has a GPU. A small corpus, such as
-the README's example, trains on a CPU in a few minutes.
+A static model trains on a CPU in minutes, even on a corpus of all the
+sources. A BERT trains far more slowly, and needs a GPU for such a corpus.
 
 On a GPU that supports bf16, `bf16: true` in the config, or `--bf16`, trains
 faster and with less memory, as Hugging Face's recipe does. It stays off by
 default, as in the library, since a CPU and older GPUs cannot use it.
 
-On a cluster with [SLURM](https://slurm.schedmd.com/), ask for one GPU and a
-few CPUs, from the repository root:
+### On a cluster with SLURM
+
+Submit the run as a [SLURM](https://slurm.schedmd.com/) job that asks for one
+GPU and a few CPUs, from the repository root:
 
 ```
-srun --gpus=1 --cpus-per-task=8 --mem=64G python -m embedding_model train --config my_run.yaml --seed 0
+sbatch --gpus=1 --cpus-per-task=8 --mem=64G --time=02:00:00 --wrap "python -m embedding_model train --config embedding_model/configs/runs/my_run.yaml --seed 0"
 ```
 
-The same options work in an `sbatch` script. SLURM gives the job its GPU
-through `CUDA_VISIBLE_DEVICES`. The trainer reads the pairs with 4 worker
-processes, so ask for at least 5 CPUs. A time limit, such as `--time=02:00:00`,
-only stops a run that takes too long: the job ends, and frees its GPU, when
-the run ends.
+- `--gpus=1`: the run's GPU. Always ask for it. A job that asks for none gets
+  no GPU from SLURM. Some clusters do not hide the other GPUs from a job.
+  There, it can still see them, and the run would use a GPU that another job
+  may hold.
+- `--cpus-per-task`: at least 5. The trainer reads the pairs with 4 worker
+  processes.
+- `--time`: a limit. It only stops a run that takes too long. The job ends,
+  and frees its GPU, when the run ends.
+
+The job's output goes to `slurm-<job id>.out`, or to the file that `--output`
+names. [experiments.md](experiments.md#on-a-cluster-with-slurm) shows how to
+train many runs in one job.
 
 ### Weights & Biases
 

@@ -8,6 +8,7 @@ from embedding_model import (
     benchmarks,
     compare,
     corpus,
+    experiments,
     pairs,
     scoring,
     sources,
@@ -180,6 +181,38 @@ def main(argv=None):
         help="the seed, which decides the starting weights and the order of the pairs",
     )
 
+    experiment_step = steps.add_parser(
+        "experiment",
+        help="train the arms of an experiment at their seeds, and follow them",
+    )
+    experiment_actions = experiment_step.add_subparsers(dest="action", required=True)
+    experiment_train = experiment_actions.add_parser(
+        "train",
+        parents=[common, writes_outputs],
+        help="train each run of an experiment that is not done",
+        description=(
+            "Train each run of an experiment that is not done, on this"
+            " machine: one run per visible GPU at a time, or one at a time on"
+            " the CPU. docs/experiments.md says how to write its file, and how"
+            " to train it through SLURM."
+        ),
+    )
+    experiment_status = experiment_actions.add_parser(
+        "status",
+        parents=[writes_outputs],
+        help="say which runs of an experiment are done, started or not started",
+    )
+    for action in (experiment_train, experiment_status):
+        action.add_argument(
+            "--config",
+            required=True,
+            type=Path,
+            help=(
+                "the experiment's file, a YAML file. The experiment is named"
+                " after it."
+            ),
+        )
+
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
@@ -300,6 +333,17 @@ def main(argv=None):
             print(f"compare: {type(error).__name__}: {error}", file=sys.stderr)
             return 1
         return 0
+    if args.step == "experiment":
+        try:
+            if args.action == "train":
+                return experiments.train(args.config, args.inputs, args.outputs)
+            return experiments.status(args.config, args.outputs)
+        except Exception as error:
+            print(
+                f"experiment {args.action}: {type(error).__name__}: {error}",
+                file=sys.stderr,
+            )
+            return 1
     if args.step == "benchmarks" and args.action == "build":
         names = [name for name in benchmarks.BUILDERS if getattr(args, name)]
         if not names:

@@ -1445,6 +1445,6 @@ class TestPrepare:
         fetched_nhanes(tmp_path, "ncit")
         monkeypatch.setattr(pairs, "READERS", {"ncit": nhanes, "nhanes": nhanes})
         assert pairs.prepare(["nhanes", "ncit"], tmp_path) == 0
-        out = capsys.readouterr().out
-        assert out.index("ncit:") < out.index("nhanes:")
-        assert "kept there once: nhanes 2" in out
+        printed = capsys.readouterr().out
+        assert printed.index("ncit:") < printed.index("nhanes:")
+        assert "kept there once: nhanes 2" in printed

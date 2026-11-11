@@ -543,9 +543,9 @@ class TestStatus:
         experiments.train(path, inputs, outputs)
         capsys.readouterr()
         assert experiments.status(path, outputs) == 0
-        out = capsys.readouterr().out
-        assert "experiment abcd-experiment: 5 of 6 runs done" in out
-        assert "dim8        1 done, 1 not started" in out
+        printed = capsys.readouterr().out
+        assert "experiment abcd-experiment: 5 of 6 runs done" in printed
+        assert "dim8        1 done, 1 not started" in printed
 
 
 class TestCommandLine:

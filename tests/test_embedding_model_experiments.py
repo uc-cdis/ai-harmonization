@@ -77,8 +77,9 @@ def experiment_file(folder, name="abcd-experiment", **fields):
 class FakeTrain:
     """Stands in for ``subprocess.run``: each call writes its run's folder, as ``train`` would.
 
-    It records each command and the GPU that the run saw. A run named in
-    ``failing`` writes nothing and returns 1, as a failed ``train`` does.
+    It records each command and the GPU that the run saw, and writes one line
+    to the run's log, as ``train`` writes its progress there. A run named in
+    ``failing`` writes nothing more and returns 1, as a failed ``train`` does.
     """
 
     def __init__(self, failing=()):
@@ -96,6 +97,7 @@ class FakeTrain:
         run_name = f"{Path(flags['--config']).stem}_s{flags['--seed']}"
         gpu = None if env is None else env["CUDA_VISIBLE_DEVICES"]
         self.calls.append({"command": command, "gpu": gpu, "run": run_name})
+        stdout.write(f"training {run_name}\n")
         if run_name in self.failing:
             return subprocess.CompletedProcess(command, 1)
         run_folder = Path(flags["--outputs"]) / "runs" / run_name
@@ -235,7 +237,21 @@ class TestReadExperiment:
     def test_a_file_name_that_cannot_be_a_folder_name_is_refused(self, tmp_path):
         """A file whose name cannot be a folder's is refused, since the experiment's folder takes its name."""
         with pytest.raises(ValueError, match="not an experiment name"):
-            experiments.read_experiment(experiment_file(tmp_path, name=".abcd"))
+            experiments.read_experiment(
+                experiment_file(tmp_path, name=".abcd-experiment")
+            )
+
+    @pytest.mark.parametrize(
+        "text, message",
+        [("", "holds no fields"), ("seeds: [0, 1\n", "cannot be read")],
+    )
+    def test_an_empty_or_unreadable_file_is_refused(self, tmp_path, text, message):
+        """An empty file holds no fields, and a list left open is not YAML: both are refused, with the file named."""
+        path = tmp_path / "abcd-experiment.yaml"
+        path.write_text(text)
+        with pytest.raises(ValueError, match=message) as refused:
+            experiments.read_experiment(path)
+        assert str(path) in str(refused.value)
 
     def test_an_empty_section_is_read_as_empty(self, tmp_path):
         """A field with nothing in it, which YAML reads as None, is read as empty, or as its default.
@@ -247,7 +263,7 @@ class TestReadExperiment:
         path.write_text(
             "question:\nbase:\n  data: {corpus: abcd-corpus, tokenizer: abcd-tokenizer}\n"
             "  training:\nseeds: [0]\ndecision:\narms:\n  dim8:\n"
-            "    test: superiority\n    model:\n"
+            "    test: non-inferiority\n    model:\n"
         )
         experiment = experiments.read_experiment(path)
         assert experiment["base"]["training"] is None
@@ -262,8 +278,8 @@ class TestTrain:
     def test_each_arm_gets_its_full_config(self, tmp_path, inputs, fake_train):
         """Each arm's config is the base's, with only the arm's settings changed.
 
-        The arm lr0.1 changes one of the base's three training settings, so
-        its training section keeps the other two.
+        The arm lr0.1 adds a learning rate to the base's two training
+        settings, and keeps both.
         """
         arms = {
             "dim8": ARMS["dim8"],
@@ -285,12 +301,15 @@ class TestTrain:
     def test_each_run_trains_on_its_own_gpu(
         self, tmp_path, inputs, fake_train, capsys, monkeypatch
     ):
-        """With GPUs 2 and 3 visible, as SLURM shows a job, each run sees one of them alone."""
+        """With GPUs 2 and 3 visible, as SLURM shows a job, each run sees one of them alone.
+
+        The base leaves out use_cpu, as a run on a GPU does.
+        """
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
-        assert (
-            experiments.train(experiment_file(tmp_path), inputs, tmp_path / "outputs")
-            == 0
+        path = experiment_file(
+            tmp_path, base={**BASE, "training": {"num_train_epochs": 2}}
         )
+        assert experiments.train(path, inputs, tmp_path / "outputs") == 0
         assert sorted(call["run"] for call in fake_train.calls) == [
             "base_s0",
             "base_s1",
@@ -335,6 +354,24 @@ class TestTrain:
             "--outputs",
             str(folder),
         ]
+
+    def test_each_run_writes_its_log(self, tmp_path, inputs, fake_train, capsys):
+        """Each run's output goes to logs/<run>.log, and a failed run's line names its log."""
+        path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
+        fake_train.failing = {"dim8_s1"}
+        experiments.train(path, inputs, outputs)
+        logs = outputs / "experiments" / "abcd-experiment" / "logs"
+        assert sorted(log.name for log in logs.iterdir()) == [
+            "base_s0.log",
+            "base_s1.log",
+            "dim32_s0.log",
+            "dim32_s1.log",
+            "dim8_s0.log",
+            "dim8_s1.log",
+        ]
+        assert (logs / "dim8_s1.log").read_text() == "training dim8_s1\n"
+        printed = capsys.readouterr().out
+        assert f"dim8_s1: failed; see {logs / 'dim8_s1.log'}" in printed
 
     def test_training_again_retries_only_the_failed_runs(
         self, tmp_path, inputs, fake_train, capsys
@@ -407,7 +444,9 @@ class TestTrain:
         self, tmp_path, inputs, fake_train
     ):
         """An arm that names a setting that does not exist is refused by train's parser, before any run trains."""
-        arms = {"dim8": {"test": "superiority", "model": {"embedding_dimension": 8}}}
+        arms = {
+            "dim8": {"test": "non-inferiority", "model": {"embedding_dimension": 8}}
+        }
         path, outputs = experiment_file(tmp_path, arms=arms), tmp_path / "outputs"
         with pytest.raises(ValueError, match="no setting embedding_dimension"):
             experiments.train(path, inputs, outputs)
@@ -455,7 +494,7 @@ class TestEarlierBase:
         arms = {"lr0.1": {"test": "superiority", "training": {"learning_rate": 0.1}}}
         later_path = experiment_file(
             tmp_path,
-            name="abcd-later",
+            name="abcd-later-experiment",
             base="abcd-experiment/dim8",
             seeds=[0, 1, 2],
             arms=arms,
@@ -470,7 +509,9 @@ class TestEarlierBase:
         earlier_config = (
             outputs / "experiments" / "abcd-experiment" / "configs" / "dim8.yaml"
         )
-        later_config = outputs / "experiments" / "abcd-later" / "configs" / "base.yaml"
+        later_config = (
+            outputs / "experiments" / "abcd-later-experiment" / "configs" / "base.yaml"
+        )
         assert yaml.safe_load(later_config.read_text()) == yaml.safe_load(
             earlier_config.read_text()
         )
@@ -478,13 +519,21 @@ class TestEarlierBase:
     def test_an_earlier_run_still_training_stops_the_experiment(
         self, tmp_path, inputs, fake_train
     ):
-        """A base run of the earlier experiment that has a staging folder may be training now, so the later one waits."""
+        """A base run of the earlier experiment that has a staging folder may be training now, so the later one waits.
+
+        The earlier experiment's dim8 failed at seed 1, and another job is
+        training it again: its staging folder sits beside its folder.
+        """
         outputs = tmp_path / "outputs"
-        experiments.train(experiment_file(tmp_path, seeds=[0]), inputs, outputs)
+        fake_train.failing = {"dim8_s1"}
+        experiments.train(experiment_file(tmp_path), inputs, outputs)
         runs_folder = outputs / "experiments" / "abcd-experiment" / "runs"
         (runs_folder / ".dim8_s1~x1y2").mkdir()
         later_path = experiment_file(
-            tmp_path, name="abcd-later", base="abcd-experiment/dim8", seeds=[0, 1]
+            tmp_path,
+            name="abcd-later-experiment",
+            base="abcd-experiment/dim8",
+            seeds=[0, 1],
         )
         with pytest.raises(ValueError, match="has started but not finished"):
             experiments.train(later_path, inputs, outputs)
@@ -505,7 +554,7 @@ class TestEarlierBase:
         """A base that names no trained experiment, or no arm of it, is refused with what there is."""
         outputs = tmp_path / "outputs"
         experiments.train(experiment_file(tmp_path), inputs, outputs)
-        later_path = experiment_file(tmp_path, name="abcd-later", base=base)
+        later_path = experiment_file(tmp_path, name="abcd-later-experiment", base=base)
         with pytest.raises(ValueError, match=message):
             experiments.train(later_path, inputs, outputs)
 

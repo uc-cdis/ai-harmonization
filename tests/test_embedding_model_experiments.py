@@ -7,6 +7,7 @@ which config, and on which GPU.
 """
 
 import json
+import stat
 import subprocess
 import sys
 from collections import defaultdict
@@ -365,6 +366,23 @@ class TestTrain:
         assert "in its seeds" in str(refused.value)
         assert "delete" in str(refused.value)
         assert "base: abcd-experiment/base" in str(refused.value)
+
+    def test_the_copy_is_as_readable_as_any_new_file(
+        self, tmp_path, inputs, fake_train
+    ):
+        """The copy takes the permissions of any new file, so a teammate who shares the outputs folder can read it.
+
+        A file that the test writes has the same mode, and no staging folder
+        is left beside the copy.
+        """
+        path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
+        experiments.train(path, inputs, outputs)
+        folder = outputs / "experiments" / "abcd-experiment"
+        new_file = tmp_path / "abcd-file.txt"
+        new_file.write_text("")
+        copy_mode = stat.S_IMODE((folder / "experiment.yaml").stat().st_mode)
+        assert copy_mode == stat.S_IMODE(new_file.stat().st_mode)
+        assert not list(folder.glob(".*"))
 
     def test_a_file_that_reads_the_same_is_not_a_change(
         self, tmp_path, inputs, fake_train

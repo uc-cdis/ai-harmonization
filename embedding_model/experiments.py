@@ -10,6 +10,7 @@ of its own. ``experiment status`` says which runs are done.
 
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,7 @@ from embedding_model.corpus import build_command
 from embedding_model.folders import (
     FOLDER_NAME,
     FOLDER_NAME_RULE,
+    STAGING_MARK,
     staged,
     staging_folders,
 )
@@ -632,8 +634,9 @@ def keep_copy(path, folder):
 
     The experiment's folder is ``outputs/experiments/<name>/``. A later
     training compares the file with this copy, in checked_experiment. The
-    copy is written to a temporary file first and then renamed, so it is
-    never half written.
+    copy is written in a staging folder first and then moved, so it is never
+    half written, as staged writes a folder. shutil.copyfile creates it as
+    any new file, so it is as readable as the run folders beside it.
 
     Args:
         path (Path): The experiment's file.
@@ -643,9 +646,12 @@ def keep_copy(path, folder):
     if copy.exists():
         return
     folder.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=folder, delete=False) as temporary_file:
-        temporary_file.write(Path(path).read_bytes())
-    os.replace(temporary_file.name, copy)
+    with tempfile.TemporaryDirectory(
+        dir=folder, prefix=f".{EXPERIMENT_FILE}{STAGING_MARK}"
+    ) as staging:
+        staged_copy = Path(staging) / EXPERIMENT_FILE
+        shutil.copyfile(path, staged_copy)
+        os.replace(staged_copy, copy)
 
 
 def checked_runs(path, inputs, outputs):

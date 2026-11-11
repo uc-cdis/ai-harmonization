@@ -545,7 +545,18 @@ class TestStatus:
         assert experiments.status(path, outputs) == 0
         printed = capsys.readouterr().out
         assert "experiment abcd-experiment: 5 of 6 runs done" in printed
-        assert "dim8        1 done, 1 not started" in printed
+        assert "dim8   1 done, 1 not started" in printed
+
+    def test_the_counts_line_up_after_the_longest_arm_name(
+        self, tmp_path, inputs, capsys
+    ):
+        """An arm named embedding_dim_64, 16 characters, pads each name to 18, so each count starts in one column."""
+        long_arm = {"test": "superiority", "model": {"embedding_dim": 64}}
+        path = experiment_file(tmp_path, arms={**ARMS, "embedding_dim_64": long_arm})
+        assert experiments.status(path, tmp_path / "outputs") == 0
+        printed = capsys.readouterr().out
+        assert f"  {'base':<18}2 not started" in printed
+        assert "  embedding_dim_64  2 not started" in printed
 
 
 class TestCommandLine:

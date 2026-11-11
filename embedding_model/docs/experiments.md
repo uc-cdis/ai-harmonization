@@ -91,9 +91,9 @@ have not started, for each arm:
 ```
 $ python -m embedding_model experiment status --config embedding_model/configs/experiments/dim.yaml
 experiment dim: 11 of 15 runs done
-  base        5 done
-  dim128      3 done, 2 started
-  dim2048     3 done, 2 not started
+  base     5 done
+  dim128   3 done, 2 started
+  dim2048  3 done, 2 not started
 ```
 
 A run is done when its folder has its manifest. It has started when a staging

@@ -758,11 +758,14 @@ def status(path, outputs):
     states = {run: run_state(run.folder) for run in runs}
     done_count = sum(state == DONE for state in states.values())
     print(f"experiment {experiment['name']}: {done_count} of {len(runs)} runs done")
-    for arm in [BASE, *experiment["arms"]]:
+    arm_names = [BASE, *experiment["arms"]]
+    # Each name is padded to the longest, so that the counts line up.
+    name_width = max(len(arm) for arm in arm_names) + 2
+    for arm in arm_names:
         state_counts = [
             f"{count} {state}"
             for state in (DONE, STARTED, NOT_STARTED)
             if (count := sum(run.arm == arm and states[run] == state for run in runs))
         ]
-        print(f"  {arm:<12}{', '.join(state_counts)}")
+        print(f"  {arm:<{name_width}}{', '.join(state_counts)}")
     return 0

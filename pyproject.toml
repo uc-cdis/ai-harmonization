@@ -104,11 +104,13 @@ embedding-model = [
     # version, so its own requirement sets the minimum.
     "huggingface-hub>=0.20.0",
     # embedding_model.corpus (the split's groups, as the connected components
-    # of a graph of items and canonical texts) and embedding_model.compare
-    # (Wilson's interval, McNemar's exact test, and the t intervals and tests).
-    # Its minimum version is the first whose ttest_1samp and ttest_rel give a
-    # confidence interval.
-    "scipy>=1.10.0",
+    # of a graph of items and canonical texts), embedding_model.compare
+    # (Wilson's interval, McNemar's exact test, and the t intervals and tests)
+    # and embedding_model.experiment_compare (Welch's interval and t-test, the
+    # noncentral t's power, and the seeds needed). Its minimum version is the
+    # first with optimize.elementwise, whose bracket_root and find_root find
+    # the seeds needed.
+    "scipy>=1.15.0",
     # embedding_model.train (the trainer's data collator, which takes a
     # preprocess_fn, and the module paths of version 6)
     "sentence-transformers>=6.0.0",

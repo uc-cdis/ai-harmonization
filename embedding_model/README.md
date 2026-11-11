@@ -139,11 +139,15 @@ python -m embedding_model tokenizer train --corpus example --vocab-size 8000
 
 python -m embedding_model experiment train --config embedding_model/examples/experiment_example.yaml
 python -m embedding_model experiment status --config embedding_model/examples/experiment_example.yaml
+python -m embedding_model experiment compare --config embedding_model/examples/experiment_example.yaml
 ```
 
 `experiment train` trains the fifteen runs, one after another on a CPU, or one
-per GPU at a time. `experiment status` then shows each arm's runs as done. Both
-use `outputs/experiments/experiment_example/`. It is a small example to see the
+per GPU at a time. `experiment status` then shows each arm's runs as done.
+`experiment compare` compares each arm with the base, prints each one's
+verdict and the arm that it recommends, and draws the figure
+`comparison/figures/arms_and_differences.png`. All three use
+`outputs/experiments/experiment_example/`. It is a small example to see the
 experiment tools work. [docs/experiments.md](docs/experiments.md) says how to
 write your own.
 
@@ -221,6 +225,7 @@ rerun on its own.
 | one model | `train --config <config.yaml> --seed <seed>` | [trains](docs/training.md) one model, as one run | `outputs/runs/` |
 | experiments | `experiment train --config <experiment.yaml>` | trains each run of an [experiment](docs/experiments.md) that is not done: the base and each arm, at each seed, one run per GPU at a time | `outputs/experiments/<experiment>/` |
 | | `experiment status --config <experiment.yaml>` | says which runs are done, started or not started | -- |
+| | `experiment compare --config <experiment.yaml>` | [compares](docs/experiments.md#comparing-the-arms) each arm with the base, by its seeds' validation scores, and recommends an arm to build on | `comparison/` in the experiment's folder |
 
 `<experiment.yaml>` is an experiment's file: its base, its arms, its seeds and
 its decision rule. [docs/experiments.md](docs/experiments.md#writing-an-experiments-file)
@@ -320,6 +325,7 @@ outputs/
         configs/                 each arm's full config, the base's first
         runs/<arm>_s<seed>/      each run, as above
         logs/                    each run's output
+        comparison/              what `experiment compare` writes: arms.csv, differences.csv, manifest.json, and figures/ with its figure
     scores/<model>/              the scores of a model trained elsewhere, such as uc-ctds/bge-large-en-v1.5-bio-mapping
         <benchmark>/<format>/    one folder per benchmark and text format
     comparisons/<comparison>/    what `compare` writes: metrics.csv, differences.csv, manifest.json, and figures/ with the figures
@@ -344,9 +350,12 @@ question: does a change to the base help? Its arms are versions of the base
 that change a setting. Each is trained at several seeds, so that a difference
 between the arms can be told apart from the difference between seeds. Each
 experiment builds on an arm of the one before, which the person running them
-selects. The [guide to experiments](docs/experiments.md) says how to write an
-experiment's file, train it and follow it. The quick start's
-[small experiment](#run-a-small-experiment) shows one.
+selects. `experiment compare` recommends one, and gives the line that names it
+as the next experiment's base. The [guide to experiments](docs/experiments.md)
+says how to write an experiment's file, train it, follow it and compare its
+arms. The quick start's [small experiment](#run-a-small-experiment) shows one.
+[docs/design_decisions.md](docs/design_decisions.md#experiments) gives the
+reasons for its rules.
 
 ## Tests
 

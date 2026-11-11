@@ -8,6 +8,7 @@ from embedding_model import (
     benchmarks,
     compare,
     corpus,
+    experiment_compare,
     experiments,
     pairs,
     scoring,
@@ -183,10 +184,10 @@ def main(argv=None):
 
     experiment_step = steps.add_parser(
         "experiment",
-        help="train the arms of an experiment at their seeds, and follow them",
+        help="train the arms of an experiment at their seeds, follow them and compare them",
     )
     experiment_actions = experiment_step.add_subparsers(dest="action", required=True)
-    experiment_train = experiment_actions.add_parser(
+    train_action = experiment_actions.add_parser(
         "train",
         parents=[common, writes_outputs],
         help="train each run of an experiment that is not done",
@@ -197,12 +198,20 @@ def main(argv=None):
             " to train it through SLURM."
         ),
     )
-    experiment_status = experiment_actions.add_parser(
+    status_action = experiment_actions.add_parser(
         "status",
         parents=[writes_outputs],
         help="say which runs of an experiment are done, started or not started",
     )
-    for action in (experiment_train, experiment_status):
+    compare_action = experiment_actions.add_parser(
+        "compare",
+        parents=[writes_outputs],
+        help=(
+            "compare each arm of an experiment with the base, and recommend an"
+            " arm to build on"
+        ),
+    )
+    for action in (train_action, status_action, compare_action):
         action.add_argument(
             "--config",
             required=True,
@@ -337,6 +346,8 @@ def main(argv=None):
         try:
             if args.action == "train":
                 return experiments.train(args.config, args.inputs, args.outputs)
+            if args.action == "compare":
+                return experiment_compare.compare(args.config, args.outputs)
             return experiments.status(args.config, args.outputs)
         except Exception as error:
             print(

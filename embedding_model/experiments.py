@@ -6,6 +6,8 @@ train`` trains each run that the file declares, on the machine where it
 runs: one run per visible GPU at a time, or one at a time on the CPU. Each
 run is the public command ``python -m embedding_model train``, in a process
 of its own. ``experiment status`` says which runs are done.
+``experiment compare``, in experiment_compare.py, then compares each arm with
+the base.
 """
 
 import os
@@ -654,6 +656,31 @@ def keep_copy(path, folder):
         os.replace(staged_copy, copy)
 
 
+def check_earlier_runs(runs, folder):
+    """Refuse a base run of an earlier experiment that has started but not finished.
+
+    Such a run may be training in another job. Its experiment trains it, so
+    this one neither trains it again nor reads it before it is done.
+
+    Args:
+        runs (list[Run]): The experiment's runs, from experiment_runs.
+        folder (Path): The experiment's folder.
+
+    Raises:
+        ValueError: If a base run of an earlier experiment has started but not
+            finished. The message says to wait, or to delete its staging
+            folder.
+    """
+    for run in runs:
+        if run.folder.parent != folder / RUNS and run_state(run.folder) == STARTED:
+            raise ValueError(
+                f"the base run {run.folder} of experiment {run.folder.parent.parent.name}"
+                " has started but not finished. Wait for it to finish. If no job is"
+                f" training it, delete its staging folder,"
+                f" {staging_folders(run.folder)[0]}"
+            )
+
+
 def checked_runs(path, inputs, outputs):
     """An experiment's runs, after every check that comes before training.
 
@@ -677,14 +704,7 @@ def checked_runs(path, inputs, outputs):
     )
     check_inputs(arm_values, inputs)
     runs = experiment_runs(experiment, folder, earlier_arm)
-    for run in runs:
-        if run.folder.parent != folder / RUNS and run_state(run.folder) == STARTED:
-            raise ValueError(
-                f"the base run {run.folder} of experiment {run.folder.parent.parent.name}"
-                " has started but not finished. Wait for it to finish. If no job is"
-                f" training it, delete its staging folder,"
-                f" {staging_folders(run.folder)[0]}"
-            )
+    check_earlier_runs(runs, folder)
     return experiment, folder, runs
 
 
@@ -723,6 +743,7 @@ def train(path, inputs, outputs):
         print(f"  {experiment['question']}")
     if not to_train:
         print(f"  every run is done -> {folder}")
+        print(f"  Compare the arms: {compare_command(path)}")
         return 0
     print(
         f"  {len(gpus)} GPU{'s' if len(gpus) > 1 else ''}:"
@@ -741,7 +762,20 @@ def train(path, inputs, outputs):
         )
         return 1
     print(f"  {len(to_train)} runs trained -> {folder}")
+    print(f"  Compare the arms: {compare_command(path)}")
     return 0
+
+
+def compare_command(path):
+    """The command that compares an experiment's arms, for a message.
+
+    Args:
+        path (Path): The experiment's file.
+
+    Returns:
+        str: The command.
+    """
+    return f"python -m embedding_model experiment compare --config {path}"
 
 
 def status(path, outputs):
@@ -774,4 +808,6 @@ def status(path, outputs):
             if (count := sum(run.arm == arm and states[run] == state for run in runs))
         ]
         print(f"  {arm:<{name_width}}{', '.join(state_counts)}")
+    if done_count == len(runs):
+        print(f"  Every run is done. Compare the arms: {compare_command(path)}")
     return 0

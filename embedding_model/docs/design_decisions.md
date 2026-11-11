@@ -3155,7 +3155,7 @@ experiment.
 
 - Good, because no config is trained twice at the same seed.
 - Good, because the selection is written in the new file, by name, where a
-  reader sees which arm was chosen.
+  user sees which arm was chosen.
 - Bad, because the earlier experiment's folder must stay, since the new one
   reads its runs. Without it, a base can still give the arm's settings in
   full, from a copy of the arm's `configs/<arm>.yaml`. Its runs then train
@@ -3323,6 +3323,277 @@ check that:
   started otherwise;
 - `experiment status` counts each arm's runs by state.
 
+### Arms are compared by their seeds' scores, with Welch's interval and t-test
+
+**Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
+
+**Context.** Each run gives one validation score. An experiment trains each
+arm at the same few seeds. A seed sets a run's starting weights and the order
+of its pairs. A change such as another table size also changes the starting
+weights that a seed gives. Two arms can vary from seed to seed by different
+amounts.
+
+**Decision.** An arm's score is the mean of its seeds' scores, with its 95% t
+interval. Each arm minus the base gets Welch's interval and Welch's t-test,
+unpaired. scipy's `ttest_ind` computes both.
+
+**Consequences.**
+
+- Good, because the interval and the test come from one t distribution, at
+  Welch's degrees of freedom. The interval excludes 0 exactly when the test's
+  p is below the arm's alpha, so the two cannot disagree.
+- Good, because Welch's test does not assume that the two arms vary alike,
+  and loses little when they do. So it is the recommended default over
+  Student's t-test ([Welch, 1947](https://doi.org/10.1093/biomet/34.1-2.28); [Delacre et al., 2017](https://doi.org/10.5334/irsp.82)).
+- Good, because at few runs, a Welch interval over the runs is recommended
+  over the bootstrap ([Knopov & Shvai, 2026](https://doi.org/10.48550/arXiv.2610.23700)).
+- Bad, because the test assumes that the mean of the seeds' scores is about
+  normally distributed. With few seeds, the shape of their spread cannot be
+  checked.
+- Bad, because a run that trains badly at one seed pulls its arm's mean
+  down, and widens its interval.
+
+**Alternatives considered.**
+
+- Student's t-test: it pools the two arms' spreads. When the spreads differ
+  and the seeds are few, it finds more false differences than its alpha says
+  ([Delacre et al., 2017](https://doi.org/10.5334/irsp.82)).
+- A paired t-test, by seed: it fits when a seed gives two arms the same
+  start. A change such as another table size gives them other starting
+  weights, so matching the runs by seed would carry little.
+- A bootstrap interval: at few runs, it understates the spread. Its variance
+  is short by the factor (n - 1) / n ([Knopov & Shvai, 2026](https://doi.org/10.48550/arXiv.2610.23700)).
+- A permutation test: with 5 seeds per arm, the 10 runs split into two groups
+  in only 252 ways. So its p cannot fall below 2 / 252, and it gives no
+  interval directly.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- the interval is Welch's, at Welch-Satterthwaite's degrees of freedom, not
+  at Student's pooled ones;
+- when neither arm's scores vary, the difference is exact, with p 1 at no
+  difference;
+- `arms.csv` gives each arm's mean, and each seed's score.
+
+### The superiority test passes on a significant gain of at least the minimum effect
+
+**Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
+
+**Context.** A `superiority` arm asks whether a change is better than the
+base by at least `minimum_effect`. Validation scores can vary little from
+seed to seed, so a gain smaller than `minimum_effect` can still be
+significant. A test that the gain is larger than `minimum_effect` passes only
+on a gain well beyond it.
+
+**Decision.** The superiority test passes when Welch's p is below the arm's
+alpha, and the arm's mean gain is at least `minimum_effect`.
+
+**Consequences.**
+
+- Good, because it is a dual-criterion design, made for go or no-go
+  decisions. It asks for statistical significance, and for an estimate that
+  reaches a decision value ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
+- Good, because a gain too small to be worth a change does not pass the test,
+  however sure it is.
+- Bad, because an arm whose true gain is exactly `minimum_effect` passes about
+  half the time, at any number of seeds. Its mean falls on either side of it.
+  The design expects this, and it does not make the study underpowered
+  ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
+- Bad, because the verdict rests on two criteria, not on one test.
+
+**Alternatives considered.**
+
+- Superiority by a margin, with the interval's low end above
+  `minimum_effect`: one test. But it passes only a gain beyond
+  `minimum_effect` by about two standard errors, so it needs many more seeds.
+- A test against no difference alone, the usual superiority trial:
+  `minimum_effect` would then only set the seeds needed. Any significant gain
+  would pass, however small.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- a gain of 0.02 passes;
+- a significant gain of 0.005 does not;
+- a gain of 0.012 that is not significant at the arm's alpha does not;
+- the decision's own metric and minimum effect decide, such as accuracy@1
+  and 0.02.
+
+### The non-inferiority test passes when the interval stays above minus the minimum effect
+
+**Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
+
+**Context.** A `non-inferiority` arm, such as a smaller table, is cheaper,
+and may lose a little. `minimum_effect` is then the largest loss worth
+taking: the margin. A non-inferiority trial sets its margin before the data,
+and reads its result from a confidence interval of the difference.
+
+**Decision.** The non-inferiority test passes when the low end of Welch's
+interval, at the arm's confidence, is above minus `minimum_effect`.
+
+**Consequences.**
+
+- Good, because it is the rule of CONSORT's extension for non-inferiority
+  trials: a two-sided interval against a margin set beforehand ([Piaggio et al., 2012](https://doi.org/10.1001/jama.2012.87802)).
+  CONSORT, the Consolidated Standards of Reporting Trials, is the guideline
+  that medical journals use for reporting randomized trials.
+- Good, because the figure shows it: the interval stays right of the left
+  edge of the margin's band.
+- Good, because `superiority` reads the same interval, so one interval
+  serves both tests.
+- Bad, because an arm that passes may still be worse than the base. The test
+  bounds the loss; it does not show that there is none.
+
+**Alternatives considered.**
+
+- A one-sided interval at 1 - alpha: it tests at alpha, where the two-sided
+  interval's low end tests at alpha / 2. So it passes more arms, and an arm
+  worse by exactly the margin passes twice as often.
+- An equivalence test, with two one-sided tests at both margins. It also asks
+  that the arm be no better by more than the margin, so a cheaper arm that is
+  clearly better fails it. A cheaper arm need not show that.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- a loss of 0.003 passes;
+- a loss of 0.009, whose interval reaches past -0.01, does not.
+
+### Alpha is split over the arms, by Bonferroni
+
+**Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
+
+**Context.** The decision's `alpha`, 0.05 by default, is the chance of a
+false finding that the experiment allows. A false finding is an arm that
+passes its statistical test, superiority or non-inferiority, by chance. The
+more arms an experiment tests against its base, the likelier that one passes
+by chance. `experiment compare` reads these tests together, and names each arm
+that passes. `compare` reports each test of two models alone.
+
+**Decision.** Each arm is tested at the decision's alpha divided by the
+number of arms. Its interval has the matching confidence, such as 97.5% with
+2 arms.
+
+**Consequences.**
+
+- Good, because the chance that any arm passes by chance alone stays at
+  alpha.
+- Good, because each arm's interval and test still agree: both use the same
+  alpha.
+- Bad, because each added arm costs every arm power. An experiment with more
+  arms needs more seeds.
+
+**Alternatives considered.**
+
+- Holm's correction: the same guarantee, and it never finds fewer
+  differences. But it has no simple intervals that agree with its tests.
+- Dunnett's procedure, made for several arms against one control
+  ([Dunnett, 1955](https://doi.org/10.1080/01621459.1955.10501294)): in its standard form, it pools the arms' spreads, as
+  Student's t-test does.
+- No correction, as `compare` has for models: it suits claims about each
+  test alone, not a choice among the arms.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- with 2 arms, each is tested at 0.025, with a 97.5% interval;
+- a gain that passes alone, at p = 0.043, is not shown beside a second arm.
+
+### An arm that does not pass its test is checked for enough seeds, at the minimum effect
+
+**Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
+
+**Context.** An arm that does not pass its statistical test, superiority or
+non-inferiority, says one of two things. The change does not do what the test
+asks, or the seeds were too few to tell. The seeds that a test needs follow
+from the two arms' seed-to-seed spreads, the arm's alpha and
+`minimum_effect`.
+
+**Decision.** Each arm gets the seeds per arm that its test needs. For
+superiority, they are the fewest at which a gain of exactly `minimum_effect`
+is significant. For non-inferiority, they are the fewest for 80% power when
+the arms do not differ. An arm that fails its test, whose interval still
+reaches the margin, with fewer seeds, is marked underpowered.
+
+**Consequences.**
+
+- Good, because superiority's count is the sample size of a dual-criterion
+  design ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)). Non-inferiority's aims at 80% power, the usual convention
+  ([Cohen, 1988/2013](https://doi.org/10.4324/9780203771587)).
+- Good, because "underpowered: k seeds needed" says how to settle the
+  question: a new experiment, at k seeds.
+- Bad, because the spreads are estimated from the same few seeds, so the
+  count is an estimate too.
+- Bad, because scipy has no function for a number of seeds. The count is the
+  root of the test's need, found by scipy's `optimize.elementwise`:
+  `bracket_root`, then `find_root`.
+
+**Alternatives considered.**
+
+- Power at the observed difference: it only restates the p, so it adds
+  nothing ([Hoenig & Heisey, 2001](https://doi.org/10.1198/000313001300339897)).
+- 90% power: fewer missed changes, at more seeds. 80% is the usual choice,
+  though it has no strong justification ([Lakens, 2022](https://doi.org/10.1525/collabra.33267)).
+- 80% power for superiority too: under its two criteria, a gain of exactly
+  `minimum_effect` passes about half the time, at any number of seeds. So 80%
+  cannot be reached there.
+- statsmodels' power for two samples, `TTestIndPower`: it uses only the
+  pooled variance, as Student's t-test does, and statsmodels is not a
+  dependency.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- at a seed sd of 0.0045 in both arms, superiority needs 4 seeds and
+  non-inferiority 6;
+- at a seed sd of 0.02, the count is the first that suffices;
+- scores that do not vary need 2 seeds, at any score;
+- an arm that does not pass its test, with too few seeds, is marked
+  underpowered;
+- an arm whose question stays open, with enough seeds, is not;
+- an arm whose interval lies wholly past the margin is not, however few its
+  seeds.
+
+### The comparison recommends one arm, or none when several pass
+
+**Described in:** [experiments.md](experiments.md#the-recommendation).
+
+**Context.** The next experiment builds on one arm, which its file names as
+its base. Several arms can pass their statistical tests, such as a cheaper arm
+that is no worse and a better one. Which is worth its cost depends on what
+each costs to train and to run. The code does not know these costs.
+
+**Decision.** `experiment compare` recommends the one arm that passes, or the
+base when none does. When several arms pass, it recommends none, and prints
+each one's base line, for the user to choose. The user writes the next
+experiment's base.
+
+**Consequences.**
+
+- Good, because the user, who knows the costs, makes the choice that weighs
+  them.
+- Bad, because each decision in a series of experiments needs the user.
+
+**Alternatives considered.**
+
+- The passing arm with the best mean: it would pick a larger model for a
+  small gain over a cheaper arm that is no worse.
+- A file for the next experiment, written by the code: it would hide the
+  choice, and the user would still have to check it.
+
+**Confirmation.** The tests in
+[test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
+check that:
+
+- one passing arm is recommended, and with none, the base;
+- with two passing arms, none is, and both base lines are printed.
+
 ## References
 
 > Aarsen, T. (2025, January 15). *Train 400x faster Static Embedding Models
@@ -3354,6 +3625,14 @@ check that:
 > Ziegler, D. M., Wu, J., Winter, C., … Amodei, D. (2020). *Language Models
 > are Few-Shot Learners* (Version 4). arXiv.
 > https://doi.org/10.48550/ARXIV.2005.14165
+
+> Cohen, J. (2013). *Statistical Power Analysis for the Behavioral Sciences*.
+> Routledge. https://doi.org/10.4324/9780203771587 (Original work published
+> 1988)
+
+> Delacre, M., Lakens, D., & Leys, C. (2017). Why Psychologists Should by
+> Default Use Welch's t-test Instead of Student's t-test. *International
+> Review of Social Psychology, 30*(1), 92–101. https://doi.org/10.5334/irsp.82
 
 > Devlin, J., Chang, M.-W., Lee, K., & Toutanova, K. (2019). BERT:
 > Pre-training of Deep Bidirectional Transformers for Language
@@ -3393,16 +3672,26 @@ check that:
 > Moving beyond P values: data analysis with estimation graphics. *Nature
 > Methods, 16*(7), 565–566. https://doi.org/10.1038/s41592-019-0470-3
 
+> Hoenig, J. M., & Heisey, D. M. (2001). The Abuse of Power. *The American
+> Statistician, 55*(1), 19–24. https://doi.org/10.1198/000313001300339897
+
 > Ihemelandu, N., & Ekstrand, M. D. (2023). Inference at Scale: Significance
 > Testing for Large Search and Recommendation Experiments. *Proceedings of the
 > 46th International ACM SIGIR Conference on Research and Development in
 > Information Retrieval*, 2087–2091. https://doi.org/10.1145/3539618.3592004
+
+> Knopov, D., & Shvai, N. (2026). *Equivalence testing and run-count design
+> for stochastic machine-learning experiments* (Version 1). arXiv.
+> https://doi.org/10.48550/ARXIV.2610.23700
 
 > Kopp, O., Armbruster, A., & Zimmermann, O. (2018). Markdown Architectural
 > Decision Records: Format and Tool Support. In N. Herzberg, C. Hochreiner, O.
 > Kopp, & J. Lenhard (Eds.), *Proceedings of the 10th Central European
 > Workshop on Services and their Composition* (pp. 55–62). CEUR-WS.org.
 > https://ceur-ws.org/Vol-2072/paper9.pdf
+
+> Lakens, D. (2022). Sample Size Justification. *Collabra: Psychology,
+> 8*(1). https://doi.org/10.1525/collabra.33267
 
 > Lee, K., Ippolito, D., Nystrom, A., Zhang, C., Eck, D., Callison-Burch, C.,
 > & Carlini, N. (2022). Deduplicating Training Data Makes Language Models
@@ -3453,6 +3742,11 @@ check that:
 > Petroff, M. A. (2021). *Accessible Color Sequences for Data Visualization*
 > (Version 3). arXiv. https://doi.org/10.48550/ARXIV.2107.02270
 
+> Piaggio, G., Elbourne, D. R., Pocock, S. J., Evans, S. J. W., Altman, D.
+> G., & CONSORT Group. (2012). Reporting of Noninferiority and Equivalence
+> Randomized Trials. *JAMA, 308*(24), 2594.
+> https://doi.org/10.1001/jama.2012.87802
+
 > Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence Embeddings
 > using Siamese BERT-Networks. *Proceedings of the 2019 Conference on
 > Empirical Methods in Natural Language Processing and the 9th International
@@ -3461,6 +3755,11 @@ check that:
 
 > Rothman, K. J. (1990). No Adjustments Are Needed for Multiple Comparisons.
 > *Epidemiology, 1*(1), 43–46. https://doi.org/10.1097/00001648-199001000-00010
+
+> Roychoudhury, S., Scheuer, N., & Neuenschwander, B. (2018). Beyond
+> *p*-values: A phase II dual-criterion design with statistical significance
+> and clinical relevance. *Clinical Trials, 15*(5), 452–461.
+> https://doi.org/10.1177/1740774518770661
 
 > Rust, P., Pfeiffer, J., Vulić, I., Ruder, S., & Gurevych, I. (2021). How
 > Good is Your Tokenizer? On the Monolingual Performance of Multilingual
@@ -3509,6 +3808,10 @@ check that:
 > Testing in Information Retrieval. *Proceedings of the 42nd International
 > ACM SIGIR Conference on Research and Development in Information
 > Retrieval*, 505–514. https://doi.org/10.1145/3331184.3331259
+
+> Welch, B. L. (1947). The Generalization of 'Student's' Problem when Several
+> Different Population Variances are Involved. *Biometrika, 34*(1–2), 28–35.
+> https://doi.org/10.1093/biomet/34.1-2.28
 
 > Wilson, E. B. (1927). Probable Inference, the Law of Succession, and
 > Statistical Inference. *Journal of the American Statistical Association,

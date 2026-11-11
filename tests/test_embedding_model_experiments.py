@@ -613,6 +613,7 @@ class TestStatus:
         printed = capsys.readouterr().out
         assert "experiment abcd-experiment: 5 of 6 runs done" in printed
         assert "dim8   1 done, 1 not started" in printed
+        assert "Compare the arms" not in printed
 
     def test_the_counts_line_up_after_the_longest_arm_name(
         self, tmp_path, inputs, capsys
@@ -632,13 +633,27 @@ class TestCommandLine:
     def test_train_and_status(self, tmp_path, inputs, fake_train, capsys):
         """experiment train trains the runs, and experiment status counts them.
 
-        The base and two arms at two seeds make six runs.
+        The base and two arms at two seeds make six runs. Once they are done,
+        each command names the one that compares the arms: train after it
+        trains them, train again with nothing left to train, and status.
         """
         path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
         flags = ["--config", str(path), "--outputs", str(outputs)]
-        assert main(["experiment", "train", *flags, "--inputs", str(inputs)]) == 0
+        compare_line = (
+            "Compare the arms: python -m embedding_model experiment compare"
+            f" --config {path}"
+        )
+        train_flags = [*flags, "--inputs", str(inputs)]
+        assert main(["experiment", "train", *train_flags]) == 0
+        assert compare_line in capsys.readouterr().out
+        assert main(["experiment", "train", *train_flags]) == 0
+        printed = capsys.readouterr().out
+        assert "every run is done" in printed
+        assert compare_line in printed
         assert main(["experiment", "status", *flags]) == 0
-        assert "6 of 6 runs done" in capsys.readouterr().out
+        printed = capsys.readouterr().out
+        assert "6 of 6 runs done" in printed
+        assert f"Every run is done. {compare_line}" in printed
 
     def test_an_error_is_reported_and_exits_with_1(
         self, tmp_path, inputs, fake_train, capsys

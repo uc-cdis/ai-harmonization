@@ -1135,8 +1135,8 @@ of matplotlib is tab10. It also ships petroff10, a sequence made for readers
 with a color vision deficiency. The repository requires matplotlib
 3.10 or later, so that it runs on Google Colab.
 
-**Decision.** The figures take their colors from petroff10, in the order of
-`--model`.
+**Decision.** By default, the figures take their colors from petroff10, in
+the order of `--model`.
 
 **Consequences.**
 
@@ -1165,6 +1165,73 @@ with a color vision deficiency. The repository requires matplotlib
 check that:
 
 - each model's bars take petroff10's color of its place in `--model`.
+
+### A model's color can be given with `--colors`, one per model
+
+**Described in:** [comparing.md](comparing.md#colors).
+
+**Context.** Each model takes the petroff10 color of its place in `--model`.
+Two comparisons that list other models, or list them in another order, can
+give one model two colors. A reader who sees both, as in one report, may take
+it for two models. matplotlib reads a color as a hex code or a name.
+`--model` and `--benchmark` each take a list.
+
+**Decision.** `--colors` gives one color per `--model`, in the same order, in
+any form that matplotlib reads. compare refuses a count that differs from
+the models', a color that matplotlib does not read, a fully transparent
+color, and one color for two models. Without `--colors`, each model keeps
+its place's petroff10 color. The manifest records each color as drawn, in
+hex.
+
+**Consequences.**
+
+- Good, because a model can keep one color in comparisons of other models,
+  so a reader can follow it from one figure to the next.
+- Good, because the colors come as a list, as `--model` and `--benchmark`
+  do, and in matplotlib's own forms
+  ([matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)).
+- Good, because the colors are checked before any score is read, so a
+  misspelled color stops compare at once.
+- Good, because a model can never be hidden by its color. The bars of
+  `accuracy_and_mrr` carry only a color, so one color for two models, or a
+  fully transparent one, would hide a model there.
+- Good, because the manifest says what the figures show, whatever form
+  each color was given in. `'tab:blue'` and `'#1f77b4'` are both recorded
+  as `#1f77b4ff`.
+- Bad, because the list must be kept in step with `--model` by hand. A model
+  added in the middle shifts the colors after it, and compare cannot tell,
+  since any color fits any model.
+- Bad, because colors that the user chooses may be hard to tell apart under
+  a color vision deficiency, which petroff10 was chosen to avoid. compare
+  does not check them.
+
+**Alternatives considered.**
+
+- A color named per model, as `--color MODEL=COLOR`. seaborn's dictionary
+  palette
+  ([seaborn.barplot](https://seaborn.pydata.org/generated/seaborn.barplot.html))
+  and plotly's `color_discrete_map`
+  ([plotly's discrete colors](https://plotly.com/python/discrete-color/))
+  take colors this way. It needs no order, and a model left out keeps its
+  default. But each model must be written again exactly as in `--model`,
+  and a model id or a run's folder can be long.
+- `--palette`, naming another of matplotlib's color sequences: it changes
+  every color at once, but a model still takes the color of its place. So
+  two comparisons of other models still give it two colors.
+
+**Confirmation.** The tests in
+[test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+check that:
+
+- in all four figures, each model takes the color that `--colors` gives its
+  place, whichever model is the reference;
+- `--colors` with fewer or more colors than models, or with one color for
+  two models, is refused before anything is written;
+- a misspelled color, and a fully transparent one, are refused too;
+- the manifest records each model's color as drawn, in hex, with
+  `--colors` and without it;
+- the command passes `--colors` on to the comparison, and stops with a
+  message when the colors do not fit.
 
 ### nDCG@10 and the median rank get no interval, test or figure
 

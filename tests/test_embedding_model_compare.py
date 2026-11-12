@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from matplotlib import rc_context
+from matplotlib.colors import to_rgba
 from matplotlib.container import BarContainer
 from scipy import stats
 
@@ -443,6 +444,9 @@ class TestCompare:
                 assert (folder / "figures" / f"{stem}.{suffix}").stat().st_size > 0
         manifest = json.loads((folder / "manifest.json").read_text())
         assert manifest["models"] == [REFERENCE, OTHER]
+        # Without --colors, the models take petroff10's first two colors, by
+        # place: blue, then orange, as 8-digit hex codes, fully opaque.
+        assert manifest["model_colors"] == ["#3f90daff", "#ffa90eff"]
         assert manifest["reference"] == REFERENCE
         assert manifest["benchmarks"] == {"topmed": committed_version("topmed")}
         assert manifest["settings"]["format"] == "compact"
@@ -656,6 +660,57 @@ class TestCompare:
             )
         assert not (outputs / "comparisons").exists()
 
+    def test_the_manifest_records_the_drawn_colors(self, built):
+        """The manifest records each model's color as drawn, in the order of --model.
+
+        Each is an 8-digit hex code, with its opacity: "tab:purple" is
+        matplotlib's #9467bd, fully opaque, so #9467bdff.
+        """
+        inputs, outputs = built
+        folder = compare.compare(
+            "abcd-comparison",
+            [REFERENCE, OTHER],
+            ["topmed"],
+            inputs,
+            outputs,
+            reference=REFERENCE,
+            model_colors=["#3f90da", "tab:purple"],
+        )
+        manifest = json.loads((folder / "manifest.json").read_text())
+        assert manifest["model_colors"] == ["#3f90daff", "#9467bdff"]
+
+    @pytest.mark.parametrize(
+        "model_colors, message",
+        [
+            (["#3f90da"], "--colors gives 1 color for 2 models"),
+            (["#3f90da", "#ffa90e", "#bd1f01"], "--colors gives 3 colors for 2 models"),
+            (["#3f90da", "tab:bleu"], "'tab:bleu' is not a color"),
+            (["#3f90da", "none"], "'none' is fully transparent"),
+            (["tab:blue", "#1f77b4"], "one color, 'tab:blue' and '#1f77b4'"),
+        ],
+    )
+    def test_colors_that_do_not_fit_the_models_are_refused(
+        self, built, model_colors, message
+    ):
+        """Colors that do not fit the models are refused before anything is written.
+
+        Too few or too many colors, a misspelled color, a fully transparent
+        one, and one color for two models are each refused. "tab:bleu" is
+        "tab:blue" misspelled, which matplotlib does not read. "tab:blue" and
+        "#1f77b4" are one color in two forms.
+        """
+        inputs, outputs = built
+        with pytest.raises(ValueError, match=message):
+            compare.compare(
+                "abcd-comparison",
+                [REFERENCE, OTHER],
+                ["topmed"],
+                inputs,
+                outputs,
+                model_colors=model_colors,
+            )
+        assert not (outputs / "comparisons").exists()
+
 
 def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
     """Results on two benchmarks for the reference and count - 1 other models.
@@ -778,6 +833,57 @@ class TestFigures:
         labels = [text.get_text() for text in figure.legends[0].get_texts()]
         assert labels == [f"{reference} (reference)", other]
         assert figure.legends[0].get_title().get_text() == compare.STARS_NOTE
+
+    def test_given_colors_follow_each_models_place_in_every_figure(self):
+        """With model_colors, each model takes the color of its place in --model, in all four figures.
+
+        The models are given as the other model, then the reference, with
+        purple and green, two colors that petroff10 does not hold. The
+        reference is drawn first in each figure, but takes green, the color
+        of its place. differences_from_reference draws only the other model.
+        """
+        (reference, other), benchmark_results, differences = figure_results(2)
+        for result in benchmark_results.values():
+            result["ranks"] = {reference: np.ones(6), other: np.full(6, 2)}
+        models = [other, reference]
+        model_colors = ["tab:purple", "tab:green"]
+        purple, green = to_rgba("tab:purple"), to_rgba("tab:green")
+        with rc_context(compare.STYLE):
+            overview = compare.overview_figure(
+                benchmark_results, models, reference, differences, model_colors
+            )
+            curves = compare.curve_figure(
+                benchmark_results, models, reference, model_colors
+            )
+            sizes = compare.size_figure(
+                benchmark_results, models, reference, model_colors
+            )
+            drawn_differences = compare.differences_figure(
+                benchmark_results, models, reference, differences, model_colors
+            )
+        first, second = [
+            bars
+            for bars in overview.get_axes()[0].containers
+            if isinstance(bars, BarContainer)
+        ]
+        assert first.patches[0].get_facecolor() == pytest.approx(green)
+        assert second.patches[0].get_facecolor() == pytest.approx(purple)
+        curve_colors = [
+            to_rgba(line.get_color()) for line in curves.get_axes()[0].get_lines()
+        ]
+        assert curve_colors == [green, purple]
+        size_colors = [
+            to_rgba(line.get_color())
+            for line in sizes.get_axes()[0].get_lines()
+            if line.get_marker() in compare.MARKERS
+        ]
+        assert size_colors == [green, purple]
+        difference_colors = {
+            to_rgba(line.get_color())
+            for line in drawn_differences.get_axes()[0].get_lines()
+            if line.get_marker() in compare.MARKERS
+        }
+        assert difference_colors == {purple}
 
     def test_the_differences_figure_draws_each_row(self):
         """differences_from_reference puts the model at its difference on each metric's row.
@@ -936,3 +1042,40 @@ class TestCommandLine:
             "embedding_model score --model ijkl-org/ijkl-model"
             in capsys.readouterr().err
         )
+
+    def test_colors_reach_the_comparison(self, built):
+        """--colors gives compare each model's color, as the manifest records it."""
+        inputs, outputs = built
+        code = main(
+            [
+                "compare",
+                "--name", "abcd-comparison",
+                "--model", REFERENCE, OTHER,
+                "--colors", "#3f90da", "tab:purple",
+                "--benchmark", "topmed",
+                "--inputs", str(inputs),
+                "--outputs", str(outputs),
+            ]
+        )  # fmt: skip
+        assert code == 0
+        manifest = json.loads(
+            (outputs / "comparisons" / "abcd-comparison" / "manifest.json").read_text()
+        )
+        assert manifest["model_colors"] == ["#3f90daff", "#9467bdff"]
+
+    def test_colors_that_do_not_fit_are_a_clean_error(self, built, capsys):
+        """One color for two models stops compare with a message, not a traceback."""
+        inputs, outputs = built
+        code = main(
+            [
+                "compare",
+                "--name", "abcd-comparison",
+                "--model", REFERENCE, OTHER,
+                "--colors", "#3f90da",
+                "--benchmark", "topmed",
+                "--inputs", str(inputs),
+                "--outputs", str(outputs),
+            ]
+        )  # fmt: skip
+        assert code == 1
+        assert "--colors gives 1 color for 2 models" in capsys.readouterr().err

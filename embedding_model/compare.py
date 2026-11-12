@@ -94,11 +94,12 @@ CURVE_K = np.arange(1, 51)
 # The x axis of accuracy_and_mrr and accuracy_by_k: what k means to a data
 # curator.
 K_LABEL = "k: suggestions a data curator reviews"
-# One color per model, by its place in the order that the models are given,
-# so that a model keeps its color in every figure: matplotlib's
-# petroff10 color sequence, made for readers with a color vision deficiency
-# (Petroff, 2021, https://doi.org/10.48550/arXiv.2107.02270).
-PALETTE = "petroff10"
+# The palette without --colors: one color per model, by its place in the
+# order that the models are given, so that a model keeps its color in every
+# figure. It is matplotlib's petroff10 color sequence, made for readers with
+# a color vision deficiency (Petroff, 2021,
+# https://doi.org/10.48550/arXiv.2107.02270).
+DEFAULT_PALETTE = "petroff10"
 # Past 8 models, the bars grow too thin to read, and the brackets fill half of
 # each panel.
 MAX_MODELS = 8
@@ -175,19 +176,26 @@ STYLE = {
 }
 
 
-def colors():
-    """The colors of PALETTE, one per model, from matplotlib's color sequences.
+def colors(model_colors=None):
+    """The palette: each model's color, by its place in ``--model``.
 
-    Every figure takes its colors from here, by the model's place in
-    ``--model``. So a model keeps one color in all the figures.
+    Every figure takes its colors from here, so a model keeps one color in
+    all the figures. The colors are those that ``--colors`` gives, or else
+    DEFAULT_PALETTE's, from matplotlib's color sequences.
+
+    Args:
+        model_colors (list[str] | None): Each model's color, in the order of
+            ``--model``, or None.
 
     Returns:
-        list[tuple[float, float, float]]: The sequence's colors, as RGB, in
-            its order.
+        list: The colors, by place: ``model_colors`` as given, or the
+            sequence's colors, as RGB.
     """
     from matplotlib import color_sequences
 
-    return color_sequences[PALETTE]
+    if model_colors is None:
+        return color_sequences[DEFAULT_PALETTE]
+    return model_colors
 
 
 def label_of(model):
@@ -630,7 +638,9 @@ def drawn(models, reference):
     ]
 
 
-def overview_figure(benchmark_results, models, reference, differences):
+def overview_figure(
+    benchmark_results, models, reference, differences, model_colors=None
+):
     """``accuracy_and_mrr``: accuracy@1, @5 and @10 and MRR as bars, per benchmark.
 
     Each benchmark has a row, under its title: accuracy@k on the left, MRR on
@@ -648,6 +658,8 @@ def overview_figure(benchmark_results, models, reference, differences):
         models (list[str]): The models' names, in order.
         reference (str | None): The reference model's name.
         differences (list[dict]): The rows of difference_rows.
+        model_colors (list[str] | None): Each model's color, in the order
+            of ``models``, or None for DEFAULT_PALETTE's, as colors gives them.
 
     Returns:
         Figure: The figure.
@@ -668,7 +680,8 @@ def overview_figure(benchmark_results, models, reference, differences):
     }
     order = drawn(models, reference)
     legend_labels = [legend_label for _, legend_label, _ in order]
-    bar_colors = [colors()[place] for _, _, place in order]
+    palette = colors(model_colors)
+    bar_colors = [palette[place] for _, _, place in order]
     legend_axes = None
     for panel, (benchmark, result) in zip(panels, benchmark_results.items()):
         panel.suptitle(benchmark_title(benchmark, result))
@@ -718,7 +731,7 @@ def overview_figure(benchmark_results, models, reference, differences):
     return figure
 
 
-def curve_figure(benchmark_results, models, reference):
+def curve_figure(benchmark_results, models, reference, model_colors=None):
     """``accuracy_by_k``: accuracy at every k from 1 to 50, a line per model.
 
     Accuracy@k at every k is the empirical distribution function of the
@@ -729,12 +742,15 @@ def curve_figure(benchmark_results, models, reference):
             overview_figure.
         models (list[str]): The models' names, in order.
         reference (str | None): The reference model's name.
+        model_colors (list[str] | None): Each model's color, in the order
+            of ``models``, or None for DEFAULT_PALETTE's, as colors gives them.
 
     Returns:
         Figure: The figure.
     """
     from matplotlib.figure import Figure
 
+    palette = colors(model_colors)
     figure = Figure(
         figsize=(PRINT_WIDTH, 2.6 * len(benchmark_results)), layout="constrained"
     )
@@ -746,7 +762,7 @@ def curve_figure(benchmark_results, models, reference):
             axes.plot(
                 CURVE_K,
                 stats.ecdf(result["ranks"][model]).cdf.evaluate(CURVE_K),
-                color=colors()[place],
+                color=palette[place],
                 linestyle=LINE_STYLES[place],
                 linewidth=1.4,
                 marker=MARKERS[place],
@@ -766,7 +782,7 @@ def curve_figure(benchmark_results, models, reference):
     return figure
 
 
-def size_figure(benchmark_results, models, reference):
+def size_figure(benchmark_results, models, reference, model_colors=None):
     """``mrr_by_size``: each model's MRR and interval, by its number of parameters.
 
     Each benchmark has a panel. The number of parameters is on a log scale,
@@ -778,6 +794,8 @@ def size_figure(benchmark_results, models, reference):
             overview_figure.
         models (list[str]): The models' names, in order.
         reference (str | None): The reference model's name.
+        model_colors (list[str] | None): Each model's color, in the order
+            of ``models``, or None for DEFAULT_PALETTE's, as colors gives them.
 
     Returns:
         Figure: The figure.
@@ -785,6 +803,7 @@ def size_figure(benchmark_results, models, reference):
     from matplotlib.figure import Figure
     from matplotlib.ticker import NullFormatter, StrMethodFormatter
 
+    palette = colors(model_colors)
     figure = Figure(
         figsize=(PRINT_WIDTH, 2.6 * len(benchmark_results)), layout="constrained"
     )
@@ -811,7 +830,7 @@ def size_figure(benchmark_results, models, reference):
                 mrr,
                 yerr=[[mrr - low], [high - mrr]],
                 fmt="none",
-                ecolor=colors()[place],
+                ecolor=palette[place],
                 elinewidth=1.2,
                 capsize=3,
                 zorder=2,
@@ -820,7 +839,7 @@ def size_figure(benchmark_results, models, reference):
                 position,
                 mrr,
                 MARKERS[place],
-                color=colors()[place],
+                color=palette[place],
                 markersize=6,
                 markeredgecolor=SURFACE,
                 markeredgewidth=0.6,
@@ -871,7 +890,9 @@ def mark_sides(axes, compared_with):
     axes.xaxis.labelpad = 14
 
 
-def differences_figure(benchmark_results, models, reference, differences):
+def differences_figure(
+    benchmark_results, models, reference, differences, model_colors=None
+):
     """``differences_from_reference``: each model minus the reference, per benchmark.
 
     Each benchmark has a panel, and each metric of accuracy_and_mrr a row. Each model
@@ -886,6 +907,8 @@ def differences_figure(benchmark_results, models, reference, differences):
         models (list[str]): The models' names, in order.
         reference (str): The reference model's name.
         differences (list[dict]): The rows of difference_rows.
+        model_colors (list[str] | None): Each model's color, in the order
+            of ``models``, or None for DEFAULT_PALETTE's, as colors gives them.
 
     Returns:
         Figure: The figure.
@@ -893,6 +916,7 @@ def differences_figure(benchmark_results, models, reference, differences):
     from matplotlib.figure import Figure
     from matplotlib.ticker import MaxNLocator
 
+    palette = colors(model_colors)
     figure = Figure(
         figsize=(PRINT_WIDTH, 2.7 * len(benchmark_results)), layout="constrained"
     )
@@ -925,7 +949,7 @@ def differences_figure(benchmark_results, models, reference, differences):
                         [row["high"] - row["difference"]],
                     ],
                     fmt="none",
-                    ecolor=colors()[place],
+                    ecolor=palette[place],
                     elinewidth=1.2,
                     capsize=2.5,
                     zorder=2,
@@ -934,7 +958,7 @@ def differences_figure(benchmark_results, models, reference, differences):
                     row["difference"],
                     height,
                     MARKERS[place],
-                    color=colors()[place],
+                    color=palette[place],
                     markersize=6,
                     markeredgecolor=SURFACE,
                     markeredgewidth=0.6,
@@ -978,6 +1002,9 @@ class Comparison:
         models (dict[str, str]): Each model, as ``--model`` gives it, by its
             name in the tables, in the order given.
         reference (str | None): The reference model's name, or None.
+        model_colors (list[str] | None): Each model's color, in the order of
+            ``models``, as ``--colors`` gives them, or None for
+            DEFAULT_PALETTE's.
         results (dict[str, dict]): Each benchmark's results, from
             benchmark_result, by the benchmark's name.
     """
@@ -986,6 +1013,7 @@ class Comparison:
     text_format: str
     models: dict
     reference: str | None
+    model_colors: list | None = None
     results: dict = field(default_factory=dict)
 
     @property
@@ -1053,6 +1081,60 @@ def checked_models(name, models, reference):
             " against it: give two models or more"
         )
     return dict(zip(labels, models)), labels[ids.index(model_id(reference))]
+
+
+def checked_colors(model_colors, models):
+    """Check that ``--colors`` gives each model a color of its own, one that shows.
+
+    The bars of accuracy_and_mrr carry only a color, so two models of one
+    color could not be told apart there. A fully transparent color, such as
+    ``none``, would draw nothing.
+
+    Args:
+        model_colors (list[str] | None): Each model's color, in the order of
+            ``models``, or None for DEFAULT_PALETTE's.
+        models (list[str]): The models, as ``--model`` gives them.
+
+    Returns:
+        list[str] | None: The colors, as given, or None.
+
+    Raises:
+        ValueError: If the colors are not one per model, one is not a color
+            that matplotlib reads or is fully transparent, or two models
+            have one color.
+    """
+    from matplotlib.colors import is_color_like, to_rgba
+
+    if model_colors is None:
+        return None
+    if len(model_colors) != len(models):
+        colors_text = f"{len(model_colors)} color" + "s" * (len(model_colors) != 1)
+        models_text = f"{len(models)} model" + "s" * (len(models) != 1)
+        raise ValueError(
+            f"--colors gives {colors_text} for {models_text}: give one color per"
+            " --model, in its order"
+        )
+    for color in model_colors:
+        if not is_color_like(color):
+            raise ValueError(
+                f"--colors: {color!r} is not a color: give one that matplotlib"
+                " reads, such as '#3f90da' or 'tab:blue'"
+            )
+        if to_rgba(color)[3] == 0:
+            raise ValueError(
+                f"--colors: {color!r} is fully transparent, so its model would"
+                " not show: give a color that can be seen"
+            )
+    rgba_colors = [to_rgba(color) for color in model_colors]
+    for index, rgba_color in enumerate(rgba_colors):
+        first = rgba_colors.index(rgba_color)
+        if first < index:
+            raise ValueError(
+                f"--colors gives {models[first]} and {models[index]} one color,"
+                f" {model_colors[first]!r} and {model_colors[index]!r}: give each"
+                " model a color of its own"
+            )
+    return list(model_colors)
 
 
 def benchmark_result(comparison, benchmark, inputs, outputs):
@@ -1139,9 +1221,11 @@ def write_comparison(comparison, destination):
         destination (Path): The comparison's folder.
     """
     from matplotlib import rc_context
+    from matplotlib.colors import to_hex
 
     results, labels = comparison.results, comparison.labels
     reference, differences = comparison.reference, comparison.differences
+    model_colors = comparison.model_colors
     with staged(destination) as built, rc_context(STYLE):
         pd.DataFrame(
             [
@@ -1155,14 +1239,14 @@ def write_comparison(comparison, destination):
         (built / FIGURES).mkdir()
         figures = {
             "accuracy_and_mrr": overview_figure(
-                results, labels, reference, differences
+                results, labels, reference, differences, model_colors
             ),
-            "accuracy_by_k": curve_figure(results, labels, reference),
-            "mrr_by_size": size_figure(results, labels, reference),
+            "accuracy_by_k": curve_figure(results, labels, reference, model_colors),
+            "mrr_by_size": size_figure(results, labels, reference, model_colors),
         }
         if reference is not None:
             figures["differences_from_reference"] = differences_figure(
-                results, labels, reference, differences
+                results, labels, reference, differences, model_colors
             )
         for stem, figure in figures.items():
             save_figure(figure, built / FIGURES, stem)
@@ -1184,6 +1268,10 @@ def write_comparison(comparison, destination):
                     "tests": TESTS,
                 },
                 "models": labels,
+                "model_colors": [
+                    to_hex(color, keep_alpha=True)
+                    for color in colors(model_colors)[: len(labels)]
+                ],
                 "reference": reference,
                 "benchmarks": {
                     benchmark: result["version"]
@@ -1246,6 +1334,7 @@ def compare(
     outputs,
     text_format=DEFAULT_FORMAT,
     reference=None,
+    model_colors=None,
 ):
     """Compare scored models and write the comparison's folder.
 
@@ -1261,18 +1350,27 @@ def compare(
         reference (str | None): One of ``models``, which each other model is
             measured against by paired tests. It may name the model another
             way, such as by a relative path. None writes no differences.
+        model_colors (list[str] | None): Each model's color, in the order of
+            ``models``, as ``--colors`` gives them. None gives each model
+            DEFAULT_PALETTE's color of its place.
 
     Returns:
         Path: The comparison's folder.
 
     Raises:
-        ValueError: If the models or the name are refused, as checked_models
-            says, or a model's scores cannot be read or list other variables,
-            as benchmark_result says.
+        ValueError: If the models, the colors or the name are refused, as
+            checked_models and checked_colors say, or a model's scores cannot
+            be read or list other variables, as benchmark_result says.
         FileNotFoundError: If a benchmark has not been built.
     """
     named_models, reference_name = checked_models(name, models, reference)
-    comparison = Comparison(name, text_format, named_models, reference_name)
+    comparison = Comparison(
+        name,
+        text_format,
+        named_models,
+        reference_name,
+        checked_colors(model_colors, models),
+    )
     for benchmark in dict.fromkeys(benchmark_names):
         comparison.results[benchmark] = benchmark_result(
             comparison, benchmark, inputs, outputs

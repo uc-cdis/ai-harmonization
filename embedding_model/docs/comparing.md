@@ -32,6 +32,7 @@ python -m embedding_model compare --name example \
 | `--reference` | one of the models: the reference, which each other model is measured against by paired tests. Without it, `compare` gives each model's metrics, without tests. |
 | `--benchmark` | one or more benchmarks that every model was scored on. A benchmark named twice is compared once. |
 | `--format` | the [text format](scoring.md#text-formats) of the scores, `compact` by default. |
+| `--colors` | one color per `--model`, in the same order, in any form that matplotlib reads, such as `'#3f90da'` or `'tab:blue'`. Without it, each model takes a color of the default `petroff10` palette, by its place in `--model`, as [Colors](#colors) says. |
 
 `compare` prints each model's MRR and accuracy@1 on each benchmark. Then it
 prints its folder, after `->`, and the full path of each figure and table,
@@ -52,7 +53,11 @@ It also stops when:
   relative path;
 - two models have one name, such as two model folders named `abcd-model`;
 - two models' scores list other source variables, or list them in another
-  order. Then the paired tests cannot match their variables.
+  order. Then the paired tests cannot match their variables;
+- `--colors` gives more or fewer colors than `--model` gives models, or
+  one color to two models;
+- `--colors` gives a color that matplotlib does not read, such as
+  `tab:bleu`, or a fully transparent one, such as `none`.
 
 ## What `compare` writes
 
@@ -113,9 +118,11 @@ The comparison's manifest, with the fields that
 - `settings`: the text format, the confidence level, and each metric's
   interval, its difference's interval and its test.
 
-It also has five fields of its own:
+It also has six fields of its own:
 
 - `models`: the models, by their names in the tables;
+- `model_colors`: each model's color as drawn, an 8-digit hex code with
+  its opacity, such as `#3f90daff`;
 - `reference`: the reference, or null without `--reference`;
 - `benchmarks`: each benchmark, with its version;
 - `ai_harmonization`: the commit of the code, and whether it had uncommitted
@@ -187,11 +194,34 @@ says why.
 
 #### Colors
 
-Each model keeps one color in every figure: the color of its place in
-`--model`. So models given in the same order keep their colors from one
+By default, each model takes the color of its place in `--model`, and
+keeps it in every figure. So models given in the same order keep their colors from one
 comparison to the next. The reference is drawn first, whatever its place.
 The colors are matplotlib's `petroff10` sequence;
 [design_decisions.md](design_decisions.md#colors-from-matplotlibs-petroff10-not-its-default-tab10)
-says why. Each model also has its own marker, in `accuracy_by_k`,
-`mrr_by_size` and `differences_from_reference`. The lines of `accuracy_by_k`
-also take one of four line styles.
+says why.
+
+`--colors` gives each model's color instead, one per `--model`, in the same
+order. So a model can keep one color through different comparisons. In
+this comparison, the run is blue and the released model purple, whatever
+colors their places would give them:
+
+```
+python -m embedding_model compare --name example \
+    --model embedding_model/outputs/runs/run_example_s0 uc-ctds/bge-large-en-v1.5-bio-mapping \
+    --colors '#3f90da' 'tab:purple' \
+    --reference embedding_model/outputs/runs/run_example_s0 \
+    --benchmark topmed
+```
+
+Each color can be in any form that matplotlib reads, as
+[matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)
+lists them. Two common forms are a hex code, such as `'#3f90da'`, and a
+name, such as `'tab:purple'`. Quote a hex code, since the shell reads `#` as the start of a
+comment.
+[design_decisions.md](design_decisions.md#a-models-color-can-be-given-with---colors-one-per-model)
+says why the colors come as a list.
+
+Each model also has its own marker, in `accuracy_by_k`, `mrr_by_size` and
+`differences_from_reference`, by its place in `--model`. The lines of
+`accuracy_by_k` also take one of four line styles.

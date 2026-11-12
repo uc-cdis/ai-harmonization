@@ -305,6 +305,18 @@ def main(argv=None):
         choices=sorted(texts.FORMATS),
         help="the text format of the scores (default: %(default)s)",
     )
+    compare_step.add_argument(
+        "--colors",
+        dest="model_colors",
+        metavar="COLOR",
+        nargs="+",
+        action="extend",
+        help=(
+            "one color per --model, in its order, as matplotlib reads it, such"
+            " as '#3f90da' or 'tab:blue' (default: matplotlib's petroff10, by"
+            " each model's place in --model)"
+        ),
+    )
 
     # Only train takes more flags: the settings that override its config.
     args, overrides = parser.parse_known_args(argv)
@@ -337,6 +349,7 @@ def main(argv=None):
                 args.outputs,
                 args.format,
                 args.reference,
+                args.model_colors,
             )
         except Exception as error:
             print(f"compare: {type(error).__name__}: {error}", file=sys.stderr)

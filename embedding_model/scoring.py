@@ -430,12 +430,12 @@ def read_scores(model, benchmark, text_format, outputs, built_manifest):
         )
     metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
     row = metrics.iloc[0]
-    ranks = pd.read_csv(
+    per_variable = pd.read_csv(
         folder / "per_variable.csv",
         dtype={**dict.fromkeys(VARIABLE_KEY, str), "rank": int},
         keep_default_na=False,
     )
-    return row, ranks, folder
+    return row, per_variable, folder
 
 
 def run_record(model):
@@ -507,7 +507,7 @@ def check_run_files(run_folder, record):
             )
 
 
-def checked_benchmarks(record):
+def corpus_benchmarks(record):
     """The benchmarks that a run's corpus was checked against, by name.
 
     Args:
@@ -543,17 +543,17 @@ def check_corpus_checked(record, benchmark_builds, inputs):
             checked against another build of it. The message gives the
             command that builds the corpus again.
     """
-    checked = checked_benchmarks(record)
+    corpus_entries = corpus_benchmarks(record)
     corpus_name = next(
         source["name"] for source in record["sources"] if source.get("role") == "corpus"
     )
     rebuild = build_command(Path(inputs) / "corpora" / corpus_name)
     for name, (_, _, manifest) in benchmark_builds.items():
-        if name not in checked:
+        if name not in corpus_entries:
             unchecked = f"benchmark {name}"
         else:
             changed = differences(
-                {"files": checked[name].get("files", {})},
+                {"files": corpus_entries[name].get("files", {})},
                 {"files": manifest["files"]},
             )
             if not changed:
@@ -654,8 +654,8 @@ def benchmark_scores(
         model (str): The model, as checked_model names it.
         benchmark (str): The benchmark's name.
         manifest (dict): The benchmark's manifest, from read_benchmark.
-        texts (tuple[list[str], list[str], dict]): The benchmark's source
-            texts, target texts and expected targets, from benchmark_texts.
+        texts (tuple[dict, dict, dict]): The benchmark's source texts, target
+            texts and expected targets, from benchmark_texts.
         text_format (str): The texts' format, a key of FORMATS.
         batch_size (int): Texts encoded at a time.
 
@@ -718,11 +718,11 @@ def score(
 
     A run of ``train`` is scored from its record. Its texts take the run's
     training format, unless ``text_format`` names another. A benchmark that
-    the run's corpus was not checked against for leakage, by name and
-    version, is refused: the model may have learned its mappings. The run's
-    model must have the checksums that its record holds. The scores go into
-    the run's folder. Any other model has no record, so its
-    leakage is unknown, and scoring says so.
+    the run's corpus was not checked against for leakage, by its name and
+    its files' checksums, is refused: the model may have learned its
+    mappings. The run's model must have the checksums that its record holds.
+    The scores go into the run's folder. Any other model has no record, so
+    its leakage is unknown, and scoring says so.
 
     For each benchmark, it writes:
 

@@ -18,11 +18,12 @@ python -m embedding_model score --model uc-ctds/bge-large-en-v1.5-bio-mapping --
 ```
 
 `--model` is a Hugging Face model id, a model folder on disk, or the folder
-of a run that `train` wrote. A run is scored in its training format, and only
-on benchmarks that its corpus was checked against for leakage; see
+of a run that `train` wrote. A run is scored in its training format, unless
+`--format` names another. It is scored only on benchmarks that its corpus
+was checked against for leakage; see
 [Scoring a run](training.md#scoring-a-run). For any other model, scoring notes
-that its leakage is unknown. `--format` is
-the shape that the source and target texts are written in.
+that its leakage is unknown. `--format` is the shape that the source and
+target texts are written in.
 [Text formats](#text-formats) lists them. Models are
 compared in the default shape, the one that this pipeline's models are trained
 in. A released model can also be scored in

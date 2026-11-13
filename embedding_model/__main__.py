@@ -242,6 +242,7 @@ def main(argv=None):
         "--benchmark",
         required=True,
         nargs="+",
+        action="extend",
         choices=sorted(benchmarks.BUILDERS),
         help="one or more benchmarks. The model is loaded once for all of them.",
     )

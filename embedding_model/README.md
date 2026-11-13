@@ -260,7 +260,8 @@ and how to build it or make a new version.
 
 `compare` puts scored models side by side. It gives each model's metrics with
 their 95% confidence intervals, and tests each model against one reference
-model. It draws four figures, ready for print.
+model. It draws three figures, ready for print, and a fourth with
+`--reference`.
 [docs/comparing.md](docs/comparing.md) says how, and what each figure shows.
 
 `get_metrics_for_approach` evaluates a harmonization approach end to end. The

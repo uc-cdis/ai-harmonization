@@ -199,8 +199,12 @@ class TestRankTargets:
         metrics, ranked = scoring.rank_targets(
             model,
             {"0": "Gender"},
-            {"abcd.gender": "Gender", "abcd.race": "Race", "abcd.sex": "Sex"},
-            {"0": {"abcd.gender", "abcd.sex"}},
+            {
+                "demographic.gender": "Gender",
+                "demographic.race": "Race",
+                "demographic.sex": "Sex",
+            },
+            {"0": {"demographic.gender", "demographic.sex"}},
         )
         assert ranked["0"]["rank"] == 1
         assert metrics["mrr"] == 1.0
@@ -576,3 +580,13 @@ class TestCommandLine:
         with pytest.raises(SystemExit) as raised:
             main(["score", "--model", "abcd-model", "--benchmark", "abcd-benchmark"])
         assert raised.value.code == 2
+
+    def test_a_repeated_benchmark_flag_adds_its_benchmarks(self, monkeypatch):
+        """``--benchmark topmed --benchmark gdc`` scores both, as ``--benchmark topmed gdc`` does."""
+        calls = []
+        monkeypatch.setattr(
+            scoring, "score", lambda model, names, *rest: calls.append(names)
+        )
+        command = ["score", "--model", "abcd-model", "--benchmark", "topmed"]
+        assert main([*command, "--benchmark", "gdc"]) == 0
+        assert calls == [["topmed", "gdc"]]

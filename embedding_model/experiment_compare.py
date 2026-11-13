@@ -51,7 +51,7 @@ from embedding_model.experiments import (
 )
 from embedding_model.folders import staged
 from embedding_model.provenance import code_commit, library_versions
-from embedding_model.scoring import checked_benchmarks
+from embedding_model.scoring import corpus_benchmarks
 
 # The folder of the experiment's folder that ``experiment compare`` writes
 # whole, and the stem of its figure.
@@ -738,7 +738,7 @@ def best_run_line(comparison):
     best_record = json.loads(
         (best_run.folder / "manifest.json").read_text(encoding="utf-8")
     )
-    benchmark_names = sorted(checked_benchmarks(best_record))
+    benchmark_names = sorted(corpus_benchmarks(best_record))
     if benchmark_names:
         next_step = (
             "To score the run on the benchmarks: python -m embedding_model score"

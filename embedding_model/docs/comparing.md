@@ -2,8 +2,9 @@
 
 `python -m embedding_model compare` compares models that are already scored.
 It reads the scores that [`score`](scoring.md) wrote for each model. It
-writes a table of metrics, the differences between the models, and four
-figures. [What `compare` writes](#what-compare-writes) lists them.
+writes a table of metrics and three figures. With `--reference`, it also
+writes each model's difference from the reference, and a fourth figure.
+[What `compare` writes](#what-compare-writes) lists them.
 [Details](#details) explains what each figure and table shows, and how it is
 computed.
 
@@ -35,20 +36,24 @@ python -m embedding_model compare --name example \
 | `--colors` | one color per `--model`, in the same order, in any form that matplotlib reads, such as `'#3f90da'` or `'tab:blue'`. Without it, each model takes a color of the default `petroff10` palette, by its place in `--model`, as [Colors](#colors) says. |
 
 `compare` prints each model's MRR and accuracy@1 on each benchmark. Then it
-prints its folder, after `->`, and the full path of each figure and table,
-one per line. In a terminal that links paths, such as VS Code's, each opens
-with a click.
+prints the comparison's folder, after `->`, and the full path of each
+figure's PNG and of each table, one per line. In a terminal that links paths,
+such as VS Code's, each opens with a click.
 
 `compare` stops, and names the `score` command to run, when a model:
 
 - has no scores on a benchmark in that format;
-- finds another model's scores in its folder. Two model folders of one name
-  share a scores folder, so the last one scored holds it;
+- has a scores folder that holds another model's scores. Two model folders
+  of one name share one scores folder, so the last one scored holds it;
 - was scored on another build of the benchmark than the one built: one of
   its files differs from the files that `score` recorded.
 
 It also stops when:
 
+- `--name` is not a folder name;
+- a benchmark is not built. The message names the command that builds it;
+- `--model` names more than 8 models;
+- `--reference` is not one of the models, or no other model is given;
 - `--model` names one model twice, such as by its full path and by a
   relative path;
 - two models have one name, such as two model folders named `abcd-model`;
@@ -88,9 +93,10 @@ One row per model and benchmark: `model`, `benchmark`, `benchmark_version`,
 
 ### `differences.csv`
 
-With `--reference` only. One row per other model and metric: `benchmark`,
-`metric`, `reference`, `model`, `difference` (the model minus the
-reference), `low`, `high`, `test` and `p`.
+With `--reference` only. It has one row per benchmark, other model and
+metric. Its columns are `benchmark`, `metric`, `reference`, `model`,
+`difference`, `low`, `high`, `test` and `p`. `difference` is the mean of the
+source variables' differences: the model minus the reference.
 
 ### `figures/`
 
@@ -136,12 +142,12 @@ It also has six fields of its own:
 
 | in the figure or table | what it shows | how it is computed |
 |---|---|---|
-| a benchmark's title | the benchmark, its version, its number of source variables and its number of targets. The source variables set how precise each number is, and the targets how many candidates each variable is ranked among | the version from the benchmark that is built; both numbers from the scores' `metrics.csv` |
+| a benchmark's title | the benchmark, its version, its number of source variables and its number of targets. The source variables set how precise each number is, and the targets how many candidates each variable is ranked among | the version from the benchmark that is built; the source variables from the scores' `per_variable.csv`, and the targets from their `metrics.csv` |
 | a model's name, in the legends and the tables | which model it is | a run's name, such as `run_example_s0`; a model folder's name; or a Hugging Face model's id |
-| the first bar of each group, in `accuracy_and_mrr` | the reference, marked "(reference)" in the legends | |
+| the first bar of each group, in `accuracy_and_mrr`, with `--reference` | the reference, marked "(reference)" in the legends | |
 | a bar of accuracy@k, in `accuracy_and_mrr` | the share of source variables whose expected target is among the model's first k suggestions | the accuracy@k that `score` reports, in the scores' `metrics.csv` |
-| a bar of MRR, in `accuracy_and_mrr` | how high the first expected target ranks, on average: 1 if first, 1/2 if second, 1/3 if third | the MRR that `score` reports, in the scores' `metrics.csv` |
-| an error bar, in `accuracy_and_mrr`, `mrr_by_size` and `differences_from_reference` | how precise that model's number is: its 95% confidence interval | accuracy@k: the Wilson score interval, from scipy's `binomtest`. MRR: the t interval of the mean, from scipy's `ttest_1samp` |
+| a bar of MRR, in `accuracy_and_mrr` | how high the best-placed expected target ranks, on average: 1 if first, 1/2 if second, 1/3 if third | the MRR that `score` reports, in the scores' `metrics.csv` |
+| an error bar, in `accuracy_and_mrr` and `mrr_by_size` | how precise that model's number is: its 95% confidence interval | accuracy@k: the Wilson score interval, from scipy's `binomtest`. MRR: the t interval of the mean, from scipy's `ttest_1samp`, cut at 0 and 1 |
 | a bracket with stars, in `accuracy_and_mrr` | that model and the reference differ, on the same source variables: `*` p < 0.05, `**` p < 0.01, `***` p < 0.001, as the note under the legend says. No bracket means no significant difference: p ≥ 0.05 | accuracy@k: McNemar's exact test, a binomial test on the variables where the two models differ. MRR: the paired t-test, scipy's `ttest_rel` |
 | a line in `accuracy_by_k` | the share of source variables whose expected target is among the first k suggestions, for every k from 1 to 50 | from each source variable's rank, in the scores' `per_variable.csv` |
 | a point in `mrr_by_size` | the model's MRR, with its 95% confidence interval, by the model's number of parameters, on a log scale. Models of the same size sit side by side | the MRR that `score` reports, with its t interval; the parameters from the scores' `metrics.csv` |
@@ -151,7 +157,8 @@ It also has six fields of its own:
 
 #### Where the numbers come from
 
-Every metric is a fraction from 0 to 1, as `score` reports it.
+Every metric but the median rank is a fraction from 0 to 1, as `score`
+reports it.
 
 Each bar of `accuracy_and_mrr` is the number that `score` reports: the
 `InformationRetrievalEvaluator` of [sentence-transformers](https://sbert.net)
@@ -160,10 +167,10 @@ value, not only the mean. So `compare` takes each value from the variable's
 rank, which `score` keeps in `per_variable.csv`: 1 / rank for MRR, and 1 or 0
 for accuracy@k.
 
-`metrics.csv` holds accuracy@k only for k of 1, 3, 5 and 10. So each line of
-`accuracy_by_k` comes from the `per_variable.csv` ranks too. At each k from 1
-to 50, it is the share of source variables whose rank is k or less. At k of
-1, 3, 5 and 10, it is the accuracy@k that `score` reports.
+The scores' `metrics.csv` holds accuracy@k only for k of 1, 3, 5 and 10. So
+each line of `accuracy_by_k` comes from the `per_variable.csv` ranks too. At
+each k from 1 to 50, it is the share of source variables whose rank is k or
+less. At k of 1, 3, 5 and 10, it is the accuracy@k that `score` reports.
 
 A model's size, in `mrr_by_size`, is its number of parameters, as `score`
 counts them on the loaded model. A static model's parameters are almost all

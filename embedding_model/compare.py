@@ -333,9 +333,9 @@ def newcombe_interval(model_values, reference_values):
     reference_up = reference_high - reference_share
     # The lower end takes the model's reach down and the reference's reach
     # up, since both make the difference smaller. The upper end takes the
-    # other two. Each pair combines as the errors of two independent
-    # estimates do, the square root of the sum of their squares, less a
-    # term for phi. Two models that succeed on the same variables move
+    # other two. The two reaches at each end combine as the errors of two
+    # independent estimates do, the square root of the sum of their squares,
+    # less a term for phi. Two models that succeed on the same variables move
     # together, so their difference moves less.
     lower_distance = np.sqrt(
         model_down**2 - 2 * phi * model_down * reference_up + reference_up**2
@@ -374,11 +374,11 @@ def paired_test(metric, model_values, reference_values):
             return MCNEMAR, 1.0
         binomial_test = stats.binomtest(only_model, only_model + only_reference, 0.5)
         return MCNEMAR, float(binomial_test.pvalue)
-    differences = np.asarray(model_values, dtype=float) - np.asarray(
+    variable_differences = np.asarray(model_values, dtype=float) - np.asarray(
         reference_values, dtype=float
     )
-    if differences.min() == differences.max():
-        return PAIRED_T, 1.0 if differences[0] == 0 else 0.0
+    if variable_differences.min() == variable_differences.max():
+        return PAIRED_T, 1.0 if variable_differences[0] == 0 else 0.0
     return PAIRED_T, float(stats.ttest_rel(model_values, reference_values).pvalue)
 
 
@@ -402,7 +402,9 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
     """One model's metrics on one benchmark, each tested one with its interval.
 
     Each mean is the one that ``score`` reported. Its interval comes from the
-    source variables' values, by the metric's method in INTERVALS.
+    source variables' values, by the metric's method in INTERVALS. A t
+    interval is cut at 0 and 1, the range of MRR. The true MRR lies in that
+    range, so an interval that holds it still holds it after the cut.
 
     Args:
         label (str): The model's name, from label_of.
@@ -430,6 +432,7 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
             low, high = wilson_interval(values[metric])
         else:
             low, high = t_interval(values[metric])
+            low, high = max(low, 0.0), min(high, 1.0)
         comparison_row[metric] = float(row[metric])
         comparison_row[f"{metric}_low"] = round(low, 4)
         comparison_row[f"{metric}_high"] = round(high, 4)
@@ -683,11 +686,11 @@ def overview_figure(
     palette = colors(model_colors)
     bar_colors = [palette[place] for _, _, place in order]
     legend_axes = None
-    for panel, (benchmark, result) in zip(panels, benchmark_results.items()):
-        panel.suptitle(benchmark_title(benchmark, result))
+    for panel, (benchmark, benchmark_result) in zip(panels, benchmark_results.items()):
+        panel.suptitle(benchmark_title(benchmark, benchmark_result))
         accuracy, mrr = panel.subplots(1, 2, width_ratios=[3, 1])
         legend_axes = legend_axes or accuracy
-        metrics = result["metrics"]
+        metrics = benchmark_result["metrics"]
         for axes, panel_metrics in (
             (accuracy, [f"accuracy@{k}" for k in FIGURE_K]),
             (mrr, ["mrr"]),
@@ -756,12 +759,14 @@ def curve_figure(benchmark_results, models, reference, model_colors=None):
     )
     figure.get_layout_engine().set(hspace=0.08)
     figure.suptitle(f"Accuracy@k for every k from 1 to {CURVE_K[-1]}")
-    rows = figure.subplots(len(benchmark_results), 1, squeeze=False)
-    for (axes,), (benchmark, result) in zip(rows, benchmark_results.items()):
+    axes_grid = figure.subplots(len(benchmark_results), 1, squeeze=False)
+    for (axes,), (benchmark, benchmark_result) in zip(
+        axes_grid, benchmark_results.items()
+    ):
         for model, legend_label, place in drawn(models, reference):
             axes.plot(
                 CURVE_K,
-                stats.ecdf(result["ranks"][model]).cdf.evaluate(CURVE_K),
+                stats.ecdf(benchmark_result["ranks"][model]).cdf.evaluate(CURVE_K),
                 color=palette[place],
                 linestyle=LINE_STYLES[place],
                 linewidth=1.4,
@@ -777,8 +782,8 @@ def curve_figure(benchmark_results, models, reference, model_colors=None):
         axes.set_ylim(0, 1)
         axes.set_xlabel(K_LABEL)
         axes.set_ylabel("Accuracy@k")
-        axes.set_title(benchmark_title(benchmark, result))
-    legend(figure, rows[0][0], len(models))
+        axes.set_title(benchmark_title(benchmark, benchmark_result))
+    legend(figure, axes_grid[0][0], len(models))
     return figure
 
 
@@ -809,9 +814,11 @@ def size_figure(benchmark_results, models, reference, model_colors=None):
     )
     figure.get_layout_engine().set(hspace=0.08)
     figure.suptitle("MRR by model size")
-    rows = figure.subplots(len(benchmark_results), 1, squeeze=False)
-    for (axes,), (benchmark, result) in zip(rows, benchmark_results.items()):
-        metrics = result["metrics"]
+    axes_grid = figure.subplots(len(benchmark_results), 1, squeeze=False)
+    for (axes,), (benchmark, benchmark_result) in zip(
+        axes_grid, benchmark_results.items()
+    ):
+        metrics = benchmark_result["metrics"]
         order = drawn(models, reference)
         millions = [metrics[model]["parameters"] / 1e6 for model, _, _ in order]
         for index, (model, legend_label, place) in enumerate(order):
@@ -852,8 +859,8 @@ def size_figure(benchmark_results, models, reference, model_colors=None):
         axes.set_ylim(0, 1)
         axes.set_xlabel("Parameters, in millions (log scale, base 10)")
         axes.set_ylabel("MRR")
-        axes.set_title(benchmark_title(benchmark, result))
-    legend(figure, rows[0][0], len(models))
+        axes.set_title(benchmark_title(benchmark, benchmark_result))
+    legend(figure, axes_grid[0][0], len(models))
     return figure
 
 
@@ -922,7 +929,7 @@ def differences_figure(
     )
     figure.get_layout_engine().set(hspace=0.1)
     figure.suptitle(f"Each model against the reference, {reference}")
-    rows = figure.subplots(len(benchmark_results), 1, squeeze=False)
+    axes_grid = figure.subplots(len(benchmark_results), 1, squeeze=False)
     others = [
         drawn_model
         for drawn_model in drawn(models, reference)
@@ -936,7 +943,9 @@ def differences_figure(
     lowest = min([0.0] + [row["low"] for row in drawn_rows])
     highest = max([0.0] + [row["high"] for row in drawn_rows])
     margin = 0.08 * (highest - lowest) or 0.01
-    for (axes,), (benchmark, result) in zip(rows, benchmark_results.items()):
+    for (axes,), (benchmark, benchmark_result) in zip(
+        axes_grid, benchmark_results.items()
+    ):
         for line, metric in enumerate(FIGURE_METRICS):
             for index, (model, legend_label, place) in enumerate(others):
                 row = differences_by_key[(benchmark, metric, model)]
@@ -975,8 +984,8 @@ def differences_figure(
         axes.grid(axis="x", visible=True)
         axes.set_xlabel("Model minus the reference, with 95% confidence intervals")
         mark_sides(axes, "the reference")
-        axes.set_title(benchmark_title(benchmark, result))
-    legend(figure, rows[0][0], len(others))
+        axes.set_title(benchmark_title(benchmark, benchmark_result))
+    legend(figure, axes_grid[0][0], len(others))
     return figure
 
 
@@ -1006,7 +1015,7 @@ class Comparison:
             ``models``, as ``--colors`` gives them, or None for
             DEFAULT_PALETTE's.
         results (dict[str, dict]): Each benchmark's results, from
-            benchmark_result, by the benchmark's name.
+            read_benchmark_result, by the benchmark's name.
     """
 
     name: str
@@ -1025,7 +1034,9 @@ class Comparison:
     def differences(self):
         """The rows of differences.csv, from every benchmark."""
         return [
-            row for result in self.results.values() for row in result["differences"]
+            row
+            for benchmark_result in self.results.values()
+            for row in benchmark_result["differences"]
         ]
 
 
@@ -1137,7 +1148,7 @@ def checked_colors(model_colors, models):
     return list(model_colors)
 
 
-def benchmark_result(comparison, benchmark, inputs, outputs):
+def read_benchmark_result(comparison, benchmark, inputs, outputs):
     """Read every model's scores on one benchmark, and compute what they show.
 
     Args:
@@ -1159,7 +1170,7 @@ def benchmark_result(comparison, benchmark, inputs, outputs):
     """
     _, _, manifest = benchmarks.read_benchmark(inputs, benchmark)
     version = manifest["version"]
-    result = {
+    benchmark_result = {
         "version": version,
         "metrics": {},
         "values": {},
@@ -1168,25 +1179,25 @@ def benchmark_result(comparison, benchmark, inputs, outputs):
     }
     variables = None
     for label, model in comparison.models.items():
-        row, ranks, folder = read_scores(
+        row, per_variable, folder = read_scores(
             model, benchmark, comparison.text_format, outputs, manifest
         )
         if variables is None:
-            variables = ranks[list(VARIABLE_KEY)]
-        elif not ranks[list(VARIABLE_KEY)].equals(variables):
+            variables = per_variable[list(VARIABLE_KEY)]
+        elif not per_variable[list(VARIABLE_KEY)].equals(variables):
             raise ValueError(
                 f"{model}'s scores on {benchmark} list other source variables,"
                 f" or list them in another order, than {comparison.labels[0]}'s,"
                 " though both were scored on this build of it. Score both again."
             )
-        values = variable_values(ranks["rank"].to_numpy())
-        result["targets"] = int(row["targets"])
-        result["metrics"][label] = metrics_row(
+        values = variable_values(per_variable["rank"].to_numpy())
+        benchmark_result["targets"] = int(row["targets"])
+        benchmark_result["metrics"][label] = metrics_row(
             label, benchmark, version, comparison.text_format, row, values
         )
-        result["values"][label] = values
-        result["ranks"][label] = ranks["rank"].to_numpy()
-        result["sources"].append(
+        benchmark_result["values"][label] = values
+        benchmark_result["ranks"][label] = per_variable["rank"].to_numpy()
+        benchmark_result["sources"].append(
             {
                 "role": "scores",
                 "model": model,
@@ -1199,14 +1210,14 @@ def benchmark_result(comparison, benchmark, inputs, outputs):
                 },
             }
         )
-    result["n"] = len(variables)
-    result["differences"] = []
+    benchmark_result["n"] = len(variables)
+    benchmark_result["differences"] = []
     if comparison.reference is not None:
         others = [label for label in comparison.labels if label != comparison.reference]
-        result["differences"] = difference_rows(
-            benchmark, comparison.reference, others, result["values"]
+        benchmark_result["differences"] = difference_rows(
+            benchmark, comparison.reference, others, benchmark_result["values"]
         )
-    return result
+    return benchmark_result
 
 
 def write_comparison(comparison, destination):
@@ -1229,8 +1240,8 @@ def write_comparison(comparison, destination):
     with staged(destination) as built, rc_context(STYLE):
         pd.DataFrame(
             [
-                result["metrics"][label]
-                for result in results.values()
+                benchmark_result["metrics"][label]
+                for benchmark_result in results.values()
                 for label in labels
             ]
         ).to_csv(built / "metrics.csv", index=False)
@@ -1257,8 +1268,8 @@ def write_comparison(comparison, destination):
                 "built": date.today().isoformat(),
                 "sources": [
                     source
-                    for result in results.values()
-                    for source in result["sources"]
+                    for benchmark_result in results.values()
+                    for source in benchmark_result["sources"]
                 ],
                 "settings": {
                     "format": comparison.text_format,
@@ -1274,8 +1285,8 @@ def write_comparison(comparison, destination):
                 ],
                 "reference": reference,
                 "benchmarks": {
-                    benchmark: result["version"]
-                    for benchmark, result in results.items()
+                    benchmark: benchmark_result["version"]
+                    for benchmark, benchmark_result in results.items()
                 },
                 "ai_harmonization": code_commit(),
                 "libraries": library_versions(COMPARE_LIBRARIES),
@@ -1308,12 +1319,13 @@ def print_summary(comparison, destination):
             results.
         destination (Path): The comparison's folder.
     """
-    for benchmark, result in comparison.results.items():
+    for benchmark, benchmark_result in comparison.results.items():
         print(
-            f"{benchmark} version {result['version']}, {result['n']:,} source variables:"
+            f"{benchmark} version {benchmark_result['version']},"
+            f" {benchmark_result['n']:,} source variables:"
         )
         for label in comparison.labels:
-            metrics = result["metrics"][label]
+            metrics = benchmark_result["metrics"][label]
             print(
                 f"  {label}: MRR {metrics['mrr']} ({metrics['mrr_low']} to"
                 f" {metrics['mrr_high']}), accuracy@1 {metrics['accuracy@1']}"
@@ -1360,7 +1372,7 @@ def compare(
     Raises:
         ValueError: If the models, the colors or the name are refused, as
             checked_models and checked_colors say, or a model's scores cannot
-            be read or list other variables, as benchmark_result says.
+            be read or list other variables, as read_benchmark_result says.
         FileNotFoundError: If a benchmark has not been built.
     """
     named_models, reference_name = checked_models(name, models, reference)
@@ -1372,7 +1384,7 @@ def compare(
         checked_colors(model_colors, models),
     )
     for benchmark in dict.fromkeys(benchmark_names):
-        comparison.results[benchmark] = benchmark_result(
+        comparison.results[benchmark] = read_benchmark_result(
             comparison, benchmark, inputs, outputs
         )
     destination = Path(outputs) / COMPARISONS / name

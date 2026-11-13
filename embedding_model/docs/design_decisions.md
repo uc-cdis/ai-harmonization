@@ -853,8 +853,8 @@ expected target first, both get 1 on accuracy@1.
 
 **Decision.** A model's accuracy@k gets a 95% Wilson score interval. Each
 other model's difference from the reference gets Newcombe's interval for
-paired shares. It combines the two models' Wilson intervals with how often
-the two models agree. The test of that difference is McNemar's exact test: a
+paired shares. It combines the two Wilson intervals with the two models'
+correlation. The test of that difference is McNemar's exact test: a
 binomial test on the variables where the two models differ.
 
 **Consequences.**
@@ -879,10 +879,9 @@ binomial test on the variables where the two models differ.
   approximation.
 - Good, because `scipy.stats.binomtest` computes both the Wilson interval and
   McNemar's exact test.
-- Bad, because no released library computes Newcombe's interval. `compare`
-  computes it by Newcombe's formula, from scipy's Wilson limits. statsmodels
-  has added it as `confint_proportions_paired`, but has no release with it
-  yet.
+- Bad, because neither scipy nor statsmodels computes Newcombe's interval.
+  So `compare` computes it by Newcombe's formula, from scipy's Wilson
+  limits.
 - Bad, because the exact test is conservative when few variables differ: its
   p tends to be larger than it should be
   ([Fagerland et al., 2013](https://doi.org/10.1186/1471-2288-13-91)).
@@ -953,9 +952,10 @@ which a confidence interval shows. Two models' values match up, variable by
 variable. Two good models often give a variable the same rank, so many of
 the differences are 0.
 
-**Decision.** A model's MRR gets the 95% t interval of its mean. A
-difference from the reference gets the paired t-test, and the test's own 95%
-t interval: the interval of the variables' differences. scipy computes both.
+**Decision.** A model's MRR gets the 95% t interval of its mean, cut at 0
+and 1, the range of MRR. A difference from the reference gets the paired
+t-test, and the test's own 95% t interval: the interval of the variables'
+differences. scipy computes both.
 
 **Consequences.**
 
@@ -971,6 +971,11 @@ t interval: the interval of the variables' differences. scipy computes both.
   a mean ([Student, 1908](https://doi.org/10.2307/2331554)).
 - Bad, because the t interval assumes that the mean is about normally
   distributed. Values that pile up at 1 need enough variables for that.
+- Good, because the cut never loses the true MRR, which lies between 0 and
+  1. An interval that held it before the cut still holds it. The cut
+  interval always holds the mean, so it is never empty.
+- Bad, because a cut interval is not symmetric around the mean. Its cut
+  end is MRR's limit, not a t limit.
 - Bad, because the t-test loses power when the differences are skewed. On a
   small benchmark, a permutation test can find a difference that the t-test
   misses.
@@ -1004,6 +1009,7 @@ t interval: the interval of the variables' differences. scipy computes both.
 check that:
 
 - on 200 variables, the interval is the mean plus or minus t × sd / √200;
+- a model's MRR interval that passes 1 ends at 1, and keeps its low end;
 - when every variable has an MRR of 1, the interval is [1, 1];
 - a difference's interval excludes 0 exactly when the paired t-test's p is
   below 0.05;
@@ -1068,7 +1074,7 @@ check that:
 
 **Described in:** [comparing.md](comparing.md#what-it-shows).
 
-**Context.** A model developer compares models to answer a few questions
+**Context.** The user compares models to answer a few questions
 quickly:
 
 - How often, and how high, does each model rank an expected target?
@@ -1178,11 +1184,12 @@ check that:
 
 **Described in:** [comparing.md](comparing.md#colors).
 
-**Context.** Each model takes the petroff10 color of its place in `--model`.
-Two comparisons that list other models, or list them in another order, can
-give one model two colors. A reader who sees both, as in one report, may take
-it for two models. matplotlib reads a color as a hex code or a name.
-`--model` and `--benchmark` each take a list.
+**Context.** By default, each model takes the
+[petroff10](#colors-from-matplotlibs-petroff10-not-its-default-tab10) color
+of its place in `--model`. Two comparisons that list other models, or list
+them in another order, can give one model two colors. A reader who sees
+both, as in one report, may take it for two models. `--model` and
+`--benchmark` each take a list.
 
 **Decision.** `--colors` gives one color per `--model`, in the same order, in
 any form that matplotlib reads. compare refuses a count that differs from
@@ -1200,18 +1207,19 @@ hex.
   ([matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)).
 - Good, because the colors are checked before any score is read, so a
   misspelled color stops compare at once.
-- Good, because a model can never be hidden by its color. The bars of
-  `accuracy_and_mrr` carry only a color, so one color for two models, or a
-  fully transparent one, would hide a model there.
+- Good, because no two models share a color, and none is fully transparent.
+  The bars of `accuracy_and_mrr` carry only a color, so either would hide a
+  model there.
 - Good, because the manifest says what the figures show, whatever form
   each color was given in. `'tab:blue'` and `'#1f77b4'` are both recorded
   as `#1f77b4ff`.
+- Bad, because a color can still be hard to see. White is lost on the white
+  background. Two colors can look alike, to every reader or only under a
+  color vision deficiency, which petroff10 was chosen to avoid. compare
+  checks neither.
 - Bad, because the list must be kept in step with `--model` by hand. A model
   added in the middle shifts the colors after it, and compare cannot tell,
   since any color fits any model.
-- Bad, because colors that the user chooses may be hard to tell apart under
-  a color vision deficiency, which petroff10 was chosen to avoid. compare
-  does not check them.
 
 **Alternatives considered.**
 

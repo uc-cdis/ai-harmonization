@@ -81,11 +81,12 @@ checked against for leakage. [training.md](training.md#what-train-writes)
 describes the run's manifest.
 
 A comparison's manifest also has `ai_harmonization` and `libraries`, as a
-run's has them, and three more fields:
+run's has them, and four more fields:
 
 - `models`: the models compared, by their names in the tables;
 - `reference`: the reference, or null without `--reference`;
-- `benchmarks`: each benchmark, with its version.
+- `benchmarks`: each benchmark, with its version;
+- `model_colors`: each model's color as drawn.
 
 [comparing.md](comparing.md#what-compare-writes) describes the
 comparison's manifest.

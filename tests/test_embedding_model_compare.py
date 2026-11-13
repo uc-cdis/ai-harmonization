@@ -30,6 +30,17 @@ VARIABLES = [
 REFERENCE = "abcd-org/abcd-model"
 OTHER = "efgh-org/efgh-model"
 RANKS = {REFERENCE: [1, 1, 1, 2, 1, 3], OTHER: [2, 1, 4, 2, 12, 3]}
+# Targets that no variable expects: the rest of the data model that each
+# variable is ranked among. With them, the benchmark has 12 targets, as many as
+# the largest rank below.
+OTHER_TARGETS = [
+    ("vital_signs.respiratory_rate", "Respiratory rate"),
+    ("vital_signs.body_temperature", "Body temperature"),
+    ("anthropometry.height", "Body height"),
+    ("anthropometry.weight", "Body weight"),
+    ("anthropometry.hip_circumference", "Hip circumference"),
+    ("lab.hemoglobin_a1c", "Hemoglobin A1c"),
+]
 # Their sizes: the reference a static model of 8,000 tokens by 256 dimensions,
 # the other a transformer of 110 million parameters.
 PARAMETERS = {REFERENCE: 8_000 * 256, OTHER: 110_000_000}
@@ -39,10 +50,10 @@ PARAMETERS = {REFERENCE: 8_000 * 256, OTHER: 110_000_000}
 NEAR_MISSES = {
     "SBP01": "vital_signs.diastolic_blood_pressure",
     "DBP01": "vital_signs.systolic_blood_pressure",
-    "HR01": "vital_signs.systolic_blood_pressure",
-    "BMI01": "anthropometry.waist_circumference",
-    "WAIST01": "anthropometry.body_mass_index",
-    "GLU01": "anthropometry.body_mass_index",
+    "HR01": "vital_signs.respiratory_rate",
+    "BMI01": "anthropometry.weight",
+    "WAIST01": "anthropometry.hip_circumference",
+    "GLU01": "lab.hemoglobin_a1c",
 }
 
 
@@ -70,7 +81,8 @@ def mappings():
 
 
 def targets():
-    """The benchmark's targets: one per variable, described as the variable is."""
+    """The benchmark's targets: one per variable, described as the variable is, and OTHER_TARGETS."""
+    expected = [(target, description) for _, description, target in VARIABLES]
     return [
         {
             "target_property": target,
@@ -78,7 +90,7 @@ def targets():
             "target_description": description,
             "target_values": "",
         }
-        for _, description, target in VARIABLES
+        for target, description in expected + OTHER_TARGETS
     ]
 
 
@@ -154,7 +166,7 @@ def scores(
         "benchmark_version": manifest["version"],
         "format": "compact",
         "n": len(ranks),
-        "targets": len(VARIABLES),
+        "targets": len(targets()),
         "parameters": PARAMETERS[model] if parameters is None else parameters,
         **score_means(ranks),
         "median_rank": float(np.median(ranks)),
@@ -246,6 +258,25 @@ class TestInterval:
         low, high = compare.t_interval(compare.variable_values(ranks)["mrr"])
         assert (low, high) == pytest.approx((0.75 - 0.0349, 0.75 + 0.0349), abs=1e-4)
 
+    def test_a_models_mrr_interval_is_cut_at_1(self):
+        """A model's MRR interval ends at 1, the most that MRR can be, where the t interval passes it.
+
+        Five of six variables rank their target first, and one second: MRR
+        values of 1 and 1/2, with a mean of 11/12 = 0.9167. Their standard
+        deviation is 0.2041, and t at 97.5% with 5 degrees of freedom is
+        2.571. So the t interval runs 2.571 x 0.2041 / sqrt(6) = 0.2142 each
+        way from the mean, from 0.7025 to 1.1309. metrics_row keeps its low
+        end, and cuts its high end at 1. MRR@10 has the same values here.
+        """
+        ranks = np.array([1, 1, 1, 1, 1, 2])
+        row = {**score_means(ranks), "median_rank": 1.0, "targets": 12, "parameters": 1}
+        found = compare.metrics_row(
+            "abcd-model", "topmed", "1", "compact", row, compare.variable_values(ranks)
+        )
+        for metric in ("mrr", "mrr@10"):
+            assert found[f"{metric}_low"] == pytest.approx(0.7025, abs=1e-4)
+            assert found[f"{metric}_high"] == 1.0
+
     @pytest.mark.filterwarnings("error")
     def test_equal_values_give_their_value(self):
         """When every variable has the same MRR, such as 1, the interval is that value, with no warning.
@@ -270,10 +301,14 @@ class TestInterval:
         better = 1 / np.array([1] * 8 + tied)
         mixed = 1 / np.array([1] * 4 + [2] * 4 + tied)
         mixed_reference = 1 / np.array([2] * 4 + [1] * 4 + tied)
+        p_values = []
         for model, base in ((better, reference), (mixed, mixed_reference)):
             low, high = compare.t_interval(model - base)
             _, p = compare.paired_test("mrr", model, base)
             assert (low > 0 or high < 0) == (p < 0.05)
+            p_values.append(p)
+        assert round(p_values[0], 3) == 0.002
+        assert p_values[1] == 1.0
 
     def test_newcombes_interval_uses_the_pairing(self):
         """Two models with the same shares get a narrower interval when they agree.
@@ -326,7 +361,8 @@ class TestPairedTest:
         reference finds second: a difference of 8 x (1 - 1/2) / 20 = 0.2 in
         MRR. The other 12 tie, at ranks 1 to 12. The paired test sees each
         variable's difference, and gives p 0.002. An unpaired test sees the
-        spread of the 12 tied ranks too, and gives p 0.07.
+        spread of the 12 tied ranks too, and gives p 0.07. The last assert
+        checks that the data shows this.
         """
         tied = list(range(1, 13))
         model = 1 / np.array([1] * 8 + tied)
@@ -385,20 +421,22 @@ class TestCompare:
     def test_metrics_differences_figures_and_manifest(self, built, capsys):
         """The folder holds both tables, the four figures in each format, and the manifest.
 
-        The reference's MRR is (1 + 1 + 1 + 1/2 + 1 + 1/3) / 6, the other's
-        (1/2 + 1 + 1/4 + 1/2 + 1/12 + 1/3) / 6. The other's nDCG@10 takes
-        1 / log2(rank + 1) for each rank within 10. The reference ranks every
-        expected target within 5, so its accuracy@5 is 1, and its Wilson
-        interval starts at 6 / (6 + z^2).
+        compare takes each mean from score's metrics.csv, rounded to four
+        decimals there. The reference's MRR is (1 + 1 + 1 + 1/2 + 1 + 1/3) / 6,
+        the other's (1/2 + 1 + 1/4 + 1/2 + 1/12 + 1/3) / 6. The other's nDCG@10
+        takes 1 / log2(rank + 1) for each rank within 10. The reference ranks
+        every expected target within 5, so its accuracy@5 is 1, and its
+        Wilson interval starts at 6 / (6 + z^2).
 
         On accuracy@1, both models find DBP01's target first, only the
         reference finds SBP01's, HR01's and WAIST01's, and neither finds
-        BMI01's or GLU01's. Newcombe lowers that table's covariance,
-        1 x 2 - 0 x 3 = 2, by n / 2 = 3, to 0. So the interval of 1/6 - 4/6
-        combines the two Wilson intervals as if apart: 0.0301 to 0.5635 for
-        1/6, and 0.3000 to 0.9032 for 4/6. It runs from 1/6 - 4/6 minus
-        sqrt((1/6 - 0.0301)^2 + (0.9032 - 4/6)^2) to 1/6 - 4/6 plus
-        sqrt((0.5635 - 1/6)^2 + (4/6 - 0.3000)^2): -0.7732 to 0.0403.
+        BMI01's or GLU01's. Newcombe lowers phi's numerator for that table,
+        1 x 2 - 0 x 3 = 2, by n / 2 = 3, and stops at 0. So phi is 0, and the
+        interval of 1/6 - 4/6 combines the two Wilson intervals as if apart:
+        0.0301 to 0.5635 for 1/6, and 0.3000 to 0.9032 for 4/6. It runs from
+        1/6 - 4/6 minus sqrt((1/6 - 0.0301)^2 + (0.9032 - 4/6)^2) to
+        1/6 - 4/6 plus sqrt((0.5635 - 1/6)^2 + (4/6 - 0.3000)^2):
+        -0.7732 to 0.0403.
         """
         inputs, outputs = built
         folder = compare.compare(
@@ -615,14 +653,14 @@ class TestCompare:
         """A benchmark named twice is read and computed once, as score scores it once."""
         inputs, outputs = built
         read = []
-        benchmark_result = compare.benchmark_result
+        read_benchmark_result = compare.read_benchmark_result
 
         def counted(comparison, benchmark, *paths):
-            """benchmark_result, which also records each benchmark that it reads."""
+            """read_benchmark_result, which also records each benchmark that it reads."""
             read.append(benchmark)
-            return benchmark_result(comparison, benchmark, *paths)
+            return read_benchmark_result(comparison, benchmark, *paths)
 
-        monkeypatch.setattr(compare, "benchmark_result", counted)
+        monkeypatch.setattr(compare, "read_benchmark_result", counted)
         folder = compare.compare(
             "abcd-comparison", [REFERENCE, OTHER], ["topmed", "topmed"], inputs, outputs
         )
@@ -725,10 +763,10 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
     models = [REFERENCE] + [f"efgh-org/model-{n}" for n in range(2, count + 1)]
     benchmark_results, differences = {}, []
     for benchmark in ("topmed", "gdc"):
-        result = {
+        benchmark_result = {
             "version": "1",
             "n": len(reference_ranks),
-            "targets": 3,
+            "targets": 12,
             "metrics": {},
             "values": {},
         }
@@ -738,17 +776,17 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
             row = {
                 **score_means(ranks),
                 "median_rank": float(np.median(ranks)),
-                "targets": 3,
+                "targets": 12,
                 "parameters": 1,
             }
-            result["metrics"][model] = compare.metrics_row(
+            benchmark_result["metrics"][model] = compare.metrics_row(
                 model, benchmark, "1", "compact", row, values
             )
-            result["values"][model] = values
+            benchmark_result["values"][model] = values
         differences += compare.difference_rows(
-            benchmark, REFERENCE, models[1:], result["values"]
+            benchmark, REFERENCE, models[1:], benchmark_result["values"]
         )
-        benchmark_results[benchmark] = result
+        benchmark_results[benchmark] = benchmark_result
     return models, benchmark_results, differences
 
 
@@ -843,8 +881,8 @@ class TestFigures:
         of its place. differences_from_reference draws only the other model.
         """
         (reference, other), benchmark_results, differences = figure_results(2)
-        for result in benchmark_results.values():
-            result["ranks"] = {reference: np.ones(6), other: np.full(6, 2)}
+        for benchmark_result in benchmark_results.values():
+            benchmark_result["ranks"] = {reference: np.ones(6), other: np.full(6, 2)}
         models = [other, reference]
         model_colors = ["tab:purple", "tab:green"]
         purple, green = to_rgba("tab:purple"), to_rgba("tab:green")
@@ -923,7 +961,7 @@ class TestFigures:
         topmed_axes, gdc_axes = figure.get_axes()[:2]
         assert topmed_axes.get_xlim() == gdc_axes.get_xlim()
         assert topmed_axes.get_title() == (
-            "Benchmark: TOPMed v1 (6 source variables, 3 targets)"
+            "Benchmark: TOPMed v1 (6 source variables, 12 targets)"
         )
         assert topmed_axes.get_xlim()[0] < -3
 
@@ -946,7 +984,7 @@ class TestFigures:
             "topmed": {
                 "version": "1",
                 "n": 6,
-                "targets": 3,
+                "targets": 12,
                 "ranks": {REFERENCE: np.array(RANKS[REFERENCE])},
             }
         }
@@ -965,7 +1003,7 @@ class TestFigures:
             "topmed": {
                 "version": "1",
                 "n": 6,
-                "targets": 3,
+                "targets": 12,
                 "ranks": {model: np.array(ranks) for model, ranks in RANKS.items()},
             }
         }
@@ -995,7 +1033,7 @@ class TestFigures:
             for model in (REFERENCE, OTHER)
         }
         benchmark_results = {
-            "topmed": {"version": "1", "n": 6, "targets": 3, "metrics": metrics}
+            "topmed": {"version": "1", "n": 6, "targets": 12, "metrics": metrics}
         }
         with rc_context(compare.STYLE):
             figure = compare.size_figure(benchmark_results, [REFERENCE, OTHER], None)

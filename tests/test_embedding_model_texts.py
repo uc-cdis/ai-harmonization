@@ -1,27 +1,19 @@
 """Tests for embedding_model.texts: how a property is written as one text."""
 
-from ai_harmonization.formatters import (
-    MAX_VALUES_IN_PROMPT,
-    get_node_property_as_name_type_description_values,
-)
-from ai_harmonization.simple_data_model import Node, Property
+from ai_harmonization.formatters import MAX_VALUES_IN_PROMPT
 from embedding_model import texts
 
 
 class TestFormats:
-    """Each format writes a property the same way as its formatter."""
+    """How a format writes a property as one text."""
 
-    def test_a_target_is_written_by_the_formatter(self):
-        """A target property's text is what the formatter writes when called directly."""
-        expected = get_node_property_as_name_type_description_values(
-            Node(name="a", description="", links=[], properties=[]),
-            Property(name="sex", description="Sex", type="string", values=["F", "M"]),
-        )
+    def test_a_target_text_is_node_property_type_description_and_values(self):
+        """A target property's text is node.property (type): its description, then its values."""
         formatter = texts.FORMATS["name_type_description_values"]
         written = texts.property_text(
-            formatter, "a", "sex", "string", "Sex", ["F", "M"]
+            formatter, "demographic", "sex", "string", "Sex", ["F", "M"]
         )
-        assert written == expected
+        assert written == "demographic.sex (string): Sex Values: F | M"
 
     def test_a_source_has_no_leading_dot(self):
         """A source variable has no node, so its text starts with its name."""

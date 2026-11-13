@@ -288,27 +288,37 @@ class TestInterval:
         assert compare.t_interval(np.ones(6)) == (1.0, 1.0)
 
     def test_the_interval_and_the_test_agree(self):
-        """A difference's interval excludes 0 exactly when the paired t-test's p is below 0.05.
+        """A difference's 95% interval excludes 0 exactly when the paired t-test's p is below 0.05.
 
-        Both come from one t distribution. Of 20 variables, the model finds
-        8 expected targets first that the reference finds second, and the two
-        tie on the other 12, at ranks 1 to 12: a difference, with p 0.002.
-        With the two models swapped on half of the 8, the means cancel: no
-        difference, and p 1.
+        The report shows both, so they must agree. Of 20 variables, the model
+        ranks the expected target first on a few, where the reference ranks it
+        second: a difference of 1 - 1/2 = 1/2 each. On the rest, both rank it
+        the same: a difference of 0. The t statistic is the mean / (sd /
+        sqrt(20)), where sd is the differences' standard deviation. The
+        interval is the mean +/- 2.093 x sd / sqrt(20). 2.093 is the t
+        distribution's 97.5% point, with 20 - 1 = 19 degrees of freedom: a
+        95% interval leaves 2.5% out on each side.
+
+        - With 4 such variables, the 20 differences have a mean of 0.1 and an
+          sd of 0.205. So t is 2.18, p is 0.042, and the interval, 0.004 to
+          0.196, excludes 0.
+        - With 3, the mean is 0.075 and the sd 0.183. So t is 1.83, p is
+          0.083, and the interval, -0.011 to 0.161, holds 0.
+
+        Each p is close to 0.05, so a 90% or a 99% interval fails one case. A
+        99% interval holds 0 with 4 such variables, and a 90% interval
+        excludes 0 with 3.
         """
-        tied = list(range(1, 13))
-        reference = 1 / np.array([2] * 8 + tied)
-        better = 1 / np.array([1] * 8 + tied)
-        mixed = 1 / np.array([1] * 4 + [2] * 4 + tied)
-        mixed_reference = 1 / np.array([2] * 4 + [1] * 4 + tied)
         p_values = []
-        for model, base in ((better, reference), (mixed, mixed_reference)):
-            low, high = compare.t_interval(model - base)
-            _, p = compare.paired_test("mrr", model, base)
+        for win_count in (4, 3):
+            tied_ranks = list(range(1, 21 - win_count))
+            reference_values = 1 / np.array([2] * win_count + tied_ranks)
+            model_values = 1 / np.array([1] * win_count + tied_ranks)
+            low, high = compare.t_interval(model_values - reference_values)
+            _, p = compare.paired_test("mrr", model_values, reference_values)
             assert (low > 0 or high < 0) == (p < 0.05)
-            p_values.append(p)
-        assert round(p_values[0], 3) == 0.002
-        assert p_values[1] == 1.0
+            p_values.append(round(p, 3))
+        assert p_values == [0.042, 0.083]
 
     def test_newcombes_interval_uses_the_pairing(self):
         """Two models with the same shares get a narrower interval when they agree.
@@ -750,7 +760,9 @@ class TestCompare:
         assert not (outputs / "comparisons").exists()
 
 
-def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
+def figure_results(
+    count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6, tied_benchmark=None
+):
     """Results on two benchmarks for the reference and count - 1 other models.
 
     By default the reference ranks each of six variables' expected target
@@ -758,7 +770,9 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
     all six variables, and McNemar's p is 2 * 0.5 ** 6 = 0.03125: one star. On
     MRR each variable differs by 1 - 1/2, with no spread, so the paired
     t-test's p is 0: three stars. So each gets a bracket. At k of 5 and 10
-    the models agree.
+    the models agree. On ``tied_benchmark``, every model ranks as the
+    reference does instead. There every difference is 0 and every p is 1, so
+    nothing gets a bracket.
     """
     models = [REFERENCE] + [f"efgh-org/model-{n}" for n in range(2, count + 1)]
     benchmark_results, differences = {}, []
@@ -771,7 +785,8 @@ def figure_results(count, reference_ranks=(1,) * 6, other_ranks=(2,) * 6):
             "values": {},
         }
         for model in models:
-            ranks = np.array(reference_ranks if model == REFERENCE else other_ranks)
+            uses_reference_ranks = model == REFERENCE or benchmark == tied_benchmark
+            ranks = np.array(reference_ranks if uses_reference_ranks else other_ranks)
             values = compare.variable_values(ranks)
             row = {
                 **score_means(ranks),
@@ -947,13 +962,13 @@ class TestFigures:
         """Each benchmark's panel of differences_from_reference has the same x axis.
 
         So the panels' 0s line up, and a difference has the same length in
-        each. GDC's accuracy@1 interval is widened here to reach -3, so
-        TOPMed's panel reaches past -3 too, though its own rows end at -1.
+        each. Here the two models tie on GDC. Its accuracy intervals run from
+        -0.39 to 0.39, Newcombe's for 6 of 6 against 6 of 6, and its MRR
+        difference is 0. TOPMed's accuracy@1 interval reaches -1, Newcombe's
+        for 0 of 6 against 6 of 6. So GDC's panel reaches past -1 too, though
+        its own rows end at -0.39.
         """
-        models, benchmark_results, differences = figure_results(2)
-        for row in differences:
-            if row["benchmark"] == "gdc" and row["metric"] == "accuracy@1":
-                row["low"] = -3.0
+        models, benchmark_results, differences = figure_results(2, tied_benchmark="gdc")
         with rc_context(compare.STYLE):
             figure = compare.differences_figure(
                 benchmark_results, models, REFERENCE, differences
@@ -963,7 +978,7 @@ class TestFigures:
         assert topmed_axes.get_title() == (
             "Benchmark: TOPMed v1 (6 source variables, 12 targets)"
         )
-        assert topmed_axes.get_xlim()[0] < -3
+        assert gdc_axes.get_xlim()[0] < -1
 
     def test_the_bars_fill_their_panel(self):
         """Without brackets too, each bar panel ends half a group beyond its groups."""

@@ -9,7 +9,7 @@ import pytest
 from embedding_model import benchmarks, corpus, leakage, texts
 from embedding_model.__main__ import main
 from embedding_model.manifests import file_sha256
-from embedding_model.pairs import common, pairs_sha256
+from embedding_model.pairs import pairs_sha256
 from embedding_model.pairs import manifest as pairs_manifest
 
 # A fictional benchmark: two source variables, from two fictional studies. A
@@ -93,8 +93,13 @@ PLANTED = [
     pair("Hip size", "Hip circumference", study="phs999902|phs999777"),
 ]
 INNOCENT = [
-    pair("waist cm", "Blood pressure"),
-    pair("waist cm", "smoking history"),
+    # Its anchor is the first benchmark row's source name, waist_cm. Its
+    # positive is a near synonym of that row's target. The synonym matches
+    # neither the target's name nor its description, so the pair is kept.
+    pair("waist cm", "Waist measurement"),
+    # Its anchor is the second benchmark row's target name. Its positive
+    # matches no source text, so the pair is kept.
+    pair("Smoking history", "Tobacco use history"),
     pair(
         "Body size",
         "Body measures",
@@ -153,6 +158,48 @@ class TestLeakage:
         )
         pairs = pd.DataFrame([pair("Waist Circumference", "Body measures")])
         assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
+
+    def test_an_answer_key_needs_both_sides_from_one_row(self):
+        """A pair whose two sides match two rows of a benchmark is kept.
+
+        This benchmark maps waist_cm to waist circumference, and
+        abdominal_girth to abdominal circumference. A source can list
+        "abdominal girth" as a synonym of "Waist circumference". But the
+        anchor matches the second row's source. The positive matches the
+        first row's target. So the pair is not an answer key. The pair
+        "abdominal girth" and "Abdominal circumference" matches one row, so
+        it is dropped.
+        """
+        mappings = MAPPINGS.assign(
+            source_variable_name=["waist_cm", "abdominal_girth"],
+            source_type=["float", "float"],
+            expected_target=[
+                "node1.waist_circumference",
+                "node2.abdominal_circumference",
+            ],
+        )
+        targets = TARGETS.iloc[:2].assign(
+            target_property=[
+                "node1.waist_circumference",
+                "node2.abdominal_circumference",
+            ],
+            target_type=["float", "float"],
+            target_description=[
+                LONG_DESCRIPTION,
+                "Circumference of the abdomen at the navel",
+            ],
+        )
+        pairs = pd.DataFrame(
+            [
+                pair("abdominal girth", "Waist circumference"),
+                pair("abdominal girth", "Abdominal circumference", item="C999902"),
+            ]
+        )
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (targets, mappings)})
+        assert findings.pair.tolist() == [1]
+        assert findings.fields.tolist() == [
+            "anchor name = source name, positive name = target name"
+        ]
 
     def test_a_one_word_name_matches_only_an_equal_text(self, monkeypatch):
         """A one-word name is not matched by its words, even beside a description match."""
@@ -347,16 +394,22 @@ class TestLeakage:
         assert "waist circumference in cm at the navel" in set(sources.text_key)
         assert "waist circumference" in set(expected.text_key)
 
-    def test_text_keys_are_those_of_pairs(self):
-        """``text_keys`` writes pairs.common.text_key: accents go, Greek letters stay."""
-        spellings = pd.Series(["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", ""])
+    def test_each_text_gets_its_key_a_repeated_one_too(self):
+        """``text_keys`` gives each text its key, a repeated text too.
+
+        The keys are those of pairs.common.text_key. Case and accents go,
+        punctuation becomes a space, ß becomes ss, and Greek letters stay.
+        """
+        spellings = pd.Series(
+            ["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", "Größe", ""]
+        )
         assert leakage.text_keys(spellings).tolist() == [
-            common.text_key("Abcd_Efgh (ijkl)!"),
-            common.text_key("α-tocopherol"),
-            common.text_key("Größe"),
+            "abcd efgh ijkl",
+            "α tocopherol",
+            "grosse",
+            "grosse",
             "",
         ]
-        assert leakage.text_keys(spellings).tolist()[1] == "α tocopherol"
 
 
 def write_pairs(inputs, source, rows):
@@ -401,8 +454,8 @@ def inputs(tmp_path, monkeypatch):
 class TestBuild:
     """``corpus build`` on a fictional inputs folder."""
 
-    def test_a_value_list_reads_back_as_a_list(self, inputs):
-        """A pair's values read back from the corpus as the list written, None too."""
+    def test_a_value_list_reads_back_whole_and_in_order(self, inputs):
+        """A pair's values read back from the corpus whole and in order, the text "None" too."""
         values = ["Mild", "Moderate", "Severe", "None"]
         write_pairs(
             inputs, "cdisc", [pair("Opqr", "Opqr Abcd", positive_values=values)]
@@ -737,7 +790,13 @@ class TestBuild:
         ]
 
     def test_items_with_one_canonical_text_share_a_group(self):
-        """Items linked by a canonical text, or through a code, take the first ``item_id`` in sorted order."""
+        """Items linked by a canonical text, or through a code, take the first ``item_id`` in sorted order.
+
+        MONDO's canonical is NCIt's in lower case, CDISC shares NCIt's code
+        C999901, and the CDE's canonical is CDISC's. So these four are one
+        group, and cde:abcd1 sorts first. caDSR's canonical, Efgh, is the
+        name that NHANES describes, so those two are another group.
+        """
         pairs = pd.DataFrame(
             {
                 "source": ["ncit", "obo", "cdisc", "cde", "cadsr", "nhanes"],
@@ -801,10 +860,10 @@ class TestBuild:
         assert set(small) < set(large)
 
     @pytest.mark.parametrize("share", [0, 1, 0.0255, -0.02])
-    def test_a_validation_share_between_buckets_stops_the_build(
+    def test_a_validation_share_off_the_allowed_steps_stops_the_build(
         self, inputs, capsys, share
     ):
-        """A share that is not a whole number of buckets is refused before any work."""
+        """A share below 0.001 or above 0.999, or between two steps of 0.001, is refused before any work."""
         assert corpus.build("abcd-corpus", ["ncit"], inputs, share) == 1
         assert "in steps of 0.001" in capsys.readouterr().err
         assert not (inputs / "corpora").exists()

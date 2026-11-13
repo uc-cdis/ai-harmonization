@@ -747,13 +747,13 @@ class TestTrain:
 
     def test_the_run_records_its_corpus_text_format(self, inputs, config, tmp_path):
         """The run copies the text format from the corpus's manifest."""
-        write_corpus(inputs, corpus_rows(), text_format="name_description")
+        write_corpus(inputs, corpus_rows(), text_format="name_type_description")
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
         record = json.loads(
             (outputs / train.RUNS / "abcd-run_s0" / "manifest.json").read_text()
         )
-        assert record["settings"]["format"] == "name_description"
+        assert record["settings"]["format"] == "name_type_description"
 
     def test_a_corpus_without_a_text_format_is_refused(
         self, inputs, config, tmp_path, capsys

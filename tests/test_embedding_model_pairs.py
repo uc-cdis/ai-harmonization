@@ -418,7 +418,7 @@ class TestStar:
             replaced_by=["abcd2"],
         )
         between = Item(
-            id="abcd2", canonical="Older", status=RETIRED, replaced_by=["abcd3"]
+            id="abcd2", canonical="Interim abcd", status=RETIRED, replaced_by=["abcd3"]
         )
         current = Item(id="abcd3", canonical="New abcd", description="An abcd.")
         found, _ = common.star([retired, between, current], source="abcd-source")
@@ -489,7 +489,9 @@ class TestStar:
         """Two retired items that name each other as replacement give no replacement."""
         items = [
             Item(id="abcd1", canonical="Old", status=RETIRED, replaced_by=["abcd2"]),
-            Item(id="abcd2", canonical="Older", status=RETIRED, replaced_by=["abcd1"]),
+            Item(
+                id="abcd2", canonical="Other old", status=RETIRED, replaced_by=["abcd1"]
+            ),
         ]
         by_id = {item.id: item for item in items}
         assert common.replacements(items[0], by_id) == []
@@ -516,7 +518,7 @@ class TestStar:
             Item(id="abcd1", canonical="Old", status=RETIRED, replaced_by=["abcd2"]),
             Item(
                 id="abcd2",
-                canonical="Older",
+                canonical="Interim",
                 status=RETIRED,
                 replaced_by=["abcd3"],
                 open=False,
@@ -719,9 +721,9 @@ class TestNcit:
         ),
         "definitions": table(
             code=["C999901", "C999901", "C999901"],
-            definition=["An abcd (CDISC)", "An abcd. (NCI)", "The abcd. (NCI04)"],
+            definition=["An abcd (CDISC)", "The abcd. (NCI04)", "An abcd. (NCI)"],
             kind=["ALT_DEFINITION", "DEFINITION", "DEFINITION"],
-            source=["CDISC", "NCI", "NCI-GLOSS"],
+            source=["CDISC", "NCI-GLOSS", "NCI"],
         ),
         "values": table(
             code=["C999901", "C999901", "C999901", "C999901"],

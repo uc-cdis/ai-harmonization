@@ -310,11 +310,11 @@ class TestIsAge:
             "Tumor stage",
             "Number of cigarettes smoked per day, averaged over all years",
             "Dosage of the medication",
-            "CT scan date",
+            "CT image acquisition date",
         ],
     )
     def test_not_ages(self, description):
-        """'age' inside another word, or a date, is not an age."""
+        """'age' inside another word, as in stage, averaged, dosage or image, is not an age."""
         assert not topmed.is_age(description)
 
 

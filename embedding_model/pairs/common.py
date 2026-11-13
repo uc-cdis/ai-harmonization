@@ -106,7 +106,15 @@ ESCAPE = re.compile(r"<U\+([0-9A-Fa-f]{4,6})>|\\u([0-9A-Fa-f]{4})")
 # "<5". unescape_html is True, since
 # ftfy's default, "auto", leaves the entities of a text that has a "<", such as
 # a tag. uncurl_quotes is off, so quotes stay as the source writes them.
-FIXES = ftfy.TextFixerConfig(unescape_html=True, uncurl_quotes=False, explain=False)
+# Control characters are removed and Unicode is normalised to NFC by these
+# settings too, so a change of ftfy's defaults does not change the clean text.
+FIXES = ftfy.TextFixerConfig(
+    unescape_html=True,
+    uncurl_quotes=False,
+    remove_control_chars=True,
+    normalization="NFC",
+    explain=False,
+)
 # The replacement character's UTF-8 bytes, read as Mac Roman. ftfy leaves them
 # as they are, so they are turned back into the replacement character.
 LOST_IN_MAC_ROMAN = "\u00d4\u00f8\u03a9"

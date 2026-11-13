@@ -1099,9 +1099,8 @@ The bars carry no numbers. A comparison holds at most 8 models.
 
 **Consequences.**
 
-- Good, because `accuracy_and_mrr` answers the first question as the
-  repository's evaluation notebook does, with grouped bars. So its readers
-  know the plot already. A bar shows well the share of source variables that
+- Good, because `accuracy_and_mrr` answers the first question with grouped
+  bars. A bar shows well the share of source variables that
   a model finds. Comparison brackets mark which differences hold.
 - Good, because `accuracy_by_k` shows where a model gains as a curator
   reviews more suggestions, beyond the three k of the bars.
@@ -1123,7 +1122,7 @@ The bars carry no numbers. A comparison holds at most 8 models.
 
 - Tables alone, with no figures: exact, but slow to read. A curve's shape,
   or a difference of 0.01, is hard to see in a column of numbers.
-- Numbers on the bars, as the notebook draws them: past a few models they
+- Numbers on the bars: past a few models they
   crowd the bars, and `metrics.csv` holds every value.
 - Points with intervals in place of bars, for the first question: they suit
   any mean, but show a share less plainly than a bar.

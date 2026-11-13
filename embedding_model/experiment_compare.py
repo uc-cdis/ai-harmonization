@@ -217,9 +217,8 @@ def seeds_needed(test, base_sd, arm_sd, alpha, minimum_effect):
     if surplus(2) >= 0:
         return 2
     # surplus is below 0 at short_count, and 0 or more at enough_count.
-    # bracket_root starts from 2 and 3 seeds, and moves the upper count up
-    # until surplus is 0 or more there. xmin keeps the lower count at 2 or
-    # more, since Welch's degrees of freedom need 2 seeds.
+    # bracket_root searches from 2 seeds, and xmin keeps the lower count at 2
+    # or more, since Welch's degrees of freedom need 2 seeds.
     short_count, enough_count = elementwise.bracket_root(surplus, 2, xmin=2).bracket
     # The count at which surplus is exactly 0, which may be fractional.
     # surplus only grows with more seeds, so this count rounded up is the
@@ -266,9 +265,8 @@ def welch_difference(scores, base_scores, alpha):
 def arm_rows(experiment, arm_scores):
     """Each arm's row of arms.csv: its scores' mean, sd and 95% t interval, and each seed's score.
 
-    The sd is statistics.stdev's, which is exact when every seed scores the
-    same: it is then 0. numpy's can be a rounding error instead, such as
-    1e-16 for five scores of 0.8123.
+    The sd is the sample standard deviation, with n - 1, from
+    statistics.stdev.
 
     Args:
         experiment (dict): The experiment, from read_experiment.

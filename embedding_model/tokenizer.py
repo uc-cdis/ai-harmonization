@@ -67,8 +67,7 @@ def training_texts(pairs):
 
     Each text comes once, as it is first written. Two texts are one when the
     tokenizer normalises them to one text, as the other steps compare texts:
-    ``BMI`` and ``bmi`` count once. The order does not change the vocabulary,
-    since BPE counts each word's frequency. It is fixed so that the input is
+    ``BMI`` and ``bmi`` count once. The order is fixed so that the input is
     the same on every run.
 
     Args:

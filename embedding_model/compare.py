@@ -81,8 +81,7 @@ DIFFERENCE_INTERVALS = {
 }
 # The stars over a bracket, by the test's p.
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
-# The figures: the k of the accuracy bars, as the team's evaluation notebook
-# draws them, and the k of the accuracy curve.
+# The figures: the k of the accuracy bars, and the k of the accuracy curve.
 FIGURE_K = (1, 5, 10)
 # The metrics of accuracy_and_mrr and differences_from_reference, by their
 # names in the figures.
@@ -355,8 +354,8 @@ def paired_test(metric, model_values, reference_values):
     each is a coin flip, so p is the binomial test's. For MRR and MRR@10,
     scipy's paired t-test compares the two models' values on each variable. When
     every variable differs by the same amount, the differences have no
-    spread: p is 1 when that amount is 0, and 0 otherwise, the limit that
-    scipy reaches with a warning.
+    spread, and the test cannot be computed: p is then 1 when that amount
+    is 0, and 0 otherwise.
 
     Args:
         metric (str): A metric of TESTED_METRICS.

@@ -141,7 +141,7 @@ In every format but `stdelement`, a target's text includes its node, as in
 node out, as StdElement-Mapper's training pairs do. So a property that several
 nodes carry alike has the same text in each. Each copy of a wrong target then
 takes a rank of its own. Identical texts tie. [sentence-transformers](https://sbert.net) 6
-breaks a tie by target key. Earlier releases break it in no fixed order.
+breaks a tie by target key.
 
 A source variable's text leaves its node out, in every format. Its node would
 be its [dbGaP](https://www.ncbi.nlm.nih.gov/gap/) table, such as `pht999999.v1`, or the paper that it comes from.

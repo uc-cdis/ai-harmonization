@@ -61,12 +61,15 @@ def replace(built, destination, staging):
 
 
 def left_warning(left, destination):
-    """The warning about a staging folder that a killed run left.
+    """The warning about a staging folder that a killed run left, or that another run writes now.
 
-    The staging folder holds the previous folder, as ``.previous``, when the
-    run was killed between the two renames of ``replace``. The destination is
-    then missing, and ``.previous`` is the only copy of it. Otherwise nothing
-    in the staging folder is needed.
+    A run that writes the same folder at the same time, such as the same
+    ``train`` submitted twice, has a staging folder too, and nothing tells the
+    two apart. So the warning says to delete the folder only when no such run
+    is writing. The staging folder holds the previous folder, as
+    ``.previous``, when the run was killed between the two renames of
+    ``replace``. The destination is then missing, and ``.previous`` is the
+    only copy of it. Otherwise nothing in the staging folder is needed.
 
     Args:
         left (Path): The staging folder.
@@ -75,15 +78,18 @@ def left_warning(left, destination):
     Returns:
         str: The warning, which says what to do with the staging folder.
     """
-    warning = f"warning: {left} is left from a run that was killed."
+    warning = (
+        f"warning: {left} is left from a run that was killed, or another run"
+        f" is writing {destination.name} now."
+    )
     previous = left / PREVIOUS
     if previous.exists() and not destination.exists():
         return (
             f"{warning} It holds the previous {destination.name}, in {previous}."
-            f" If this run fails, move it back to {destination}. Otherwise"
-            f" delete {left}."
+            f" If this run fails, move it back to {destination}. Otherwise,"
+            f" once no other run writes it, delete {left}."
         )
-    return f"{warning} Nothing in it is needed, so delete it."
+    return f"{warning} If no other run writes it, nothing in it is needed: delete it."
 
 
 def staging_folders(destination):

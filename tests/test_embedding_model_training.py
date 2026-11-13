@@ -494,7 +494,7 @@ class TestConfig:
         assert values["corpus"] == CORPUS
 
     def test_the_settings_are_built_from_the_values(self, config):
-        """Each settings class becomes settings, with the values read: the run's own architecture's alone."""
+        """Each settings class becomes settings, with the values read. Of the architectures, only the run's own, static, is built."""
         values, _ = train.read_config(config, 3, ["--use_cpu"])
         settings = train.apply_config(values)
         assert list(settings) == ["data", "model", "static", "loss", "training"]
@@ -514,7 +514,7 @@ class TestFirstGpuOnly:
         assert "trains on GPU 2 only" in capsys.readouterr().out
 
     def test_without_a_list_gpu_0_is_kept(self, monkeypatch):
-        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0, or no GPU where there is none."""
+        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0."""
         monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
         assert train.first_gpu_only() == []
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
@@ -564,17 +564,10 @@ class TestTrain:
                                              "accuracy@10"}  # fmt: skip
         corpus_source = record["sources"][0]
         assert corpus_source["name"] == CORPUS
-        corpus_record = json.loads(
-            (inputs / "corpora" / CORPUS / "manifest.json").read_text()
-        )
+        # write_corpus records one benchmark that the corpus was checked
+        # against, topmed at version 1, with no files. The run copies it.
         assert corpus_source["benchmarks"] == [
-            {
-                "name": source["name"],
-                "version": source["version"],
-                "files": source["files"],
-            }
-            for source in corpus_record["sources"]
-            if source["role"] == "benchmark"
+            {"name": "topmed", "version": "1", "files": {}}
         ]
         assert record["files"]["model/model.safetensors"]["sha256"] == file_sha256(
             run / "model" / "model.safetensors"
@@ -761,10 +754,13 @@ class TestTrain:
         assert "learned its vocabulary from efgh-corpus" in note
         assert train.tokenizer_note("efgh-corpus", "efgh-corpus-8k", manifest) is None
 
-    def test_a_negative_seed_is_refused(self, inputs, config, tmp_path, capsys):
-        """A seed below 0 is refused before anything is read."""
-        assert train.train(config, -1, [], inputs, tmp_path / "outputs") == 1
-        assert "--seed must be 0 or more" in capsys.readouterr().err
+    @pytest.mark.parametrize("seed", [-1, 2**32])
+    def test_a_seed_out_of_range_is_refused(
+        self, inputs, config, tmp_path, capsys, seed
+    ):
+        """A seed below 0, or past numpy's 32 bits, is refused before anything is read."""
+        assert train.train(config, seed, [], inputs, tmp_path / "outputs") == 1
+        assert "--seed must be from 0 to 4,294,967,295" in capsys.readouterr().err
 
     def test_a_config_without_a_corpus_is_refused(self, inputs, tmp_path, capsys):
         """The data section must name the corpus and the tokenizer."""
@@ -974,7 +970,9 @@ class TestBert:
         """A text's embedding is the same alone and beside a longer text, which pads it.
 
         The attention mask keeps the padding out of the attention and out of
-        the mean of the token vectors.
+        the mean of the token vectors: the libraries' own work. Our part is
+        the pad token that ``bert.build`` gives the model's tokenizer and
+        config, which this checks.
         """
         settings = bert.Settings(**BERT_SETTINGS)
         model = bert.build(settings, trained_tokenizer(inputs))

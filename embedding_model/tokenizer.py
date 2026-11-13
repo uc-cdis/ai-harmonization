@@ -41,10 +41,11 @@ from embedding_model.manifests import file_sha256
 from embedding_model.normalization import TOKENIZER_NORMALIZER, normalised
 
 # The special tokens of every tokenizer here, in id order. A static model uses
-# only [UNK], since StaticEmbedding pads nothing. A BERT model needs the other
-# four, and they stay so that the special tokens' ids never change.
-SPECIAL_TOKENS = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"]
-UNKNOWN = "[UNK]"
+# only [UNK], since StaticEmbedding pads nothing. The BERT model uses [UNK]
+# and [PAD]. [CLS], [SEP] and [MASK] are kept for a later BERT setting, and so
+# that the special tokens' ids never change.
+PAD, UNKNOWN, CLS, SEP, MASK = "[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"
+SPECIAL_TOKENS = [PAD, UNKNOWN, CLS, SEP, MASK]
 VOCAB_SIZE = 16_000
 MIN_FREQUENCY = 2
 # How many texts are encoded at once for the diagnostics, to bound memory.

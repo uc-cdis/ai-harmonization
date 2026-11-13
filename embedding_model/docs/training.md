@@ -69,7 +69,7 @@ trained it. Otherwise `train` stops before it trains, and names the settings
 that differ. The message gives the run's full path:
 
 ```
-ValueError: run my_run_s1 exists, trained with other settings: learning_rate 0.2, here 0.01; to train this run, delete .../embedding_model/outputs/runs/my_run_s1, or save the changed config under a new name
+ValueError: run my_run_s1 exists, trained with other settings: learning_rate 0.1, here 0.01; to train this run, delete .../embedding_model/outputs/runs/my_run_s1, or save the changed config under a new name
 ```
 
 ## What `train` writes
@@ -329,7 +329,8 @@ sources. A BERT trains far more slowly, and needs a GPU for such a corpus.
 
 On a GPU that supports bf16, `bf16: true` in the config, or `--bf16`, trains
 faster and with less memory, as Hugging Face's recipe does. It stays off by
-default, as in the library, since a CPU and older GPUs cannot use it.
+default, as in the library. The library refuses it on a GPU without bf16,
+and on a CPU unless the config sets `use_cpu: true`.
 
 ### On a cluster with SLURM
 
@@ -363,9 +364,8 @@ needs the `tracking` group, which `uv sync` leaves out:
 uv sync --group tracking
 ```
 
-Set up W&B as its [quickstart](https://docs.coreweave.com/products/wandb/quickstart)
-says: an account, an API key, and `wandb login`. The trainer then logs to the
-project that `WANDB_PROJECT` names, as
+Set up W&B as its quickstart says: an account, an API key, and `wandb login`.
+The trainer then logs to the project that `WANDB_PROJECT` names, as
 [W&B's Hugging Face page](https://docs.coreweave.com/guides/integrations/huggingface/)
 shows. Without it, sentence-transformers' trainer sets the project
 `sentence-transformers`. W&B shows each run under its name, such as

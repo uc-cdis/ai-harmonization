@@ -59,9 +59,8 @@ them.
 Everything runs on a CPU, model training included. Training and scoring use a
 GPU if the machine has one. `train --use_cpu` and `score --device cpu` keep
 them on the CPU. The [quick start](#quick-start) examples train on a CPU in a
-few minutes. A static model on all the sources trains in minutes too, even on a
-laptop's CPU. A BERT trains far more slowly, and needs a GPU for all the
-sources.
+few minutes. A static model on all the sources trains in minutes too, on a
+CPU. A BERT trains far more slowly, and needs a GPU for all the sources.
 
 `train` trains one model. An [experiment](docs/experiments.md) asks whether a
 change to the settings helps. So `experiment train` trains many models: one

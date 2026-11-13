@@ -91,8 +91,9 @@ class TestStaged:
         with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("new")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was killed. Nothing in it"
-            " is needed, so delete it.\n"
+            f"warning: {left} is left from a run that was killed, or another run"
+            " is writing abcd-folder now. If no other run writes it, nothing in it"
+            " is needed: delete it.\n"
         )
         assert left.exists()
 
@@ -107,9 +108,11 @@ class TestStaged:
         with staged(destination) as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was killed. It holds the"
-            f" previous abcd-folder, in {left / '.previous'}. If this run fails, move it"
-            f" back to {destination}. Otherwise delete {left}.\n"
+            f"warning: {left} is left from a run that was killed, or another run"
+            f" is writing abcd-folder now. It holds the previous abcd-folder, in"
+            f" {left / '.previous'}. If this run fails, move it back to"
+            f" {destination}. Otherwise, once no other run writes it, delete"
+            f" {left}.\n"
         )
         assert (left / ".previous" / "file.txt").read_text() == "previous"
 
@@ -121,8 +124,9 @@ class TestStaged:
         with staged(tmp_path / "abcd-folder") as built:
             (built / "file.txt").write_text("newer")
         assert capsys.readouterr().err == (
-            f"warning: {left} is left from a run that was killed. Nothing in it"
-            " is needed, so delete it.\n"
+            f"warning: {left} is left from a run that was killed, or another run"
+            " is writing abcd-folder now. If no other run writes it, nothing in it"
+            " is needed: delete it.\n"
         )
 
     def test_the_staging_folder_of_a_longer_name_is_not_warned_about(

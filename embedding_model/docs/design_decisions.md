@@ -90,9 +90,9 @@ format. Scoring needs ranks and metrics.
 **Alternatives considered.**
 
 - Plain PyTorch: a static model's forward pass is short, so it could be
-  written by hand. But the training loop, the loss, batches without
-  duplicates, checkpoints and the saved format would all be our code to
-  write, test and defend. And the embedding approach could not load the
+  written by hand. But the training loop, the loss, the batches, the
+  evaluation and the saved format would all be our code to write, test and
+  defend. And the embedding approach could not load the
   model without a converter.
 - A training loop of our own around sentence-transformers' modules: it
   would replace the `transformers` Trainer with our code, for no known gain.
@@ -1590,7 +1590,7 @@ with the canonical "Body Mass Index". They are never paired with each other.
 - Good, because an item has few pairs, so two of them rarely share a batch.
   So an item's texts rarely work against each other as in-batch negatives.
 - Good, because each pair is marked with what it is made of. So a later
-  series can choose pairs by these marks, though `train` reads none of them
+  experiment can choose pairs by these marks, though `train` reads none of them
   yet:
   - `kind`, such as `name_to_description`, whose positive is a description
     alone;
@@ -2435,8 +2435,8 @@ Removing a token moves the id of every token after it.
   setting that needs `[CLS]`, `[SEP]` or `[MASK]`, such as masked-language
   pretraining, finds them in place.
 - Bad, because a static model carries four rows that it never uses.
-- Bad, because the BERT here uses only `[PAD]`. It adds no `[CLS]` or `[SEP]`
-  to a text, and trains no masked tokens.
+- Bad, because the BERT here uses only `[UNK]` and `[PAD]`. It does not yet
+  add `[CLS]` or `[SEP]` to a text, or train masked tokens.
 - Bad, because the `[UNK]` row never trains. Every character of the training
   texts is in the vocabulary, so `[UNK]` never occurs in them, and its row
   keeps its random start.
@@ -2482,7 +2482,7 @@ model's own `preprocess`.
   spends most of its time in the model's layers. So a BERT keeps the
   standard path, with no code of ours to cut and pad its texts.
 - Bad, because each run encodes the pairs again, and holds its own copy of
-  the ids in memory. A series trains many runs at once, each with its copy.
+  the ids in memory. An experiment trains many runs at once, each with its copy.
 
 **Alternatives considered.**
 
@@ -2757,17 +2757,17 @@ The others are this pipeline's own:
 - Good, because random batches suit the corpus, and train faster.
   [The star](#a-star-around-each-item) keeps an item's pairs apart, so a
   random batch rarely holds a text twice.
-- Good, because the defaults work on every machine. Only a GPU that supports
-  bf16 can use it, so it stays off, as in the library, until a config turns
-  it on.
+- Good, because the defaults work on every machine. transformers refuses
+  bf16 on a GPU without it, and on a CPU without `use_cpu`. So it stays off,
+  as in the library, until a config turns it on.
 - Bad, because five epochs is a starting point, not a measured choice. The
   validation curve in the run's
   [`trainer_state.json`](training.md#trainer_statejson) shows whether a corpus
-  needs more, and a series tunes the number.
+  needs more, and an experiment tunes the number.
 - Bad, because a run on a GPU trains in 32 bits unless its config turns bf16
   on.
-- Bad, because the recipe was made for general text, not for metadata. A
-  series may find better settings, and tests them as arms.
+- Bad, because the recipe was made for general text, not for metadata. An
+  experiment may find better settings, and tests them as arms.
 - Bad, because the recipe's 1,024 dimensions come with `MatryoshkaLoss`, which
   trains shorter embeddings too. Without it, a model here is used at its full
   length.
@@ -2781,8 +2781,8 @@ The others are this pipeline's own:
   should not match. Here it removes a rare repeat, but slows each run. Its
   hashed form also forks processes from a process that runs threads.
 - The recipe's single epoch: the recipe trains on far more pairs.
-- The recipe's bf16: only a GPU that supports it can use it. A config turns
-  it on.
+- The recipe's bf16: transformers refuses it on a GPU without it, and on a
+  CPU without `use_cpu`. A config turns it on.
 - The recipe's `MatryoshkaLoss`: it also trains shorter embeddings, and a
   model here is used at its full length.
 - The recipe's evaluation, logging and checkpoints every 250 steps: they
@@ -2821,8 +2821,9 @@ added to a text, as for the static model.
   BERT run is a sentence-transformers model, which a plain
   `SentenceTransformer` loads.
 - Good, because both architectures form a text's embedding the same way:
-  the average of its token vectors. So a comparison of the two measures only
-  what BERT's layers add.
+  the average of its token vectors. So a comparison of the two does not
+  measure pooling. It measures the other differences: BERT's layers and, at
+  the defaults, the width, the learning rate and dropout.
 - Good, because the average, mean pooling, is the default of
   sentence-transformers' `Pooling` and of Sentence-BERT
   ([Reimers & Gurevych, 2019](https://doi.org/10.18653/v1/d19-1410)).
@@ -2834,8 +2835,8 @@ added to a text, as for the static model.
 - A pretrained BERT, fine-tuned on the corpus: its pretraining texts are
   outside the leakage check.
 - Masked-language pretraining on the corpus's own texts before the pair
-  loss, as the BERT paper pretrains: not built yet. Once it is built, a
-  series can compare it as an arm. The tokenizer keeps `[MASK]` for it.
+  loss, as the BERT paper pretrains: not built yet. Once it is built, an
+  experiment can compare it as an arm. The tokenizer keeps `[MASK]` for it.
 - CLS pooling, as BERT's own classifiers use: a `[CLS]` token goes before
   each text, and its output vector is the embedding. A static model cannot
   pool this way: its `[CLS]` vector is the same for every text. So a BERT
@@ -2871,9 +2872,8 @@ tokens. Its other settings default to `BertConfig`'s.
   Google's release ([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)).
   Its feed-forward part is 4 times the width, as the BERT paper sets it.
 - Good, because the BERT paper pretrains with "sequence length of 128 for
-  90% of the steps" (Appendix A.2). Attention is quadratic in the length,
-  so at 128 tokens the attention scores take a sixteenth of the memory that
-  they take at 512.
+  90% of the steps" (Appendix A.2). Attention's work is quadratic in the
+  length, so at 128 tokens it is a sixteenth of its work at 512.
 - Good, because BERT's other defaults are read from `BertConfig` itself, so
   the code copies none of its numbers.
 - Bad, because BERT-Small is a guess at a size that suits a corpus of short
@@ -2914,7 +2914,7 @@ data and the loss. The learning rate is the architecture's own: 0.2 for
 
 - Good, because each rate comes from a public source for its architecture.
 - Bad, because the BERT paper set its rate for pretraining with masked
-  language modelling, not for a contrastive loss. A series tests other rates
+  language modelling, not for a contrastive loss. An experiment tests other rates
   as arms.
 
 **Alternatives considered.**
@@ -2938,8 +2938,8 @@ check that:
 
 **Context.** The trainer can save checkpoints during a run and load the best
 of them at the end, by a validation metric. By default, it keeps the model at
-the last step. Its learning rate decays linearly to zero over the run. A
-series compares its runs by their validation metrics.
+the last step. Its learning rate decays linearly to zero over the run. An
+experiment compares its runs by their validation metrics.
 
 **Decision.** A run keeps the model at the last step: a config that sets
 `load_best_model_at_end` is refused, and no checkpoint is saved. The run
@@ -2955,7 +2955,7 @@ writes that model's validation metrics.
 - Good, because nothing is saved during training, so a run writes only its
   model.
 - Bad, because a run that peaks early keeps a later, worse model. The loss
-  curve shows it, and a series can then try fewer epochs.
+  curve shows it, and an experiment can then try fewer epochs.
 
 **Alternatives considered.**
 
@@ -2991,7 +2991,7 @@ built as `score` builds its own, with a cutoff of 10.
 
 **Consequences.**
 
-- Good, because a series can tune on a ranking, as the benchmarks score one,
+- Good, because an experiment can tune on a ranking, as the benchmarks score one,
   without opening a benchmark.
 - Good, because every metric comes from the evaluator, with no code of our
   own.

@@ -11,6 +11,8 @@ batch.
 import functools
 from dataclasses import asdict, dataclass, field
 
+from embedding_model.tokenizer import CLS, MASK, PAD, SEP, UNKNOWN
+
 # The BERT paper pretrains at this rate (Devlin et al., 2019, Appendix A.2).
 LEARNING_RATE = 1e-4
 
@@ -108,17 +110,17 @@ def build(settings, tokenizer):
     config = BertConfig(
         **asdict(settings),
         vocab_size=tokenizer.get_vocab_size(),
-        pad_token_id=tokenizer.token_to_id("[PAD]"),
+        pad_token_id=tokenizer.token_to_id(PAD),
     )
     with tempfile.TemporaryDirectory() as folder:
         BertModel(config).save_pretrained(folder)
         PreTrainedTokenizerFast(
             tokenizer_object=tokenizer,
-            unk_token="[UNK]",
-            pad_token="[PAD]",
-            cls_token="[CLS]",
-            sep_token="[SEP]",
-            mask_token="[MASK]",
+            unk_token=UNKNOWN,
+            pad_token=PAD,
+            cls_token=CLS,
+            sep_token=SEP,
+            mask_token=MASK,
         ).save_pretrained(folder)
         body = Transformer(folder, max_seq_length=settings.max_position_embeddings)
     model = SentenceTransformer(

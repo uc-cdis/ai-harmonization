@@ -43,6 +43,9 @@ from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
 
 # Where the runs trained on their own are written, under the outputs folder.
 RUNS = "runs"
+# The largest seed: transformers' set_seed seeds numpy too, whose seed is 32
+# bits.
+MAX_SEED = 2**32 - 1
 # The training settings whose defaults here differ from the library's. The
 # batch sizes and the warmup are those of Hugging Face's recipe for training a
 # static model from scratch. The others are this pipeline's own, as
@@ -213,7 +216,11 @@ def read_config(path, seed, overrides=(), run_name=None):
         for name, settings_class in classes.items()
     }
     class_setting_names = {
-        name: {setting.name for setting in fields(settings_class) if setting.init}
+        name: {
+            settings_field.name
+            for settings_field in fields(settings_class)
+            if settings_field.init
+        }
         for name, settings_class in settings_classes.items()
     }
     setting_names = {
@@ -295,9 +302,9 @@ def read_config(path, seed, overrides=(), run_name=None):
         other_flags = sorted(flags & class_setting_names[other])
         other_settings = sorted(model_given & class_setting_names[other])
         if other_flags or other_settings:
-            setting = f"--{other_flags[0]}" if other_flags else other_settings[0]
+            setting_shown = f"--{other_flags[0]}" if other_flags else other_settings[0]
             raise ValueError(
-                f"{path}: {setting} is a setting of the {other} architecture, and"
+                f"{path}: {setting_shown} is a setting of the {other} architecture, and"
                 f" this run's architecture is {architecture}"
             )
     if "learning_rate" not in training_given:
@@ -574,11 +581,11 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
 
     training = settings["training"]
     architecture_name = settings["model"].architecture
-    architecture = ARCHITECTURES[architecture_name]
+    architecture_module = ARCHITECTURES[architecture_name]
     # The trainer sets the seed itself, but only after the model is built.
     # Setting it here first makes the seed decide the starting weights too.
     set_seed(training.seed)
-    model = architecture.build(settings[architecture_name], tokenizer)
+    model = architecture_module.build(settings[architecture_name], tokenizer)
     evaluator = ranking_evaluator(
         model,
         *validation_texts(validation_pairs),
@@ -586,7 +593,7 @@ def fit(settings, tokenizer, training_pairs, validation_pairs):
         name="validation",
         cutoff=MRR_CUTOFF,
     )
-    features = getattr(architecture, "features", None)
+    features = getattr(architecture_module, "features", None)
     if features is None:
         # An architecture without features, such as bert, trains on the texts,
         # and the dataloader's workers tokenize each batch. false runs them
@@ -860,8 +867,7 @@ def train(config, seed, overrides, inputs, outputs):
 
     Returns:
         int: 0 if the run was written, 1 if the seed, the config, an
-            earlier run of that name, the corpus, the tokenizer or the GPUs
-            stop it.
+            earlier run of that name, the corpus or the tokenizer stop it.
 
     Raises:
         Exception: If training fails or the run cannot be written. The
@@ -873,8 +879,8 @@ def train(config, seed, overrides, inputs, outputs):
             f"{run_name!r} is not a run name: use {FOLDER_NAME_RULE}", file=sys.stderr
         )
         return 1
-    if seed < 0:
-        print(f"--seed must be 0 or more, not {seed}", file=sys.stderr)
+    if not 0 <= seed <= MAX_SEED:
+        print(f"--seed must be from 0 to {MAX_SEED:,}, not {seed}", file=sys.stderr)
         return 1
     first_gpu_only()
     destination = Path(outputs) / RUNS / run_name

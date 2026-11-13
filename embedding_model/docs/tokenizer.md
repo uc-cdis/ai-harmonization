@@ -80,8 +80,9 @@ with made-up ids:
 | `bodyweight` | `body`, `weight` | 812, 1407 |
 
 The first two texts get the same ids, so the model cannot tell them apart.
-The last one is cut into the same two tokens when `bodyweight` is not a token
-itself, so it gets the same ids too.
+Here the last one is cut into the same two tokens, so it gets the same ids
+too. Byte-pair encoding does not promise that: it can cut another compound
+elsewhere, as `heartrate` into `hear` and `trate`.
 
 A tokenizer cuts a text into tokens in three steps:
 
@@ -89,7 +90,7 @@ A tokenizer cuts a text into tokens in three steps:
 |---|---|---|
 | 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
 | 2. split | splits at whitespace and at every punctuation character, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
-| 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `bodyweight` -> `body`, `weight`, if `bodyweight` is not a token itself |
+| 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `bodyweight` -> `body`, `weight` |
 
 The same rules run at two times:
 
@@ -188,10 +189,12 @@ Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
 `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them:
 `[UNK]` stands for a character that the training texts never had.
 The `StaticEmbedding` module of [sentence-transformers](https://sbert.net),
-which Hugging Face maintains, pads nothing. A [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert) model needs the other
-four: `[PAD]`, for one, fills a short text in a batch. A text that holds
-a special token's name, such as `[PAD]`, is read as that token, as in every
-Hugging Face tokenizer.
+which Hugging Face maintains, pads nothing. The
+[BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
+model here uses `[UNK]` and `[PAD]`. `[PAD]` fills a short text in a batch.
+`[CLS]`, `[SEP]` and `[MASK]` are kept for a later BERT setting, such as
+masked-language pretraining;
+[Five special tokens](design_decisions.md#five-special-tokens) says why.
 
 ### What it learns from
 

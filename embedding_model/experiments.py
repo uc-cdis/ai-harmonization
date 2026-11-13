@@ -42,7 +42,7 @@ from embedding_model.folders import (
     staging_folders,
 )
 from embedding_model.tokenizer import read_tokenizer
-from embedding_model.train import RUNS, listed_gpus, read_config
+from embedding_model.train import MAX_SEED, RUNS, listed_gpus, read_config
 
 # Where experiments are written, under the outputs folder.
 EXPERIMENTS = "experiments"
@@ -142,7 +142,7 @@ class Experiment(BaseModel):
 
     question: str | None = None
     base: dict[str, dict[str, Any] | None] | str
-    seeds: list[Annotated[StrictInt, Field(ge=0)]] = Field(min_length=1)
+    seeds: list[Annotated[StrictInt, Field(ge=0, le=MAX_SEED)]] = Field(min_length=2)
     decision: Decision = Field(default_factory=Decision)
     arms: dict[str, Arm] = Field(min_length=1)
 
@@ -256,7 +256,7 @@ def problems(error):
                 f"{'.'.join(parent) or 'the file'} has no field {unknown_field}: its fields"
                 f" are {field_names}"
             )
-        elif problem["type"] in ("too_short", "too_long"):
+        elif problem["type"] == "too_short":
             lines.append(f"{location}: {problem['msg']}")
         else:
             lines.append(f"{location}: {problem['msg']}, not {problem['input']!r}")
@@ -360,7 +360,13 @@ def checked_experiment(path, outputs):
 
 
 def base_config(base, outputs):
-    """The base's config, by section, and the earlier experiment's arm that it comes from.
+    """The base's config, by section, and the earlier experiments' arms whose runs it reuses.
+
+    A base ``<experiment>/base`` reuses that experiment's base runs. That
+    experiment's base may itself be an arm of an earlier experiment, whose
+    runs it reused at some seeds. Those runs are in the earlier experiment's
+    folder. So the chain of bases is followed, to a base that a file gives
+    itself, or to an arm that is not a base.
 
     Args:
         base (dict | str): The file's base: the settings themselves, or an
@@ -368,35 +374,45 @@ def base_config(base, outputs):
         outputs (Path): The outputs folder.
 
     Returns:
-        tuple[dict, tuple[Path, str] | None]: The base's sections; and the
-            earlier experiment's folder and arm, or None for a base that the
-            file gives itself.
+        tuple[dict, list[tuple[Path, str]]]: The base's sections; and each
+            earlier experiment's folder and arm whose runs are the base's, the
+            one that the file names first. The list is empty for a base that
+            the file gives itself.
 
     Raises:
         ValueError: If the earlier experiment has not been trained, or has no
             such arm.
     """
     if isinstance(base, dict):
-        return base, None
+        return base, []
     earlier_name, arm = base.split("/")
     earlier_folder = Path(outputs) / EXPERIMENTS / earlier_name
     config_path = earlier_folder / CONFIGS / f"{arm}.yaml"
     if not config_path.exists():
-        earlier_arms = sorted(
+        earlier_arm_names = sorted(
             path.stem for path in (earlier_folder / CONFIGS).glob("*.yaml")
         )
-        if not earlier_arms:
+        if not earlier_arm_names:
             raise ValueError(
                 f"base: no experiment {earlier_name} has been trained in {earlier_folder.parent}"
             )
         raise ValueError(
             f"base: experiment {earlier_name} has no arm {arm}; its arms are"
-            f" {', '.join(earlier_arms)}"
+            f" {', '.join(earlier_arm_names)}"
         )
-    return yaml.safe_load(config_path.read_text(encoding="utf-8")), (
-        earlier_folder,
-        arm,
-    )
+    earlier_arms = [(earlier_folder, arm)]
+    while arm == BASE and (earlier_folder / EXPERIMENT_FILE).exists():
+        earlier_base = read_experiment(earlier_folder / EXPERIMENT_FILE)["base"]
+        if not isinstance(earlier_base, str):
+            break
+        earlier_name, arm = earlier_base.split("/")
+        earlier_folder = Path(outputs) / EXPERIMENTS / earlier_name
+        # An experiment deleted and trained again can name a later one as its
+        # base, so the chain stops where it would go round.
+        if (earlier_folder, arm) in earlier_arms:
+            break
+        earlier_arms.append((earlier_folder, arm))
+    return yaml.safe_load(config_path.read_text(encoding="utf-8")), earlier_arms
 
 
 def arm_configs(experiment, base_sections):
@@ -483,7 +499,7 @@ def run_state(run_folder):
 
     A run that ``train`` finished has its ``manifest.json``. One that is
     training has a staging folder beside its folder, and so does one that
-    was stopped before it finished.
+    was killed before it finished, such as by ``scancel`` or a time limit.
 
     Args:
         run_folder (Path): The run's folder.
@@ -498,18 +514,22 @@ def run_state(run_folder):
     return NOT_STARTED
 
 
-def experiment_runs(experiment, folder, earlier_arm):
+def experiment_runs(experiment, folder, earlier_arms):
     """Every run that the experiment needs, the base's first, each arm's in seed order.
 
-    A base run comes from the earlier experiment when that experiment has
-    it, done or started, and this experiment has not trained it itself.
+    A base run comes from the first earlier experiment that has a run at the
+    same seed, done or started, when this experiment has not trained it
+    itself. For example, with ``base: lr/base``, where lr's base is
+    ``dim/dim128``, ``base_s0`` is lr's own ``base_s0`` when lr trained it, and
+    dim's ``dim128_s0`` otherwise. A seed that no earlier experiment has is
+    trained here.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
         folder (Path): The experiment's folder.
-        earlier_arm (tuple[Path, str] | None): The earlier experiment's arm
-            that the base is, as that experiment's folder and the arm's name,
-            from base_config, or None.
+        earlier_arms (list[tuple[Path, str]]): The earlier experiments' arms
+            whose runs are the base's, as each experiment's folder and the
+            arm's name, from base_config.
 
     Returns:
         list[Run]: The runs.
@@ -518,11 +538,14 @@ def experiment_runs(experiment, folder, earlier_arm):
     for arm in [BASE, *experiment["arms"]]:
         for seed in experiment["seeds"]:
             run_folder = folder / RUNS / f"{arm}_s{seed}"
-            if arm == BASE and earlier_arm and run_state(run_folder) == NOT_STARTED:
-                earlier_folder, earlier_arm_name = earlier_arm
-                earlier_run = earlier_folder / RUNS / f"{earlier_arm_name}_s{seed}"
-                if run_state(earlier_run) != NOT_STARTED:
-                    run_folder = earlier_run
+            if arm == BASE and run_state(run_folder) == NOT_STARTED:
+                for earlier_folder, earlier_arm in earlier_arms:
+                    earlier_run_folder = (
+                        earlier_folder / RUNS / f"{earlier_arm}_s{seed}"
+                    )
+                    if run_state(earlier_run_folder) != NOT_STARTED:
+                        run_folder = earlier_run_folder
+                        break
             runs.append(Run(arm, seed, run_folder, folder / CONFIGS / f"{arm}.yaml"))
     return runs
 
@@ -536,9 +559,9 @@ def gpu_ids():
     Returns:
         list[str]: Each GPU's id, or an empty list when there is none.
     """
-    listed = listed_gpus()
-    if listed is not None:
-        return listed
+    listed_gpu_ids = listed_gpus()
+    if listed_gpu_ids is not None:
+        return listed_gpu_ids
     import torch
 
     return [str(index) for index in range(torch.cuda.device_count())]
@@ -601,33 +624,28 @@ def train_runs(runs, gpus, inputs, folder):
         run_name = run.folder.name
         log_path = folder / LOGS / f"{run_name}.log"
         try:
-            on_gpu = f" on GPU {gpu}" if gpu else ""
-            print(f"  {run_name}: training{on_gpu} -> {log_path}", flush=True)
+            gpu_shown = f" on GPU {gpu}" if gpu else ""
+            print(f"  {run_name}: training{gpu_shown} -> {log_path}", flush=True)
             environment = {**os.environ, "CUDA_VISIBLE_DEVICES": gpu} if gpu else None
             with open(log_path, "w", encoding="utf-8") as log_file:
-                completed = subprocess.run(
+                process = subprocess.run(
                     train_command(run, inputs, folder),
                     env=environment,
                     stdout=log_file,
                     stderr=subprocess.STDOUT,
                     check=False,
                 )
-            succeeded = completed.returncode == 0
+            succeeded = process.returncode == 0
             outcome = "done" if succeeded else f"failed; see {log_path}"
             print(f"  {run_name}: {outcome}", flush=True)
             return succeeded
         finally:
             free_gpus.put(gpu)
 
-    executor = ThreadPoolExecutor(max_workers=max(len(gpus), 1))
-    try:
+    # Ctrl-C stops the runs that are training, which share the terminal. map
+    # then cancels the runs still waiting, so none starts after it.
+    with ThreadPoolExecutor(max_workers=max(len(gpus), 1)) as executor:
         successes = list(executor.map(train_one, runs))
-    except KeyboardInterrupt:
-        # Ctrl-C stops the runs that are training, which share the terminal.
-        # The runs still waiting are cancelled, so none starts after it.
-        executor.shutdown(wait=False, cancel_futures=True)
-        raise
-    executor.shutdown()
     return [run for run, success in zip(runs, successes) if not success]
 
 
@@ -698,12 +716,12 @@ def checked_runs(path, inputs, outputs):
         FileNotFoundError: If the corpus or a tokenizer is not built.
     """
     experiment, folder = checked_experiment(path, outputs)
-    base_sections, earlier_arm = base_config(experiment["base"], outputs)
+    base_sections, earlier_arms = base_config(experiment["base"], outputs)
     arm_values = written_configs(
         arm_configs(experiment, base_sections), folder, experiment["seeds"][0]
     )
     check_inputs(arm_values, inputs)
-    runs = experiment_runs(experiment, folder, earlier_arm)
+    runs = experiment_runs(experiment, folder, earlier_arms)
     check_earlier_runs(runs, folder)
     return experiment, folder, runs
 
@@ -729,41 +747,52 @@ def train(path, inputs, outputs):
     """
     experiment, folder, runs = checked_runs(path, inputs, outputs)
     keep_copy(path, folder)
-    to_train = [run for run in runs if run_state(run.folder) != DONE]
+    runs_to_train = [run for run in runs if run_state(run.folder) != DONE]
     gpus = gpu_ids()
-    arm_count = len(experiment["arms"])
-    seed_count = len(experiment["seeds"])
     print(
-        f"experiment {experiment['name']}: the base and {arm_count} arm"
-        f"{'s' if arm_count > 1 else ''} at {seed_count} seed{'s' if seed_count > 1 else ''},"
-        f" {len(runs)} runs: {len(runs) - len(to_train)} done,"
-        f" {len(to_train)} to train"
+        f"experiment {experiment['name']}: the base and"
+        f" {counted(len(experiment['arms']), 'arm')} at"
+        f" {counted(len(experiment['seeds']), 'seed')}, {len(runs)} runs:"
+        f" {len(runs) - len(runs_to_train)} done, {len(runs_to_train)} to train"
     )
     if experiment["question"]:
         print(f"  {experiment['question']}")
-    if not to_train:
+    if not runs_to_train:
         print(f"  every run is done -> {folder}")
         print(f"  Compare the arms: {compare_command(path)}")
         return 0
     print(
-        f"  {len(gpus)} GPU{'s' if len(gpus) > 1 else ''}:"
-        f" {len(gpus)} run{'s' if len(gpus) > 1 else ''} at a time"
+        f"  {counted(len(gpus), 'GPU')}:"
+        f" {counted(min(len(gpus), len(runs_to_train)), 'run')} at a time"
         if gpus
         else "  no CUDA GPU: one run at a time"
     )
-    failed = train_runs(to_train, gpus, inputs, folder)
-    if failed:
+    failed_runs = train_runs(runs_to_train, gpus, inputs, folder)
+    if failed_runs:
         print(
-            f"  {len(failed)} of {len(to_train)} runs failed: "
-            + ", ".join(run.folder.name for run in failed)
+            f"  {len(failed_runs)} of {counted(len(runs_to_train), 'run')} failed: "
+            + ", ".join(run.folder.name for run in failed_runs)
             + f". Their logs are in {folder / LOGS}. Train the experiment again"
             " to retry them.",
             file=sys.stderr,
         )
         return 1
-    print(f"  {len(to_train)} runs trained -> {folder}")
+    print(f"  {counted(len(runs_to_train), 'run')} trained -> {folder}")
     print(f"  Compare the arms: {compare_command(path)}")
     return 0
+
+
+def counted(count, noun):
+    """A count with its noun, plural unless the count is 1, such as ``1 run`` or ``4 runs``.
+
+    Args:
+        count (int): The count.
+        noun (str): The noun, in the singular.
+
+    Returns:
+        str: The count and the noun.
+    """
+    return f"{count} {noun}{'' if count == 1 else 's'}"
 
 
 def compare_command(path):
@@ -793,8 +822,8 @@ def status(path, outputs):
             differs from the copy that its first training kept.
     """
     experiment, folder = checked_experiment(path, outputs)
-    _, earlier_arm = base_config(experiment["base"], outputs)
-    runs = experiment_runs(experiment, folder, earlier_arm)
+    _, earlier_arms = base_config(experiment["base"], outputs)
+    runs = experiment_runs(experiment, folder, earlier_arms)
     states = {run: run_state(run.folder) for run in runs}
     done_count = sum(state == DONE for state in states.values())
     print(f"experiment {experiment['name']}: {done_count} of {len(runs)} runs done")

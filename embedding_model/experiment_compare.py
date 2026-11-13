@@ -124,15 +124,15 @@ def seed_scores(experiment, runs, path):
     Raises:
         ValueError: If a run is not done.
     """
-    unfinished_runs = [
+    unfinished_run_states = [
         f"{run.folder.name} ({state})"
         for run in runs
         if (state := run_state(run.folder)) != DONE
     ]
-    if unfinished_runs:
+    if unfinished_run_states:
         raise ValueError(
             f"experiment {experiment['name']} has runs that are not done:"
-            f" {', '.join(unfinished_runs)}. Train them first: python -m"
+            f" {', '.join(unfinished_run_states)}. Train them first: python -m"
             f" embedding_model experiment train --config {path}"
         )
     metric = experiment["decision"]["metric"]
@@ -153,13 +153,13 @@ def seeds_needed(test, base_sd, arm_sd, alpha, minimum_effect):
     Superiority's is the fewest seeds at which a mean gain of exactly the
     minimum effect is significant: the sample size of a dual-criterion
     design (Roychoudhury et al., 2018), by Welch's t. With more seeds, a gain
-    larger than the minimum effect passes more often; a gain of exactly the
-    minimum effect passes about half the time at any count of seeds, as its
-    mean falls on either side. Non-inferiority's is the fewest seeds that
-    give TARGET_POWER to show it when the arm and the base do not differ: the
-    power of Welch's test, from the noncentral t. Both take
-    Welch-Satterthwaite's degrees of freedom at the two sds, with the same
-    seeds in each arm.
+    larger than the minimum effect passes more often. A gain of exactly the
+    minimum effect passes at most half the time, as its mean falls on either
+    side, and about half the time once the seeds suffice. Non-inferiority's
+    is the fewest seeds that give TARGET_POWER to show it when the arm and
+    the base do not differ: the power of Welch's test, from the noncentral
+    t. Both take Welch-Satterthwaite's degrees of freedom at the two sds,
+    with the same seeds in each arm.
 
     The count is the one at which the test's need is met exactly, rounded up.
     scipy's optimize.elementwise finds it in two steps. bracket_root finds
@@ -305,7 +305,7 @@ def difference_rows(experiment, arm_scores):
 
     Each arm is tested at the decision's alpha divided by the number of arms,
     by Bonferroni, so the chance of any false finding over the experiment
-    stays at alpha. Its interval is Welch's two-sided interval at one minus
+    is at most alpha. Its interval is Welch's two-sided interval at one minus
     that alpha, and its p is Welch's t-test of no difference, so the two
     agree.
 
@@ -403,9 +403,8 @@ def recommendation(experiment, differences):
 
     One arm that passes its test is recommended. With none, the base is.
     With several, none is: which is worth its cost is the user's choice,
-    and each one's line is given. The base's line names the arm whose runs
-    the base is: this experiment's own base, or the earlier experiment's arm
-    that it builds on. So the next experiment reuses those runs.
+    and each one's line is given. The base's line names this experiment's
+    base, whose runs the next experiment reuses, wherever they were trained.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
@@ -418,8 +417,7 @@ def recommendation(experiment, differences):
     name = experiment["name"]
     passing_rows = [row for row in differences if row["passes"]]
     if not passing_rows:
-        base = experiment["base"] if isinstance(experiment["base"], str) else None
-        return BASE, "no arm passes its test", [f"base: {base or f'{name}/{BASE}'}"]
+        return BASE, "no arm passes its test", [f"base: {name}/{BASE}"]
     base_lines = [f"base: {name}/{row['arm']}" for row in passing_rows]
     if len(passing_rows) == 1:
         return passing_rows[0]["arm"], passing_rows[0]["verdict"], base_lines
@@ -438,14 +436,15 @@ def arms_figure(experiment, arm_scores, arms, differences):
     and the arm's mean is a bar on its 95% t interval, on the row itself, so
     that it lines up with the arm's diamond on the right; a gray band spans
     the base's mean, plus and minus the minimum effect. The raw scores beside
-    their summary are the layout of an estimation plot (Ho et al., 2019). On the right, each arm minus the base has Welch's interval, at
-    the confidence of its test. 0 is at the center, and a gray band spans
+    their summary are the layout of an estimation plot (Ho et al., 2019).
+    On the right, each arm minus the base has Welch's interval, at the
+    confidence of its test. 0 is at the center, and a gray band spans
     minus to plus the minimum effect, with a dashed line at each end, as in
     the figure of CONSORT, the guideline for reporting randomized trials, for
-    non-inferiority trials (Piaggio et al., 2012). The
-    color says the arm's test, and on the right only, a filled diamond that
-    it passes, a hollow one that it does not. The legend shows the colors as
-    swatches, so that a diamond means one thing. The verdicts' words are in the printout and in
+    non-inferiority trials (Piaggio et al., 2012). The color says the arm's
+    test, and on the right only, a filled diamond that it passes, a hollow
+    one that it does not. The legend shows the colors as swatches, so that a
+    diamond means one thing. The verdicts' words are in the printout and in
     differences.csv: under each row, they crowd the panel past a few arms.
 
     Args:
@@ -613,7 +612,7 @@ class Comparison:
         arms (list[dict]): The rows of arms.csv, from arm_rows.
         differences (list[dict]): The rows of differences.csv, from
             difference_rows.
-        recommended (str | None): The recommended arm, BASE, or None, from
+        recommended_arm (str | None): The recommended arm, BASE, or None, from
             recommendation.
         reason (str): Why, from recommendation.
         base_lines (list[str]): The ``base:`` line of each arm to build on,
@@ -626,7 +625,7 @@ class Comparison:
     arm_scores: dict
     arms: list
     differences: list
-    recommended: str | None
+    recommended_arm: str | None
     reason: str
     base_lines: list
 
@@ -685,7 +684,7 @@ def comparison_manifest(comparison):
             "target_power": TARGET_POWER,
         },
         "seeds": experiment["seeds"],
-        "recommended": comparison.recommended,
+        "recommended": comparison.recommended_arm,
         "ai_harmonization": code_commit(),
         "libraries": library_versions(COMPARE_LIBRARIES),
     }
@@ -729,16 +728,16 @@ def best_run_line(comparison):
     Returns:
         str: The line to print.
     """
-    recommended = comparison.recommended
+    recommended_arm = comparison.recommended_arm
     # The arm's runs and its scores come in the same order: by seed.
-    recommended_runs = [run for run in comparison.runs if run.arm == recommended]
-    scores = comparison.arm_scores[recommended]
+    recommended_runs = [run for run in comparison.runs if run.arm == recommended_arm]
+    scores = comparison.arm_scores[recommended_arm]
     best_score = max(scores)
     best_run = recommended_runs[scores.index(best_score)]
-    best_record = json.loads(
+    run_manifest = json.loads(
         (best_run.folder / "manifest.json").read_text(encoding="utf-8")
     )
-    benchmark_names = sorted(corpus_benchmarks(best_record))
+    benchmark_names = sorted(corpus_benchmarks(run_manifest))
     if benchmark_names:
         next_step = (
             "To score the run on the benchmarks: python -m embedding_model score"
@@ -749,9 +748,9 @@ def best_run_line(comparison):
             "Its corpus was checked against no benchmark, so score refuses every"
             " one: build the benchmarks, then build the corpus again."
         )
-    metric = metric_name(comparison.experiment["decision"]["metric"])
+    metric_shown = metric_name(comparison.experiment["decision"]["metric"])
     return (
-        f"Its best run is {best_run.folder.name}, at validation {metric}"
+        f"Its best run is {best_run.folder.name}, at validation {metric_shown}"
         f" {best_score}. The comparison uses the validation pairs only. {next_step}"
     )
 
@@ -767,11 +766,11 @@ def print_summary(comparison, destination):
         destination (Path): The comparison's folder.
     """
     experiment, differences = comparison.experiment, comparison.differences
-    metric = metric_name(experiment["decision"]["metric"])
+    metric_shown = metric_name(experiment["decision"]["metric"])
     base_row = comparison.arms[0]
     name_width = max(len(arm) for arm in comparison.arm_scores) + 2
     print(
-        f"experiment {experiment['name']}: validation {metric}, the base and"
+        f"experiment {experiment['name']}: validation {metric_shown}, the base and"
         f" {len(differences)} arm{'s' if len(differences) > 1 else ''} at"
         f" {base_row['seeds']} seeds"
     )
@@ -786,7 +785,9 @@ def print_summary(comparison, destination):
             f" {row['confidence']:.1%} interval {row['low']:+.{DECIMALS}f} to"
             f" {row['high']:+.{DECIMALS}f}, p {row['p']:.2g}: {row['verdict']}"
         )
-    print(f"  recommended: {comparison.recommended or 'none'}, as {comparison.reason}")
+    print(
+        f"  recommended: {comparison.recommended_arm or 'none'}, as {comparison.reason}"
+    )
     print(
         "  To build on it, write in the next experiment's file:"
         if len(comparison.base_lines) == 1
@@ -794,7 +795,7 @@ def print_summary(comparison, destination):
     )
     for line in comparison.base_lines:
         print(f"    {line}")
-    if comparison.recommended is not None:
+    if comparison.recommended_arm is not None:
         print(f"  {best_run_line(comparison)}")
     print_destination(destination)
 
@@ -819,23 +820,17 @@ def compare(path, outputs):
 
     Raises:
         ValueError: If the file or the base cannot be used, the file differs
-            from the copy that its first training kept, it has one seed, a
-            base run of an earlier experiment has started but not finished, or
-            a run is not done.
+            from the copy that its first training kept, a base run of an
+            earlier experiment has started but not finished, or a run is not
+            done.
     """
     experiment, folder = checked_experiment(path, outputs)
-    if len(experiment["seeds"]) < 2:
-        raise ValueError(
-            f"experiment {experiment['name']} has one seed, so its seed-to-seed"
-            " spread is unknown, and its arms cannot be compared. Give a new"
-            " experiment at least 2 seeds, such as seeds: [0, 1, 2, 3, 4]"
-        )
-    _, earlier_arm = base_config(experiment["base"], outputs)
-    runs = experiment_runs(experiment, folder, earlier_arm)
+    _, earlier_arms = base_config(experiment["base"], outputs)
+    runs = experiment_runs(experiment, folder, earlier_arms)
     check_earlier_runs(runs, folder)
     arm_scores = seed_scores(experiment, runs, path)
     differences = difference_rows(experiment, arm_scores)
-    recommended, reason, base_lines = recommendation(experiment, differences)
+    recommended_arm, reason, base_lines = recommendation(experiment, differences)
     comparison = Comparison(
         experiment=experiment,
         folder=folder,
@@ -843,7 +838,7 @@ def compare(path, outputs):
         arm_scores=arm_scores,
         arms=arm_rows(experiment, arm_scores),
         differences=differences,
-        recommended=recommended,
+        recommended_arm=recommended_arm,
         reason=reason,
         base_lines=base_lines,
     )

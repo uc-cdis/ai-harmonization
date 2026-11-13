@@ -34,8 +34,9 @@ builds' own manifests record their inputs.
 
 Every manifest has these fields. A field that does not apply is left out:
 
-- `benchmark`, `source`, `corpus`, `tokenizer`, `run` or `comparison`: the
-  build's name, under the kind of build that it is;
+- `benchmark`, `source`, `corpus`, `tokenizer`, `run`, `comparison` or
+  `experiment`: the build's name, under the kind of build that it is. An
+  experiment's comparison is named by its experiment;
 - `version`: the benchmark's or the source's version;
 - `built` or `fetched`: the date of the build;
 - `files`: each file's row count, and its `sha256`, the [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4) of the
@@ -89,7 +90,9 @@ run's has them, and four more fields:
 - `model_colors`: each model's color as drawn.
 
 [comparing.md](comparing.md#what-compare-writes) describes the
-comparison's manifest.
+comparison's manifest, and
+[experiments.md](experiments.md#manifestjson) the manifest of an
+experiment's comparison.
 
 ## Two checksums
 

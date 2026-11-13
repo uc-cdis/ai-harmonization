@@ -3140,8 +3140,8 @@ a seed in the config. An experiment lists its seeds, and refuses
 **Context.** Model development compares versions of a run's config, each at
 several seeds. Which change to try next depends on what the last comparison
 found. It also takes judgement, after a tie, a result near the margin, or a
-change that costs more. A comparison is fair when its arms, its seeds and its decision rule are
-fixed before its runs are read.
+change that costs more. A comparison is fair when its arms, its seeds and
+its decision rule are fixed before its runs are read.
 
 **Decision.** An experiment is one file: a base, its arms, its seeds and its
 decision rule. It asks one question. The next experiment is another file,
@@ -3150,8 +3150,8 @@ whose base names an arm of the one before.
 **Consequences.**
 
 - Good, because each question keeps its record, its file, beside its runs.
-- Good, because the person who runs the experiments chooses the next
-  question, from what the results show.
+- Good, because the user chooses the next question, from what the results
+  show.
 - Good, because the rule is written before the runs are read, and stays
   fixed for them: a [changed file is refused](#a-changed-experiment-file-is-refused-rather-than-trained-again).
 - Bad, because a series of experiments is many small files.
@@ -3175,12 +3175,13 @@ check that:
 
 **Described in:** [experiments.md](experiments.md#the-experiments-file).
 
-**Context.** Users write an experiment's file by hand. It is nested YAML: the
-decision rule's fields, and each arm's test and settings by section. Most of
-its checks are of form: a field's type, its allowed values and its default. A
-few are rules of an experiment, such as different seeds. ai-harmonization
-depends on [pydantic](https://docs.pydantic.dev/), and its `SimpleDataModel`
-is a pydantic model. A run's config is read by `HfArgumentParser`.
+**Context.** The user writes an experiment's file by hand. It is nested
+YAML: the decision rule's fields, and each arm's test and settings by
+section. Most of its checks are of form: a field's type, its allowed values
+and its default. A few are rules of an experiment, such as different seeds.
+ai-harmonization depends on [pydantic](https://docs.pydantic.dev/), and its
+`SimpleDataModel` is a pydantic model. A run's config is read by
+`HfArgumentParser`.
 
 **Decision.** pydantic models check the file. What pydantic can declare is
 declared: a field's type, its values, its bounds, its length and its default.
@@ -3267,10 +3268,10 @@ check that:
 **Described in:** [experiments.md](experiments.md#gpus-and-cpus).
 
 **Context.** An experiment trains many runs, and something must decide when
-and where each one trains. Users train on a laptop with a GPU, on CPUs alone,
-or on a cluster with SLURM. `train` trains on the machine where it runs, and
-a cluster user runs it inside a job. A SLURM job can hold several GPUs of one
-node. A run trains on one GPU, as
+and where each one trains. The user trains on a laptop with a GPU, on CPUs
+alone, or on a cluster with SLURM. `train` trains on the machine where it
+runs, and on a cluster the user runs it inside a job. A SLURM job can hold
+several GPUs of one node. A run trains on one GPU, as
 [its entry](#a-run-trains-on-one-gpu-the-first-one-it-sees) decides.
 
 **Decision.** `experiment train` queues its runs itself. Whenever one of its
@@ -3287,8 +3288,8 @@ it, not as jobs of their own.
 - Good, because each run is the public `train` command, which can be run
   again by hand.
 - Good, because it works with any scheduler, or none: the code holds none.
-- Good, because the experiment uses only the GPUs of its job, so it cannot
-  fill a shared cluster.
+- Good, because the experiment uses only the GPUs that its job shows it. A
+  job that asks for its GPUs with `--gpus` cannot fill a shared cluster.
 - Bad, because the experiment's job holds all its GPUs until the last run
   ends, although the GPUs of finished runs then wait.
 - Bad, because the experiment's job holds the GPUs of one node. One job per
@@ -3386,9 +3387,10 @@ manifest, started with a staging folder, and not started otherwise.
   scheduler.
 - Good, because training again uses the same states, so only the runs that
   are not done train.
-- Bad, because a run that was stopped looks the same as one that is
-  training. A later experiment whose base run has started waits, until the
-  run finishes or its staging folder is deleted.
+- Bad, because a run that was killed, such as by `scancel` or a time limit,
+  looks the same as one that is training. A later experiment whose base run
+  has started stops, and says to wait for the run, or to delete its staging
+  folder.
 
 **Alternatives considered.**
 
@@ -3479,8 +3481,9 @@ alpha, and the arm's mean gain is at least `minimum_effect`.
   reaches a decision value ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
 - Good, because a gain too small to be worth a change does not pass the test,
   however sure it is.
-- Bad, because an arm whose true gain is exactly `minimum_effect` passes about
-  half the time, at any number of seeds. Its mean falls on either side of it.
+- Bad, because an arm whose true gain is exactly `minimum_effect` passes at
+  most half the time, and about half once the seeds suffice. Its mean falls
+  on either side of it.
   The design expects this, and it does not make the study underpowered
   ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
 - Bad, because the verdict rests on two criteria, not on one test.
@@ -3562,7 +3565,7 @@ number of arms. Its interval has the matching confidence, such as 97.5% with
 
 **Consequences.**
 
-- Good, because the chance that any arm passes by chance alone stays at
+- Good, because the chance that any arm passes by chance alone is at most
   alpha.
 - Good, because each arm's interval and test still agree: both use the same
   alpha.
@@ -3622,8 +3625,8 @@ reaches the margin, with fewer seeds, is marked underpowered.
 - 90% power: fewer missed changes, at more seeds. 80% is the usual choice,
   though it has no strong justification ([Lakens, 2022](https://doi.org/10.1525/collabra.33267)).
 - 80% power for superiority too: under its two criteria, a gain of exactly
-  `minimum_effect` passes about half the time, at any number of seeds. So 80%
-  cannot be reached there.
+  `minimum_effect` passes at most half the time, at any number of seeds. So
+  80% cannot be reached there.
 - statsmodels' power for two samples, `TTestIndPower`: it uses only the
   pooled variance, as Student's t-test does, and statsmodels is not a
   dependency.

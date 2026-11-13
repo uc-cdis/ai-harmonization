@@ -192,7 +192,8 @@ class TestReadExperiment:
                 "arms.dim8.test: Input should be 'superiority' or 'non-inferiority',"
                 " not 'better'",
             ),
-            ({"seeds": []}, "seeds: List should have at least 1 item"),
+            ({"seeds": []}, "seeds: List should have at least 2 items"),
+            ({"seeds": [0]}, "seeds: List should have at least 2 items"),
             (
                 {"seeds": [0, -1]},
                 "seeds.1: Input should be greater than or equal to 0, not -1",
@@ -234,9 +235,9 @@ class TestReadExperiment:
         assert str(refused.value).startswith(f"{path}: ")
         assert message in str(refused.value)
 
-    def test_a_file_name_that_cannot_be_a_folder_name_is_refused(self, tmp_path):
-        """A file whose name cannot be a folder's is refused, since the experiment's folder takes its name."""
-        with pytest.raises(ValueError, match="not an experiment name"):
+    def test_a_file_name_that_starts_with_a_dot_is_refused(self, tmp_path):
+        """A file whose name starts with a dot is refused: the experiment's folder takes its name, and only staging folders start with a dot."""
+        with pytest.raises(ValueError, match="starting with a letter or a digit"):
             experiments.read_experiment(
                 experiment_file(tmp_path, name=".abcd-experiment")
             )
@@ -262,7 +263,7 @@ class TestReadExperiment:
         path = tmp_path / "abcd-experiment.yaml"
         path.write_text(
             "question:\nbase:\n  data: {corpus: abcd-corpus, tokenizer: abcd-tokenizer}\n"
-            "  training:\nseeds: [0]\ndecision:\narms:\n  dim8:\n"
+            "  training:\nseeds: [0, 1]\ndecision:\narms:\n  dim8:\n"
             "    test: non-inferiority\n    model:\n"
         )
         experiment = experiments.read_experiment(path)
@@ -335,7 +336,7 @@ class TestTrain:
     def test_each_run_is_the_public_train_command(self, tmp_path, inputs, fake_train):
         """A run is ``train``, with the arm's config and the seed, writing under the experiment's folder."""
         outputs = tmp_path / "outputs"
-        experiments.train(experiment_file(tmp_path, seeds=[3]), inputs, outputs)
+        experiments.train(experiment_file(tmp_path, seeds=[3, 4]), inputs, outputs)
         folder = outputs / "experiments" / "abcd-experiment"
         command = next(
             call["command"] for call in fake_train.calls if call["run"] == "dim8_s3"
@@ -388,6 +389,21 @@ class TestTrain:
         fake_train.calls.clear()
         assert experiments.train(path, inputs, outputs) == 0
         assert [call["run"] for call in fake_train.calls] == ["dim8_s1"]
+
+    def test_the_printout_counts_the_runs_left(
+        self, tmp_path, inputs, fake_train, capsys, monkeypatch
+    ):
+        """With one run left and two GPUs, one run trains at a time, and the count is singular."""
+        path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
+        fake_train.failing = {"dim8_s1"}
+        experiments.train(path, inputs, outputs)
+        fake_train.failing = set()
+        capsys.readouterr()
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
+        assert experiments.train(path, inputs, outputs) == 0
+        printed = capsys.readouterr().out
+        assert "2 GPUs: 1 run at a time" in printed
+        assert "1 run trained" in printed
 
     def test_the_file_is_kept_as_it_was_first_trained(
         self, tmp_path, inputs, fake_train
@@ -515,6 +531,43 @@ class TestEarlierBase:
         assert yaml.safe_load(later_config.read_text()) == yaml.safe_load(
             earlier_config.read_text()
         )
+
+    def test_an_earlier_base_reuses_the_runs_that_it_reused(
+        self, tmp_path, inputs, fake_train
+    ):
+        """``base: <later>/base`` reuses the earlier arm's runs that the later experiment reused itself.
+
+        abcd-later-experiment builds on abcd-experiment's dim8, and trains only
+        its base at seed 2. A third experiment on abcd-later-experiment's base,
+        at seeds 0 to 2, reuses all three: dim8 at seeds 0 and 1, and the later
+        experiment's own base at seed 2. Only its arm trains.
+        """
+        outputs = tmp_path / "outputs"
+        experiments.train(experiment_file(tmp_path), inputs, outputs)
+        arms = {"lr0.1": {"test": "superiority", "training": {"learning_rate": 0.1}}}
+        later_path = experiment_file(
+            tmp_path,
+            name="abcd-later-experiment",
+            base="abcd-experiment/dim8",
+            seeds=[0, 1, 2],
+            arms=arms,
+        )
+        experiments.train(later_path, inputs, outputs)
+        fake_train.calls.clear()
+        arms = {"lr0.4": {"test": "superiority", "training": {"learning_rate": 0.4}}}
+        third_path = experiment_file(
+            tmp_path,
+            name="abcd-third-experiment",
+            base="abcd-later-experiment/base",
+            seeds=[0, 1, 2],
+            arms=arms,
+        )
+        assert experiments.train(third_path, inputs, outputs) == 0
+        assert sorted(call["run"] for call in fake_train.calls) == [
+            "lr0.4_s0",
+            "lr0.4_s1",
+            "lr0.4_s2",
+        ]
 
     def test_an_earlier_run_still_training_stops_the_experiment(
         self, tmp_path, inputs, fake_train

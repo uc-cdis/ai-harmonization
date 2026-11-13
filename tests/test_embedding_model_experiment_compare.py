@@ -37,7 +37,7 @@ ARMS = {
 
 
 def experiment_file(folder, name="abcd-experiment", **fields):
-    """Write an experiment's file, the base and two arms at seeds 0 and 1 unless fields say otherwise."""
+    """Write an experiment's file, the base and three arms at seeds 0 and 1 unless fields say otherwise."""
     path = folder / f"{name}.yaml"
     path.write_text(
         yaml.safe_dump({"base": BASE, "seeds": [0, 1], "arms": ARMS, **fields})
@@ -144,8 +144,9 @@ class TestCompare:
         minimum effect. Here p is about 0.001, under 0.05. The interval ends
         below 0.01, so the gain is settled as too small: "not better", not
         "not shown better". No arm passes, and the base is recommended. dim32
-        varies as the base does, by 0.0016, so 2 seeds would show a gain of
-        0.01: t(0.975, 2) * 0.0016 = 0.0068.
+        varies as the base does, by 0.0016. A gain of 0.01 is significant at
+        n seeds once t(0.975, 2(n - 1)) * 0.0016 * sqrt(2 / n) is under 0.01.
+        At 2 seeds that is t(0.975, 2) * 0.0016, about 0.007.
         """
         path = trained_experiment(
             tmp_path,
@@ -419,10 +420,15 @@ class TestCompare:
         Here the base's seeds and dim32's vary by 0.0079 each, five times as
         much as BASE_SCORES. So the standard error is 0.005, t = 0.012 /
         0.005 = 2.4 at 8 degrees of freedom, and p is 0.043. Alone, dim32 is
-        tested at 0.05, and passes. Beside dim8, it is tested at 0.025, and its
-        97.5% interval, about -0.002 to 0.026, still reaches 0.01: not shown.
-        A gain of 0.01 would be significant at 8 seeds, with 0.0099, not at
-        7, with 0.0108, so 5 seeds are too few.
+        tested at 0.05, and passes. Beside dim8, it is tested at 0.025. Its
+        97.5% interval, about -0.002 to 0.026, holds 0, so the gain is not
+        shown. The interval still reaches 0.01, so the question stays open,
+        and dim32 is checked for the seeds that it would need. A gain of
+        exactly the margin, 0.01, is significant when its interval, 0.01 plus
+        or minus the half-width, does not hold 0: when the half-width is under
+        the margin. At n seeds in each arm, the half-width is
+        t(0.9875, 2(n - 1)) * 0.0079 * sqrt(2 / n): 0.0137 at 5 seeds, 0.0108
+        at 7 and 0.0099 at 8. So dim32 needs 8 seeds: underpowered.
         """
         base_scores = [0.795, 0.805, 0.800, 0.790, 0.810]
         dim32_scores = [0.812, 0.802, 0.817, 0.807, 0.822]
@@ -458,8 +464,8 @@ class TestCompare:
         """dim32 gains 0.008, and its interval, about 0.0057 to 0.0103, still reaches 0.01: not shown better.
 
         dim32 varies as the base does, by 0.0016, so 2 seeds would show a
-        gain of 0.01: t(0.975, 2) * 0.0016 = 0.0068. Its 5 seeds are enough,
-        so it is not underpowered: the gain may simply be under 0.01.
+        gain of 0.01: t(0.975, 2) * 0.0016 is about 0.007. Its 5 seeds are
+        enough, so it is not underpowered: the gain may simply be under 0.01.
         """
         path = trained_experiment(
             tmp_path,
@@ -532,9 +538,9 @@ class TestCompare:
         """abcd-later-experiment builds on abcd-experiment's dim8, so its base's scores are dim8's runs.
 
         dim8's five scores have a mean of 0.798. dim32 gains 0.002 on it, too
-        little to pass, so the base is recommended. Its line names dim8 in
-        abcd-experiment, where its runs are, so the next experiment reuses
-        them.
+        little to pass, so the base is recommended. Its line names the later
+        experiment's base, through which the next experiment reuses dim8's
+        runs in abcd-experiment.
         """
         trained_experiment(
             tmp_path,
@@ -551,7 +557,7 @@ class TestCompare:
         assert (arms[0]["arm"], arms[0]["mean"]) == ("base", 0.798)
         printed = capsys.readouterr().out
         assert "recommended: base" in printed
-        assert "    base: abcd-experiment/dim8\n" in printed
+        assert "    base: abcd-later-experiment/base\n" in printed
 
     def test_an_earlier_run_still_training_stops_the_comparison(self, tmp_path):
         """A base run of the earlier experiment with a staging folder may be training, so the comparison waits for it.
@@ -620,12 +626,6 @@ class TestCompare:
             experiment_compare.compare(path, tmp_path / "outputs")
         assert f"experiment train --config {path}" in str(error.value)
 
-    def test_one_seed_is_refused(self, tmp_path):
-        """One seed has no seed-to-seed spread, so its arms cannot be compared."""
-        path = experiment_file(tmp_path, seeds=[0])
-        with pytest.raises(ValueError, match="has one seed"):
-            experiment_compare.compare(path, tmp_path / "outputs")
-
 
 class TestSeedsNeeded:
     """The fewest seeds per arm that an arm's test needs."""
@@ -636,7 +636,9 @@ class TestSeedsNeeded:
         Superiority: a gain of 0.01 is significant once 0.01 is at least
         t(0.9875, 2(n - 1)) * 0.0045 * sqrt(2 / n). That is 0.0128 at 3 seeds
         and 0.0094 at 4. Non-inferiority: Welch's power, when the arms do not
-        differ, is 0.76 at 5 seeds and 0.87 at 6, so 6 give 80%.
+        differ, is the chance that a noncentral t, with noncentrality
+        0.01 / sqrt(2 * 0.0045^2 / n), passes t(0.9875, 2(n - 1)). It is 0.76
+        at 5 seeds and 0.87 at 6, so 6 give 80%.
         """
         assert (
             experiment_compare.seeds_needed("superiority", 0.0045, 0.0045, 0.025, 0.01)

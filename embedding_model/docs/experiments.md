@@ -14,7 +14,7 @@ files. [Details](#details) describes the experiment's file in full, the
 checks before training, the GPUs and clusters, and how the arms are compared.
 
 Model development is a series of experiments. Each one builds on an arm of the
-one before, which the person running them selects.
+one before. You choose that arm.
 [design_decisions.md](design_decisions.md#experiments) gives the reasons for
 the rules below.
 
@@ -102,8 +102,9 @@ experiment dim: 11 of 15 runs done
 ```
 
 A run is done when its folder has its manifest. It has started when a staging
-folder sits beside its folder: it is training now, or it was stopped before it
-finished.
+folder sits beside its folder. Then it is training now, or it was killed
+before it finished, such as by `scancel` or a time limit. A run stopped with
+Ctrl-C deletes its staging folder.
 
 [design_decisions.md](design_decisions.md#an-experiments-status-comes-from-its-run-folders)
 gives the reasons for these states.
@@ -117,9 +118,9 @@ and recommends an arm to build on:
 ```
 $ python -m embedding_model experiment compare --config embedding_model/configs/experiments/dim.yaml
 experiment dim: validation MRR@10, the base and 2 arms at 5 seeds
-  base     0.87198, 95% interval 0.86491 to 0.87905
-  dim128   -0.00412, 97.5% interval -0.00845 to +0.00021, p 0.059: no more than 0.01 worse
-  dim2048  +0.00178, 97.5% interval -0.00676 to +0.01032, p 0.56: not shown better by at least 0.01
+  base     0.87200, 95% interval 0.86974 to 0.87426
+  dim128   -0.00274, 97.5% interval -0.00678 to +0.00130, p 0.096: no more than 0.01 worse
+  dim2048  +0.00178, 97.5% interval -0.00188 to +0.00544, p 0.21: not better by at least 0.01
   recommended: dim128, as no more than 0.01 worse
   To build on it, write in the next experiment's file:
     base: dim/dim128
@@ -144,7 +145,10 @@ recommended.
 
 - a run is not done. The message names the runs, and the command that trains
   them;
-- the experiment has one seed, so its seed-to-seed spread is unknown;
+- a base run of an earlier experiment has started but not finished. The
+  message says to wait for it, or to delete its staging folder;
+- the base names an earlier experiment that has not been trained, or an arm
+  that it does not have;
 - the file differs from the copy that its first training kept; see
   [A changed file](#a-changed-file).
 
@@ -184,7 +188,9 @@ A copy of the experiment's file, as it was first trained.
 
 Each arm's full config, the base's as `base.yaml`: the base's settings, with
 the arm's changes. `train` trains each run from its arm's config. A config is
-also a run's config that `train` takes on its own:
+also a run's config that `train` takes on its own. Run by hand, it writes
+its run to `embedding_model/outputs/runs/dim128_s0/`, not into the
+experiment's folder:
 
 ```
 python -m embedding_model train --config embedding_model/outputs/experiments/dim/configs/dim128.yaml --seed 0
@@ -249,6 +255,8 @@ do: a `.png`, at 300 dpi, and a `.pdf` and an `.eps`.
 The comparison's manifest, with the fields that
 [manifests.md](manifests.md#its-fields) lists:
 
+- `experiment`: the experiment's name;
+- `built`: the date of the comparison;
 - `sources`: the experiment's `experiment.yaml`, and each run's
   `manifest.json`, each with its SHA-256;
 - `settings`: the decision's fields, the arm's alpha, the intervals, the
@@ -272,9 +280,12 @@ It also has four fields of its own:
 |---|---|---|
 | `question` | no | one sentence: what the experiment asks |
 | `base` | yes | the base's settings, by the sections of a run's [config](training.md#the-config). Or an arm of an earlier experiment, as `<experiment>/<arm>`: see [Building on an earlier experiment](#building-on-an-earlier-experiment) |
-| `seeds` | yes | the seeds, as a list of different whole numbers, 0 or more |
+| `seeds` | yes | the seeds, as a list of at least 2 different whole numbers, from 0 to 4,294,967,295. One seed has no seed-to-seed spread, so its arms could not be compared |
 | `decision` | no | the rule that decides between the arms: see the next table |
-| `arms` | yes | each arm, by its name: its `test`, and the settings that it changes, by section |
+| `arms` | yes | each arm, by its name: its `test`, and the settings that it changes, by section. An arm is not named `base`, and does not change `data.corpus` |
+
+Neither the base nor an arm sets `training.seed`: each run's seed comes from
+`seeds`.
 
 The `decision` block has a default for each of its fields:
 
@@ -282,8 +293,8 @@ The `decision` block has a default for each of its fields:
 |---|---|---|
 | `scored_on` | the data whose scores decide: `validation`, the corpus's validation pairs, the only choice for now | `validation` |
 | `metric` | the validation metric that decides: `mrr@10`, `accuracy@1`, `accuracy@3`, `accuracy@5` or `accuracy@10`, as each run's manifest records it | `mrr@10` |
-| `minimum_effect` | the smallest difference worth deciding, on the metric's scale | `0.01` |
-| `alpha` | the share of false findings allowed, split over the arms | `0.05` |
+| `minimum_effect` | the margin: for `superiority`, the smallest gain worth a change; for `non-inferiority`, the largest loss worth taking. On the metric's scale | `0.01` |
+| `alpha` | the chance, over the whole experiment, that an arm passes by chance alone; it is split over the arms | `0.05` |
 
 Each arm names its `test`: the statistical test, the question that it asks of
 the base:
@@ -326,10 +337,14 @@ The base is then that arm's full config, from the earlier experiment's
 `configs/`. The arm's runs at the same seeds are reused, not trained again. A
 seed that the earlier experiment has not trained is trained here, as
 `base_s<seed>`. A base run that the earlier experiment is still training stops
-`experiment train`, so that no run is trained twice.
+`experiment train`, so that two experiments do not train it at once. But a
+base run that the earlier experiment has not started yet is trained here
+too. So train a later experiment once the earlier one is done.
 
 `base: dim/base` builds on the earlier experiment's own base. It asks a new
-question of the same config, and reuses its runs.
+question of the same config, and reuses its runs. When `dim`'s own base is
+an arm of another experiment, such as `base: size/dim512`, the runs of that
+arm are reused too.
 
 The earlier experiment's folder must stay, since the new one reads its runs.
 To delete it, first copy the arm's config, such as
@@ -458,7 +473,7 @@ each is tested at 0.05 / 2 = 0.025, and its interval is a 97.5% interval.
 | `non-inferiority` | `no more than 0.01 worse` | `may be more than 0.01 worse` | `more than 0.01 worse` |
 
 The middle column says too little, either way. The last has settled the
-question: more seeds would not make the arm pass.
+question: more seeds would most likely not make the arm pass.
 
 Each arm's row also gives [`seeds_needed`](design_decisions.md#an-arm-that-does-not-pass-its-test-is-checked-for-enough-seeds-at-the-minimum-effect), the seeds per arm
 that its test needs, at the two arms' seed-to-seed spreads:
@@ -469,7 +484,9 @@ that its test needs, at the two arms' seed-to-seed spreads:
   when the arm and the base do not differ. This is the power of Welch's
   t-test, from the noncentral t distribution, scipy's `stats.nct`.
 
-scipy's `optimize.elementwise` finds both counts: `bracket_root` finds a count too few and a count enough, and `find_root` finds the exact count between them, rounded up.
+scipy's `optimize.elementwise` finds both counts: `bracket_root` finds a
+count too few and a count enough, and `find_root` finds the exact count
+between them, rounded up.
 
 An arm whose interval still reaches the margin, and that had fewer seeds
 than it needs, is also marked `underpowered: <k> seeds needed`. To settle its
@@ -489,9 +506,9 @@ them, to 5 decimals. So a gain shown as 0.01 is a gain of at least 0.01.
 - no arm passes: the base is recommended;
 - several arms pass: none is recommended, and each one's line is printed.
 
-When the base is recommended, and it is itself an arm of an earlier
-experiment, its line names that arm, such as `base: dim/dim128`. The next
-experiment then reuses its runs.
+When the base is recommended, its line names this experiment's base, such as
+`base: dim/base`. The next experiment then reuses the base's runs, wherever
+they were trained.
 
 The comparison uses the validation pairs only, never the benchmarks. So the
 recommended arm's best run comes with the command that scores it on the

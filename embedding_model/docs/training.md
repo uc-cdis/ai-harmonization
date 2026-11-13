@@ -304,10 +304,11 @@ says why.
    the last evaluation. When the last step was not evaluated, the run
    evaluates the model once more.
 
-A tokenizer that learned its vocabulary from another corpus, or from an
-earlier build of this one, is refused. It could hold this build's validation
-texts. The message names the command that trains one on this build, at the
-same vocabulary size.
+A tokenizer that learned its vocabulary from another corpus, or from another
+build of this one, is refused. It could hold this build's validation texts.
+Two builds are the same when their pairs have the same rows and the same
+content checksum. The message names the command that trains one on this
+build, with the same vocabulary size and minimum frequency.
 
 ### GPUs and CPUs
 

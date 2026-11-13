@@ -39,7 +39,12 @@ from embedding_model.architectures import ARCHITECTURES
 from embedding_model.provenance import code_commit, library_versions
 from embedding_model.scoring import ACCURACY_AT_K, MRR_CUTOFF, ranking_evaluator
 from embedding_model.texts import recorded_format
-from embedding_model.tokenizer import BATCH_SIZE, read_tokenizer
+from embedding_model.tokenizer import (
+    BATCH_SIZE,
+    default_name,
+    read_tokenizer,
+    tokenizer_train_command,
+)
 
 # Where the runs trained on their own are written, under the outputs folder.
 RUNS = "runs"
@@ -419,7 +424,7 @@ def device_name(training):
     return torch.cuda.get_device_name(0)
 
 
-def check_tokenizer_corpus(
+def check_tokenizer_build(
     corpus_name, tokenizer_name, tokenizer_manifest, corpus_manifest
 ):
     """Refuse a tokenizer that learned its vocabulary from another corpus, or another build of it.
@@ -427,8 +432,9 @@ def check_tokenizer_corpus(
     A tokenizer learns only from its own corpus's training pairs. Another
     corpus's training pairs, or another build's, can hold this corpus's
     validation pairs, so the vocabulary could depend on the texts that judge
-    the model. The tokenizer's manifest records the checksum of the pairs
-    that it learned from.
+    the model. The tokenizer's manifest records the pairs that it learned
+    from, and they are compared as manifests.file_identity compares a table:
+    by their rows and their content's checksum.
 
     Args:
         corpus_name (str): The corpus that the run trains on.
@@ -438,33 +444,36 @@ def check_tokenizer_corpus(
 
     Raises:
         ValueError: If the tokenizer learned from another corpus or another
-            build, with the command that trains one on this build, at the
-            same vocabulary size.
+            build, with the command that trains one on this build, with the
+            same vocabulary size and minimum frequency.
     """
     learned_from = {
         source["name"]: source
         for source in tokenizer_manifest["sources"]
         if source["role"] == "corpus"
     }
-    command = (
-        f"python -m embedding_model tokenizer train --corpus {corpus_name}"
-        f" --vocab-size {tokenizer_manifest['settings']['vocab_size']}"
-    )
+    command = tokenizer_train_command(corpus_name, tokenizer_manifest)
     if corpus_name not in learned_from:
         raise ValueError(
             f"tokenizer {tokenizer_name} learned its vocabulary from"
             f" {', '.join(sorted(learned_from))}, not from corpus {corpus_name},"
             " so it could hold this corpus's validation texts. Train one on"
-            " this corpus, at the same size, and name it in the config's data"
-            f" section: {command}"
+            " this corpus, with the same vocabulary size and minimum frequency,"
+            f" and name it in the config's data section: {command}. It is named"
+            f" {default_name(corpus_name, tokenizer_manifest['settings']['vocab_size'])};"
+            " if a tokenizer of that name exists with other settings, add --name"
+            " with a new name"
         )
-    learned_pairs_sha256 = learned_from[corpus_name]["files"]["pairs.parquet"]["sha256"]
-    if learned_pairs_sha256 != corpus_manifest["files"]["pairs.parquet"]["sha256"]:
+    learned_pairs_entry = learned_from[corpus_name]["files"]["pairs.parquet"]
+    corpus_pairs_entry = corpus_manifest["files"]["pairs.parquet"]
+    if manifests.file_identity(learned_pairs_entry) != manifests.file_identity(
+        corpus_pairs_entry
+    ):
         raise ValueError(
-            f"tokenizer {tokenizer_name} learned its vocabulary from an earlier"
+            f"tokenizer {tokenizer_name} learned its vocabulary from another"
             f" build of corpus {corpus_name}, so it could hold this build's"
-            f" validation texts. Train it again on this build: {command}"
-            f" --name {tokenizer_name}"
+            " validation texts. Train it again on this build:"
+            f" {command} --name {tokenizer_name}"
         )
 
 
@@ -924,7 +933,7 @@ def train(config, seed, overrides, inputs, outputs):
             inputs, values["corpus"]
         )
         tokenizer, tokenizer_manifest = read_tokenizer(inputs, values["tokenizer"])
-        check_tokenizer_corpus(
+        check_tokenizer_build(
             values["corpus"], values["tokenizer"], tokenizer_manifest, corpus_manifest
         )
         settings = apply_config(values)

@@ -222,6 +222,28 @@ def manifest(
     }
 
 
+def tokenizer_train_command(corpus_name, tokenizer_manifest):
+    """The command that trains a tokenizer on a corpus, with another tokenizer's settings.
+
+    The manifest gives the vocabulary size and the minimum frequency, so the
+    command learns a vocabulary as that tokenizer did, from this corpus.
+
+    Args:
+        corpus_name (str): The corpus to learn from.
+        tokenizer_manifest (dict): The manifest of the tokenizer whose
+            settings it keeps.
+
+    Returns:
+        str: The command.
+    """
+    tokenizer_settings = tokenizer_manifest["settings"]
+    return (
+        f"python -m embedding_model tokenizer train --corpus {corpus_name}"
+        f" --vocab-size {tokenizer_settings['vocab_size']}"
+        f" --min-frequency {tokenizer_settings['min_frequency']}"
+    )
+
+
 def read_tokenizer(inputs, name):
     """A trained tokenizer and its manifest, checked against each other.
 

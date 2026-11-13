@@ -779,37 +779,86 @@ class TestTrain:
     def test_a_tokenizer_from_another_corpus_or_build_is_refused(self):
         """A tokenizer is refused when it learned from another corpus, or from another build of this one.
 
-        Each message gives the command that trains one on this build, at the
-        tokenizer's own size, 8,000 tokens. The build is told by the
-        checksum of the pairs that the tokenizer learned from.
+        Each message gives the command that trains one on this build, with
+        the tokenizer's own settings: 8,000 tokens, a minimum frequency of 3.
+        A build is told by the content of the pairs that the tokenizer
+        learned from, as manifests.file_identity compares a table.
         """
-        learned_files = {"pairs.parquet": {"sha256": "abcd1234"}}
+        learned_pairs_entry = {
+            "rows": 12,
+            "sha256": "abcd1234",
+            "content_sha256": "efab5678",
+        }
         tokenizer_manifest = {
             "sources": [
-                {"role": "corpus", "name": "efgh-corpus", "files": learned_files}
+                {
+                    "role": "corpus",
+                    "name": "efgh-corpus",
+                    "files": {"pairs.parquet": learned_pairs_entry},
+                }
             ],
-            "settings": {"vocab_size": 8000},
+            "settings": {"vocab_size": 8000, "min_frequency": 3},
         }
-        corpus_manifest = {"files": learned_files}
+        corpus_manifest = {"files": {"pairs.parquet": learned_pairs_entry}}
         with pytest.raises(
             ValueError, match="learned its vocabulary from efgh-corpus"
         ) as refused:
-            train.check_tokenizer_corpus(
+            train.check_tokenizer_build(
                 "abcd-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
             )
-        assert "tokenizer train --corpus abcd-corpus --vocab-size 8000" in str(
-            refused.value
-        )
-        rebuilt_manifest = {"files": {"pairs.parquet": {"sha256": "efgh5678"}}}
+        assert (
+            "python -m embedding_model tokenizer train --corpus abcd-corpus"
+            " --vocab-size 8000 --min-frequency 3. It is named abcd-corpus-8k"
+        ) in str(refused.value)
+        rebuilt_manifest = {
+            "files": {
+                "pairs.parquet": {
+                    **learned_pairs_entry,
+                    "sha256": "bcde2345",
+                    "content_sha256": "cdef9012",
+                }
+            }
+        }
         with pytest.raises(
-            ValueError, match="an earlier build of corpus efgh-corpus"
+            ValueError, match="another build of corpus efgh-corpus"
         ) as refused:
-            train.check_tokenizer_corpus(
+            train.check_tokenizer_build(
                 "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, rebuilt_manifest
             )
-        assert "--vocab-size 8000 --name efgh-corpus-8k" in str(refused.value)
-        train.check_tokenizer_corpus(
+        assert (
+            "python -m embedding_model tokenizer train --corpus efgh-corpus"
+            " --vocab-size 8000 --min-frequency 3 --name efgh-corpus-8k"
+        ) in str(refused.value)
+        train.check_tokenizer_build(
             "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
+        )
+
+    def test_a_tokenizer_of_the_same_pairs_written_again_is_kept(self):
+        """Pairs whose file was written again, with other bytes but the same content, are the same build.
+
+        A parquet file's bytes depend on the library that wrote it, so only
+        its rows and its content's checksum tell a build.
+        """
+        learned_pairs_entry = {
+            "rows": 12,
+            "sha256": "abcd1234",
+            "content_sha256": "efab5678",
+        }
+        tokenizer_manifest = {
+            "sources": [
+                {
+                    "role": "corpus",
+                    "name": "efgh-corpus",
+                    "files": {"pairs.parquet": learned_pairs_entry},
+                }
+            ],
+            "settings": {"vocab_size": 8000, "min_frequency": 3},
+        }
+        written_again_manifest = {
+            "files": {"pairs.parquet": {**learned_pairs_entry, "sha256": "bcde2345"}}
+        }
+        train.check_tokenizer_build(
+            "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, written_again_manifest
         )
 
     @pytest.mark.parametrize("seed", [-1, 2**32])

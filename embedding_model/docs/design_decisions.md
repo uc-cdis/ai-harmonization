@@ -2403,8 +2403,9 @@ same texts:
   result.
 - Good, because a tokenizer of another corpus, or of another build, is
   refused. Its training pairs can hold this build's validation pairs. The
-  tokenizer's manifest records the checksum of the pairs that it learned
-  from, so a rebuilt corpus is told apart.
+  tokenizer's manifest records the pairs that it learned from. They are
+  compared by their rows and content, as every manifest compares a table. So
+  the same pairs, written again on another machine, are still accepted.
 - Good, because
   [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243) found,
   across languages, that the fertility and the share of words split matter.
@@ -2434,8 +2435,11 @@ same texts:
   ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
 - spellings of one text count once
   ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
-- a run refuses a tokenizer of another corpus or another build, with the
-  command that trains one on this build, at the same size
+- a run refuses a tokenizer of another corpus or another build. Its message
+  gives the command that trains one on this build, with the same vocabulary
+  size and minimum frequency
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
+- a run keeps a tokenizer whose pairs were only written again
   ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py)).
 
 ### Five special tokens

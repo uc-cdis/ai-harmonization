@@ -66,11 +66,11 @@ class TestGithubArchive:
         cached = MagicMock(return_value=b"archive")
         monkeypatch.setattr(download, "cached", cached)
         archive = download.github_archive(
-            "https://github.com/abcd/docs", "abcd1234", tmp_path
+            "https://github.com/abcd-org/docs", "abcd1234", tmp_path
         )
         assert archive == b"archive"
         cached.assert_called_once_with(
-            "https://codeload.github.com/abcd/docs/tar.gz/abcd1234",
+            "https://codeload.github.com/abcd-org/docs/tar.gz/abcd1234",
             tmp_path / "abcd1234.tar.gz",
         )
 

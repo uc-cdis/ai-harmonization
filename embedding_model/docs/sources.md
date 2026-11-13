@@ -80,8 +80,9 @@ joins them with `|`.
 
 Each source's main table has an `open` column. It is `true` when the item may
 be used, by the source's rule in
-[Restricted items](licenses.md#restricted-items). Other tables have no `open`:
-a row counts as open when its item is.
+[Restricted items](licenses.md#restricted-items). A few other tables have an
+`open` of their own, such as PhenX's `protocols`. In a table without one, a
+row counts as open when its item is.
 
 ### `<source>/manifest.json`
 
@@ -230,7 +231,7 @@ year, and loinc.org lists them. To use a newer one, write its number as the
 release's `version`, and delete the release's `md5`: the old checksum belongs
 to the old release. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. The fetch
-writes the new release's MD5 into it.
+writes the new release's MD5 into the manifest.
 
 [licenses.md](licenses.md#loinc) gives its license and reference.
 

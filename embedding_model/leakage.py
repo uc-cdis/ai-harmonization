@@ -39,10 +39,10 @@ two kinds:
   For example, a benchmark maps the variable ``body_weight`` to
   ``vitals.weight``. Then the pair ``Weight`` -> ``Body Weight`` is an answer
   key: its positive matches the source variable, and its anchor matches the
-  expected target. A pair with the same item, anchor and canonical as an
-  answer key goes with it: an anchor gives a ``name`` pair, and a
-  ``name_description`` pair when the canonical has a description. Often only
-  the second holds the description that matches.
+  expected target. A pair whose anchor name and positive name read as an
+  answer key's goes with it, as its twin: an anchor gives a ``name`` pair,
+  and a ``name_description`` pair when the canonical has a description.
+  Often only the second holds the description that matches.
 - ``benchmark_study``, the study rule: the pair's ``study`` holds the source
   study of a benchmark row. For example, a benchmark row comes from the study
   ``phs999901``. Then every pair made from a dbGaP variable of ``phs999901``
@@ -391,8 +391,9 @@ def answer_key_twins(sides, answer_key_findings):
     canonical has a description. The second holds that description, which can
     match the target while the first matches nothing. Kept, the first would
     still pair the source's text with the canonical of the answer key. The
-    names are compared by their ``text_key``, as the model reads them. So a
-    pair of another item or source that reads the same is a twin too.
+    names are compared by their ``text_key``, which ignores case, accents
+    and punctuation. So a pair of another item or source that reads the same
+    is a twin too.
 
     Args:
         sides (pd.DataFrame): The pairs' side texts, from ``side_text_keys``.
@@ -418,12 +419,12 @@ def answer_key_twins(sides, answer_key_findings):
         .drop(columns="pair")
         .merge(names, on=identity)
     )
-    finding = ["pair", "benchmark"]
+    finding_key = ["pair", "benchmark"]
     is_answer_key = twins.merge(
-        answer_key_findings[finding], on=finding, how="left", indicator="found"
+        answer_key_findings[finding_key], on=finding_key, how="left", indicator="found"
     ).found.eq("both")
     twins = twins[~is_answer_key.to_numpy()]
-    return twins.assign(fields=TWIN + twins.fields).drop_duplicates(finding)[
+    return twins.assign(fields=TWIN + twins.fields).drop_duplicates(finding_key)[
         list(answer_key_findings.columns)
     ]
 

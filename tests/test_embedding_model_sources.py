@@ -606,8 +606,8 @@ class TestCdisc:
             + "\n"
             + "\t".join(
                 [
-                    "C99999",
-                    "C99998",
+                    "C999901",
+                    "C999902",
                     "",
                     "Abcd",
                     "NA",
@@ -623,7 +623,7 @@ class TestCdisc:
 
     def test_quotes_are_text_and_a_lost_column_is_an_error(self):
         """A cell starting with a quote is read as written; a missing column raises."""
-        row = ["C99999", "C99998", "", "Abcd", '"Abcd', "", "Abcd", "Abcd"]
+        row = ["C999901", "C999902", "", "Abcd", '"Abcd', "", "Abcd", "Abcd"]
         package_text = "\t".join(cdisc.COLUMNS) + "\n" + "\t".join(row)
         frame = cdisc.read_package(package_text.encode(), "sdtm")
         assert frame["CDISC Submission Value"].tolist() == ['"Abcd']

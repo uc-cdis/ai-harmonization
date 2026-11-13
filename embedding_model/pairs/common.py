@@ -593,17 +593,17 @@ def distinct(texts, canonical):
     ``Abcd``. Equal texts become one text. It keeps the first spelling and the
     studies of all of them.
     """
-    by_key, canonical_key = {}, normalised_text(canonical)
+    by_name_key, canonical_name_key = {}, normalised_text(canonical)
     for text in texts:
-        text_key = normalised_text(text.text)
-        if text_key and text_key != canonical_key and is_name(text.text):
-            first = by_key.setdefault(text_key, text)
+        name_key = normalised_text(text.text)
+        if name_key and name_key != canonical_name_key and is_name(text.text):
+            first = by_name_key.setdefault(name_key, text)
             if text.study and text.study != first.study:
                 study = joined_studies([first.study, text.study])
-                by_key[text_key] = Text(
+                by_name_key[name_key] = Text(
                     first.text, first.term_type, first.question, study
                 )
-    return list(by_key.values())
+    return list(by_name_key.values())
 
 
 def item_pairs(

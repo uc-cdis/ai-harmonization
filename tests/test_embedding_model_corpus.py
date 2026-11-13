@@ -191,7 +191,7 @@ class TestLeakage:
                 pair(
                     "SMOKING-status", "smoking.", source="efgh-source", item="C999902"
                 ),
-                pair("smoking_status", "Physical activity"),
+                pair("smoking_status", "Tobacco use"),
             ]
         )
         findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
@@ -328,8 +328,14 @@ class TestLeakage:
     def test_benchmark_texts_are_cleaned_and_named_after_their_last_dot(self):
         """A benchmark's texts are cleaned before keying, as the pairs' texts were."""
         mappings = MAPPINGS.assign(
-            source_description=["Waist &amp; hip <b>in cm</b>", ""],
-            expected_target=["node1.sub.waist_circumference", "node4.alcohol_use"],
+            source_description=[
+                "Waist <b>circumference</b>, in cm &amp; at the navel",
+                "",
+            ],
+            expected_target=[
+                "node1.sub.waist_circumference",
+                MAPPINGS.expected_target[1],
+            ],
         )
         targets = TARGETS.assign(
             target_property=[
@@ -338,7 +344,7 @@ class TestLeakage:
             ]
         )
         sources, expected = leakage.benchmark_texts("abcd-benchmark", targets, mappings)
-        assert "waist hip in cm" in set(sources.text_key)
+        assert "waist circumference in cm at the navel" in set(sources.text_key)
         assert "waist circumference" in set(expected.text_key)
 
     def test_text_keys_are_those_of_pairs(self):

@@ -382,7 +382,7 @@ check that:
 
 **Context.** The GDC benchmark's targets come from a release of
 [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). The benchmark's
-manifest pins it by its commit, with the SHA-256 of the release's archive.
+manifest pins it by its commit.
 Each node is a YAML file, which refers to shared definitions by `$ref`. The
 release's own loader, `GDCDictionary`, needs `jsonschema` and `pyyaml`. On
 PyPI, the name `gdcdictionary` holds another package, a "Gen3 generic data
@@ -396,7 +396,8 @@ definition over the node's own keys, as `GDCDictionary` merges it.
 **Consequences.**
 
 - Good, because the dictionary is pinned like every other input, by its
-  committed manifest. `benchmarks build --gdc --update-manifest` updates it.
+  committed manifest. A newer release is its commit, written in the
+  manifest, and a build with `--update-manifest` accepts it.
 - Good, because the build runs no code from the download.
 - Good, because `referencing` adds no package: `uv.lock` holds it already, as
   a dependency of `jsonschema`, which
@@ -421,6 +422,11 @@ definition over the node's own keys, as `GDCDictionary` merges it.
   stops with an error. It would also add three packages, dictionaryutils,
   gen3dictionary and cdislogging, for a few lines of our code. And it requires
   `jsonschema` 4.23.0 or below, which the repository's lock would then hold.
+- The dictionary that GDC's API serves, at `/v0/submission/_dictionary/_all`
+  ([GDC's submission API](https://docs.gdc.cancer.gov/API/Users_Guide/Submission/)).
+  It serves only the dictionary that GDC uses now, which can change without
+  notice. So a later build could not read the pinned release. Its schemas
+  still hold `$ref`s, which the build would resolve all the same.
 
 **Confirmation.** The tests in
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
@@ -455,7 +461,9 @@ computes it.
 - Good, because each correction names its unit and its reason, so a reader
   can check it in that unit's function.
 - Good, because a correction that does not match the documentation fails
-  the build. A newer commit cannot leave a stale one in place.
+  the build. A newer commit cannot leave a stale one in place. The build
+  matches a correction by its variable and its target. It does not check
+  the correction's harmonization unit.
 - Bad, because the corrections come from reading each unit's function by
   hand. A newer commit of the documentation needs them reviewed.
 - Bad, because some corrections rest on a judgment that could go the other
@@ -2097,10 +2105,9 @@ check that:
 **Described in:** [leakage.md](leakage.md).
 
 **Context.** A model trained on a benchmark's mappings has seen its expected
-targets. Its score there would look too good. An anchor gives twin pairs, a
-`name` pair and a `name_description` pair: two
-[kinds](pairs.md#the-shape-a-star-around-each-item) of pair. Often only the
-second matches a benchmark row. Some sources hold
+targets. Its score there would look too good. An anchor with a described
+canonical gives twin pairs, a `name` pair and a `name_description` pair.
+Often only the second matches a benchmark row. Some sources hold
 variables of the benchmarks' own [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)
 studies: [PhenX](sources.md#phenx) maps its variables to dbGaP study variables.
 A word such as `age` occurs in many pairs and in many benchmark rows.

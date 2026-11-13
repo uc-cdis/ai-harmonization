@@ -15,7 +15,10 @@ is the dataset whose folder holds the variable's documentation
 (``atherosclerosis``). The property is the phenotype (``cac_score_1``), or the
 age at measurement (``age_at_cac_score_1``) where the variable has one. A
 component variable maps to the age when its dbGaP description says "age", and
-to the phenotype otherwise.
+to the phenotype otherwise. A reviewed list, ``topmed_corrections.csv``, then
+corrects these mappings: it removes the ones whose variable does not carry
+the target's value, and maps a variable to the age that its unit computes
+from it.
 """
 
 import csv
@@ -388,7 +391,7 @@ def apply_corrections(rows, corrections, targets):
     if stale:
         raise ValueError(
             f"{len(stale)} corrections do not match the documentation; review "
-            f"{CORRECTIONS.name}: " + "; ".join(stale[:12])
+            f"{CORRECTIONS}: " + "; ".join(stale[:12])
         )
     return [
         {**row, "expected_target": sorted(expected[row["source_variable_id"]])}

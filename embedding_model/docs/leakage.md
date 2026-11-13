@@ -140,9 +140,9 @@ canonical and its description. Often only
 the second matches a benchmark row, by its description. A pair whose anchor
 name and positive name read as an answer key's is its twin. The twin is
 dropped with the answer key, for the same benchmark row. The names are
-compared by their `text_key`, as the model reads them, so a pair of another
-item or source can be a twin too. In `dropped.parquet`, a twin's `fields` are
-its answer key's, after `twin of: `. For example:
+compared by their `text_key`, which ignores case, accents and punctuation.
+So a pair of another item or source can be a twin too. In `dropped.parquet`,
+a twin's `fields` are its answer key's, after `twin of: `. For example:
 
 ```
 twin of: anchor name = source name, positive description = target description

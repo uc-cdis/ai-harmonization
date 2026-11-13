@@ -311,7 +311,7 @@ class TestStar:
     """Pairs around each item's canonical, the same for every source."""
 
     def test_each_text_twice_and_each_other_description_once(self):
-        """Each text gives two pairs, and each other description that differs from the first gives one pair."""
+        """Each text gives two pairs, and each other description gives one pair, unless it is the first in another case or punctuation."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -1265,7 +1265,7 @@ class TestPhenx:
     """PhenX's variables and their dbGaP mappings."""
 
     def test_variables(self, capsys):
-        """Visible variables only, closed ones marked; comparable mappings with their studies."""
+        """Visible variables only, closed ones marked; comparable mappings with their studies; a new map_level is printed, and not used."""
         tables = {
             "variables": table(
                 id=["1", "2", "3"],
@@ -1317,7 +1317,7 @@ class TestPhenx:
         assert phenx.unquoted('"Abcd" or "efgh"?') == '"Abcd" or "efgh"?'
 
     def test_value_labels(self):
-        """Codes are taken off; ranges list no values; a tab also separates entries.
+        """Codes are taken off; ranges list no values; a vertical tab also separates entries.
 
         An explanation on the right is not the label: in "Yes = Classify as a
         user", the label is Yes.

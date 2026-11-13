@@ -42,8 +42,8 @@ SHARED_SCHEMAS = {
     "_terms.yaml",
     "_terms_enum.yaml",
 }
-# The root of GDC's graph, whose one property beside its id is the
-# dictionary's schema version, not data.
+# The root of GDC's graph, whose one property beside its id and its type is
+# the dictionary's schema version, not data.
 NOT_NODES = {"root"}
 
 # The ground truth names a property, not a node. So a property that several
@@ -293,11 +293,12 @@ def column_type_and_values(column):
     column of numbers is an ``integer`` or a ``float``, without values: its
     values are measurements, not categories. A column counts as numbers when
     more than half of its values are numbers, so a few values such as
-    ``unknown`` do not make it a column of categories. Any other column is
-    ``string/encoded``, as a variable with value codes is. Its values are
-    listed most frequent first, so a formatter that shows only some shows the
-    most common ones. Values that are equally frequent keep their order in the
-    table.
+    ``unknown`` do not make it a column of categories. A column of True and
+    False is two categories, though pandas counts it as numbers. Any other
+    column is ``string/encoded``, as a variable with value codes is. Its
+    values are listed most frequent first, so a formatter that shows only
+    some shows the most common ones. Values that are equally frequent keep
+    their order in the table.
 
     Args:
         column (pd.Series): The column, as read_source_table gives it.
@@ -307,7 +308,10 @@ def column_type_and_values(column):
     """
     non_missing = column.dropna()
     numbers = pd.to_numeric(non_missing, errors="coerce").dropna()
-    if pd.api.types.is_numeric_dtype(column) or len(numbers) > len(non_missing) / 2:
+    is_numbers = (
+        pd.api.types.is_numeric_dtype(column) or len(numbers) > len(non_missing) / 2
+    )
+    if is_numbers and not pd.api.types.is_bool_dtype(column):
         calculated = "integer" if (numbers % 1 == 0).all() else "decimal"
         return resolve_variable_type(calculated, None, has_codes=False), []
     text = non_missing.astype(str)

@@ -223,7 +223,7 @@ class TestBuilders:
     GDC_PIN = {"name": gdc.GROUND_TRUTH, "role": "mappings", "version": "999999",
                "location": "https://doi.org/10.5281/zenodo.999999"}  # fmt: skip
     DICTIONARY_PIN = {"name": gdc.DICTIONARY, "role": "targets", "version": "abcd1234",
-                      "location": "https://github.com/abcd/gdcdictionary"}  # fmt: skip
+                      "location": "https://github.com/abcd-org/gdcdictionary"}  # fmt: skip
 
     def test_gdc_reads_its_dictionary_at_the_pinned_commit(self, monkeypatch, tmp_path):
         """The dictionary's release is fetched at the manifest's commit and recorded as pinned."""
@@ -244,7 +244,7 @@ class TestBuilders:
             tmp_path, {"sources": [self.GDC_PIN, self.DICTIONARY_PIN]}
         )
         assert fetched == [
-            ("https://github.com/abcd/gdcdictionary", "abcd1234", tmp_path)
+            ("https://github.com/abcd-org/gdcdictionary", "abcd1234", tmp_path)
         ]
         assert [target["target_property"] for target in targets] == ["case.abcd_score"]
         assert sources[-1] == self.DICTIONARY_PIN
@@ -958,10 +958,18 @@ class TestColumnTypeAndValues:
         column = pd.Series([0.85, 0.9])
         assert gdc.column_type_and_values(column) == ("float", [])
 
-    def test_a_column_mostly_of_numbers_is_a_number(self):
-        """A text column whose values are mostly numbers is a number."""
+    def test_a_column_mostly_of_whole_numbers_is_an_integer(self):
+        """A text column whose values are mostly whole numbers is an integer."""
         column = pd.Series(["64", "unknown", "58", None])
         assert gdc.column_type_and_values(column) == ("integer", [])
+
+    def test_a_column_of_true_and_false_is_two_categories(self):
+        """A column that pandas reads as True and False, such as a tumor's recurrence, is string/encoded, not an integer."""
+        column = pd.Series([False, True, False])
+        assert gdc.column_type_and_values(column) == (
+            "string/encoded",
+            ["False", "True"],
+        )
 
     def test_a_column_of_categories_lists_the_most_frequent_first(self):
         """A column of categories is string/encoded, most frequent first; ties keep the table's order."""

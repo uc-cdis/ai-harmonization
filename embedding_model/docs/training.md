@@ -192,10 +192,12 @@ Most are settings of transformers'
 such as `learning_rate` and `num_train_epochs`. sentence-transformers adds a
 few of its own, in
 [`SentenceTransformerTrainingArguments`](https://sbert.net/docs/package_reference/sentence_transformer/training_args.html).
-Both pages give the library's defaults. A run refuses three settings:
+Both pages give the library's defaults. A run refuses four settings:
 [`prompts` and `router_mapping`](design_decisions.md#a-run-refuses-the-trainers-prompts-and-router_mapping),
-and
-[`load_best_model_at_end`](design_decisions.md#the-model-kept-is-the-model-at-the-last-step).
+and `load_best_model_at_end` and `resume_from_checkpoint`, since
+[the model kept is the model at the last step](design_decisions.md#the-model-kept-is-the-model-at-the-last-step)
+and a run saves no checkpoint. For the same reason, `save_strategy` must stay
+`no`.
 
 This pipeline changes some of the defaults. Some come from Hugging Face's
 [recipe for static models](https://huggingface.co/blog/static-embeddings), and
@@ -302,8 +304,9 @@ says why.
    the last evaluation. When the last step was not evaluated, the run
    evaluates the model once more.
 
-A note is printed when the tokenizer learned its vocabulary from another
-corpus.
+A tokenizer that learned its vocabulary from another corpus is refused: it
+could hold this corpus's validation texts. The message names the command
+that trains one on this corpus.
 
 ### GPUs and CPUs
 

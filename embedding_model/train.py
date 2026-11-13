@@ -66,8 +66,8 @@ TRAINING_DEFAULTS = {
 # approaches of ai-harmonization embed both sides with the same encode call, in
 # embed_query and embed_documents. It adds only the model's default prompt and
 # takes a Router's default route, so a prompt or a route for each side would
-# be lost in use. A run keeps the model at the last step, so it loads no
-# checkpoint.
+# be lost in use. A run keeps the model at the last step, so it saves no
+# checkpoint, and has none to load or to resume from.
 REFUSED_TRAINING = {
     "prompts": (
         "the approaches embed both sides with the same encode call, which adds"
@@ -77,6 +77,7 @@ REFUSED_TRAINING = {
     "load_best_model_at_end": (
         "a run keeps the model at the last step, and saves no checkpoint"
     ),
+    "resume_from_checkpoint": "a run saves no checkpoint to resume from",
 }
 
 
@@ -287,6 +288,15 @@ def read_config(path, seed, overrides=(), run_name=None):
     if unused:
         raise ValueError(f"not a setting: {' '.join(unused)}")
     values = vars(parsed)
+    # A run's config.yaml records save_strategy, at its default, so only
+    # another value is refused.
+    save_strategy = getattr(values["save_strategy"], "value", values["save_strategy"])
+    if save_strategy != TRAINING_DEFAULTS["save_strategy"]:
+        raise ValueError(
+            f"{path}: save_strategy must be {TRAINING_DEFAULTS['save_strategy']!r},"
+            f" not {save_strategy!r}: a run keeps the model at the last step, and"
+            " saves no checkpoint"
+        )
     if values["corpus"] is None or values["tokenizer"] is None:
         raise ValueError(
             f"{path}: the data section must name the corpus and the tokenizer"
@@ -409,29 +419,35 @@ def device_name(training):
     return torch.cuda.get_device_name(0)
 
 
-def tokenizer_note(corpus_name, tokenizer_name, tokenizer_manifest):
-    """A note when the tokenizer learned its vocabulary from another corpus.
+def check_tokenizer_corpus(corpus_name, tokenizer_name, tokenizer_manifest):
+    """Refuse a tokenizer that learned its vocabulary from another corpus.
+
+    A tokenizer learns only from its own corpus's training pairs. Another
+    corpus's training pairs can hold this corpus's validation pairs, so the
+    vocabulary could depend on the texts that judge the model.
 
     Args:
         corpus_name (str): The corpus that the run trains on.
         tokenizer_name (str): The tokenizer's name.
         tokenizer_manifest (dict): The tokenizer's manifest.
 
-    Returns:
-        str | None: The note, or None when the tokenizer learned from this
-            corpus.
+    Raises:
+        ValueError: If the tokenizer learned from another corpus, with the
+            command that trains one on this corpus.
     """
     learned_from = {
         source["name"]
         for source in tokenizer_manifest["sources"]
         if source["role"] == "corpus"
     }
-    if corpus_name in learned_from:
-        return None
-    return (
-        f"  note: tokenizer {tokenizer_name} learned its vocabulary from"
-        f" {', '.join(sorted(learned_from))}, not from corpus {corpus_name}"
-    )
+    if corpus_name not in learned_from:
+        raise ValueError(
+            f"tokenizer {tokenizer_name} learned its vocabulary from"
+            f" {', '.join(sorted(learned_from))}, not from corpus {corpus_name},"
+            " so it could hold this corpus's validation texts. Train one on"
+            " this corpus: python -m embedding_model tokenizer train --corpus"
+            f" {corpus_name}"
+        )
 
 
 def read_splits(inputs, corpus_name):
@@ -890,6 +906,9 @@ def train(config, seed, overrides, inputs, outputs):
             inputs, values["corpus"]
         )
         tokenizer, tokenizer_manifest = read_tokenizer(inputs, values["tokenizer"])
+        check_tokenizer_corpus(
+            values["corpus"], values["tokenizer"], tokenizer_manifest
+        )
         settings = apply_config(values)
         check_earlier_run(destination, settings, seed, run_name)
     except Exception as error:
@@ -904,12 +923,6 @@ def train(config, seed, overrides, inputs, outputs):
         f"  {len(training_pairs):,} training pairs,"
         f" {len(validation_pairs):,} validation pairs"
     )
-    note = tokenizer_note(
-        data_settings.corpus, data_settings.tokenizer, tokenizer_manifest
-    )
-    if note:
-        print(note)
-
     # Read before training, so that a change to the checkout during a long run
     # does not change the commit that the run writes.
     commit = code_commit()

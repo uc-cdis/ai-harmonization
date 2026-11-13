@@ -2386,15 +2386,14 @@ The validation loss and the benchmark scores judge a model.
 word occurs.
 
 **Decision.** The tokenizer learns from the training pairs' distinct texts,
-each once after normalisation. Four [diagnostics](tokenizer.md#diagnostics)
-are measured on the same texts:
+each once after normalisation. A run refuses a tokenizer that learned from
+another corpus. Four [diagnostics](tokenizer.md#diagnostics) are measured on
+the same texts:
 
 - the fertility, the tokens per word;
 - the share of words split;
 - the unknown rate;
 - the share of the vocabulary used.
-
-They are a sanity check, not a measure of quality.
 
 **Consequences.**
 
@@ -2402,14 +2401,17 @@ They are a sanity check, not a measure of quality.
   any new text.
 - Good, because nothing that makes a choice looks at the data that judges the
   result.
+- Good, because a tokenizer of another corpus is refused. That corpus's
+  training pairs can hold this corpus's validation pairs.
 - Good, because
   [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243) found,
   across languages, that the fertility and the share of words split matter.
   A lower fertility and a smaller share of continued words, their name for
   words split, "correlate with an increase in downstream performance".
 - Bad, because the diagnostics are measured on the training texts, which the
-  tokenizer learned from. So they look a little better than on new texts. A
-  broken tokenizer still gives bad numbers on them. Examples are an unknown
+  tokenizer learned from. So they look a little better than on new texts, and
+  are a sanity check, not a measure of quality. A broken tokenizer still
+  gives bad numbers on them. Examples are an unknown
   rate above 0, and a high fertility when words are cut into single letters.
 
 **Alternatives considered.**
@@ -2420,13 +2422,19 @@ They are a sanity check, not a measure of quality.
 - A pretrained tokenizer, such as a released model's: its vocabulary was
   learned from other texts, and its size is fixed. A rare word of the corpus,
   such as a variable's short name, would more often be cut into pieces.
+- A note, rather than a refusal, for a tokenizer of another corpus: the run
+  would still train on a vocabulary that this corpus's validation texts may
+  have shaped.
 
-**Confirmation.** The tests in
-[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
-check that:
+**Confirmation.** The tests check that:
 
-- only training texts shape the vocabulary;
-- spellings of one text count once.
+- only training texts shape the vocabulary
+  ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
+- spellings of one text count once
+  ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
+- a run refuses a tokenizer of another corpus, with the command that trains
+  one on its corpus
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py)).
 
 ### Five special tokens
 
@@ -2955,9 +2963,10 @@ of them at the end, by a validation metric. By default, it keeps the model at
 the last step. Its learning rate decays linearly to zero over the run. An
 experiment compares its runs by their validation metrics.
 
-**Decision.** A run keeps the model at the last step: a config that sets
-`load_best_model_at_end` is refused, and no checkpoint is saved. The run
-writes that model's validation metrics.
+**Decision.** A run keeps the model at the last step, and saves no
+checkpoint. A config that sets `load_best_model_at_end` or
+`resume_from_checkpoint`, or a `save_strategy` other than `no`, is refused.
+The run writes that model's validation metrics.
 
 **Consequences.**
 
@@ -2968,6 +2977,11 @@ writes that model's validation metrics.
   changes little at the end.
 - Good, because nothing is saved during training, so a run writes only its
   model.
+- Good, because a setting that the run cannot honour stops it at once,
+  rather than doing nothing. The trainer does not read
+  `resume_from_checkpoint` itself
+  ([`TrainingArguments`](https://huggingface.co/docs/transformers/v5.17.0/en/main_classes/trainer#transformers.TrainingArguments)),
+  and another `save_strategy` would write checkpoints that nothing reads.
 - Bad, because a run that peaks early keeps a later, worse model. The loss
   curve shows it, and an experiment can then try fewer epochs.
 
@@ -2984,7 +2998,10 @@ writes that model's validation metrics.
 check that:
 
 - a run writes the model at the last step, and no checkpoint;
-- a config that sets `load_best_model_at_end` is refused.
+- a config that sets `load_best_model_at_end` or `resume_from_checkpoint` is
+  refused;
+- a `save_strategy` other than `no` is refused, in the config or as a flag,
+  and `no` is read.
 
 ### Validation pairs are ranked, with MRR@10
 

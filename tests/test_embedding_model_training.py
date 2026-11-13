@@ -338,6 +338,11 @@ class TestConfig:
                 [],
                 "load_best_model_at_end setting cannot be used",
             ),
+            (
+                {},
+                ["--resume_from_checkpoint", "abcd-run/trainer"],
+                "resume_from_checkpoint setting cannot be used",
+            ),
         ],
     )
     def test_a_setting_that_a_run_cannot_honour_is_refused(
@@ -348,6 +353,24 @@ class TestConfig:
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
         with pytest.raises(ValueError, match=message):
             train.read_config(path, 0, overrides)
+
+    @pytest.mark.parametrize(
+        "training, overrides",
+        [({"save_strategy": "epoch"}, []), ({}, ["--save_strategy", "steps"])],
+    )
+    def test_a_save_strategy_but_no_is_refused(self, tmp_path, training, overrides):
+        """save_strategy other than "no" is refused, in the config or as a flag; "no", as config.yaml records it, is read."""
+        path = tmp_path / "abcd-run.yaml"
+        path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
+        with pytest.raises(ValueError, match="save_strategy must be 'no'"):
+            train.read_config(path, 0, overrides)
+        path.write_text(
+            yaml.safe_dump(
+                {"data": CONFIG["data"], "training": {"save_strategy": "no"}}
+            )
+        )
+        values, _ = train.read_config(path, 0)
+        assert values["save_strategy"] == "no"
 
     def test_an_unknown_architecture_is_refused(self, tmp_path):
         """argparse checks choices only for a flag, so read_config checks a config's architecture."""
@@ -747,12 +770,15 @@ class TestTrain:
         assert train.train(path, 0, [], inputs, tmp_path / "outputs") == 1
         assert "tokenizer train --name efgh-tokenizer" in capsys.readouterr().err
 
-    def test_a_tokenizer_from_another_corpus_is_noted(self):
-        """The note names the corpus that the tokenizer learned its vocabulary from."""
+    def test_a_tokenizer_from_another_corpus_is_refused(self):
+        """A tokenizer that learned from another corpus is refused, with the command that trains one on this corpus."""
         manifest = {"sources": [{"role": "corpus", "name": "efgh-corpus"}]}
-        note = train.tokenizer_note("abcd-corpus", "efgh-corpus-8k", manifest)
-        assert "learned its vocabulary from efgh-corpus" in note
-        assert train.tokenizer_note("efgh-corpus", "efgh-corpus-8k", manifest) is None
+        with pytest.raises(
+            ValueError, match="learned its vocabulary from efgh-corpus"
+        ) as refused:
+            train.check_tokenizer_corpus("abcd-corpus", "efgh-corpus-8k", manifest)
+        assert "tokenizer train --corpus abcd-corpus" in str(refused.value)
+        train.check_tokenizer_corpus("efgh-corpus", "efgh-corpus-8k", manifest)
 
     @pytest.mark.parametrize("seed", [-1, 2**32])
     def test_a_seed_out_of_range_is_refused(

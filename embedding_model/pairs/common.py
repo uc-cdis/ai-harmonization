@@ -107,7 +107,8 @@ ESCAPE = re.compile(r"<U\+([0-9A-Fa-f]{4,6})>|\\u([0-9A-Fa-f]{4})")
 # ftfy's default, "auto", leaves the entities of a text that has a "<", such as
 # a tag. uncurl_quotes is off, so quotes stay as the source writes them.
 # Control characters are removed and Unicode is normalised to NFC by these
-# settings too, so a change of ftfy's defaults does not change the clean text.
+# settings too, rather than by ftfy's defaults, since clean's docstring names
+# both as its steps.
 FIXES = ftfy.TextFixerConfig(
     unescape_html=True,
     uncurl_quotes=False,

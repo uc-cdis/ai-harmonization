@@ -419,34 +419,52 @@ def device_name(training):
     return torch.cuda.get_device_name(0)
 
 
-def check_tokenizer_corpus(corpus_name, tokenizer_name, tokenizer_manifest):
-    """Refuse a tokenizer that learned its vocabulary from another corpus.
+def check_tokenizer_corpus(
+    corpus_name, tokenizer_name, tokenizer_manifest, corpus_manifest
+):
+    """Refuse a tokenizer that learned its vocabulary from another corpus, or another build of it.
 
     A tokenizer learns only from its own corpus's training pairs. Another
-    corpus's training pairs can hold this corpus's validation pairs, so the
-    vocabulary could depend on the texts that judge the model.
+    corpus's training pairs, or another build's, can hold this corpus's
+    validation pairs, so the vocabulary could depend on the texts that judge
+    the model. The tokenizer's manifest records the checksum of the pairs
+    that it learned from.
 
     Args:
         corpus_name (str): The corpus that the run trains on.
         tokenizer_name (str): The tokenizer's name.
         tokenizer_manifest (dict): The tokenizer's manifest.
+        corpus_manifest (dict): The corpus's manifest.
 
     Raises:
-        ValueError: If the tokenizer learned from another corpus, with the
-            command that trains one on this corpus.
+        ValueError: If the tokenizer learned from another corpus or another
+            build, with the command that trains one on this build, at the
+            same vocabulary size.
     """
     learned_from = {
-        source["name"]
+        source["name"]: source
         for source in tokenizer_manifest["sources"]
         if source["role"] == "corpus"
     }
+    command = (
+        f"python -m embedding_model tokenizer train --corpus {corpus_name}"
+        f" --vocab-size {tokenizer_manifest['settings']['vocab_size']}"
+    )
     if corpus_name not in learned_from:
         raise ValueError(
             f"tokenizer {tokenizer_name} learned its vocabulary from"
             f" {', '.join(sorted(learned_from))}, not from corpus {corpus_name},"
             " so it could hold this corpus's validation texts. Train one on"
-            " this corpus: python -m embedding_model tokenizer train --corpus"
-            f" {corpus_name}"
+            " this corpus, at the same size, and name it in the config's data"
+            f" section: {command}"
+        )
+    learned_pairs_sha256 = learned_from[corpus_name]["files"]["pairs.parquet"]["sha256"]
+    if learned_pairs_sha256 != corpus_manifest["files"]["pairs.parquet"]["sha256"]:
+        raise ValueError(
+            f"tokenizer {tokenizer_name} learned its vocabulary from an earlier"
+            f" build of corpus {corpus_name}, so it could hold this build's"
+            f" validation texts. Train it again on this build: {command}"
+            f" --name {tokenizer_name}"
         )
 
 
@@ -907,7 +925,7 @@ def train(config, seed, overrides, inputs, outputs):
         )
         tokenizer, tokenizer_manifest = read_tokenizer(inputs, values["tokenizer"])
         check_tokenizer_corpus(
-            values["corpus"], values["tokenizer"], tokenizer_manifest
+            values["corpus"], values["tokenizer"], tokenizer_manifest, corpus_manifest
         )
         settings = apply_config(values)
         check_earlier_run(destination, settings, seed, run_name)

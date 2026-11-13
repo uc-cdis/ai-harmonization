@@ -2386,9 +2386,9 @@ The validation loss and the benchmark scores judge a model.
 word occurs.
 
 **Decision.** The tokenizer learns from the training pairs' distinct texts,
-each once after normalisation. A run refuses a tokenizer that learned from
-another corpus. Four [diagnostics](tokenizer.md#diagnostics) are measured on
-the same texts:
+each once after normalisation. A run refuses a tokenizer of another corpus
+or build. Four [diagnostics](tokenizer.md#diagnostics) are measured on the
+same texts:
 
 - the fertility, the tokens per word;
 - the share of words split;
@@ -2401,8 +2401,10 @@ the same texts:
   any new text.
 - Good, because nothing that makes a choice looks at the data that judges the
   result.
-- Good, because a tokenizer of another corpus is refused. That corpus's
-  training pairs can hold this corpus's validation pairs.
+- Good, because a tokenizer of another corpus, or of another build, is
+  refused. Its training pairs can hold this build's validation pairs. The
+  tokenizer's manifest records the checksum of the pairs that it learned
+  from, so a rebuilt corpus is told apart.
 - Good, because
   [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243) found,
   across languages, that the fertility and the share of words split matter.
@@ -2422,9 +2424,9 @@ the same texts:
 - A pretrained tokenizer, such as a released model's: its vocabulary was
   learned from other texts, and its size is fixed. A rare word of the corpus,
   such as a variable's short name, would more often be cut into pieces.
-- A note, rather than a refusal, for a tokenizer of another corpus: the run
-  would still train on a vocabulary that this corpus's validation texts may
-  have shaped.
+- A note, rather than a refusal, for a tokenizer of another corpus or
+  build. The run would then train on a vocabulary that this build's
+  validation texts may have shaped.
 
 **Confirmation.** The tests check that:
 
@@ -2432,8 +2434,8 @@ the same texts:
   ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
 - spellings of one text count once
   ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
-- a run refuses a tokenizer of another corpus, with the command that trains
-  one on its corpus
+- a run refuses a tokenizer of another corpus or another build, with the
+  command that trains one on this build, at the same size
   ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py)).
 
 ### Five special tokens

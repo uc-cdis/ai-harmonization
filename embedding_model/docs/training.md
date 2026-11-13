@@ -304,9 +304,10 @@ says why.
    the last evaluation. When the last step was not evaluated, the run
    evaluates the model once more.
 
-A tokenizer that learned its vocabulary from another corpus is refused: it
-could hold this corpus's validation texts. The message names the command
-that trains one on this corpus.
+A tokenizer that learned its vocabulary from another corpus, or from an
+earlier build of this one, is refused. It could hold this build's validation
+texts. The message names the command that trains one on this build, at the
+same vocabulary size.
 
 ### GPUs and CPUs
 

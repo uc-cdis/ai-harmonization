@@ -358,12 +358,18 @@ class TestConfig:
         "training, overrides",
         [({"save_strategy": "epoch"}, []), ({}, ["--save_strategy", "steps"])],
     )
-    def test_a_save_strategy_but_no_is_refused(self, tmp_path, training, overrides):
-        """save_strategy other than "no" is refused, in the config or as a flag; "no", as config.yaml records it, is read."""
+    def test_a_save_strategy_other_than_no_is_refused(
+        self, tmp_path, training, overrides
+    ):
+        """A save_strategy other than "no" is refused, in the config or as a flag."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
         with pytest.raises(ValueError, match="save_strategy must be 'no'"):
             train.read_config(path, 0, overrides)
+
+    def test_a_save_strategy_of_no_is_read(self, tmp_path):
+        """save_strategy "no", which every run's config.yaml records, is read."""
+        path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump(
                 {"data": CONFIG["data"], "training": {"save_strategy": "no"}}
@@ -770,15 +776,41 @@ class TestTrain:
         assert train.train(path, 0, [], inputs, tmp_path / "outputs") == 1
         assert "tokenizer train --name efgh-tokenizer" in capsys.readouterr().err
 
-    def test_a_tokenizer_from_another_corpus_is_refused(self):
-        """A tokenizer that learned from another corpus is refused, with the command that trains one on this corpus."""
-        manifest = {"sources": [{"role": "corpus", "name": "efgh-corpus"}]}
+    def test_a_tokenizer_from_another_corpus_or_build_is_refused(self):
+        """A tokenizer is refused when it learned from another corpus, or from another build of this one.
+
+        Each message gives the command that trains one on this build, at the
+        tokenizer's own size, 8,000 tokens. The build is told by the
+        checksum of the pairs that the tokenizer learned from.
+        """
+        learned_files = {"pairs.parquet": {"sha256": "abcd1234"}}
+        tokenizer_manifest = {
+            "sources": [
+                {"role": "corpus", "name": "efgh-corpus", "files": learned_files}
+            ],
+            "settings": {"vocab_size": 8000},
+        }
+        corpus_manifest = {"files": learned_files}
         with pytest.raises(
             ValueError, match="learned its vocabulary from efgh-corpus"
         ) as refused:
-            train.check_tokenizer_corpus("abcd-corpus", "efgh-corpus-8k", manifest)
-        assert "tokenizer train --corpus abcd-corpus" in str(refused.value)
-        train.check_tokenizer_corpus("efgh-corpus", "efgh-corpus-8k", manifest)
+            train.check_tokenizer_corpus(
+                "abcd-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
+            )
+        assert "tokenizer train --corpus abcd-corpus --vocab-size 8000" in str(
+            refused.value
+        )
+        rebuilt_manifest = {"files": {"pairs.parquet": {"sha256": "efgh5678"}}}
+        with pytest.raises(
+            ValueError, match="an earlier build of corpus efgh-corpus"
+        ) as refused:
+            train.check_tokenizer_corpus(
+                "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, rebuilt_manifest
+            )
+        assert "--vocab-size 8000 --name efgh-corpus-8k" in str(refused.value)
+        train.check_tokenizer_corpus(
+            "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
+        )
 
     @pytest.mark.parametrize("seed", [-1, 2**32])
     def test_a_seed_out_of_range_is_refused(

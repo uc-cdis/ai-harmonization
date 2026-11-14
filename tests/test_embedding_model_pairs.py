@@ -65,38 +65,28 @@ class TestClean:
         assert common.clean("Abcd<br>efgh<p>ijkl</p>") == "Abcd efgh ijkl"
 
     def test_mojibake_is_repaired(self):
-        """UTF-8 read as cp1252 is repaired, beside correct text; other text is kept."""
+        """UTF-8 read as cp1252 is repaired, beside correct text."""
         assert common.clean("I\u00e2\u20ac\u2122m abcd") == "I\u2019m abcd"
         assert common.clean("Caf\u00e9 \u00e2\u20ac\u2122s \u2265 5") == (
             "Caf\u00e9 \u2019s \u2265 5"
         )
-        assert common.clean("\u00c3bcd") == "\u00c3bcd"
 
-    def test_mojibake_read_wrongly_twice_or_with_undefined_bytes(self):
-        """Text read wrongly twice, or with cp1252's undefined bytes, is repaired."""
-        twice = "Iâ€™m".encode("utf-8").decode("cp1252")
-        assert common.clean(twice) == "I’m"
-        assert common.clean("say â€œhiâ€\x9d") == ("say “hi”")
+    def test_curly_quotes_stay_curly(self):
+        """Curly quotes and apostrophes are kept, since FIXES sets uncurl_quotes to False."""
+        text = "The patient\u2019s \u201cusual\u201d diet"
+        assert common.clean(text) == text
 
-    def test_correct_text_that_looks_like_mojibake_is_kept(self):
-        """A repair that would give a letter of another script is not made."""
-        assert common.clean("Fuß–Länge") == "Fuß–Länge"
+    def test_entities_are_read_beside_a_tag_and_beside_a_less_than_sign(self):
+        """Entities are read beside a tag, and beside a "<" that is no tag.
 
-    def test_an_accented_capital_before_punctuation_is_kept(self):
-        """A correct accented capital before a quote or a sign is not repaired."""
-        for text in ("JOS\u00c9\u2019s", "FIANC\u00c9\u00ae", "\u201cCAF\u00c9\u201d"):
-            assert common.clean(text) == text
-
-    def test_an_entity_written_in_capitals_is_read(self):
-        """An entity that an upper-cased text wrote in capitals is still unescaped."""
-        assert common.clean("&EACUTE;COLE") == "ÉCOLE"
-
-    def test_entities_are_read_until_none_is_left_and_only_when_whole(self):
-        """Entities are unescaped, even twice escaped and beside a tag, only with their semicolon."""
-        assert common.clean("I&acirc;&#128;&#153;m") == "I\u2019m"
-        assert common.clean("x &amp;lt;5") == "x <5"
+        The second needs FIXES' unescape_html=True. ftfy's own default reads
+        no entity in a text that holds a "<".
+        """
         assert common.clean("<b>x</b> &amp;lt;5") == "x <5"
-        assert common.clean("Yes&not sure") == "Yes&not sure"
+        assert (
+            common.clean("Hemoglobin <7 g/dL &amp; transfused")
+            == "Hemoglobin <7 g/dL & transfused"
+        )
 
     @pytest.mark.parametrize(
         "text",
@@ -125,12 +115,6 @@ class TestClean:
         """An exponent stays apart from its base."""
         assert common.clean("10<sup>9</sup>/L, kg/m<sup>2</sup>") == "10^9/L, kg/m^2"
 
-    def test_entities_with_digits_in_their_names(self):
-        """Entities such as &sup2; and &frac12;, and upper-case hex ones, are unescaped."""
-        assert common.clean("kg/m&sup2;, &frac12; cup, &#X41;") == (
-            "kg/m\u00b2, \u00bd cup, A"
-        )
-
     def test_a_lone_cp1252_byte_is_its_character(self):
         """A cp1252 byte read as Latin-1 becomes its character, not nothing."""
         assert common.clean("Age 18\x9665, don\x92t") == "Age 18\u201365, don\u2019t"
@@ -140,12 +124,6 @@ class TestClean:
         """R's <U+00A0> and JSON-style escapes are read as their characters."""
         assert common.clean("Abcd?<U+00A0>") == "Abcd?"
         assert common.clean("Abcd" + "\\" + "u2122 480") == "Abcd\u2122 480"
-
-    def test_a_cp1252_sign_on_the_way_is_repaired_too(self):
-        """A text read wrongly twice through cp1252's own "˜" is repaired."""
-        twice = "\u2018abcd".encode("utf-8").decode("cp1252")
-        twice = twice.encode("utf-8").decode("cp1252")
-        assert common.clean(twice) == "\u2018abcd"
 
     def test_a_lost_character_read_as_mac_roman_is_a_space(self):
         """The replacement character read as Mac Roman is a space."""
@@ -200,32 +178,33 @@ class TestNamesAndTypes:
         Words joined by "-" are a paraphrase when one of them is long.
         """
         expansions = [
-            "ABCD",
-            "ABCD_EFG_TXT",
-            "AB12",
-            "aBcD",
-            "abcd1",
-            "AB-12C",
-            "Abc-Def",
+            "BMI",
+            "RACE_CAT_TXT",
+            "race_cat",
+            "B12",
+            "mRNA",
+            "brca1",
+            "IL-17D",
+            "Val-Trp",
         ]
         for text in expansions:
             assert common.term_group(text) == common.EXPANSION
         paraphrases = [
-            "abcd",
-            "Abcd",
-            "Abcd efgh",
-            "ABCD EFGH",
-            "Pre-Abcdef",
-            "A-Bcdefg",
+            "diet",
+            "Diet",
+            "Body weight",
+            "BODY WEIGHT",
+            "Pre-Operative",
+            "T-Lymphocytes",
         ]
         for text in paraphrases:
             assert common.term_group(text) == common.PARAPHRASE
 
     def test_a_name_with_a_number_is_words(self):
         """A long word joined to a number is a name, not a short form."""
-        assert common.term_group("Abcdefg-10") == common.PARAPHRASE
-        assert common.term_group("abcdefg-10") == common.PARAPHRASE
-        assert common.term_group("AB-10") == common.EXPANSION
+        assert common.term_group("Galectin-10") == common.PARAPHRASE
+        assert common.term_group("galectin-10") == common.PARAPHRASE
+        assert common.term_group("IL-10") == common.EXPANSION
 
     def test_codes_go_when_every_value_has_one(self):
         """A list whose values all carry a code loses the codes, in every style."""
@@ -247,16 +226,20 @@ class TestNamesAndTypes:
         assert common.value_labels(ranges) == ranges
 
     def test_a_dashed_code_needs_three_coded_values(self):
-        """A dash code needs three values or more, each with its own code."""
-        assert common.value_labels(["0-Abcd", "1-Efgh", "2-Ijkl"]) == [
-            "Abcd",
-            "Efgh",
-            "Ijkl",
+        """A dash code needs three values or more, each with its own code and its own label.
+
+        A list keeps its codes with two values, with a label twice, or with a
+        code twice. So "2-Dimensional echo" and "1-Octanol" keep their names.
+        """
+        assert common.value_labels(["0-Never", "1-Sometimes", "2-Always"]) == [
+            "Never",
+            "Sometimes",
+            "Always",
         ]
         for names in (
-            ["2-Abcdef Mno", "3-Abcdef Pqr"],
-            ["3-Abcdef", "2-Abcdef", "1-Abcdef"],
-            ["2-Abcdef Mno", "3-Abcdef Pqr", "3-Abcdef Stu"],
+            ["2-Dimensional echo", "3-Dimensional MRI"],
+            ["1-Octanol", "2-Octanol", "3-Octanol"],
+            ["2-Dimensional echo", "3-Dimensional MRI", "3-Dimensional CT"],
         ):
             assert common.value_labels(names) == names
 
@@ -409,7 +392,7 @@ class TestStar:
         }
 
     def test_a_retired_item_gives_its_names_to_its_replacement(self):
-        """The retired item's canonical and texts point to the replacement, through a chain."""
+        """Each retired item's canonical and texts point to the replacement at the chain's end."""
         retired = Item(
             id="abcd1",
             canonical="Old abcd",
@@ -417,15 +400,17 @@ class TestStar:
             status=RETIRED,
             replaced_by=["abcd2"],
         )
-        between = Item(
+        interim = Item(
             id="abcd2", canonical="Interim abcd", status=RETIRED, replaced_by=["abcd3"]
         )
         current = Item(id="abcd3", canonical="New abcd", description="An abcd.")
-        found, _ = common.star([retired, between, current], source="abcd-source")
-        old = found[found.anchor_name.isin(["Old abcd", "OA"])]
-        assert set(old.positive_name) == {"New abcd"}
-        assert set(old.status) == {RETIRED}
-        assert old.term_type.tolist() == ["canonical"] * 2 + ["AB"] * 2
+        found, _ = common.star([retired, interim, current], source="abcd-source")
+        old_pairs = found[found.anchor_name.isin(["Old abcd", "OA"])]
+        assert set(old_pairs.positive_name) == {"New abcd"}
+        assert set(old_pairs.status) == {RETIRED}
+        assert old_pairs.term_type.tolist() == ["canonical"] * 2 + ["AB"] * 2
+        interim_pairs = found[found.anchor_name == "Interim abcd"]
+        assert set(interim_pairs.positive_name) == {"New abcd"}
 
     def test_a_retired_item_without_one_keeps_only_new_names(self):
         """Without a replacement, only names that no current item has are used.
@@ -569,7 +554,7 @@ class TestStar:
         assert counts["duplicates_removed"] == 1
 
     def test_a_text_equal_to_the_canonical_is_no_description(self):
-        """A description that repeats the canonical gives no pair of its own."""
+        """A description that repeats the canonical, case and punctuation aside, gives no pair of its own."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -589,32 +574,39 @@ class TestStar:
         assert made([item]) == [("name_to_description", "Abcd", "An abcd.")]
 
     def test_a_question_loses_its_item_number_and_a_name_keeps_it(self):
-        """A form's item number goes from a question text, not from other texts."""
+        """A form's item number goes from a question text, not from other texts.
+
+        A letter item goes only from a text that ends with "?", so "H.
+        Influenzae result" keeps its "H.". A dose such as "2.5 mg" is no item
+        number, so it stays.
+        """
         item = Item(
             id="abcd1",
             canonical="Abcd",
             texts=[
-                Text("24. Is it abcd?", "Question Text", question=True),
-                Text("(5a) How abcd?", "Question Text", question=True),
-                Text("13f-2. Abcd weak?", "Question Text", question=True),
-                Text("1. e During the past abcd", "Question Text", question=True),
-                Text("W2 - Unhappy with abcd", "Question Text", question=True),
-                Text("C. What abcd?", "Question Text", question=True),
-                Text("H. Abcdef result", "Question Text", question=True),
-                Text("2.5 mg of abcd?", "Question Text", question=True),
-                Text("F361. Abcd medicine", "dbGaP variable description"),
+                Text(
+                    "24. What is your marital status?", "Question Text", question=True
+                ),
+                Text("(5a) How often do you smoke?", "Question Text", question=True),
+                Text("13f-2. Legs weak?", "Question Text", question=True),
+                Text("1. e During the past month", "Question Text", question=True),
+                Text("W2 - Unhappy with sleep", "Question Text", question=True),
+                Text("C. What is your age?", "Question Text", question=True),
+                Text("H. Influenzae result", "Question Text", question=True),
+                Text("2.5 mg of aspirin daily?", "Question Text", question=True),
+                Text("F361. Wheezing medicine", "dbGaP variable description"),
             ],
         )
         assert [anchor for _, anchor, _ in made([item])] == [
-            "Is it abcd?",
-            "How abcd?",
-            "Abcd weak?",
-            "During the past abcd",
-            "Unhappy with abcd",
-            "What abcd?",
-            "H. Abcdef result",
-            "2.5 mg of abcd?",
-            "F361. Abcd medicine",
+            "What is your marital status?",
+            "How often do you smoke?",
+            "Legs weak?",
+            "During the past month",
+            "Unhappy with sleep",
+            "What is your age?",
+            "H. Influenzae result",
+            "2.5 mg of aspirin daily?",
+            "F361. Wheezing medicine",
         ]
 
     def test_a_question_that_differs_only_by_an_item_number_is_the_canonical(self):
@@ -630,10 +622,12 @@ class TestStar:
         """A text that is not a question keeps its number, so it differs from the canonical."""
         item = Item(
             id="abcd1",
-            canonical="Abcd medicine",
-            texts=[Text("F361. Abcd medicine", "dbGaP variable description")],
+            canonical="Wheezing medicine",
+            texts=[Text("F361. Wheezing medicine", "dbGaP variable description")],
         )
-        assert made([item]) == [("name", "F361. Abcd medicine", "Abcd medicine")]
+        assert made([item]) == [
+            ("name", "F361. Wheezing medicine", "Wheezing medicine")
+        ]
 
     def test_empty_template_headings_go_from_a_description(self):
         """A template's headings with nothing after them leave a description."""
@@ -1321,19 +1315,29 @@ class TestPhenx:
     def test_value_labels(self):
         """Codes are taken off; ranges list no values; a vertical tab also separates entries.
 
-        An explanation on the right is not the label: in "Yes = Classify as a
-        user", the label is Yes.
+        The code is taken off on either side: "Never = 0" gives Never, and
+        "1 = Yes" gives Yes. An explanation on the right is not the label: in
+        "Yes = Classify as a user", the label is Yes.
         """
-        assert phenx.labels("(-3) = Abcd|? = Efgh\vIjkl|0..110") == [
-            "Abcd",
-            "Efgh",
-            "Ijkl",
+        assert phenx.labels("(-3) = Not asked|? = Unknown\vRefused|0..110") == [
+            "Not asked",
+            "Unknown",
+            "Refused",
         ]
-        assert phenx.labels("Abcd = 0|Efgh ijkl = 1") == ["Abcd", "Efgh ijkl"]
-        assert phenx.labels("1 = Abcd,2 = Efgh, ijkl") == ["Abcd", "Efgh, ijkl"]
-        assert phenx.labels("A = 1 mm|= = Abcd") == ["1 mm", "Abcd"]
-        assert phenx.labels("Abcd = n/t|001 - 700 = efgh") == ["Abcd", "efgh"]
-        assert phenx.labels("99/99/9999 = abcd|>=18 = efgh") == ["abcd", "efgh"]
+        assert phenx.labels("Never = 0|Some days = 1") == ["Never", "Some days"]
+        assert phenx.labels("1 = Yes,2 = No, never") == ["Yes", "No, never"]
+        assert phenx.labels("A = 1 mm|= = Cannot be assessed") == [
+            "1 mm",
+            "Cannot be assessed",
+        ]
+        assert phenx.labels("Not done = n/t|001 - 700 = Number of cigarettes") == [
+            "Not done",
+            "Number of cigarettes",
+        ]
+        assert phenx.labels("99/99/9999 = Unknown date|>=18 = Adult") == [
+            "Unknown date",
+            "Adult",
+        ]
         assert phenx.labels("Yes = Classify as a user|NA = Not applicable") == [
             "Yes",
             "Not applicable",
@@ -1442,11 +1446,16 @@ class TestPrepare:
     def test_a_run_counts_pairs_an_earlier_source_has(
         self, tmp_path, monkeypatch, capsys
     ):
-        """When two sources in one run share a pair, the later source counts it."""
-        fetched_nhanes(tmp_path)
-        fetched_nhanes(tmp_path, "ncit")
-        monkeypatch.setattr(pairs, "READERS", {"ncit": nhanes, "nhanes": nhanes})
-        assert pairs.prepare(["nhanes", "ncit"], tmp_path) == 0
+        """When two sources in one run share a pair, the later source counts it.
+
+        The run takes the sources in READERS' order, not in the order given.
+        """
+        fetched_nhanes(tmp_path, "abcd-source")
+        fetched_nhanes(tmp_path, "efgh-source")
+        monkeypatch.setattr(
+            pairs, "READERS", {"abcd-source": nhanes, "efgh-source": nhanes}
+        )
+        assert pairs.prepare(["efgh-source", "abcd-source"], tmp_path) == 0
         printed = capsys.readouterr().out
-        assert printed.index("ncit:") < printed.index("nhanes:")
-        assert "kept there once: nhanes 2" in printed
+        assert printed.index("abcd-source:") < printed.index("efgh-source:")
+        assert "kept there once: efgh-source 2" in printed

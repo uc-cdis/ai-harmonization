@@ -1205,13 +1205,16 @@ class TestWriteAndRead:
     """Writing a source's tables, and reading them back."""
 
     def test_round_trip_and_content_hash(self, tmp_path):
-        """Tables written as parquet read back, checked by their content's SHA-256."""
+        """Tables written as parquet read back, checked by their content's SHA-256.
+
+        The counts are written as the fetch gives them.
+        """
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         manifest = sources.write_source(
-            directory, "abcd-source", "1", {"items": TABLE}, [], {"items": 3}
+            directory, "abcd-source", "1", {"items": TABLE}, [], {"not_open": 1}
         )
-        assert manifest["counts"] == {"items": 3}
+        assert manifest["counts"] == {"not_open": 1}
         assert manifest["files"]["items.parquet"][
             "content_sha256"
         ] == manifests.table_sha256(TABLE)
@@ -1479,9 +1482,11 @@ class TestFetch:
         assert (inputs / "sources" / "efgh-source" / "items.parquet").exists()
 
 
-# An SPDX license expression of one license: an id from the SPDX list, a
-# LicenseRef- id for other terms, or NONE.
-SPDX_LICENSE = re.compile(r"NONE|LicenseRef-[A-Za-z0-9.-]+|[A-Za-z0-9.+-]+")
+# The ids of the SPDX license list, https://spdx.org/licenses/, that the
+# sources use. A source with another listed license adds its id here. Other
+# terms are a LicenseRef- id.
+SPDX_IDS = {"CC-BY-3.0", "CC-BY-4.0", "CC0-1.0"}
+LICENSE_REF = re.compile(r"LicenseRef-[A-Za-z0-9.-]+")
 
 
 class TestLicenses:
@@ -1489,11 +1494,18 @@ class TestLicenses:
 
     @pytest.mark.parametrize("name", sorted(sources.FETCHERS))
     def test_each_source_license_is_spdx(self, name):
-        """A source's LICENSE is an SPDX id, a LicenseRef- id, or NONE."""
+        """A source's LICENSE is an id of the SPDX list, a LicenseRef- id, or NONE.
+
+        So a misspelt id, such as CC-BY4.0, fails.
+        """
         module = sources.FETCHERS[name]
         licenses = getattr(module, "LICENSE_IDS", {}).values() or [module.LICENSE]
         for license_ in licenses:
-            assert SPDX_LICENSE.fullmatch(license_), license_
+            assert (
+                license_ == "NONE"
+                or license_ in SPDX_IDS
+                or LICENSE_REF.fullmatch(license_)
+            ), license_
 
 
 class TestCommandLine:

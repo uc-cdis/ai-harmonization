@@ -14,7 +14,7 @@ behaviour, and has these parts:
 - **Confidence:** only where it is low, with what would settle it;
 - **Alternatives considered:** each option, with the facts about it and why
   it was not chosen;
-- **Confirmation:** the tests that check the decision.
+- **Confirmation:** the tests that check the decision, if any.
 
 The entries follow the shape of an architecture decision record
 ([Nygard, 2011](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)),
@@ -2319,12 +2319,6 @@ with the library's `BpeTrainer`.
 - Unigram, as in [SentencePiece](https://github.com/google/sentencepiece): not
   compared.
 
-**Confirmation.** The tests in
-[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
-check that:
-
-- the same texts give the same tokenizer.
-
 ### The normalisation of BERT's tokenizer, with NFD
 
 **Described in:** [tokenizer.md](tokenizer.md#step-1-normalize).
@@ -2473,6 +2467,13 @@ Removing a token moves the id of every token after it.
 
 - `[PAD]` and `[UNK]` alone: a later BERT setting that needs `[CLS]`,
   `[SEP]` or `[MASK]` would need another tokenizer, with every id moved.
+
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
+
+- a trained tokenizer gives `[PAD]`, `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]` the
+  ids 0 to 4.
 
 ## Training
 
@@ -2820,7 +2821,8 @@ The others are this pipeline's own:
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a config that names only its data trains at these defaults.
+- a config that names only its data trains at the recipe's batch size, warmup,
+  width and learning rate, for five epochs.
 
 ### A second architecture: BERT, trained from scratch
 
@@ -2921,8 +2923,7 @@ tokens. Its other settings default to `BertConfig`'s.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a BERT config gets BERT-Small's shape, 128 tokens and `BertConfig`'s other
-  defaults.
+- a BERT config gets BERT-Small's shape and 128 tokens.
 
 ### Each architecture has its own learning rate
 

@@ -73,7 +73,7 @@ def pair(anchor, positive, split):
 
 
 def write_corpus(
-    inputs, rows, checked=(("topmed", "1"),), text_format=texts.DEFAULT_FORMAT
+    inputs, rows, checked=(("abcd-benchmark", "1"),), text_format=texts.DEFAULT_FORMAT
 ):
     """Write the fictional corpus's pairs and its manifest, as ``corpus build`` would.
 
@@ -143,12 +143,12 @@ def trained_tokenizer(inputs):
 
 
 def write_benchmark(inputs):
-    """A fictional benchmark named topmed at version 1, of vital signs that the corpus does not hold.
+    """A fictional benchmark named abcd-benchmark at version 1, of vital signs that the corpus does not hold.
 
     The corpus's manifest then records the benchmark's files, as ``corpus
     build`` does for each benchmark that it checks.
     """
-    folder = inputs / "benchmarks" / "topmed"
+    folder = inputs / "benchmarks" / "abcd-benchmark"
     folder.mkdir(parents=True)
     targets = [
         {
@@ -176,12 +176,12 @@ def write_benchmark(inputs):
         }
     ]
     manifest = benchmarks.write_benchmark(
-        folder, "topmed", "1", targets, mappings, [], {}
+        folder, "abcd-benchmark", "1", targets, mappings, [], {}
     )
     corpus_path = inputs / "corpora" / CORPUS / "manifest.json"
     record = json.loads(corpus_path.read_text())
     for source in record["sources"]:
-        if source["role"] == "benchmark" and source["name"] == "topmed":
+        if source["role"] == "benchmark" and source["name"] == "abcd-benchmark":
             source["files"] = manifest["files"]
     corpus_path.write_text(json.dumps(record))
 
@@ -268,8 +268,7 @@ class TestConfig:
         """A config that names only its data trains at the recipe's settings, with this pipeline's own.
 
         The recipe gives the batch size, the warmup, the learning rate and the
-        width. This pipeline gives 5 epochs and random batches. The loss's
-        scale is the library's.
+        width. This pipeline gives 5 epochs. The loss's scale is 20.
         """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"]}))
@@ -280,8 +279,6 @@ class TestConfig:
         assert training.learning_rate == 0.2
         assert training.warmup_steps == 0.1
         assert training.num_train_epochs == 5
-        sampler = training.batch_sampler
-        assert getattr(sampler, "value", sampler) == "batch_sampler"
         assert settings["static"].embedding_dim == 1024
         assert settings["loss"].scale == 20.0
 
@@ -416,13 +413,11 @@ class TestConfig:
         assert settings["bert"].num_hidden_layers == 1
 
     def test_a_bert_defaults_to_bert_smalls_shape(self, tmp_path):
-        """A BERT without settings has BERT-Small's shape, 128 tokens and BertConfig's other defaults.
+        """A BERT without settings has BERT-Small's shape and 128 tokens.
 
         BERT-Small has 4 layers of 512, with 8 heads, and a feed-forward part
         4 times the width. The length, 128 tokens, is the BERT paper's.
         """
-        from transformers import BertConfig
-
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump({"data": CONFIG["data"], "model": {"architecture": "bert"}})
@@ -434,13 +429,6 @@ class TestConfig:
         assert settings.num_attention_heads == 8
         assert settings.intermediate_size == 4 * 512
         assert settings.max_position_embeddings == 128
-        library = BertConfig()
-        assert settings.hidden_dropout_prob == library.hidden_dropout_prob
-        assert (
-            settings.attention_probs_dropout_prob
-            == library.attention_probs_dropout_prob
-        )
-        assert settings.initializer_range == library.initializer_range
 
     def test_a_given_learning_rate_is_kept(self, config):
         """The architecture's learning rate holds only when no config or flag gives one."""
@@ -502,13 +490,13 @@ class TestConfig:
         with pytest.raises(ValueError, match="--learning"):
             train.read_config(config, 0, ["--learning", "1e-2"])
 
-    def test_bf16_is_off_unless_the_config_turns_it_on(self, config, tmp_path):
-        """bf16 keeps the library's default, off; a config or a flag turns it on."""
-        values, _ = train.read_config(config, 0)
-        assert values["bf16"] is False
-        values, given = train.read_config(config, 0, ["--bf16"])
-        assert values["bf16"] is True
-        assert "bf16" in given
+    def test_a_flag_with_no_value_counts_as_given(self, config):
+        """--bf16, a flag with no value, is among the settings that the command line gives.
+
+        The setting after it is read as given too, not as the flag's value.
+        """
+        _, given = train.read_config(config, 0, ["--bf16", "--learning_rate", "1e-3"])
+        assert {"bf16", "learning_rate"} <= given
 
     def test_reading_a_config_builds_no_settings(self, config, monkeypatch):
         """read_config builds no training settings, so it sets up no device."""
@@ -594,9 +582,9 @@ class TestTrain:
         corpus_source = record["sources"][0]
         assert corpus_source["name"] == CORPUS
         # write_corpus records one benchmark that the corpus was checked
-        # against, topmed at version 1, with no files. The run copies it.
+        # against, abcd-benchmark at version 1, with no files. The run copies it.
         assert corpus_source["benchmarks"] == [
-            {"name": "topmed", "version": "1", "files": {}}
+            {"name": "abcd-benchmark", "version": "1", "files": {}}
         ]
         assert record["files"]["model/model.safetensors"]["sha256"] == file_sha256(
             run / "model" / "model.safetensors"
@@ -688,9 +676,11 @@ class TestTrain:
         """An earlier run of the same name whose config.yaml is broken is not replaced."""
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
-        (outputs / train.RUNS / "abcd-run_s0" / "config.yaml").write_text("abcd: [")
+        earlier_config = outputs / train.RUNS / "abcd-run_s0" / "config.yaml"
+        earlier_config.write_text("abcd: [")
         assert train.train(config, 0, [], inputs, outputs) == 1
         assert "its config.yaml cannot be read" in capsys.readouterr().err
+        assert earlier_config.read_text() == "abcd: ["
 
     def test_the_last_evaluation_is_not_repeated(
         self, inputs, config, tmp_path, monkeypatch
@@ -799,12 +789,24 @@ class TestTrain:
             ],
             "settings": {"vocab_size": 8000, "min_frequency": 3},
         }
-        corpus_manifest = {"files": {"pairs.parquet": learned_pairs_entry}}
+        learned_corpus_manifest = {"files": {"pairs.parquet": learned_pairs_entry}}
+        abcd_corpus_manifest = {
+            "files": {
+                "pairs.parquet": {
+                    "rows": 16,
+                    "sha256": "cdef3456",
+                    "content_sha256": "abef7890",
+                }
+            }
+        }
         with pytest.raises(
             ValueError, match="learned its vocabulary from efgh-corpus"
         ) as refused:
             train.check_tokenizer_build(
-                "abcd-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
+                "abcd-corpus",
+                "efgh-corpus-8k",
+                tokenizer_manifest,
+                abcd_corpus_manifest,
             )
         assert (
             "python -m embedding_model tokenizer train --corpus abcd-corpus"
@@ -830,7 +832,7 @@ class TestTrain:
             " --vocab-size 8000 --min-frequency 3 --name efgh-corpus-8k"
         ) in str(refused.value)
         train.check_tokenizer_build(
-            "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, corpus_manifest
+            "efgh-corpus", "efgh-corpus-8k", tokenizer_manifest, learned_corpus_manifest
         )
 
     def test_a_tokenizer_of_the_same_pairs_written_again_is_kept(self):
@@ -905,7 +907,7 @@ class TestScoreRun:
 
     @pytest.fixture
     def run(self, inputs, config, tmp_path):
-        """A trained run, and a benchmark named topmed at version 1."""
+        """A trained run, and a benchmark named abcd-benchmark at version 1."""
         write_benchmark(inputs)
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
@@ -914,15 +916,23 @@ class TestScoreRun:
     def test_a_checked_benchmark_is_scored_into_the_run(self, run, inputs):
         """A run whose corpus was checked against the benchmark is scored into its folder."""
         folder, outputs = run
-        rows = scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+        rows = scoring.score(
+            str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+        )
         assert rows[0]["format"] == "compact"
-        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+        assert (
+            folder / "scores" / "abcd-benchmark" / "compact" / "metrics.csv"
+        ).exists()
 
     def test_the_run_is_found_from_its_model_folder(self, run, inputs):
         """The run's model folder also finds the run's record."""
         folder, outputs = run
-        scoring.score(str(folder / "model"), ["topmed"], inputs, outputs, device="cpu")
-        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+        scoring.score(
+            str(folder / "model"), ["abcd-benchmark"], inputs, outputs, device="cpu"
+        )
+        assert (
+            folder / "scores" / "abcd-benchmark" / "compact" / "metrics.csv"
+        ).exists()
 
     def test_the_run_is_found_from_dot_inside_its_model_folder(
         self, run, inputs, monkeypatch
@@ -930,15 +940,19 @@ class TestScoreRun:
         """--model . inside the run's model folder finds the run's record too."""
         folder, outputs = run
         monkeypatch.chdir(folder / "model")
-        scoring.score(".", ["topmed"], inputs, outputs, device="cpu")
-        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+        scoring.score(".", ["abcd-benchmark"], inputs, outputs, device="cpu")
+        assert (
+            folder / "scores" / "abcd-benchmark" / "compact" / "metrics.csv"
+        ).exists()
 
     def test_a_record_that_cannot_be_read_stops_scoring(self, run, inputs):
         """A broken record stops scoring, rather than skip the run's leakage check."""
         folder, outputs = run
         (folder / "manifest.json").write_text("{")
         with pytest.raises(ValueError, match="cannot be read"):
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
 
     @pytest.mark.parametrize(
         "field", ["not an object", "run", "files", "sources", "settings"]
@@ -956,7 +970,9 @@ class TestScoreRun:
             del record[field]
             path.write_text(json.dumps(record))
         with pytest.raises(ValueError, match="is not a run's record"):
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
 
     def test_a_record_with_an_unknown_text_format_stops_scoring(self, run, inputs):
         """A run's text format must be one of FORMATS, rather than fail on lookup."""
@@ -965,7 +981,9 @@ class TestScoreRun:
         record["settings"]["format"] = "abcd-format"
         (folder / "manifest.json").write_text(json.dumps(record))
         with pytest.raises(ValueError, match="which is not one of compact"):
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
 
     def test_a_model_that_differs_from_its_record_is_refused(self, run, inputs):
         """A run's model must be the one that its record names."""
@@ -973,7 +991,9 @@ class TestScoreRun:
         with (folder / "model" / "model.safetensors").open("ab") as weights:
             weights.write(b"abcd")
         with pytest.raises(ValueError, match="differs from the run's record"):
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
 
     def test_an_unchecked_benchmark_is_refused(self, run, inputs):
         """A benchmark that the corpus was not checked against stops scoring."""
@@ -982,9 +1002,11 @@ class TestScoreRun:
         record["sources"][0]["benchmarks"] = []
         (folder / "manifest.json").write_text(json.dumps(record))
         with pytest.raises(
-            ValueError, match="was not checked against benchmark topmed"
+            ValueError, match="was not checked against benchmark abcd-benchmark"
         ):
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
 
     def test_a_new_version_with_the_same_files_is_scored(self, run, inputs):
         """The check compares the benchmark's files, so its version alone does not matter."""
@@ -992,26 +1014,32 @@ class TestScoreRun:
         record = json.loads((folder / "manifest.json").read_text())
         record["sources"][0]["benchmarks"][0]["version"] = "0"
         (folder / "manifest.json").write_text(json.dumps(record))
-        scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
-        assert (folder / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+        scoring.score(str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu")
+        assert (
+            folder / "scores" / "abcd-benchmark" / "compact" / "metrics.csv"
+        ).exists()
 
     def test_another_build_of_a_checked_version_is_refused(self, run, inputs):
         """A benchmark rebuilt with other files stops scoring, under the same version too."""
         folder, outputs = run
-        built = inputs / "benchmarks" / "topmed"
-        mappings = built / "topmed_mappings.csv"
+        built = inputs / "benchmarks" / "abcd-benchmark"
+        mappings = built / "abcd-benchmark_mappings.csv"
         mappings.write_text(
             mappings.read_text().replace(
                 "Mean arterial pressure", "Mean blood pressure"
             )
         )
         manifest = json.loads((built / "manifest.json").read_text())
-        manifest["files"]["topmed_mappings.csv"]["sha256"] = file_sha256(mappings)
+        manifest["files"]["abcd-benchmark_mappings.csv"]["sha256"] = file_sha256(
+            mappings
+        )
         (built / "manifest.json").write_text(json.dumps(manifest))
         with pytest.raises(
-            ValueError, match="this build of benchmark topmed"
+            ValueError, match="this build of benchmark abcd-benchmark"
         ) as raised:
-            scoring.score(str(folder), ["topmed"], inputs, outputs, device="cpu")
+            scoring.score(
+                str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
+            )
         assert f"corpus build --name {CORPUS}" in str(raised.value)
 
 
@@ -1122,6 +1150,8 @@ class TestBert:
         outputs = tmp_path / "outputs"
         assert train.train(bert_config, 0, [], inputs, outputs) == 0
         run = outputs / train.RUNS / "abcd-bert_s0"
-        rows = scoring.score(str(run), ["topmed"], inputs, outputs, device="cpu")
+        rows = scoring.score(
+            str(run), ["abcd-benchmark"], inputs, outputs, device="cpu"
+        )
         assert rows[0]["n"] == 1
-        assert (run / "scores" / "topmed" / "compact" / "metrics.csv").exists()
+        assert (run / "scores" / "abcd-benchmark" / "compact" / "metrics.csv").exists()

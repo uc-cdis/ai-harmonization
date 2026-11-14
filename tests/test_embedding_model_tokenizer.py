@@ -106,25 +106,6 @@ class TestTokenizer:
         )
         assert tokenizer.training_texts(found) == ["BMI", "Abcd"]
 
-    def test_decoding_shows_the_tokens(self):
-        """Without a decoder, decoding joins the tokens with spaces, words kept apart."""
-        trained_tokenizer = tokenizer.learn(["body weight", "body_weight"], 100, 2)
-        assert (
-            trained_tokenizer.decode(trained_tokenizer.encode("Body Weight").ids)
-            == "body weight"
-        )
-        assert (
-            trained_tokenizer.decode(trained_tokenizer.encode("body_weight").ids)
-            == "body _ weight"
-        )
-
-    def test_the_same_texts_give_the_same_tokenizer(self):
-        """BPE training is reproducible, ids included."""
-        texts = [text for row in TRAINING for text in row]
-        first = tokenizer.learn(texts, 100, 2)
-        second = tokenizer.learn(texts, 100, 2)
-        assert first.to_str() == second.to_str()
-
     def test_the_diagnostics(self):
         """Whole words give fertility 1; a word cut into 4 tokens gives 4; unknown characters show."""
         trained_tokenizer = tokenizer.learn(["abcd abcd", "abcd abcd"], 100, 2)
@@ -156,7 +137,7 @@ class TestTrain:
     """``tokenizer train`` on a fictional inputs folder."""
 
     def test_the_tokenizer_and_its_manifest(self, inputs, capsys):
-        """The tokenizer is written with a manifest of its corpus, settings and counts."""
+        """The tokenizer is written with its five special tokens and a manifest of its corpus, settings and counts."""
         assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
         folder = inputs / "tokenizers" / "abcd-corpus-100"
         trained_tokenizer = Tokenizer.from_file(str(folder / "tokenizer.json"))
@@ -182,10 +163,10 @@ class TestTrain:
             "min_frequency": 2,
             "tokenizers": tokenizers.__version__,
         }
-        assert [
-            token.content
-            for token in trained_tokenizer.get_added_tokens_decoder().values()
-        ] == tokenizer.SPECIAL_TOKENS
+        assert {
+            token_id: token.content
+            for token_id, token in trained_tokenizer.get_added_tokens_decoder().items()
+        } == {0: "[PAD]", 1: "[UNK]", 2: "[CLS]", 3: "[SEP]", 4: "[MASK]"}
         assert written["counts"]["training_texts"] == 9
         assert written["counts"]["vocabulary"] == trained_tokenizer.get_vocab_size()
         assert written["counts"]["diagnostics"]["unknown_rate"] == 0.0

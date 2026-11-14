@@ -975,10 +975,28 @@ class TestFigures:
             )
         topmed_axes, gdc_axes = figure.get_axes()[:2]
         assert topmed_axes.get_xlim() == gdc_axes.get_xlim()
+        assert gdc_axes.get_xlim()[0] < -1
+
+    def test_each_differences_panel_names_its_benchmark(self):
+        """A panel's title gives its benchmark, its version and its counts.
+
+        figure_results gives each benchmark version 1, with 6 source variables
+        and 12 targets. Here GDC has version 2 and 15 targets, so each panel
+        must show its own version and targets.
+        """
+        models, benchmark_results, differences = figure_results(2)
+        benchmark_results["gdc"].update(version="2", targets=15)
+        with rc_context(compare.STYLE):
+            figure = compare.differences_figure(
+                benchmark_results, models, REFERENCE, differences
+            )
+        topmed_axes, gdc_axes = figure.get_axes()[:2]
         assert topmed_axes.get_title() == (
             "Benchmark: TOPMed v1 (6 source variables, 12 targets)"
         )
-        assert gdc_axes.get_xlim()[0] < -1
+        assert gdc_axes.get_title() == (
+            "Benchmark: GDC v2 (6 source variables, 15 targets)"
+        )
 
     def test_the_bars_fill_their_panel(self):
         """Without brackets too, each bar panel ends half a group beyond its groups."""

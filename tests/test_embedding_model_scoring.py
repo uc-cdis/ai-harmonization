@@ -194,17 +194,21 @@ class TestRankTargets:
         the variable's MRR is 1, and its nDCG@10 is below 1. Each expected
         target adds 1 / log2(rank + 1): gender at rank 1, and sex at rank 3.
         A perfect ranking would put both expected targets first: gender at
-        rank 1, sex at rank 2, then race.
+        rank 1, sex at rank 2, then race. The mapping row names both targets,
+        and benchmark_texts splits them.
         """
+        targets = pd.DataFrame(
+            [
+                target("demographic.gender", "Gender"),
+                target("demographic.race", "Race"),
+                target("demographic.sex", "Sex"),
+            ]
+        )
+        mappings = pd.DataFrame(
+            [mapping("GENDER", "Gender", "demographic.gender;demographic.sex")]
+        )
         metrics, ranked = scoring.rank_targets(
-            model,
-            {"0": "Gender"},
-            {
-                "demographic.gender": "Gender",
-                "demographic.race": "Race",
-                "demographic.sex": "Sex",
-            },
-            {"0": {"demographic.gender", "demographic.sex"}},
+            model, *scoring.benchmark_texts(targets, mappings, texts.DEFAULT_FORMAT)
         )
         assert ranked["0"]["rank"] == 1
         assert metrics["mrr"] == 1.0
@@ -578,7 +582,7 @@ class TestCommandLine:
     def test_score_needs_a_known_benchmark(self):
         """An unknown benchmark is a usage error."""
         with pytest.raises(SystemExit) as raised:
-            main(["score", "--model", "abcd-model", "--benchmark", "abcd-benchmark"])
+            main(["score", "--model", "abcd-model", "--benchmark", "efgh-benchmark"])
         assert raised.value.code == 2
 
     def test_a_repeated_benchmark_flag_adds_its_benchmarks(self, monkeypatch):

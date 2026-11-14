@@ -100,7 +100,7 @@ def ground_truth(rows):
 
 # A fictional paper's dbGaP study, DOI and license, in the shape of gdc.PAPERS.
 GDC_PAPERS = {
-    "Abcd": {"study": "phs999999", "doi": "10.9999/abcd", "license": "CC-BY-4.0"}
+    "abcd-paper": {"study": "phs999999", "doi": "10.9999/abcd", "license": "CC-BY-4.0"}
 }
 
 
@@ -540,13 +540,22 @@ CORRECTION_HEADER = (
 )
 
 
+# The fictional unit's variables: a day count, a record type, and the age at
+# the CAC score.
+CAC_VARIABLES = {
+    "phv99999901.v1": "CACDAYS",
+    "phv99999902.v1": "IDTYPE",
+    "phv99999903.v1": "AGECAC",
+}
+
+
 def correction(action, variable, target, use="selects records"):
     """A row of the TOPMed corrections file, for a fictional unit."""
     return {
         "target": target,
-        "unit": "ABCD",
+        "unit": "abcd-unit",
         "source_variable_id": variable,
-        "source_variable_name": "abcd_var",
+        "source_variable_name": CAC_VARIABLES.get(variable, "abcd_var"),
         "action": action,
         "use": use,
         "reason": "The unit's reason.",
@@ -558,61 +567,111 @@ class TestCorrections:
 
     TARGETS = [
         {"target_property": key}
-        for key in ("abcd.age_at_score_1", "abcd.score_1", "abcd.subcohort_1")
+        for key in (
+            "atherosclerosis.age_at_cac_score_1",
+            "atherosclerosis.cac_score_1",
+            "demographic.subcohort_1",
+        )
     ]
 
     def rows(self):
-        """Two mapping rows: a day count mapped to a score, and a variable with two mappings."""
+        """Three mapping rows, one per variable.
+
+        CACDAYS, a day count, maps to the CAC score. IDTYPE maps to the score
+        and the subcohort. AGECAC maps to the age at the score.
+        """
+        expected_targets = {
+            "phv99999901.v1": ["atherosclerosis.cac_score_1"],
+            "phv99999902.v1": [
+                "atherosclerosis.cac_score_1",
+                "demographic.subcohort_1",
+            ],
+            "phv99999903.v1": ["atherosclerosis.age_at_cac_score_1"],
+        }
         return [
             {
-                "source_variable_id": "phv99999901.v1",
-                "expected_target": ["abcd.score_1"],
-            },
-            {
-                "source_variable_id": "phv99999902.v1",
-                "expected_target": ["abcd.score_1", "abcd.subcohort_1"],
-            },
+                "source_variable_id": variable,
+                "source_variable_name": CAC_VARIABLES[variable],
+                "expected_target": targets,
+            }
+            for variable, targets in expected_targets.items()
         ]
 
     def test_an_excluded_mapping_is_removed_and_an_empty_row_dropped(self):
         """An exclude removes one mapping; a row with no target left is dropped."""
         corrections = [
-            correction("exclude", "phv99999901.v1", "abcd.score_1", "times the event"),
-            correction("exclude", "phv99999902.v1", "abcd.subcohort_1"),
+            correction(
+                "exclude",
+                "phv99999901.v1",
+                "atherosclerosis.cac_score_1",
+                "times the event",
+            ),
+            correction("exclude", "phv99999902.v1", "atherosclerosis.cac_score_1"),
         ]
         rows = topmed.apply_corrections(self.rows(), corrections, self.TARGETS)
         assert rows == [
             {
                 "source_variable_id": "phv99999902.v1",
-                "expected_target": ["abcd.score_1"],
-            }
+                "source_variable_name": "IDTYPE",
+                "expected_target": ["demographic.subcohort_1"],
+            },
+            {
+                "source_variable_id": "phv99999903.v1",
+                "source_variable_name": "AGECAC",
+                "expected_target": ["atherosclerosis.age_at_cac_score_1"],
+            },
         ]
 
     def test_an_added_mapping_moves_a_day_count_to_the_age(self):
-        """An exclude and an add move a variable from its score to its age."""
+        """An exclude and an add move CACDAYS, a day count, from the CAC score to the age at the CAC score."""
         corrections = [
-            correction("exclude", "phv99999901.v1", "abcd.score_1", "times the event"),
             correction(
-                "add", "phv99999901.v1", "abcd.age_at_score_1", "computes the age"
+                "exclude",
+                "phv99999901.v1",
+                "atherosclerosis.cac_score_1",
+                "times the event",
+            ),
+            correction(
+                "add",
+                "phv99999901.v1",
+                "atherosclerosis.age_at_cac_score_1",
+                "computes the age",
             ),
         ]
         rows = topmed.apply_corrections(self.rows(), corrections, self.TARGETS)
-        assert rows[0]["expected_target"] == ["abcd.age_at_score_1"]
+        assert rows[0]["expected_target"] == ["atherosclerosis.age_at_cac_score_1"]
 
     @pytest.mark.parametrize(
-        "action, variable, target",
+        "action, variable, target, use",
         [
-            ("exclude", "phv99999901.v1", "abcd.subcohort_1"),
-            ("add", "phv99999901.v1", "abcd.other_1"),
-            ("add", "phv99999901.v1", "abcd.score_1"),
-            ("add", "phv99999909.v1", "abcd.age_at_score_1"),
+            ("exclude", "phv99999901.v1", "demographic.subcohort_1", "not used"),
+            (
+                "add",
+                "phv99999901.v1",
+                "atherosclerosis.age_at_cac_volume_1",
+                "computes the age",
+            ),
+            (
+                "add",
+                "phv99999903.v1",
+                "atherosclerosis.age_at_cac_score_1",
+                "computes the age",
+            ),
+            (
+                "add",
+                "phv99999909.v1",
+                "atherosclerosis.age_at_cac_score_1",
+                "computes the age",
+            ),
         ],
     )
-    def test_a_correction_that_does_not_match_fails(self, action, variable, target):
+    def test_a_correction_that_does_not_match_fails(
+        self, action, variable, target, use
+    ):
         """A mapping not given, an unknown target or variable, or a mapping given already fails, named."""
         with pytest.raises(ValueError, match=f"{action} {variable} -> {target}"):
             topmed.apply_corrections(
-                self.rows(), [correction(action, variable, target)], self.TARGETS
+                self.rows(), [correction(action, variable, target, use)], self.TARGETS
             )
 
     def test_an_unknown_use_is_refused(self, tmp_path):
@@ -620,10 +679,13 @@ class TestCorrections:
         path = tmp_path / "corrections.csv"
         path.write_text(
             CORRECTION_HEADER
-            + "abcd.score_1,ABCD,phv99999901.v1,abcd_var,exclude,helper,Why.\n",
+            + "atherosclerosis.cac_score_1,abcd-unit,phv99999901.v1,CACDAYS,exclude,"
+            "helper,Why.\n",
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="phv99999901.v1 -> abcd.score_1"):
+        with pytest.raises(
+            ValueError, match="phv99999901.v1 -> atherosclerosis.cac_score_1"
+        ):
             topmed.read_corrections(path)
 
     def test_the_committed_corrections_are_sorted_and_complete(self):
@@ -728,21 +790,16 @@ class TestDictionaryTargets:
             "demographic.vital_status",
         ]
 
-    def test_text_as_the_shared_parser_reads_it(self):
-        """Types, values and descriptions come from from_gdc_model, nested ones included."""
-        rows = self.rows()
-        assert rows["demographic.race"]["target_type"] == "string"
-        assert rows["demographic.age_at_index"]["target_type"] == "integer"
-        assert rows["demographic.vital_status"]["target_type"] == "enum"
-        assert rows["demographic.vital_status"]["target_values"] == (
-            f"Alive{VALUE_SEPARATOR}Dead"
-        )
-        assert rows["demographic.ethnicity"]["target_description"] == (
-            "Self-reported ethnicity."
-        )
-        assert (
-            rows["demographic.sites"]["target_values"] == f"Lung{VALUE_SEPARATOR}Liver"
-        )
+    def test_a_type_list_loses_its_null_and_the_values_are_joined(self):
+        """A type of ["string", "null"] is string, and the values are joined by VALUE_SEPARATOR.
+
+        The description is the property's. The rest of each text is
+        from_gdc_model's, which tests/test_simple_data_model.py tests.
+        """
+        race = self.rows()["demographic.race"]
+        assert race["target_type"] == "string"
+        assert race["target_values"] == f"asian{VALUE_SEPARATOR}white"
+        assert race["target_description"] == "Self-reported race."
 
 
 class TestReadGroundTruth:
@@ -753,13 +810,13 @@ class TestReadGroundTruth:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as zipped:
             zipped.writestr(
-                "gdc-sm-data/ground-truth/Abcd.csv",
+                "gdc-sm-data/ground-truth/abcd-paper.csv",
                 "original_paper_variable_names,GDC_format_variable_names\nAge,age\n",
             )
             zipped.writestr("gdc-sm-data/target-tables/flat.csv", "age\n")
         truth = gdc.read_ground_truth(buffer.getvalue())
-        assert list(truth) == ["Abcd"]
-        assert truth["Abcd"].iloc[0].tolist() == ["Age", "age"]
+        assert list(truth) == ["abcd-paper"]
+        assert truth["abcd-paper"].iloc[0].tolist() == ["Age", "age"]
 
 
 def spreadsheet(columns, sheet="Clinical"):
@@ -782,12 +839,15 @@ class TestReadSourceTable:
             "Age in Months at Time of Tissue Procurement",
             "Site ",
         ]
-        assert tabbed in gdc.read_source_table(file_bytes, "Clinical", "Abcd").columns
+        assert (
+            tabbed
+            in gdc.read_source_table(file_bytes, "Clinical", "abcd-paper").columns
+        )
 
     def test_column_types_are_those_of_its_csv(self):
         """Numbers stored as text in the sheet read as numbers, as GDC-SM's CSV tables do."""
         file_bytes = spreadsheet({"Age": ["61", "70"], "Site": ["Ovary", "Lung"]})
-        table = gdc.read_source_table(file_bytes, "Clinical", "Abcd")
+        table = gdc.read_source_table(file_bytes, "Clinical", "abcd-paper")
         assert table["Age"].tolist() == [61, 70]
         assert table["Site"].tolist() == ["Ovary", "Lung"]
 
@@ -822,29 +882,29 @@ class TestGdcPapers:
 
     def test_listed_and_mapped_papers_with_entries_pass(self):
         """Papers that are listed, mapped and in the paper table pass the check."""
-        gdc.require_papers(["Abcd"], ["Abcd"], GDC_PAPERS)
+        gdc.require_papers(["abcd-paper"], ["abcd-paper"], GDC_PAPERS)
 
     def test_a_paper_without_an_entry_raises(self):
         """A listed paper missing from the paper table fails the build, and is named."""
-        with pytest.raises(ValueError, match="no dbGaP study and DOI: Efgh"):
-            gdc.require_papers(["Abcd", "Efgh"], ["Abcd"], GDC_PAPERS)
+        with pytest.raises(ValueError, match="no dbGaP study and DOI: efgh-paper"):
+            gdc.require_papers(["abcd-paper", "efgh-paper"], ["abcd-paper"], GDC_PAPERS)
 
     def test_a_mapped_paper_without_a_listed_table_raises(self):
         """A paper that the ground truth maps but papers_info does not list is named."""
-        with pytest.raises(ValueError, match="no listed table: Efgh"):
-            gdc.require_papers(["Abcd"], ["Abcd", "Efgh"], GDC_PAPERS)
+        with pytest.raises(ValueError, match="no listed table: efgh-paper"):
+            gdc.require_papers(["abcd-paper"], ["abcd-paper", "efgh-paper"], GDC_PAPERS)
 
     def test_a_papers_source_is_cited_by_its_doi(self):
         """A paper's manifest entry points to its file, gives its license and cites its DOI."""
         source = gdc.paper_source(
-            "Abcd",
+            "abcd-paper",
             {"Dataset URL": "https://example.org/abcd.xlsx"},
             b"abcd",
             GDC_PAPERS,
         )
         assert source == {
             "role": "source text",
-            "name": "Abcd, supplementary table",
+            "name": "abcd-paper, supplementary table",
             "location": "https://example.org/abcd.xlsx",
             "sha256": manifests.sha256(b"abcd"),
             "license": "CC-BY-4.0",
@@ -884,16 +944,16 @@ class TestGdcMappingRows:
 
     def test_the_study_is_the_papers_dbgap_study(self):
         """Each row's study is its paper's dbGaP study, and its table is the paper."""
-        truth = {"Abcd": ground_truth([("Race", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Race": ["Asian"]})}
+        truth = {"abcd-paper": ground_truth([("Race", "race")])}
+        tables = {"abcd-paper": pd.DataFrame({"Race": ["Asian"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["source_study_id"] == "phs999999"
-        assert row["source_table_id"] == "Abcd"
+        assert row["source_table_id"] == "abcd-paper"
 
     def test_a_property_two_nodes_carry_is_expected_in_both(self):
         """A property that two nodes carry is an expected target in both. The description is empty."""
-        truth = {"Abcd": ground_truth([("Race", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Race": ["Asian", "White", None]})}
+        truth = {"abcd-paper": ground_truth([("Race", "race")])}
+        tables = {"abcd-paper": pd.DataFrame({"Race": ["Asian", "White", None]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["clinical.race", "demographic.race"]
         assert row["source_type"] == "string/encoded"
@@ -902,19 +962,21 @@ class TestGdcMappingRows:
 
     def test_a_node_with_another_meaning_is_left_out(self):
         """A node that gives the property another meaning is not an expected target."""
-        truth = {"Abcd": ground_truth([("Tumor site", "primary_site")])}
-        tables = {"Abcd": pd.DataFrame({"Tumor site": ["Ovary"]})}
+        truth = {"abcd-paper": ground_truth([("Tumor site", "primary_site")])}
+        tables = {"abcd-paper": pd.DataFrame({"Tumor site": ["Ovary"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["case.primary_site"]
 
     def test_several_published_targets_merge_into_one_row(self):
         """Two ground-truth mappings for one variable give one row with both targets."""
         truth = {
-            "Abcd": ground_truth(
+            "abcd-paper": ground_truth(
                 [("Race/Ethnicity", "race"), ("Race/Ethnicity", "ethnicity")]
             )
         }
-        tables = {"Abcd": pd.DataFrame({"Race/Ethnicity": ["White, not Hispanic"]})}
+        tables = {
+            "abcd-paper": pd.DataFrame({"Race/Ethnicity": ["White, not Hispanic"]})
+        }
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == [
             "clinical.ethnicity",
@@ -925,23 +987,23 @@ class TestGdcMappingRows:
 
     def test_gender_is_also_expected_as_sex_at_birth(self):
         """A variable mapped to gender also expects the demographic node's sex at birth."""
-        truth = {"Abcd": ground_truth([("Sex", "gender")])}
-        tables = {"Abcd": pd.DataFrame({"Sex": ["Female", "Male"]})}
+        truth = {"abcd-paper": ground_truth([("Sex", "gender")])}
+        tables = {"abcd-paper": pd.DataFrame({"Sex": ["Female", "Male"]})}
         (row,) = gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
         assert row["expected_target"] == ["clinical.gender", "demographic.sex_at_birth"]
 
     def test_target_not_in_the_dictionary_drops_the_mapping(self, capsys):
         """A published mapping to a target the dictionary does not carry is dropped, and named."""
-        truth = {"Abcd": ground_truth([("Stage", "tumor_stage")])}
-        tables = {"Abcd": pd.DataFrame({"Stage": ["I"]})}
+        truth = {"abcd-paper": ground_truth([("Stage", "tumor_stage")])}
+        tables = {"abcd-paper": pd.DataFrame({"Stage": ["I"]})}
         assert gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS) == []
-        assert "Abcd: Stage -> tumor_stage" in capsys.readouterr().out
+        assert "abcd-paper: Stage -> tumor_stage" in capsys.readouterr().out
 
     def test_variable_missing_from_its_table_raises(self):
         """A mapped variable that is not a column of its table fails the build."""
-        truth = {"Abcd": ground_truth([("Missing", "race")])}
-        tables = {"Abcd": pd.DataFrame({"Race": ["Asian"]})}
-        with pytest.raises(ValueError, match="Abcd: Missing"):
+        truth = {"abcd-paper": ground_truth([("Missing", "race")])}
+        tables = {"abcd-paper": pd.DataFrame({"Race": ["Asian"]})}
+        with pytest.raises(ValueError, match="abcd-paper: Missing"):
             gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS)
 
 

@@ -1,0 +1,938 @@
+"""Tests for embedding_model.corpus and embedding_model.leakage: planted leaks, the split, the build."""
+
+import json
+import pathlib
+
+import pandas as pd
+import pytest
+
+from embedding_model import benchmarks, corpus, leakage, texts
+from embedding_model.__main__ import main
+from embedding_model.manifests import file_sha256
+from embedding_model.pairs import pairs_sha256
+from embedding_model.pairs import manifest as pairs_manifest
+
+# A fictional benchmark: two source variables, from two fictional studies. A
+# waist measurement maps to one target, and a smoking status to two.
+MAPPINGS = pd.DataFrame(
+    {
+        "source_study_id": ["phs999901", "phs999902"],
+        "source_table_id": ["pht999901.v1", "pht999902.v1"],
+        "source_variable_id": ["phv99999901.v1", "phv99999902.v1"],
+        "source_variable_name": ["waist_cm", "smoking_status"],
+        "source_type": ["float", "string"],
+        "source_description": ["Waist in cm", ""],
+        "source_values": ["", ""],
+        "expected_target": [
+            "node1.waist_circumference",
+            "node2.smoking_history;node3.smoking_history",
+        ],
+    }
+)
+LONG_DESCRIPTION = (
+    "Waist circumference of the participant, measured at the first visit with a"
+    " tape."
+)
+TARGETS = pd.DataFrame(
+    {
+        "target_property": [
+            "node1.waist_circumference",
+            "node2.smoking_history",
+            "node3.smoking_history",
+            "node4.alcohol_use",
+        ],
+        "target_type": ["float", "string", "string", "string"],
+        "target_description": [
+            LONG_DESCRIPTION,
+            "History of smoking",
+            "Smoking history at study entry",
+            "Alcohol use",
+        ],
+        "target_values": ["", "", "", ""],
+    }
+)
+
+
+def pair(anchor_name="", positive_name="", **fields):
+    """One pair row, with every column, the given fields set."""
+    row = {
+        "anchor": anchor_name,
+        "positive": positive_name,
+        "source": "abcd-source",
+        "kind": "name",
+        "item": "C999901",
+        "term_type": "SY",
+        "term_group": "paraphrase",
+        "status": "current",
+        "study": "",
+        "value_list": "",
+        "anchor_name": anchor_name,
+        "anchor_type": "string",
+        "anchor_description": "",
+        "anchor_values": [],
+        "positive_name": positive_name,
+        "positive_type": "string",
+        "positive_description": "",
+        "positive_values": [],
+    }
+    row.update(fields)
+    return row
+
+
+# One planted leak of each kind, in the shapes that pairs prepare writes: a
+# second definition is a description_description pair's anchor name, and a
+# name_to_description pair's description is its positive name.
+PLANTED = [
+    pair("Waist CM", "Waist Circumference"),
+    pair("smoking_status", "Smoking", positive_description="History of smoking"),
+    pair("Waist in cm", "waist_circumference", kind="description_description"),
+    pair("smoking history", "SMOKING STATUS"),
+    pair("waist cm", "Waist", positive_description=f"{LONG_DESCRIPTION} In cm."),
+    pair("waist_cm", f"{LONG_DESCRIPTION} In cm.", kind="name_to_description"),
+    pair("Waist size in cm", "Abdominal girth", positive_description=LONG_DESCRIPTION),
+    pair("Hip size", "Hip circumference", study="phs999902|phs999777"),
+]
+INNOCENT = [
+    # Its anchor is the first benchmark row's source name, waist_cm. Its
+    # positive is a near synonym of that row's target. The synonym matches
+    # neither the target's name nor its description, so the pair is kept.
+    pair("waist cm", "Waist measurement"),
+    # Its anchor is the second benchmark row's target name. Its positive
+    # matches no source text, so the pair is kept.
+    pair("Smoking history", "Tobacco use history"),
+    pair(
+        "Body size",
+        "Body measures",
+        anchor_values=["waist circumference"],
+        positive_values=["waist cm"],
+    ),
+    pair(
+        "smoking_status",
+        "Tobacco use",
+        positive_description="Smoking history at study entry, in pack-years",
+    ),
+    pair("Heart rate", "Pulse rate", study="phs999555"),
+    pair("Waist size in cm", "Waist Circumference"),
+]
+
+
+class TestLeakage:
+    """Leakage prevention on a fictional benchmark, one planted leak of each kind."""
+
+    @pytest.fixture
+    def audited(self):
+        """The audit of the planted and the innocent pairs, in that order."""
+        pairs = pd.DataFrame(PLANTED + INNOCENT)
+        return leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
+
+    def test_each_planted_leak_is_dropped_and_nothing_else(self, audited):
+        """Every planted leak is dropped, with its finding, and no innocent pair is."""
+        findings, _ = audited
+        assert findings.pair.tolist() == list(range(len(PLANTED)))
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY] * 7 + [
+            leakage.BENCHMARK_STUDY
+        ]
+
+    def test_the_fields_that_matched_are_named(self, audited):
+        """Each answer key names the two fields that matched, and how."""
+        findings, _ = audited
+        assert findings.fields.tolist()[:7] == [
+            "anchor name = source name, positive name = target name",
+            "anchor name = source name, positive description = target description",
+            "anchor name = source description, positive name = target name",
+            "positive name = source name, anchor name = target name",
+            "anchor name = source name, positive description ~ target description",
+            "anchor name = source name, positive name ~ target description",
+            "anchor name >= source name, positive description = target description",
+        ]
+        assert findings.target_property.tolist()[0] == "node1.waist_circumference"
+        assert findings.target_description.tolist()[0] == LONG_DESCRIPTION
+        assert findings.source_variable_description.tolist()[0] == "Waist in cm"
+        assert findings.target_description.tolist()[7] == ""
+        assert findings.study_id.tolist()[7] == "phs999902"
+
+    def test_a_text_that_matches_source_and_target_on_one_side_is_kept(self):
+        """A source name equal to its target's name, on one side only, is shared vocabulary."""
+        mappings = MAPPINGS.assign(
+            source_variable_name=["waist_circumference", "smoking_status"]
+        )
+        pairs = pd.DataFrame([pair("Waist Circumference", "Body measures")])
+        assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
+
+    def test_an_answer_key_needs_both_sides_from_one_row(self):
+        """A pair whose two sides match two rows of a benchmark is kept.
+
+        This benchmark maps waist_cm to waist circumference, and
+        abdominal_girth to abdominal circumference. A source can list
+        "abdominal girth" as a synonym of "Waist circumference". But the
+        anchor matches the second row's source. The positive matches the
+        first row's target. So the pair is not an answer key. The pair
+        "abdominal girth" and "Abdominal circumference" matches one row, so
+        it is dropped.
+        """
+        mappings = MAPPINGS.assign(
+            source_variable_name=["waist_cm", "abdominal_girth"],
+            source_type=["float", "float"],
+            expected_target=[
+                "node1.waist_circumference",
+                "node2.abdominal_circumference",
+            ],
+        )
+        targets = TARGETS.iloc[:2].assign(
+            target_property=[
+                "node1.waist_circumference",
+                "node2.abdominal_circumference",
+            ],
+            target_type=["float", "float"],
+            target_description=[
+                LONG_DESCRIPTION,
+                "Circumference of the abdomen at the navel",
+            ],
+        )
+        pairs = pd.DataFrame(
+            [
+                pair("abdominal girth", "Waist circumference"),
+                pair("abdominal girth", "Abdominal circumference", item="C999902"),
+            ]
+        )
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (targets, mappings)})
+        assert findings.pair.tolist() == [1]
+        assert findings.fields.tolist() == [
+            "anchor name = source name, positive name = target name"
+        ]
+
+    def test_a_one_word_name_matches_only_an_equal_text(self, monkeypatch):
+        """A one-word name is not matched by its words, even beside a description match."""
+        mappings = MAPPINGS.assign(source_variable_name=["Waist", "smoking_status"])
+        pairs = pd.DataFrame(
+            [pair("Waist Size", "Abdomen", positive_description=LONG_DESCRIPTION)]
+        )
+        assert leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})[0].empty
+        monkeypatch.setattr(leakage, "MIN_NAME_WORDS", 1)
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})
+        assert findings.fields.tolist() == [
+            "anchor name >= source name, positive description = target description"
+        ]
+
+    def test_a_long_name_matches_by_eight_words_in_a_row(self):
+        """The 8-word overlap applies to names too, not only to descriptions."""
+        name = "abcd efgh ijkl mnop qrst uvwx yzab cdef ghij"
+        mappings = MAPPINGS.assign(source_variable_name=[name, "smoking_status"])
+        pairs = pd.DataFrame([pair(name.rsplit(" ", 1)[0], "Waist Circumference")])
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, mappings)})
+        assert findings.fields.tolist() == [
+            "anchor name ~ source name, positive name = target name"
+        ]
+
+    def test_an_answer_keys_twin_goes_with_it(self):
+        """A pair whose names read as an answer key's is dropped too, from any item or source."""
+        pairs = pd.DataFrame(
+            [
+                pair(
+                    "smoking_status",
+                    "Smoking",
+                    kind="name_description",
+                    positive_description="History of smoking",
+                ),
+                pair("smoking_status", "Smoking"),
+                pair(
+                    "SMOKING-status", "smoking.", source="efgh-source", item="C999902"
+                ),
+                pair("smoking_status", "Tobacco use"),
+            ]
+        )
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
+        assert findings.pair.tolist() == [0, 1, 2]
+        assert (
+            findings.fields.tolist()[1:]
+            == [
+                "twin of: anchor name = source name,"
+                " positive description = target description"
+            ]
+            * 2
+        )
+        assert findings.target_property.tolist() == ["node2.smoking_history"] * 3
+
+    def test_a_twin_of_one_benchmark_and_answer_key_of_another_has_both(self):
+        """A pair that is one benchmark's twin and another's answer key gets a finding for each."""
+        targets = pd.concat(
+            [
+                TARGETS,
+                pd.DataFrame(
+                    {
+                        "target_property": ["node5.smoking"],
+                        "target_type": ["string"],
+                        "target_description": ["Tobacco smoking"],
+                        "target_values": [""],
+                    }
+                ),
+            ],
+            ignore_index=True,
+        )
+        mappings = MAPPINGS.assign(
+            expected_target=["node1.waist_circumference", "node5.smoking"]
+        )
+        pairs = pd.DataFrame(
+            [
+                pair(
+                    "smoking_status",
+                    "Smoking",
+                    kind="name_description",
+                    positive_description="History of smoking",
+                ),
+                pair("smoking_status", "Smoking"),
+            ]
+        )
+        findings, _ = leakage.audit(
+            pairs,
+            {
+                "abcd-benchmark": (TARGETS, MAPPINGS),
+                "efgh-benchmark": (targets, mappings),
+            },
+        )
+        assert findings[findings.pair == 1].set_index("benchmark").fields.to_dict() == {
+            "abcd-benchmark": (
+                "twin of: anchor name = source name,"
+                " positive description = target description"
+            ),
+            "efgh-benchmark": "anchor name = source name, positive name = target name",
+        }
+
+    def test_a_pair_that_leaks_two_benchmarks_has_a_finding_for_each(self):
+        """One pair can leak two benchmarks, and each one gets its finding."""
+        pairs = pd.DataFrame([pair("Waist CM", "Waist Circumference")])
+        findings, _ = leakage.audit(
+            pairs,
+            {
+                "abcd-benchmark": (TARGETS, MAPPINGS),
+                "efgh-benchmark": (TARGETS, MAPPINGS),
+            },
+        )
+        assert findings.benchmark.tolist() == ["abcd-benchmark", "efgh-benchmark"]
+        assert findings.pair.tolist() == [0, 0]
+
+    def test_an_answer_key_comes_before_a_benchmark_study(self):
+        """A pair that is an answer key and from a benchmark's study has one finding."""
+        pairs = pd.DataFrame(
+            [pair("Waist CM", "Waist Circumference", study="phs999902")]
+        )
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY]
+
+    def test_accents_and_case_do_not_hide_an_answer_key(self):
+        """A pair whose texts differ from a benchmark's only by accents and case is an answer key."""
+        pairs = pd.DataFrame([pair("Wäist Cm", "WAIST CIRCUMFERENCE")])
+        findings, _ = leakage.audit(pairs, {"abcd-benchmark": (TARGETS, MAPPINGS)})
+        assert findings.finding.tolist() == [leakage.ANSWER_KEY]
+
+    def test_shared_vocabulary_is_reported(self, audited):
+        """Benchmark texts in the kept pairs are counted, not dropped.
+
+        Both benchmark rows have a source text and a target text in the kept
+        pairs.
+        """
+        shared = audited[1]["abcd-benchmark"]
+        assert shared["rows_with_shared_source"] == len(MAPPINGS)
+        assert shared["rows_with_shared_target"] == len(MAPPINGS)
+        assert {item["text"] for item in shared["most_common"]} == {
+            "waist circumference",
+            "waist cm",
+            "smoking status",
+            "smoking history",
+        }
+
+    def test_texts_overlap_when_they_share_eight_words_in_a_row(self):
+        """An edited copy overlaps. Seven shared words do not, nor the same words reordered."""
+        reference = "one two three four five six seven eight nine ten eleven twelve"
+        edited = "one two three four five six seven eight nine ten zero twelve"
+        seven = "zero two three four five six seven eight zero"
+        reordered = "twelve eleven ten nine eight seven six five four three two one"
+        cut = "one two three four five six seven eigh"
+        matched = leakage.overlaps(
+            [edited, seven, reordered, cut, reference], [reference], length=8
+        )
+        assert matched == {(edited, reference)}
+
+    def test_the_run_length_is_read_when_the_audit_runs(self, monkeypatch):
+        """The module's run length applies when the audit runs."""
+        pairs = pd.DataFrame(
+            [
+                pair(
+                    "smoking_status",
+                    "Tobacco use",
+                    positive_description="Smoking history at study entry, in pack-years",
+                )
+            ]
+        )
+        benchmark = {"abcd-benchmark": (TARGETS, MAPPINGS)}
+        assert leakage.audit(pairs, benchmark)[0].empty
+        monkeypatch.setattr(leakage, "MIN_OVERLAP_WORDS", 5)
+        findings, _ = leakage.audit(pairs, benchmark)
+        assert findings.fields.tolist() == [
+            "anchor name = source name, positive description ~ target description"
+        ]
+
+    def test_benchmark_texts_are_cleaned_and_named_after_their_last_dot(self):
+        """A benchmark's texts are cleaned before keying, as the pairs' texts were."""
+        mappings = MAPPINGS.assign(
+            source_description=[
+                "Waist <b>circumference</b>, in cm &amp; at the navel",
+                "",
+            ],
+            expected_target=[
+                "node1.sub.waist_circumference",
+                MAPPINGS.expected_target[1],
+            ],
+        )
+        targets = TARGETS.assign(
+            target_property=[
+                "node1.sub.waist_circumference",
+                *TARGETS.target_property[1:],
+            ]
+        )
+        sources, expected = leakage.benchmark_texts("abcd-benchmark", targets, mappings)
+        assert "waist circumference in cm at the navel" in set(sources.text_key)
+        assert "waist circumference" in set(expected.text_key)
+
+    def test_each_text_gets_its_key_a_repeated_one_too(self):
+        """``text_keys`` gives each text its key, a repeated text too.
+
+        The keys are those of pairs.common.text_key. Case and accents go,
+        punctuation becomes a space, ß becomes ss, and Greek letters stay.
+        """
+        spellings = pd.Series(
+            ["Abcd_Efgh (ijkl)!", "α-tocopherol", "Größe", "Größe", ""]
+        )
+        assert leakage.text_keys(spellings).tolist() == [
+            "abcd efgh ijkl",
+            "α tocopherol",
+            "grosse",
+            "grosse",
+            "",
+        ]
+
+
+def write_pairs(inputs, source, rows):
+    """Write a fictional source's pairs and their manifest, as ``pairs prepare`` would."""
+    folder = inputs / "pairs" / source
+    folder.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(rows).assign(source=source)
+    frame.to_parquet(folder / "pairs.parquet", index=False)
+    written = pd.read_parquet(folder / "pairs.parquet")
+    fetch = {"version": "1", "fetched": "2026-01-01", "files": {}}
+    record = pairs_manifest(
+        source, written, file_sha256(folder / "pairs.parquet"), {}, fetch
+    )
+    (folder / "manifest.json").write_text(json.dumps(record))
+
+
+@pytest.fixture
+def inputs(tmp_path, monkeypatch):
+    """An inputs folder with the fictional benchmark and two sources' pairs."""
+    monkeypatch.setattr(corpus.benchmarks, "BUILDERS", {"abcd-benchmark": None})
+    targets = TARGETS.to_dict("records")
+    mappings = [
+        {**row, "expected_target": row["expected_target"].split(";")}
+        for row in MAPPINGS.to_dict("records")
+    ]
+    (tmp_path / "benchmarks" / "abcd-benchmark").mkdir(parents=True)
+    benchmarks.write_benchmark(
+        tmp_path / "benchmarks" / "abcd-benchmark",
+        "abcd-benchmark",
+        "1",
+        targets,
+        mappings,
+        [],
+        {},
+    )
+    duplicate = pair("Wxyz", "Wxyz Abcd")
+    write_pairs(tmp_path, "ncit", PLANTED[:3] + [duplicate, pair("Stuv", "Stuv Abcd")])
+    write_pairs(tmp_path, "cdisc", [duplicate, pair("Opqr", "Opqr Abcd")])
+    return tmp_path
+
+
+class TestBuild:
+    """``corpus build`` on a fictional inputs folder."""
+
+    def test_a_value_list_reads_back_whole_and_in_order(self, inputs):
+        """A pair's values read back from the corpus whole and in order, the text "None" too."""
+        values = ["Mild", "Moderate", "Severe", "None"]
+        write_pairs(
+            inputs, "cdisc", [pair("Opqr", "Opqr Abcd", positive_values=values)]
+        )
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        kept, _ = corpus.read_corpus(inputs, "abcd-corpus")
+        assert list(kept.set_index("anchor_name").positive_values["Opqr"]) == values
+
+    def test_the_corpus_and_its_manifest(self, inputs, capsys):
+        """Duplicates are kept once, leaks dropped, and the manifest counts both."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        folder = inputs / "corpora" / "abcd-corpus"
+        kept = pd.read_parquet(folder / "pairs.parquet")
+        dropped = pd.read_parquet(folder / "dropped.parquet")
+        written = json.loads((folder / "manifest.json").read_text())
+        assert sorted(kept.anchor_name) == ["Opqr", "Stuv", "Wxyz"]
+        assert set(kept.split) <= {corpus.TRAIN, corpus.VALIDATION}
+        assert kept.set_index("anchor_name").source["Wxyz"] == "ncit"
+        assert dropped.finding.tolist() == [leakage.ANSWER_KEY] * 3
+        assert dropped.benchmark_source_variable_name.tolist() == [
+            "waist_cm",
+            "smoking_status",
+            "waist_cm",
+        ]
+        assert written["counts"]["rows"] == {
+            "combined": 7,
+            "duplicates_removed": 1,
+            "leakage_removed": 3,
+            "kept": 3,
+            corpus.TRAIN: int((kept.split == corpus.TRAIN).sum()),
+            corpus.VALIDATION: int((kept.split == corpus.VALIDATION).sum()),
+        }
+        assert written["counts"]["duplicates_by_source"] == {"cdisc": 1}
+        assert written["counts"]["leakage_findings"]["by_benchmark"] == {
+            "abcd-benchmark": 3
+        }
+        assert written["files"]["pairs.parquet"] == {
+            "rows": 3,
+            "sha256": file_sha256(folder / "pairs.parquet"),
+            "content_sha256": pairs_sha256(kept),
+        }
+        assert written["files"]["dropped.parquet"] == {
+            "rows": 3,
+            "sha256": file_sha256(folder / "dropped.parquet"),
+            "content_sha256": pairs_sha256(dropped),
+        }
+        assert [(source["role"], source["name"]) for source in written["sources"]] == [
+            ("pairs", "ncit"),
+            ("pairs", "cdisc"),
+            ("benchmark", "abcd-benchmark"),
+        ]
+        assert written["settings"]["validation_share"] == corpus.VALIDATION_SHARE
+        assert written["settings"]["min_name_words"] == leakage.MIN_NAME_WORDS
+        read, record = corpus.read_corpus(inputs, "abcd-corpus")
+        assert read.equals(kept) and record == written
+        printed = capsys.readouterr().out
+        assert "checked against: abcd-benchmark v1" in printed
+        assert "3 pairs dropped for leakage (findings: answer_key 3)" in printed
+
+    def test_a_rebuild_replaces_the_previous_corpus(self, inputs, capsys):
+        """A second build of one name replaces the first, and leaves no work folder."""
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
+        assert corpus.build("abcd-corpus", ["cdisc"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
+        assert set(kept.source) == {"cdisc"}
+        assert [path.name for path in (inputs / "corpora").iterdir()] == ["abcd-corpus"]
+        assert "0 pairs dropped for leakage\n" in capsys.readouterr().out
+
+    def test_sources_combine_in_their_own_order_whatever_the_order_named(self, inputs):
+        """Sources named in another order still combine in READERS' order."""
+        assert corpus.build("abcd-corpus", ["cdisc", "ncit"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
+        assert kept.set_index("anchor_name").source["Wxyz"] == "ncit"
+
+    def test_a_copy_gives_its_study_to_the_pair_kept(self, inputs, capsys):
+        """A later source's copy with a benchmark study gets the kept pair dropped."""
+        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd"), pair("Stuv", "Stuv")])
+        write_pairs(inputs, "phenx", [pair("Wxyz", "Wxyz Abcd", study="phs999902")])
+        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 0
+        dropped = pd.read_parquet(
+            inputs / "corpora" / "abcd-corpus" / "dropped.parquet"
+        )
+        assert dropped[["source", "finding", "study"]].values.tolist() == [
+            ["ncit", leakage.BENCHMARK_STUDY, "phs999902"]
+        ]
+
+    def test_the_pair_kept_holds_the_studies_of_every_copy(self, inputs):
+        """Copies in two sources give the pair kept both of their studies."""
+        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd", study="phs999555")])
+        write_pairs(inputs, "phenx", [pair("Wxyz", "Wxyz Abcd", study="phs999444")])
+        assert corpus.build("abcd-corpus", ["ncit", "phenx"], inputs) == 0
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
+        assert kept[["source", "study"]].values.tolist() == [
+            ["ncit", "phs999444|phs999555"]
+        ]
+
+    def test_a_corpus_is_read_back_checked(self, inputs):
+        """read_corpus refuses a bad name, a missing corpus, and changed pairs."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        with pytest.raises(ValueError, match="not a corpus name"):
+            corpus.read_corpus(inputs, "../abcd-corpus")
+        with pytest.raises(FileNotFoundError, match="corpus build --name efgh-corpus"):
+            corpus.read_corpus(inputs, "efgh-corpus")
+        path = inputs / "corpora" / "abcd-corpus" / "pairs.parquet"
+        pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
+        with pytest.raises(ValueError, match="differs from its manifest"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+
+    def test_a_corpus_manifest_or_columns_that_do_not_fit_are_refused(self, inputs):
+        """An empty manifest, another corpus's, or a missing column names the command."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        folder = inputs / "corpora" / "abcd-corpus"
+        record = (folder / "manifest.json").read_text()
+        (folder / "manifest.json").write_text("")
+        with pytest.raises(ValueError, match="corpus build --name abcd-corpus"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+        (folder / "manifest.json").write_text(
+            record.replace('"corpus": "abcd-corpus"', '"corpus": "efgh-corpus"')
+        )
+        with pytest.raises(ValueError, match="the manifest of corpus 'efgh-corpus'"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+        pairs = pd.read_parquet(folder / "pairs.parquet").drop(columns="split")
+        pairs.to_parquet(folder / "pairs.parquet", index=False)
+        rewritten = json.loads(record)
+        rewritten["files"]["pairs.parquet"]["sha256"] = file_sha256(
+            folder / "pairs.parquet"
+        )
+        (folder / "manifest.json").write_text(json.dumps(rewritten))
+        with pytest.raises(ValueError, match="columns that its step writes"):
+            corpus.read_corpus(inputs, "abcd-corpus")
+
+    def test_a_corpus_named_previous_can_be_rebuilt(self, inputs):
+        """The swap's own folder name cannot clash with a corpus's name."""
+        assert corpus.build("previous", ["ncit"], inputs) == 0
+        assert corpus.build("previous", ["cdisc"], inputs) == 0
+
+    def test_a_failed_swap_puts_the_previous_corpus_back(self, inputs, monkeypatch):
+        """When the new corpus cannot move into place, the previous one stays."""
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
+        rename, calls = pathlib.Path.rename, []
+
+        def failing(self, target):
+            """Fail the second rename, the new corpus's move into place."""
+            calls.append(self)
+            if len(calls) == 2:
+                raise OSError("abcd")
+            return rename(self, target)
+
+        monkeypatch.setattr(pathlib.Path, "rename", failing)
+        with pytest.raises(OSError):
+            corpus.build("abcd-corpus", ["cdisc"], inputs)
+        monkeypatch.setattr(pathlib.Path, "rename", rename)
+        kept = pd.read_parquet(inputs / "corpora" / "abcd-corpus" / "pairs.parquet")
+        assert set(kept.source) == {"ncit"}
+
+    def test_a_manifest_without_a_field_names_the_command(self, inputs, capsys):
+        """A pairs manifest that lacks a field asks for pairs prepare again."""
+        path = inputs / "pairs" / "ncit" / "manifest.json"
+        record = json.loads(path.read_text())
+        del record["files"]
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "KeyError: 'files'" in error
+        assert "pairs prepare --source ncit" in error
+        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd")])
+        record = json.loads(path.read_text())
+        del record["sources"][0]["version"]
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "KeyError: 'version'" in capsys.readouterr().err
+
+    @pytest.mark.parametrize(
+        "settings, message",
+        [
+            (None, "holds no text format"),
+            ({"format": None}, "holds no text format"),
+            ({"format": ["compact"]}, "which is not one of compact"),
+            ({"format": "abcd-format"}, "which is not one of compact"),
+        ],
+    )
+    def test_a_pairs_manifest_without_a_known_text_format_is_refused(
+        self, inputs, capsys, settings, message
+    ):
+        """Pairs whose manifest names no format of FORMATS ask for pairs prepare again."""
+        path = inputs / "pairs" / "ncit" / "manifest.json"
+        record = json.loads(path.read_text())
+        if settings is None:
+            del record["settings"]
+        else:
+            record["settings"] = settings
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert message in error
+        assert "pairs prepare --source ncit" in error
+
+    def test_sources_in_different_text_formats_are_refused(self, inputs, capsys):
+        """A corpus holds pairs of one text format, so mixed formats stop the build."""
+        path = inputs / "pairs" / "cdisc" / "manifest.json"
+        record = json.loads(path.read_text())
+        record["settings"]["format"] = "name_description"
+        path.write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "different text formats: ncit compact, cdisc name_description" in error
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
+
+    def test_the_manifest_records_the_pairs_text_format(self, inputs):
+        """The corpus's manifest copies the text format that its pairs share."""
+        other = next(name for name in texts.FORMATS if name != texts.DEFAULT_FORMAT)
+        for source in ("ncit", "cdisc"):
+            path = inputs / "pairs" / source / "manifest.json"
+            record = json.loads(path.read_text())
+            record["settings"]["format"] = other
+            path.write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs) == 0
+        _, record = corpus.read_corpus(inputs, "abcd-corpus")
+        assert record["settings"]["format"] == other
+
+    def test_the_build_command_gives_the_corpus_sources_and_share(self, inputs):
+        """The command that builds a corpus again names the sources and share it had."""
+        assert corpus.build("abcd-corpus", ["cdisc"], inputs) == 0
+        folder = inputs / "corpora" / "abcd-corpus"
+        command = "python -m embedding_model corpus build --name abcd-corpus"
+        assert corpus.build_command(folder) == (
+            f"{command} --source cdisc --validation-share {corpus.VALIDATION_SHARE}"
+        )
+        (folder / "manifest.json").unlink()
+        assert corpus.build_command(folder) == command
+
+    def test_another_sources_manifest_is_refused(self, inputs, capsys):
+        """A pairs manifest that names another source is not read as this one's."""
+        manifests = inputs / "pairs"
+        (manifests / "ncit" / "manifest.json").write_text(
+            (manifests / "cdisc" / "manifest.json").read_text()
+        )
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "the manifest of source 'cdisc'" in capsys.readouterr().err
+
+    def test_sources_without_pairs_build_no_corpus(self, inputs, capsys):
+        """Sources that hold no pairs are reported, and no corpus is written."""
+        write_pairs(inputs, "ncit", pd.DataFrame([pair()]).iloc[:0])
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "no pairs in ncit" in capsys.readouterr().err
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
+
+    def test_a_corpus_that_would_be_empty_is_not_written(self, inputs, capsys):
+        """When leakage prevention drops every pair, no corpus is written."""
+        write_pairs(inputs, "ncit", PLANTED[:3])
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "dropped all 3 pairs" in capsys.readouterr().err
+        assert not (inputs / "corpora" / "abcd-corpus").exists()
+
+    def test_pairs_that_cannot_be_read_name_the_source(self, inputs, capsys):
+        """A broken pairs file names its source and the command that remakes it."""
+        (inputs / "pairs" / "ncit" / "manifest.json").write_text("")
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "ncit/manifest.json cannot be read" in error
+        assert "pairs prepare --source ncit" in error
+
+    def test_a_missing_pairs_manifest_is_named(self, inputs, capsys):
+        """Pairs without their manifest name the manifest, not the pairs."""
+        (inputs / "pairs" / "ncit" / "manifest.json").unlink()
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "ncit/manifest.json is missing" in error
+        assert "pairs prepare --source ncit" in error
+
+    def test_pairs_without_a_column_are_refused(self, inputs, capsys):
+        """Pairs whose columns are not those of pairs prepare are not read."""
+        write_pairs(inputs, "ncit", [pair("Wxyz", "Wxyz Abcd")])
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
+        pd.read_parquet(path).drop(columns="study").to_parquet(path, index=False)
+        record = json.loads((inputs / "pairs" / "ncit" / "manifest.json").read_text())
+        record["files"]["pairs.parquet"]["sha256"] = file_sha256(path)
+        (inputs / "pairs" / "ncit" / "manifest.json").write_text(json.dumps(record))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "does not have the columns" in capsys.readouterr().err
+
+    def test_pairs_are_checked_against_the_fetch_in_the_inputs(self, inputs, capsys):
+        """Pairs from the fetch in the inputs are read; pairs from another are not."""
+        fetch = inputs / "sources" / "ncit" / "manifest.json"
+        fetch.parent.mkdir(parents=True)
+        fetch.write_text(json.dumps({"source": "ncit", "files": {}}))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 0
+        files = {"abcd-table.parquet": {"rows": 1, "content_sha256": "abcd"}}
+        fetch.write_text(json.dumps({"source": "ncit", "files": files}))
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "come from another fetch" in capsys.readouterr().err
+
+    def test_a_fetch_that_cannot_be_read_names_its_command(self, inputs, capsys):
+        """A broken fetch manifest asks for the fetch again, not for the pairs."""
+        fetch = inputs / "sources" / "ncit" / "manifest.json"
+        fetch.parent.mkdir(parents=True)
+        fetch.write_text("")
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "sources fetch --source ncit" in capsys.readouterr().err
+
+    def test_the_split_follows_a_fixed_hash_of_the_group(self):
+        """A group's side comes from a fixed hash, and NCIt and CDISC share groups.
+
+        corpus.bucket is the group id's blake2b hash, of 8 bytes, modulo
+        BUCKETS (1,000). A bucket below VALIDATION_SHARE x BUCKETS (20) is
+        validation. These two ids were picked for buckets on each side of 20.
+        """
+        assert corpus.bucket("ncit:C999904") == 20
+        assert corpus.bucket("ncit:C999909") == 19
+        pairs = pd.DataFrame(
+            {
+                "source": ["ncit", "cdisc", "cadsr", "ncit", "cdisc"],
+                "item": ["C999904", "C999904", "C999904", "C999909", "C999909"],
+                "kind": "name",
+                "anchor_name": "Wxyz",
+                "positive_name": ["Abcd", "Abcd", "Efgh", "Ijkl", "Ijkl"],
+            }
+        )
+        assert corpus.group_ids(pairs).tolist() == [
+            "ncit:C999904",
+            "ncit:C999904",
+            "cadsr:C999904",
+            "ncit:C999909",
+            "ncit:C999909",
+        ]
+        assert corpus.splits(pairs).tolist() == [
+            corpus.TRAIN,
+            corpus.TRAIN,
+            corpus.TRAIN,
+            corpus.VALIDATION,
+            corpus.VALIDATION,
+        ]
+
+    def test_items_with_one_canonical_text_share_a_group(self):
+        """Items linked by a canonical text, or through a code, take the first ``item_id`` in sorted order.
+
+        MONDO's canonical is NCIt's in lower case, CDISC shares NCIt's code
+        C999901, and the CDE's canonical is CDISC's. So these four are one
+        group, and cde:abcd1 sorts first. caDSR's canonical, Efgh, is the
+        name that NHANES describes, so those two are another group.
+        """
+        pairs = pd.DataFrame(
+            {
+                "source": ["ncit", "obo", "cdisc", "cde", "cadsr", "nhanes"],
+                "item": [
+                    "C999901",
+                    "MONDO:9999901",
+                    "C999901",
+                    "abcd1",
+                    "abcd2",
+                    "abcd3",
+                ],
+                "kind": ["name"] * 5 + ["name_to_description"],
+                "anchor_name": ["Wxyz"] * 5 + ["Efgh"],
+                "positive_name": [
+                    "Inverted Papilloma",
+                    "inverted papilloma",
+                    "Papilloma, Inverted",
+                    "Papilloma, Inverted",
+                    "Efgh",
+                    "An efgh, as a description alone.",
+                ],
+            }
+        )
+        assert corpus.group_ids(pairs).tolist() == ["cde:abcd1"] * 4 + [
+            "cadsr:abcd2",
+            "cadsr:abcd2",
+        ]
+
+    def test_canonicals_that_differ_in_punctuation_share_a_group(self):
+        """Canonicals are linked by their ``text_key``, and an empty one links nothing."""
+        pairs = pd.DataFrame(
+            {
+                "source": ["ncit", "obo", "cde", "cadsr"],
+                "item": ["C999901", "MONDO:9999901", "abcd1", "abcd2"],
+                "kind": ["name"] * 4,
+                "anchor_name": ["Wxyz"] * 4,
+                "positive_name": ["Abcd, Efgh", "abcd-efgh", "?", "?"],
+            }
+        )
+        assert corpus.group_ids(pairs).tolist() == [
+            "ncit:C999901",
+            "ncit:C999901",
+            "cde:abcd1",
+            "cadsr:abcd2",
+        ]
+
+    def test_a_larger_validation_share_keeps_the_smaller_ones_groups(self):
+        """A larger share holds out more groups, and every group of the smaller."""
+        numbers = range(2000)
+        pairs = pd.DataFrame(
+            {
+                "source": "cadsr",
+                "item": [f"abcd{number}" for number in numbers],
+                "kind": "name",
+                "anchor_name": "Wxyz",
+                "positive_name": [f"Abcd {number}" for number in numbers],
+            }
+        )
+        small = pairs.item[corpus.splits(pairs, 0.02) == corpus.VALIDATION]
+        large = pairs.item[corpus.splits(pairs, 0.1) == corpus.VALIDATION]
+        assert set(small) < set(large)
+
+    @pytest.mark.parametrize("share", [0, 1, 0.0255, -0.02])
+    def test_a_validation_share_off_the_allowed_steps_stops_the_build(
+        self, inputs, capsys, share
+    ):
+        """A share below 0.001 or above 0.999, or between two steps of 0.001, is refused before any work."""
+        assert corpus.build("abcd-corpus", ["ncit"], inputs, share) == 1
+        assert "in steps of 0.001" in capsys.readouterr().err
+        assert not (inputs / "corpora").exists()
+
+    def test_the_manifest_records_the_validation_share(self, inputs):
+        """A corpus built with another share records that share."""
+        assert corpus.build("abcd-corpus", ["ncit", "cdisc"], inputs, 0.5) == 0
+        written = json.loads(
+            (inputs / "corpora" / "abcd-corpus" / "manifest.json").read_text()
+        )
+        assert written["settings"]["validation_share"] == 0.5
+
+    def test_no_benchmark_built_stops_the_build(self, tmp_path, capsys):
+        """Without a benchmark, the corpus cannot be checked, so it is not built."""
+        assert corpus.build("abcd-corpus", ["ncit"], tmp_path) == 1
+        assert "benchmarks build" in capsys.readouterr().err
+        assert not (tmp_path / "corpora").exists()
+
+    def test_a_benchmark_with_a_file_missing_stops_the_build(self, inputs, capsys):
+        """A built benchmark that cannot be read is an error, not skipped."""
+        (
+            inputs / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_targets.csv"
+        ).unlink()
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "a benchmark cannot be read" in capsys.readouterr().err
+
+    def test_every_source_not_prepared_names_its_command(self, inputs, capsys):
+        """Each source with no pairs is named with its command, not only the first."""
+        assert corpus.build("abcd-corpus", ["ncit", "nhanes", "phenx"], inputs) == 1
+        error = capsys.readouterr().err
+        assert "pairs prepare --source nhanes" in error
+        assert "pairs prepare --source phenx" in error
+        assert "the pairs of nhanes, phenx cannot be used" in error
+
+    def test_an_unknown_source_is_named(self, inputs, capsys):
+        """A source that is not one of READERS is named, not skipped."""
+        assert corpus.build("abcd-corpus", ["ncit", "abcd-source"], inputs) == 1
+        assert "unknown: ['abcd-source']" in capsys.readouterr().err
+
+    def test_pairs_changed_since_their_manifest_are_refused(self, inputs, capsys):
+        """Pairs whose content differs from their manifest's checksum are not read."""
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
+        pd.read_parquet(path).iloc[:1].to_parquet(path, index=False)
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "differs from its manifest" in capsys.readouterr().err
+
+    def test_pairs_are_checked_by_the_bytes_of_their_file(self, inputs, capsys):
+        """The same table written again with other bytes is not the file that was written."""
+        path = inputs / "pairs" / "ncit" / "pairs.parquet"
+        pd.read_parquet(path).to_parquet(path, index=False, compression="gzip")
+        assert corpus.build("abcd-corpus", ["ncit"], inputs) == 1
+        assert "differs from its manifest" in capsys.readouterr().err
+
+    def test_a_name_that_is_not_a_folder_name_is_refused(self, inputs, capsys):
+        """A corpus name must be a plain folder name."""
+        assert corpus.build("../abcd-corpus", ["ncit"], inputs) == 1
+        assert "not a corpus name" in capsys.readouterr().err
+
+    def test_the_command(self, inputs):
+        """``corpus build`` builds a corpus from the sources named."""
+        argv = [
+            "corpus",
+            "build",
+            "--inputs",
+            str(inputs),
+            "--name",
+            "abcd-corpus",
+            "--source",
+            "ncit",
+        ]
+        assert main(argv) == 0
+        assert (inputs / "corpora" / "abcd-corpus" / "manifest.json").exists()

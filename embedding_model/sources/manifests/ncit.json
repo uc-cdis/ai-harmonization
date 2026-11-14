@@ -1,0 +1,57 @@
+{
+  "source": "ncit",
+  "version": "2",
+  "fetched": "2026-10-29",
+  "files": {
+    "concepts.parquet": {
+      "rows": 213524,
+      "sha256": "f591580cca8f3576c1840d7857e21f77588520d15072472014053ad3e69a3e6e",
+      "content_sha256": "84b0de63caf3c0f45a6bdc030a59efc2cecec6135dfc5f84a525c61613080d44"
+    },
+    "synonyms.parquet": {
+      "rows": 821596,
+      "sha256": "5a1e8b3153c2ea595d22fd818d302c4e7c648f4da402db7106bc7b2ceacfaa7c",
+      "content_sha256": "17a10a5f1d8b6ad852e10603c3be8375e398193689875a69ab8dffb819b30d0d"
+    },
+    "definitions.parquet": {
+      "rows": 242486,
+      "sha256": "db08cb85398436411ca26b9424c71ea28b769cdad05ac7b917e675683a834c72",
+      "content_sha256": "4e08865dafba9a4d983502a65282580f3fe75a13b2ee37a6e955476b505bcf97"
+    },
+    "values.parquet": {
+      "rows": 22869,
+      "sha256": "2e5647a64e8cb12605475b7972ade906ea8743ebfe57a1af57a37ae4f4a901a0",
+      "content_sha256": "25b8cd35f2464e648408f6b361232f944093d4a4a42c20a943815a060b731a35"
+    },
+    "replacements.parquet": {
+      "rows": 8462,
+      "sha256": "950e738bdbe5f750ac9752cd5f7140f60a73be7942fbc2ca27f7c299c606ac8e",
+      "content_sha256": "1151a4e322665deb557edb416d295398b1aa29c0890a626070d9801635185625"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "NCIt OWL release",
+      "location": "https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/Thesaurus_26.09d.OWL.zip",
+      "version": "26.09d",
+      "sha256": "a6b0897dc68ac9c9312e5d09db1c3d7caf1c6572452942e89cc4506c70f1877e",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ncit"
+    },
+    {
+      "role": "release",
+      "name": "NCIt history file",
+      "location": "https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/subset_cumulative_history_26.09d.zip",
+      "version": "26.09d",
+      "sha256": "e1d1e01560b37c9b4bc09ba98dc5d294775d99efddf8fc7e779d1f726e527355",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ncit"
+    }
+  ],
+  "counts": {
+    "concepts": 213524,
+    "retired_or_obsolete": 8803,
+    "replaced": 2268
+  }
+}

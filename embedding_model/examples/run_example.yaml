@@ -1,0 +1,10 @@
+# One run: a static model trained on the README's example corpus, NHANES alone.
+# It trains on a CPU in a few minutes. It keeps the code's defaults, except
+# for pinned memory.
+# docs/training.md lists every setting and its default.
+data:
+  corpus: example
+  tokenizer: example-8k
+training:
+  # The example is small enough for a CPU, where pinned memory has no use.
+  dataloader_pin_memory: false

@@ -366,10 +366,16 @@ When `dim`'s own base is an arm of another experiment, for example
 `base: size/dim512`, the new experiment reuses the runs of that arm too.
 
 The earlier experiment's folder must stay, because the new experiment reads
-the earlier experiment's runs. To delete the folder, first copy the arm's config, for example
+the earlier experiment's runs. To delete the folder, first copy the arm's
+config, for example
 `embedding_model/outputs/experiments/dim/configs/dim128.yaml`. A later
 experiment can give those settings in full, as its `base`. Its base runs then
 train again.
+
+If you delete an earlier experiment and train it again with other settings,
+train again each experiment that builds on it too. Its done runs keep the old
+base's settings, while the base runs that it reuses change. Nothing checks
+this, so its comparison would mix runs of two bases.
 
 [design_decisions.md](design_decisions.md#the-base-can-be-an-arm-of-an-earlier-experiment-whose-runs-are-reused)
 gives the reasons.

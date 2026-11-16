@@ -3340,8 +3340,12 @@ the new experiment.
   which arm was chosen.
 - Bad, because the earlier experiment's folder must stay: the new experiment
   reads the earlier experiment's runs. Without the folder, a base can still
-  give the arm's settings in full, from a copy of the arm's `configs/<arm>.yaml`. The
-  base runs then train again.
+  give the arm's settings in full, from a copy of the arm's
+  `configs/<arm>.yaml`. The base runs then train again.
+- Bad, because nothing checks that an earlier experiment keeps its settings.
+  If it is deleted and trained again with other settings, a new experiment
+  that built on it mixes runs of two bases. The user then trains the new
+  experiment again, as experiments.md says.
 - Bad, because a base run that the earlier experiment is still training
   stops the new experiment, until the run ends.
 
@@ -3351,6 +3355,10 @@ the new experiment.
 - A path to a run config as the base: its runs could not be found, and a
   first experiment would need two files. The first experiment gives its
   base's settings in its own file instead.
+- Recording each reused run by the SHA-256 of its manifest, and refusing a
+  run that changed: it would catch an earlier experiment trained again. But
+  that takes a deliberate delete, and it is rare. So the docs warn of it
+  instead.
 
 **Confirmation.** The tests in
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)

@@ -917,7 +917,9 @@ binomial test on the variables where the two models differ.
 - Bad, because a difference's interval and its test are two methods, so near
   0 they can disagree. Far from 0, the two agree. When an end of the interval
   is close to 0, the interval can just miss 0 while p is just above 0.05, or
-  the reverse.
+  the reverse. The one method that could serve both, the BCa bootstrap, has
+  no width at a share of 0 or 1. So the design takes two methods, though they
+  can disagree near 0.
 
 **Alternatives considered.**
 
@@ -3197,8 +3199,8 @@ check that:
 **Described in:** [training.md](training.md).
 
 **Context.** When no flag overrides a setting, runs of one config at several
-seeds differ only by their seed. A run is named after its config and its seed. An experiment trains each of
-its arms at several seeds.
+seeds differ only by their seed. A run is named after its config and its
+seed. An experiment trains each of its arms at several seeds.
 
 **Decision.** `train` requires the seed, as `--seed`. `--seed` overrides a
 seed in the config. An experiment lists its seeds, and refuses
@@ -3209,6 +3211,10 @@ seed in the config. An experiment lists its seeds, and refuses
 - Good, because one config trains at many seeds, with no copy of it for each
   seed.
 - Good, because a run's name says its seed, as in `run_example_s0`.
+- Good, because `train` sets the seed before it builds the model. The
+  trainer sets the seed itself only after the model is built. Without this,
+  the starting weights would come from torch's own random seed, which differs
+  in each process.
 - Bad, because a config alone does not say how to train a run: the seed is
   needed too.
 
@@ -3222,6 +3228,8 @@ seed in the config. An experiment lists its seeds, and refuses
 - the seed given reaches the run's settings, and a seed below 0 is refused
   ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py))
 - the run is named after its config and its seed
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py))
+- two BERT runs of one config and one seed give the same weights
   ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py))
 - an experiment refuses `training.seed` in its base and in an arm
   ([test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py))
@@ -3538,8 +3546,6 @@ unpaired. scipy's `ttest_ind` computes both.
 - Good, because Welch's test does not assume that the two arms vary alike,
   and loses little when they do. So it is the recommended default over
   Student's t-test ([Welch, 1947](https://doi.org/10.1093/biomet/34.1-2.28); [Delacre et al., 2017](https://doi.org/10.5334/irsp.82)).
-- Good, because at few runs, a Welch interval over the runs is recommended
-  over the bootstrap ([Knopov & Shvai, 2026](https://doi.org/10.48550/arXiv.2610.23700)).
 - Bad, because the test assumes that the mean of the seeds' scores is about
   normally distributed. With few seeds, the shape of their spread cannot be
   checked.
@@ -3554,8 +3560,9 @@ unpaired. scipy's `ttest_ind` computes both.
 - A paired t-test, by seed: it fits when a seed gives two arms the same
   start. A change, for example another table size, gives them other starting
   weights. So matching the runs by seed would carry little.
-- A bootstrap interval: at few runs, it understates the spread. Its variance
-  is short by the factor (n - 1) / n ([Knopov & Shvai, 2026](https://doi.org/10.48550/arXiv.2610.23700)).
+- A bootstrap interval: at few runs, it understates the spread. It divides
+  the variance by n, not by n - 1, so its variance is short by the factor
+  (n - 1) / n.
 - A permutation test: with 5 seeds per arm, the 10 runs split into two groups
   in only 252 ways. So its p cannot fall below 2 / 252, and it gives no
   interval directly.
@@ -3879,10 +3886,6 @@ check that:
 > Testing for Large Search and Recommendation Experiments. *Proceedings of the
 > 46th International ACM SIGIR Conference on Research and Development in
 > Information Retrieval*, 2087–2091. https://doi.org/10.1145/3539618.3592004
-
-> Knopov, D., & Shvai, N. (2026). *Equivalence testing and run-count design
-> for stochastic machine-learning experiments* (Version 1). arXiv.
-> https://doi.org/10.48550/ARXIV.2610.23700
 
 > Kopp, O., Armbruster, A., & Zimmermann, O. (2018). Markdown Architectural
 > Decision Records: Format and Tool Support. In N. Herzberg, C. Hochreiner, O.

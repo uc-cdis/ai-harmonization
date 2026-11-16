@@ -1,6 +1,6 @@
 {
   "source": "ncit",
-  "version": "2",
+  "version": "1",
   "fetched": "2026-10-29",
   "files": {
     "concepts.parquet": {

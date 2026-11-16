@@ -4,7 +4,7 @@ The model learns from pairs of texts that mean the same thing. `pairs
 prepare` makes them from the [sources](sources.md) that `sources fetch` wrote.
 
 A pair has two sides. Their names come from
-[sentence-transformers](https://sbert.net), the library that Hugging Face
+[sentence-transformers](https://sbert.net/docs/sentence_transformer/loss_overview.html#loss-table), the library that Hugging Face
 maintains and that training uses:
 
 - the **anchor**: a text as a study might word a variable, for example a
@@ -276,7 +276,7 @@ anchor takes its item's type word, or `string` when there is none.
 - It removes HTML tags. It keeps other text in angle brackets, as in
   "Candida <Debaryomycetaceae> infection".
 - It removes the characters that hold no text, as
-  [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components)
+  [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/api/normalizers#tokenizers.normalizers.BertNormalizer)
   removes them: control, format and private-use characters, for example
   zero-width spaces and direction marks.
 - It turns each run of whitespace into one space.
@@ -333,7 +333,7 @@ it as current and prints it.
 
 | source | canonical (the positive's name) | anchors | description | values | retired items replaced by |
 |---|---|---|---|---|---|
-| [NCIt](#ncit) | the preferred name | synonyms of the same meaning | the first definition, NCI's where there is one | each registry's list | [EVS](https://evs.nci.nih.gov/)'s history |
+| [NCIt](#ncit) | the preferred name | synonyms of the same meaning | the first definition, NCI's where there is one | each registry's list | [EVS's history](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt) |
 | [Ontologies](#ontologies) | the label | EXACT synonyms | the definition | none | "term replaced by" |
 | [LOINC](#loinc) | the long common name | short and display names, question texts | the definition | the default answer list | the MapTo file |
 | [CDISC](#cdisc) | a term's NCI Preferred Term, and a codelist's Codelist Name | submission values, synonyms, question texts | the first definition | a codelist's terms | none |

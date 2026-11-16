@@ -254,7 +254,7 @@ With `architecture: static`, the `model` section takes one setting:
 #### `bert`: a transformer embedding model with BERT's architecture
 
 The model is BERT's encoder, as `BertModel` of
-[transformers](https://huggingface.co/docs/transformers) builds it, without
+[transformers](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert#transformers.BertModel) builds it, without
 BERT's pretraining heads. `train` trains it from scratch: the model starts
 from random weights, not from a pretrained BERT. Its attention layers let
 each token's vector depend on the other tokens of the text. Mean pooling over
@@ -277,7 +277,7 @@ model:
 This config trains a BERT of 2 layers and 256 dimensions.
 
 With `architecture: bert`, the `model` section takes these settings of
-[`BertConfig`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertConfig),
+[`BertConfig`](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert#transformers.BertConfig),
 under its own names. The first four set the model's shape. Their defaults
 are BERT-Small's, from Google's release of smaller BERT models
 ([Turc et al., 2019](https://doi.org/10.48550/ARXIV.1908.08962)): 4 layers of
@@ -392,7 +392,7 @@ uv sync --group tracking
 Configure W&B as its quickstart says: an account, an API key, and
 `wandb login`. The trainer then logs to the project that `WANDB_PROJECT`
 names, as
-[W&B's Hugging Face page](https://docs.coreweave.com/guides/integrations/huggingface/)
+[W&B's Hugging Face page](https://docs.coreweave.com/products/wandb/integrations/huggingface_transformers#name-the-project)
 shows. Without `WANDB_PROJECT`, sentence-transformers' trainer sets the
 project `sentence-transformers`. W&B shows each run under its name, for
 example `run_example_s0`.

@@ -185,7 +185,7 @@ Every metric but the median rank is a fraction from 0 to 1, as `score`
 reports it.
 
 Each bar of `accuracy_and_mrr` is the number that `score` reports: the
-`InformationRetrievalEvaluator` of [sentence-transformers](https://sbert.net)
+`InformationRetrievalEvaluator` of [sentence-transformers](https://sbert.net/docs/package_reference/sentence_transformer/evaluation.html#informationretrievalevaluator)
 computes it. The intervals and the tests need each source variable's own
 value, not only the mean. So `compare` takes each value from the variable's
 rank, which `score` keeps in `per_variable.csv`: 1 / rank for MRR, and 1 or 0
@@ -249,7 +249,7 @@ python -m embedding_model compare --name example \
 ```
 
 Each color can be in any form that matplotlib reads, as
-[matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)
+[matplotlib's guide to colors](https://matplotlib.org/3.11.1/users/explain/colors/colors.html#color-formats)
 lists them. Two common forms are a hex code, for example `'#3f90da'`, and a
 name, for example `'tab:purple'`. Quote a hex code, because the shell reads
 `#` as the start of a comment.

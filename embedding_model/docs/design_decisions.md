@@ -75,7 +75,7 @@ library does the job:
   Hugging Face publishes a recipe that trains a static model with it
   ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)).
 - Good, because `SentenceTransformerTrainer` builds on the `Trainer` of Hugging
-  Face's [`transformers`](https://huggingface.co/docs/transformers). That
+  Face's [`transformers`](https://huggingface.co/docs/transformers/v5.17.0/en/main_classes/trainer#transformers.Trainer). That
   Trainer handles checkpoints, logging, seeds and devices, so none of this is
   our own code.
 - Good, because the library maintains and tests its losses, samplers and
@@ -204,7 +204,7 @@ check that:
 file that it reads. The bytes of a
 [parquet](https://parquet.apache.org/) file depend on the libraries that wrote
 it. The file stores each column's
-[Arrow](https://arrow.apache.org/docs/python/api/datatypes.html) type, for
+[Arrow](https://arrow.apache.org/docs/25.0/python/api/datatypes.html) type, for
 example `string`, `bool` or `int64`. CSV text loses these types. It writes
 `True` and the text `"True"` alike, and it writes a missing value like an
 empty text. Hashing a large table's content takes far longer than hashing the
@@ -219,7 +219,7 @@ written. Builds compare parquet tables by `content_sha256`, and other files by
 **Consequences.**
 
 - Good, because the same table has one `content_sha256` on every machine,
-  whichever versions of [pyarrow](https://arrow.apache.org/docs/python/) and
+  whichever versions of [pyarrow](https://arrow.apache.org/docs/25.0/python/index.html) and
   pandas wrote it. The checksum came out the same under pandas 2.2 with
   pyarrow 17 as under pandas 3.0 with pyarrow 25, for every table.
 - Good, because a change of type changes the checksum: `True` and the text
@@ -429,13 +429,13 @@ definition over the node's own keys, as `GDCDictionary` merges it.
   need other packages, and can change how it is called.
 - `DataDictionary` of dictionaryutils, the loader of Gen3's data
   dictionaries. It reads each `$ref` as a single reference, the form that
-  Gen3's dictionaries write, for example BioData Catalyst's. In the pinned
+  Gen3's dictionaries write. In the pinned
   release, a node's `$ref` can be a list of references, so version 3.5.1
   stops with an error. It would also add three packages, dictionaryutils,
   gen3dictionary and cdislogging, for a few lines of our code. And it requires
   `jsonschema` 4.23.0 or below, which the repository's lock would then hold.
 - The dictionary that GDC's API serves, at `/v0/submission/_dictionary/_all`
-  ([GDC's submission API](https://docs.gdc.cancer.gov/API/Users_Guide/Submission/)).
+  ([GDC's submission API](https://docs.gdc.cancer.gov/API/Users_Guide/Submission/#entity-json-schemas)).
   The API serves only the dictionary that GDC uses now, which can change
   without notice. So a later build could not read the pinned release. That
   dictionary's schemas still hold `$ref`s, which the build would resolve all
@@ -521,7 +521,7 @@ check that:
 target texts with `model.encode()`
 (`ai_harmonization/harmonization_approaches/embeddings.py`), and rank by
 cosine similarity (`ai_harmonization/utils.py`). By default,
-[sentence-transformers](https://sbert.net)' `InformationRetrievalEvaluator`
+[sentence-transformers](https://sbert.net/docs/package_reference/sentence_transformer/evaluation.html#informationretrievalevaluator)' `InformationRetrievalEvaluator`
 adds a model's `query` and `document` prompts instead. It also ranks by the
 similarity function that the model's config names, for example `dot`.
 
@@ -566,7 +566,7 @@ check that:
 **Context.** A data curator harmonizes a source variable by choosing its
 target from the suggestions, and needs one expected target near the top. In
 both benchmarks, many source variables have several expected
-targets. By default, [sentence-transformers](https://sbert.net)' evaluator
+targets. By default, [sentence-transformers](https://sbert.net/docs/package_reference/sentence_transformer/evaluation.html#informationretrievalevaluator)' evaluator
 reports:
 
 - the mean reciprocal rank at 10, MRR@10
@@ -924,7 +924,8 @@ binomial test on the variables where the two models differ.
 **Alternatives considered.**
 
 - The BCa bootstrap: one method for every metric. But at a share of 0 or 1
-  its interval has no width, and on small benchmarks it covers too little
+  its interval has no width. And on small benchmarks, a bootstrap interval
+  covers too little
   ([Bowyer et al., 2025](https://proceedings.mlr.press/v267/bowyer25a.html)).
 - Clopper and Pearson's exact interval: it always covers at least 95%, but it
   is wider than needed ([Brown et al.,
@@ -1199,7 +1200,7 @@ the order of `--model`.
 - A pattern on each bar, by matplotlib's hatching: it would keep the bars
   apart in black-and-white print. But up to 8 patterns crowd the bars, and
   matplotlib names no sequence of patterns, as it does of colors.
-- [Okabe and Ito's](https://jfly.uni-koeln.de/color/) eight colors, and
+- [Okabe and Ito's](https://jfly.uni-koeln.de/color/#pallet) eight colors, and
   Petroff's eight: matplotlib ships them only from 3.11, above the version
   that the repository requires. Okabe and Ito's also hold black, the color of
   the error bars and the text.
@@ -1238,7 +1239,7 @@ manifest records each color as drawn, in hex.
   so a reader can follow it from one figure to the next.
 - Good, because the colors come as a list, as `--model` and `--benchmark`
   do, and in matplotlib's own forms
-  ([matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)).
+  ([matplotlib's guide to colors](https://matplotlib.org/3.11.1/users/explain/colors/colors.html)).
 - Good, because `compare` checks the colors before it reads any score, so a
   misspelled color stops `compare` at once.
 - Good, because no two models share a color, and none is fully transparent.
@@ -1261,7 +1262,7 @@ manifest records each color as drawn, in hex.
   palette
   ([seaborn.barplot](https://seaborn.pydata.org/generated/seaborn.barplot.html))
   and plotly's `color_discrete_map`
-  ([plotly's discrete colors](https://plotly.com/python/discrete-color/))
+  ([plotly's discrete colors](https://plotly.com/python/discrete-color/#Directly-Mapping-Colors-to-Data-Values))
   take colors this way. It needs no order, and a model left out keeps its
   default. But the user must write each model again exactly as in
   `--model`, and a model id or a run's folder can be long.
@@ -1577,9 +1578,10 @@ check that:
 **Described in:** [sources.md](sources.md#cdisc) and
 [pairs.md](pairs.md#cdisc).
 
-**Context.** NCI [EVS](https://evs.nci.nih.gov/) publishes CDISC's controlled
-terminology as four [packages](sources.md#cdisc): SDTM, ADaM, Protocol and the
-Glossary, each with its own dated releases. Every CDISC term and codelist is
+**Context.** [NCI EVS](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc)
+publishes CDISC's controlled terminology in packages, each with its own dated
+releases. The fetch reads four of them: [SDTM, ADaM, Protocol and the
+Glossary](sources.md#cdisc). Every CDISC term and codelist is
 also an [NCIt](sources.md#ncit) concept. The packages hold what CDISC adds to
 the concepts: each term's submission value, the short value that a dataset
 stores, and its CDISC synonyms. They also list each codelist with its terms.
@@ -1628,7 +1630,7 @@ check that:
 **Context.** An item has a canonical and other texts, for example synonyms,
 descriptions and question texts. The task pairs a study's wording with a data
 model's property. Training uses in-batch negatives, as
-[sentence-transformers](https://sbert.net)' `MultipleNegativesRankingLoss`
+[sentence-transformers](https://sbert.net/docs/package_reference/sentence_transformer/losses.html#multiplenegativesrankingloss)' `MultipleNegativesRankingLoss`
 does. So two pairs of one item in one batch work against each other.
 
 **Decision.** Each pair joins the item's canonical to one of the item's other
@@ -2114,14 +2116,14 @@ of the groups.
   "all the samples in the validation fold come
   from groups that are not represented at all in the paired training fold"
   ([Cross-validation iterators for grouped
-  data](https://scikit-learn.org/stable/modules/cross_validation.html#group-cv)).
+  data](https://scikit-learn.org/1.9/modules/cross_validation.html#group-cv)).
 - Good, because a hash needs no random draw and no seed. So the same sources
   and benchmarks give the same split on every build. Géron (2022) splits a
   test set by a hash of each row's identifier, in the
-  [notebook of its chapter 2](https://github.com/ageron/handson-ml3/blob/main/02_end_to_end_machine_learning_project.ipynb).
+  [notebook of its chapter 2](https://github.com/ageron/handson-ml3/blob/ef1c9f5ab11083584635b9b3a7846f49c58a6084/02_end_to_end_machine_learning_project.ipynb).
 - Good, because the groups are the connected components of a graph of items
   and canonical texts, which
-  [`scipy.sparse.csgraph.connected_components`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csgraph.connected_components.html)
+  [`scipy.sparse.csgraph.connected_components`](https://docs.scipy.org/doc/scipy-1.18.0/reference/generated/scipy.sparse.csgraph.connected_components.html)
   finds.
 - Good, because an added source moves only the groups that it links.
 - Good, because a larger share only adds buckets. So a group held out at a
@@ -2284,7 +2286,7 @@ The source and the target match on different sides.
   'dirty' example as one with any N-gram overlap with any training document"
   ([Brown et al., 2020](https://doi.org/10.48550/ARXIV.2005.14165), Appendix
   C). EleutherAI's evaluation tool uses the same check, as its
-  [decontamination docs](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/decontamination.md)
+  [decontamination docs](https://github.com/EleutherAI/lm-evaluation-harness/blob/v0.4.13/docs/decontamination.md)
   say. GPT-3 sets N per benchmark, from the 5th percentile of its examples'
   lengths, between 8 and 13 words. Applied to each compared text, that rule
   gives 8 here, because the benchmarks' descriptions are short.
@@ -2386,9 +2388,9 @@ meaning. Texts hold accents, invisible characters, and compatibility
 characters, for example `µ`, `²` and `½`.
 
 **Decision.** The tokenizer normalises a text as
-[BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does for BERT's
+[BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components#normalizers) does for BERT's
 uncased models. It takes four steps: text cleaning, Unicode's
-[NFD](https://www.unicode.org/reports/tr15/#Norm_Forms), lowercase, and no
+[NFD](https://www.unicode.org/reports/tr15/tr15-58.html#Norm_Forms), lowercase, and no
 accents. It omits only the spaces that BERT's tokenizer puts around Chinese
 characters. `normalization.py` builds the steps from `BertNormalizer`,
 `NFD`, `Lowercase` and `StripAccents` of `tokenizers`. Every step that
@@ -2407,12 +2409,12 @@ compares texts uses the same normalisation.
 **Alternatives considered.**
 
 - NFKD, or NFKC as in
-  [SentencePiece](https://github.com/google/sentencepiece)'s default rule,
+  [SentencePiece](https://github.com/google/sentencepiece/blob/v0.2.3/doc/normalization.md)'s default rule,
   `nmt_nfkc`: they fold the micro sign `µ` into the Greek `μ`, which mean the
   same thing. But they also fold `x²` into `x2`, which can name another
   variable. Unicode warns: "Normalization Forms KC and KD must not be blindly
   applied to arbitrary text"
-  ([Unicode Consortium, 2026](https://www.unicode.org/reports/tr15/)).
+  ([Unicode Consortium, 2026](https://www.unicode.org/reports/tr15/tr15-58.html#Norm_Forms)).
 
   On a corpus of all the sources, NFKD would change very few training texts.
   Most changes are `µ`, `…`, `´` and `‑`. A few texts would become equal to
@@ -2512,10 +2514,12 @@ check that:
 **Described in:** [tokenizer.md](tokenizer.md#special-tokens).
 
 **Context.** A static model uses only `[UNK]`:
-[sentence-transformers](https://sbert.net)' `StaticEmbedding` turns padding
-off, and pools each text's tokens as they are. A
+sentence-transformers'
+[`StaticEmbedding`](https://sbert.net/docs/package_reference/sentence_transformer/modules.html#sentence_transformers.sentence_transformer.modules.StaticEmbedding)
+[turns padding off](https://github.com/huggingface/sentence-transformers/blob/v6.0.1/sentence_transformers/sentence_transformer/modules/static_embedding.py#L106), and pools each text's tokens as they are. A
 [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
-model pads its batches, so it needs `[PAD]`. `BertTokenizer` of `transformers`
+model pads its batches, so it needs `[PAD]`.
+[`BertTokenizer`](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert#transformers.BertTokenizer) of `transformers`
 also names `[CLS]`, `[SEP]` and `[MASK]`, which BERT's own pretraining uses.
 Removing a token moves the id of every token after it.
 
@@ -2561,7 +2565,7 @@ sentence-transformers cuts, pads and masks each batch in its own `preprocess`.
 
 **Decision.** A static run encodes its training and validation pairs once,
 before training, with `Dataset.map` of Hugging Face's
-[`datasets`](https://huggingface.co/docs/datasets). The ids have no special
+[`datasets`](https://github.com/huggingface/datasets/blob/5.0.1/src/datasets/arrow_dataset.py). The ids have no special
 tokens, and they stay in memory. The standard
 `SentenceTransformerDataCollator` takes `features` as its `preprocess_fn`,
 which builds the batch from the ids. A BERT run trains on the texts, with its
@@ -2612,7 +2616,7 @@ check that:
 **Context.** A run has settings of its own: the corpus, the tokenizer, the
 architecture, its size and the loss's scale. The trainer has many more, in
 `SentenceTransformerTrainingArguments`. The `HfArgumentParser` of
-[`transformers`](https://huggingface.co/docs/transformers) makes a flag for
+[`transformers`](https://huggingface.co/docs/transformers/v5.17.0/en/internal/trainer_utils#transformers.HfArgumentParser) makes a flag for
 every field of a dataclass. Its YAML reader takes one flat list of settings.
 PyYAML reads `1e-3` as text, because YAML 1.1 writes a number with a dot.
 
@@ -2683,7 +2687,7 @@ architecture, in the config or as a flag.
 
 - Good, because the model's kind and its shape sit in one section. A
   transformers `config.json` keeps them together too:
-  [BERT's](https://huggingface.co/google-bert/bert-base-uncased/blob/main/config.json)
+  [BERT's](https://huggingface.co/google-bert/bert-base-uncased/blob/86b5e0934494bd15c9632b12f734a8a67f723594/config.json)
   has `model_type` beside `hidden_size` and the other settings.
 - Good, because the section takes only its own architecture's settings. So
   a static model's config cannot carry BERT's by mistake.
@@ -2850,7 +2854,7 @@ The others are this pipeline's own:
   run of a few epochs.
 - Good, because four data loader workers build the next batches while the
   model trains on the current one, as
-  [PyTorch's multi-process loading](https://docs.pytorch.org/docs/stable/data.html#multi-process-data-loading)
+  [PyTorch's multi-process loading](https://docs.pytorch.org/docs/2.14/data.html#multi-process-data-loading)
   does.
 - Good, because no checkpoint is needed:
   [the model kept is the model at the last step](#the-model-kept-is-the-model-at-the-last-step).
@@ -2909,7 +2913,7 @@ encoder with the same trainer and loss. A pretrained BERT learned
 from texts that the leakage check never sees.
 
 **Decision.** `architecture: bert` builds `BertModel` of
-[`transformers`](https://huggingface.co/docs/transformers) from random weights,
+[`transformers`](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert#transformers.BertModel) from random weights,
 followed by mean pooling. It trains on the same corpus and tokenizer, with the
 same loss, trainer and defaults, except the learning rate. The model reads a
 text without special tokens, as the static model does.
@@ -3059,7 +3063,7 @@ writes that model's validation metrics.
 - Good, because a setting that the run cannot honour stops it at once,
   rather than doing nothing. The trainer does not read
   `resume_from_checkpoint` itself
-  ([`TrainingArguments`](https://huggingface.co/docs/transformers/v5.17.0/en/main_classes/trainer#transformers.TrainingArguments)),
+  ([`TrainingArguments`](https://huggingface.co/docs/transformers/v5.17.0/en/main_classes/trainer#transformers.TrainingArguments.resume_from_checkpoint)),
   and another `save_strategy` would write checkpoints that nothing reads.
 - Bad, because a run that peaks early keeps a later, worse model. The loss
   curve shows it, and an experiment can then try fewer epochs.
@@ -3284,7 +3288,7 @@ check that:
 YAML: the decision rule's fields, and each arm's test and settings by
 section. Most of its checks are of form: a field's type, its allowed values
 and its default. A few are rules of an experiment, for example different
-seeds. ai-harmonization depends on [pydantic](https://docs.pydantic.dev/),
+seeds. ai-harmonization depends on [pydantic](https://pydantic.dev/docs/validation/latest/get-started/),
 and its `SimpleDataModel` is a pydantic model. `train` reads a run's config
 with `HfArgumentParser`.
 
@@ -3422,7 +3426,7 @@ the job, not as jobs of their own.
   requeues are not needed.
 - A SLURM job array: each task would look up its run from a number, so a job
   would not be a public command either.
-- [Hydra](https://hydra.cc)'s multirun, with its submitit launcher: a second
+- [Hydra](https://hydra.cc/docs/1.3/plugins/submitit_launcher/)'s multirun, with its submitit launcher: a second
   config system beside `train`'s, whose sweeps do not express arms against a
   base.
 
@@ -3811,12 +3815,6 @@ check that:
 > Sampling. *Technometrics, 24*(4), 295–300.
 > https://doi.org/10.1080/00401706.1982.10487790
 
-> Berrendorf, M., Faerman, E., Vermue, L., & Tresp, V. (2020). Interpretable
-> and Fair Comparison of Link Prediction or Entity Alignment Methods. *2020
-> IEEE/WIC/ACM International Joint Conference on Web Intelligence and
-> Intelligent Agent Technology (WI-IAT)*, 371–374.
-> https://doi.org/10.1109/wiiat50758.2020.00053
-
 > Bowyer, S., Aitchison, L., & Ivanova, D. R. (2025). Position: Don't Use the
 > CLT in LLM Evals With Fewer Than a Few Hundred Datapoints. *Proceedings of
 > the 42nd International Conference on Machine Learning*, 81143–81184.
@@ -3917,11 +3915,6 @@ check that:
 > Correlated Proportions or Percentages. *Psychometrika, 12*(2), 153–157.
 > https://doi.org/10.1007/bf02295996
 
-> Melnik, S., Gubarev, A., Long, J. J., Romer, G., Shivakumar, S., Tolton,
-> M., & Vassilakis, T. (2010). Dremel: Interactive Analysis of Web-Scale
-> Datasets. *Proceedings of the VLDB Endowment, 3*(1-2), 330–339.
-> https://doi.org/10.14778/1920841.1920886
-
 > Muennighoff, N., Tazi, N., Magne, L., & Reimers, N. (2023). MTEB: Massive
 > Text Embedding Benchmark. *Proceedings of the 17th Conference of the
 > European Chapter of the Association for Computational Linguistics*,
@@ -3930,7 +3923,7 @@ check that:
 > Newcombe, R. G. (1998). Improved confidence intervals for the difference
 > between binomial proportions based on paired data. *Statistics in Medicine,
 > 17*(22), 2635–2650.
-> https://doi.org/10.1002/(SICI)1097-0258(19981130)17:22<2635::AID-SIM954>3.0.CO;2-C
+> https://doi.org/10.1002/(SICI)1097-0258(19981130)17:22%3C2635::AID-SIM954%3E3.0.CO;2-C
 
 > Nygard, M. (2011, November 15). *Documenting architecture decisions*.
 > Cognitect.
@@ -3979,9 +3972,6 @@ check that:
 > Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
 > (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
 
-> Speer, R. (2019). *ftfy* (Version 5.5.1) [Computer software]. Zenodo.
-> https://doi.org/10.5281/ZENODO.2591652
-
 > Student. (1908). The Probable Error of a Mean. *Biometrika, 6*(1), 1–25.
 > https://doi.org/10.2307/2331554
 
@@ -4000,7 +3990,7 @@ check that:
 > Linguistics*, 6710–6716. https://doi.org/10.18653/v1/2020.coling-main.588
 
 > Unicode Consortium. (2026). *Unicode Normalization Forms* (Unicode Standard
-> Annex #15, Revision 58). https://www.unicode.org/reports/tr15/
+> Annex #15, Revision 58). https://www.unicode.org/reports/tr15/tr15-58.html
 
 > Urbano, J. (2026). Stop Using the Wilcoxon Test: Myth, Misconception and
 > Misuse in IR Research. *Proceedings of the 49th International ACM SIGIR
@@ -4023,7 +4013,3 @@ check that:
 > Yang, S., Chiang, W.-L., Zheng, L., Gonzalez, J. E., & Stoica, I. (2023).
 > *Rethinking Benchmark and Contamination for Language Models with Rephrased
 > Samples* (Version 2). arXiv. https://doi.org/10.48550/ARXIV.2311.04850
-
-> Zeng, X., Hui, Y., Shen, J., Pavlo, A., McKinney, W., & Zhang, H. (2023). An
-> Empirical Evaluation of Columnar Storage Formats. *Proceedings of the VLDB
-> Endowment, 17*(2), 148–161. https://doi.org/10.14778/3626292.3626298

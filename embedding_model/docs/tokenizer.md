@@ -97,7 +97,7 @@ A tokenizer cuts a text into tokens in three steps:
 
 | step | what it does | example |
 |---|---|---|
-| 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does. Then it splits most accented letters into the letter and its accents (Unicode's NFD form), lowercases the text and drops the accents. | `Café` -> `cafe` |
+| 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/api/normalizers#tokenizers.normalizers.BertNormalizer) does. Then it splits most accented letters into the letter and its accents (Unicode's NFD form), lowercases the text and drops the accents. | `Café` -> `cafe` |
 | 2. split | splits at whitespace, at every punctuation character and at every ASCII symbol, for example `+`, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
 | 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `bodyweight` -> `body`, `weight` |
 
@@ -206,8 +206,9 @@ prints a note, and the manifest holds the vocabulary size reached.
 Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
 `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them,
 `[UNK]`, which stands for a character that the training texts never had.
-The `StaticEmbedding` module of [sentence-transformers](https://sbert.net),
-which Hugging Face maintains, pads nothing.
+The [`StaticEmbedding`](https://sbert.net/docs/package_reference/sentence_transformer/modules.html#sentence_transformers.sentence_transformer.modules.StaticEmbedding) module of sentence-transformers,
+which Hugging Face maintains,
+[pads nothing](https://github.com/huggingface/sentence-transformers/blob/v6.0.1/sentence_transformers/sentence_transformer/modules/static_embedding.py#L106).
 
 The [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
 model here uses `[UNK]` and `[PAD]`. `[PAD]` fills a short text in a batch.

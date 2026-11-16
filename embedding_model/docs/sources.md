@@ -276,7 +276,7 @@ in four packages:
   research terms
 
 `sources fetch` reads each package from EVS's archive at a pinned release
-date, for example `CDISC/SDTM/Archive/SDTM Terminology 2026-09-25.txt`. CDISC
+date, for example `CDISC/ADaM/Archive/ADaM Terminology 2026-09-25.txt`. CDISC
 retired the Protocol package, so its last release is older than the others.
 
 | table | one row per | columns |
@@ -289,7 +289,8 @@ concept code.
 
 **Newer releases.** EVS publishes a current package's terminology several
 times a year. A package's `Archive/` folder on EVS's server, for example
-`CDISC/SDTM/Archive/`, lists every release by date. To use a newer one, write
+`CDISC/ADaM/Archive/`, lists every release by date. SDTM's releases are in
+`CDISC/SDTM/Archive/SDTM/`. To use a newer one, write
 its date as the package's release `version`. Then make a new version, as
 [Making a new version](manifests.md#making-a-new-version) says. Each package
 has its own date, so a package without a new release keeps its pin.

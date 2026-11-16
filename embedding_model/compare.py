@@ -589,7 +589,7 @@ def benchmark_title(benchmark, benchmark_result):
             number of source variables and its number of targets.
 
     Returns:
-        str: The title, for example ``Benchmark: TOPMed v2 (900 source
+        str: The title, for example ``Benchmark: TOPMed v1 (900 source
             variables, 120 targets)``.
     """
     name = benchmarks.TITLES[benchmark]

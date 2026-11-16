@@ -184,18 +184,18 @@ release, make a new version of it:
 
 A version committed in git never changes. So a build that differs asks the
 local git checkout which version is committed at `HEAD`. For example, a
-source's manifest is committed at version 2, and a new release makes the fetch
+source's manifest is committed at version 1, and a new release makes the fetch
 differ:
 
 | the build | `version` in the manifest file | git's committed version | `--update-manifest` | result |
 |---|---|---|---|---|
-| matches | 2 | not asked | given or not | kept |
-| differs | 2 | 2 | given or not | refused: version 2 is committed, so raise `version` first |
-| differs | 3 | 2 | not given | refused: the message gives the command with `--update-manifest` |
-| differs | 3 | 2 | given | accepted as version 3: the build records its checksums in the manifest file, and you then commit the file |
-| differs | 3 | git cannot answer | given or not | refused: the message asks for a git checkout where `git status` works |
+| matches | 1 | not asked | given or not | kept |
+| differs | 1 | 1 | given or not | refused: version 1 is committed, so raise `version` first |
+| differs | 2 | 1 | not given | refused: the message gives the command with `--update-manifest` |
+| differs | 2 | 1 | given | accepted as version 2: the build records its checksums in the manifest file, and you then commit the file |
+| differs | 2 | git cannot answer | given or not | refused: the message asks for a git checkout where `git status` works |
 
 A build that matches needs no git, so it also works in a copy without git.
-Until you commit version 3, you can build and accept it as often as you need.
+Until you commit version 2, you can build and accept it as often as you need.
 A refused build is deleted, and the working folder stays as it was. An
 accepted build replaces the working folder.

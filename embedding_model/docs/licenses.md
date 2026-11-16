@@ -58,9 +58,10 @@ as [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary), and Magneto's code
 [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0). Seven of the ten
 papers are published under [CC BY-NC-ND
 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/), a Creative Commons
-NoDerivatives license. It allows sharing a file as published, but not a
-modified version of it. A benchmark table is a modified version: it is
-repaired and joined to the expert mappings.
+NonCommercial NoDerivatives license. It allows sharing a file as published,
+but not for commercial purposes, and not a modified version of it. A
+benchmark table is a modified version: it is repaired and joined to the
+expert mappings.
 
 So GDC-SM distributes only the ground truth, with instructions for rebuilding
 the tables from the publishers' originals. Likewise, this repository
@@ -130,7 +131,8 @@ state [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 The HPO license names no standard license. It asks users to:
 
-- acknowledge and cite the HPO Consortium
+- acknowledge the HPO Consortium, and cite the article that its
+  [citation page](https://hpo.jax.org/citation) names
 - show the date or version of each HPO file that they display
 - leave the files and their logical relationships unaltered
 - say in a service or product: "This service/product is using the Human
@@ -141,12 +143,12 @@ longer loads. The license is now at the address in the table.
 
 **References:**
 
-> Vasilevsky, N. A., Matentzoglu, N. A., Toro, S., Flack, J. E., Hegde, H.,
-> Unni, D. R., Alyea, G. F., Amberger, J. S., Babb, L., Balhoff, J. P.,
-> Bingaman, T. I., Burns, G. A., Buske, O. J., Callahan, T. J., Carmody, L.
-> C., Cordo, P. C., Chan, L. E., Chang, G. S., Christiaens, S. L., et al.
-> (2022). Mondo: Unifying diseases for the world, by the world.
-> https://doi.org/10.1101/2022.04.13.22273750
+> Vasilevsky, N. A., Toro, S., Matentzoglu, N., Flack, J. E., Mullen, K. R.,
+> Hegde, H., Gehrke, S., Whetzel, P. L., Shwetar, Y., Harris, N. L., Ngu, M.
+> S., Alyea, G. L., Kane, M. S., Roncaglia, P., Sid, E., Thaxton, C. L.,
+> Wood, V., Abraham, R. S., Achatz, M. I., et al. (2025). Mondo: integrating
+> disease terminology across communities. *Genetics*, *232*(4).
+> https://doi.org/10.1093/genetics/iyaf215
 
 > Gargano, M. A., Matentzoglu, N., Coleman, B., Addo-Lartey, E. B.,
 > Anagnostopoulos, A., Anderton, J., Avillach, P., Bagley, A. M., Bakštein,
@@ -237,9 +239,11 @@ licensing restrictions", on its
 
 **Website:** [cde.nlm.nih.gov](https://cde.nlm.nih.gov/).
 
-**License:** NLM's [web policies](https://www.nlm.nih.gov/web_policies.html)
+**License:** NLM's [web policies](https://www.nlm.nih.gov/web_policies.html#copyright)
 state that U.S. government works on its sites "may be freely used or reproduced
-without permission in the U.S.". Content contributed by others may be
+without permission in the U.S.". NLM asks you to name it as the source, with
+"Courtesy of the National Library of Medicine" or "Source: National Library
+of Medicine". Content contributed by others may be
 copyrighted. Each element's `copyrightStatus` and `noRenderAllowed` say which:
 an element is open when its status is "Public domain, free to use" and
 `noRenderAllowed` is false. An element without `noRenderAllowed` is closed.
@@ -258,6 +262,8 @@ an element is open when its status is "Public domain, free to use" and
 **License:** NCI states that "unless otherwise indicated, all text within
 National Cancer Institute (NCI) products is free of copyright"
 ([Reuse of NCI Information](https://www.cancer.gov/policies/copyright-reuse)).
+The same page asks you to "credit the National Cancer Institute as the
+source".
 An element of a proprietary measure has a Proprietary Measure Permission
 document, and is not open.
 
@@ -291,7 +297,7 @@ permission"
 
 **Website:** [phenxtoolkit.org](https://www.phenxtoolkit.org/).
 
-**License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq) states that
+**License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq#question-11) states that
 most of its protocols are freely available, and a small share have limited
 availability. Each protocol's `availability` says which: only "Available" is
 open. A variable whose protocol is not in `protocols`, for example one of the

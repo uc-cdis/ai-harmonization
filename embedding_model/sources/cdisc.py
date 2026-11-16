@@ -16,13 +16,15 @@ import pandas as pd
 from embedding_model.download import cached
 from embedding_model.manifests import pinned, sha256
 
-ARCHIVE = "https://evs.nci.nih.gov/ftp1/CDISC/{folder}/Archive/{file}"
-# Each package's folder and its file's name, before the release date.
+ARCHIVE = "https://evs.nci.nih.gov/ftp1/CDISC/{archive}/{file}"
+# Each package's name, its folder in EVS's CDISC archive, and its file's name
+# before the release date. EVS keeps SDTM's releases in a subfolder of its
+# archive.
 PACKAGES = {
-    "sdtm": ("SDTM", "SDTM Terminology"),
-    "adam": ("ADaM", "ADaM Terminology"),
-    "protocol": ("Protocol", "Protocol Terminology"),
-    "glossary": ("Glossary", "CDISC Glossary"),
+    "sdtm": ("SDTM", "SDTM/Archive/SDTM", "SDTM Terminology"),
+    "adam": ("ADaM", "ADaM/Archive", "ADaM Terminology"),
+    "protocol": ("Protocol", "Protocol/Archive", "Protocol Terminology"),
+    "glossary": ("Glossary", "Glossary/Archive", "CDISC Glossary"),
 }
 COLUMNS = [
     "Code",
@@ -90,10 +92,10 @@ def fetch_source(downloads, manifest):
             - the counts that the fetch prints
     """
     frames, sources, rows = [], [], {}
-    for package, (folder, stem) in PACKAGES.items():
+    for package, (_, archive, stem) in PACKAGES.items():
         released = pinned(manifest, release_name(package))["version"]
         name = f"{stem} {released}.txt"
-        url = ARCHIVE.format(folder=folder, file=quote(name))
+        url = ARCHIVE.format(archive=archive, file=quote(name))
         file_bytes = cached(url, downloads / name)
         frame = read_package(file_bytes, package)
         rows[package] = len(frame)

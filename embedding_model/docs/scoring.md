@@ -172,7 +172,7 @@ has no node, as in the training pairs of StdElement-Mapper. So two targets on
 different nodes have the same `stdelement` text when they have the same
 name, description and values. Each copy of a wrong target then takes its own
 place in the ranking. Copies of one text tie, and
-[sentence-transformers](https://sbert.net) 6 orders them by their key,
+[sentence-transformers](https://github.com/huggingface/sentence-transformers/blob/v6.0.1/sentence_transformers/sentence_transformer/evaluation/information_retrieval.py#L424-L425) 6 orders them by their key,
 `node.property`.
 
 A source variable's text has no node, in every format. Its node would be its
@@ -224,7 +224,7 @@ perfect ranking would put them at places 1 and 2. So the variable's nDCG@10
 is (1 + 0.5) / (1 + 0.63) = 0.92, while its MRR is 1.
 
 The `InformationRetrievalEvaluator` of
-[sentence-transformers](https://sbert.net), which Hugging Face maintains, ranks
+[sentence-transformers](https://sbert.net/docs/package_reference/sentence_transformer/evaluation.html#informationretrievalevaluator), which Hugging Face maintains, ranks
 the targets and computes MRR, MRR@10, nDCG@10 and accuracy@k. `score` gives
 the evaluator the model's default prompt for both the source texts and the
 target texts. It is the prompt that `model.encode()` adds. So the evaluator

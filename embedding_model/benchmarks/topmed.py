@@ -123,10 +123,9 @@ def read_documentation(archive):
 def target_rows(variables):
     """The targets: each harmonized variable's phenotype and, if it has one, age.
 
-    target_rows describes the age target as the BioData Catalyst data model
-    describes the same properties: "age at measurement of <name> (years)". It
-    spells each type as ``ai_harmonization.dbgap`` spells the sources' types,
-    so the two sides of a mapping name a type alike.
+    target_rows describes each age target as "age at measurement of <name>
+    (years)". It spells each type as ``ai_harmonization.dbgap`` spells the
+    sources' types, so the two sides of a mapping name a type alike.
 
     Args:
         variables (list[dict]): From read_documentation.

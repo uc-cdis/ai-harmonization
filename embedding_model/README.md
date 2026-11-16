@@ -21,7 +21,7 @@ The tools build, train and score the model with
 [sentence-transformers](https://sbert.net), the library for embedding models
 that UKP Lab created and Hugging Face maintains. The trainer of
 sentence-transformers builds on the `Trainer` of Hugging Face's
-[`transformers`](https://huggingface.co/docs/transformers/v5.17.0/en/index). So a trained model
+[`transformers`](https://huggingface.co/docs/transformers/v5.17.0/en/main_classes/trainer#transformers.Trainer). So a trained model
 is a sentence-transformers model, and it loads wherever one does.
 [docs/design_decisions.md](docs/design_decisions.md#the-model-is-built-trained-and-scored-with-sentence-transformers)
 says why.
@@ -68,7 +68,7 @@ uv pip install -e .
 
 `uv sync` also installs `embedding_model`'s own dependencies, for example
 [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) and
-[pyarrow](https://arrow.apache.org/docs/python/). They are in the
+[pyarrow](https://arrow.apache.org/docs/25.0/python/index.html). They are in the
 `embedding-model` dependency group of `pyproject.toml`, so installing
 `ai_harmonization` as a package leaves them out. With pip 25.1 or later,
 `pip install --group embedding-model` installs them.

@@ -172,7 +172,7 @@ Coordinating Center mapped them to the Center's harmonized variables.
 
 `benchmarks build` builds the TOPMed benchmark from the Center's harmonized
 phenotype documentation,
-[UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes),
+[UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes/tree/14960eb088d9057f3fcd04c65f609a31e0d981a1),
 at the repository's last commit, `14960eb`. The documentation covers the
 harmonized variables. For each one, it lists the harmonization units, each a
 study or a subcohort of one. For each unit, it lists the dbGaP variables that
@@ -195,8 +195,7 @@ column is a target, written `node.property` with the dataset as the node:
   description and values of its documentation file (`data_type`,
   `description`, `encoded_values`)
 - the age, `atherosclerosis.age_at_cac_score_1`, with the description "age
-  at measurement of cac_score_1 (years)", as the [BioData Catalyst](https://biodatacatalyst.nhlbi.nih.gov/) data model
-  describes the same properties
+  at measurement of cac_score_1 (years)"
 
 #### Which target a variable maps to
 

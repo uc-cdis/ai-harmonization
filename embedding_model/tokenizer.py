@@ -1,27 +1,29 @@
 """Tokenizers: the vocabulary that a model's token ids come from.
 
-``tokenizer train`` learns a vocabulary from a corpus's training pairs and
+``tokenizer train`` learns a vocabulary from a corpus's training pairs. It
 writes one tokenizer under ``<inputs>/tokenizers/<name>/``: ``tokenizer.json``,
 which Hugging Face ``tokenizers`` reads, and ``manifest.json``.
 
 The tokenizer works in three steps:
 
-1. Text is cleaned as BERT's tokenizer cleans it, which removes control and
-   format characters, such as a zero-width space. It is decomposed into
-   letters and accents (NFD), lowercased, and stripped of its accents:
-   ``Café`` becomes ``cafe``.
-2. It is split at whitespace and at every punctuation character, as
+1. The tokenizer cleans the text as BERT's tokenizer cleans it. The cleaning
+   removes control, format and private-use characters, for example a
+   zero-width space. Then the tokenizer splits most accented letters into the
+   letter and its accents (NFD), lowercases the text, and strips the accents: ``Café`` becomes
+   ``cafe``.
+2. The tokenizer splits the text at whitespace, at every punctuation
+   character and at every ASCII symbol, for example ``+``, as
    ``BertPreTokenizer`` splits it: ``SUBJECT_ID`` becomes ``subject``, ``_``
    and ``id``.
-3. Each piece is cut into vocabulary tokens by byte-pair encoding (BPE).
+3. Byte-pair encoding (BPE) cuts each piece into vocabulary tokens.
 
-The tokenizer uses BPE, since its training is reproducible: the same texts
-give the same tokens and the same ids. A token's id picks its row in the
-model's table, so other ids would give a model another starting point.
+The tokenizer uses BPE because BPE's training is reproducible: the same
+texts give the same tokens and the same ids. A token's id picks its row in
+the model's table, so other ids would give a model another starting point.
 
-Only the training pairs' texts shape the vocabulary. The diagnostics are
-measured on the training texts too: they are a sanity check that the
-tokenizer is not broken.
+Only the training pairs' texts shape the vocabulary. ``tokenizer train``
+measures the diagnostics on the training texts too: they are a sanity check
+that the tokenizer is not broken.
 """
 
 import itertools
@@ -41,21 +43,22 @@ from embedding_model.manifests import file_sha256
 from embedding_model.normalization import TOKENIZER_NORMALIZER, normalised
 
 # The special tokens of every tokenizer here, in id order. A static model uses
-# only [UNK], since StaticEmbedding pads nothing. The BERT model uses [UNK]
-# and [PAD]. [CLS], [SEP] and [MASK] are kept for a later BERT setting, and so
-# that the special tokens' ids never change.
+# only [UNK], because StaticEmbedding pads nothing. The BERT model uses [UNK]
+# and [PAD]. Every tokenizer keeps [CLS], [SEP] and [MASK], for a later BERT
+# setting and so that the special tokens' ids never change.
 PAD, UNKNOWN, CLS, SEP, MASK = "[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"
 SPECIAL_TOKENS = [PAD, UNKNOWN, CLS, SEP, MASK]
 VOCAB_SIZE = 16_000
 MIN_FREQUENCY = 2
-# How many texts are encoded at once for the diagnostics, to bound memory.
+# How many texts the tokenizer encodes at once for the diagnostics, to bound
+# memory.
 BATCH_SIZE = 100_000
 
 
 def default_name(corpus, vocab_size):
-    """A tokenizer's name: its corpus and its vocabulary size, such as ``example-8k``.
+    """A tokenizer's default name: its corpus and its vocabulary size, for example ``example-8k``.
 
-    A size that is not a multiple of 1,000 keeps its full number, such as
+    A size that is not a multiple of 1,000 keeps its full number, for example
     ``example-12500``.
     """
     size = f"{vocab_size // 1000}k" if vocab_size % 1000 == 0 else str(vocab_size)
@@ -65,10 +68,10 @@ def default_name(corpus, vocab_size):
 def training_texts(pairs):
     """The training pairs' distinct texts: the anchors, then the positives.
 
-    Each text comes once, as it is first written. Two texts are one when the
-    tokenizer normalises them to one text, as the other steps compare texts:
-    ``BMI`` and ``bmi`` count once. The order is fixed so that the input is
-    the same on every run.
+    Each text comes once, as it is first written. Two texts are one text when
+    the tokenizer normalises them to one text, so ``BMI`` and ``bmi`` count
+    once. The other steps compare texts the same way. training_texts returns
+    the texts in a fixed order, so that the input is the same on every run.
 
     Args:
         pairs (pd.DataFrame): A corpus's kept pairs, with ``split``.
@@ -102,12 +105,14 @@ def learn(texts, vocab_size, min_frequency):
     """A tokenizer trained on texts.
 
     The vocabulary always holds the special tokens and every character of the
-    texts. So a small corpus can give fewer tokens than asked for, and a size
-    below the special tokens plus the characters gives more.
+    texts. So a size below the special tokens plus the characters gives more
+    tokens than asked for. A small corpus can give fewer, because BPE stops
+    when no two adjacent tokens occur together ``min_frequency`` times or more.
 
     Args:
         texts (list[str]): The texts to learn the vocabulary from.
-        vocab_size (int): The vocabulary's size, special tokens included.
+        vocab_size (int): The vocabulary size asked for, special tokens
+            included.
         min_frequency (int): How often a merge must occur to become a token.
 
     Returns:
@@ -128,12 +133,12 @@ def learn(texts, vocab_size, min_frequency):
 def diagnostics(tokenizer, texts):
     """How a tokenizer cuts texts: a sanity check, not a measure of quality.
 
-    A word is a piece after the split at whitespace and punctuation, so
-    ``SUBJECT_ID`` holds three words. Fertility near 1 means that words stay
+    A word is a piece after the split at whitespace, punctuation and ASCII
+    symbols, so ``SUBJECT_ID`` holds three words. Fertility near 1 means that words stay
     whole. A high share of words split, or a high fertility, means that the
     vocabulary does not fit the texts. Unknown tokens mean characters that the
-    training texts never had. The texts are encoded without special tokens, as
-    a static model encodes them.
+    training texts never had. diagnostics encodes the texts without special
+    tokens, as a static model encodes them.
 
     Args:
         tokenizer (Tokenizer): The tokenizer.
@@ -142,11 +147,11 @@ def diagnostics(tokenizer, texts):
     Returns:
         dict: Four numbers:
 
-            - ``fertility``: the tokens per word;
-            - ``words_split``: the share of words cut into two or more tokens;
-            - ``unknown_rate``: the share of tokens that are UNKNOWN;
-            - ``vocabulary_used``: the share of the vocabulary's tokens,
-              specials left out, that the texts use.
+            - ``fertility``: the tokens per word
+            - ``words_split``: the share of words cut into two or more tokens
+            - ``unknown_rate``: the share of tokens that are UNKNOWN
+            - ``vocabulary_used``: the share of the vocabulary's tokens that
+              the texts use, not counting the special tokens
     """
     unknown_id = tokenizer.token_to_id(UNKNOWN)
     special_ids = {tokenizer.token_to_id(token) for token in SPECIAL_TOKENS}
@@ -187,8 +192,9 @@ def manifest(
         name (str): The tokenizer's name.
         corpus_manifest (dict): The manifest of the corpus that it learned
             from, from ``read_corpus``.
-        vocab_size (int): The vocabulary size asked for.
-        min_frequency (int): The minimum frequency of a merge.
+        vocab_size (int): The vocabulary size asked for, special tokens
+            included.
+        min_frequency (int): How often a merge must occur to become a token.
         tokenizer_sha256 (str): The SHA-256 of the written ``tokenizer.json``.
         training_text_count (int): How many training texts it learned from.
         learned_vocab_size (int): The vocabulary size reached, special tokens
@@ -247,9 +253,12 @@ def tokenizer_train_command(corpus_name, tokenizer_manifest):
 def read_tokenizer(inputs, name):
     """A trained tokenizer and its manifest, checked against each other.
 
-    Four things are checked, in this order: the name is a tokenizer name, the
-    manifest exists and names this tokenizer, ``tokenizer.json`` has the
-    SHA-256 that the manifest holds, and the file can be read.
+    read_tokenizer checks four things, in this order:
+
+    1. the name is a tokenizer name
+    2. the manifest exists and names this tokenizer
+    3. ``tokenizer.json`` has the SHA-256 that the manifest holds
+    4. ``tokenizer.json`` can be read
 
     Args:
         inputs (Path): The inputs folder that the tokenizer was trained in.
@@ -260,9 +269,14 @@ def read_tokenizer(inputs, name):
 
     Raises:
         FileNotFoundError: If no tokenizer of that name was trained there.
-        ValueError: If the name is not a tokenizer name, the manifest is
-            another tokenizer's or cannot be read, or ``tokenizer.json``
-            differs from it or cannot be read.
+        ValueError: In each of these cases:
+
+            - the name is not a tokenizer name
+            - the manifest cannot be read, is not a JSON object, or is another
+              tokenizer's
+            - the manifest holds no SHA-256 for ``tokenizer.json``, or
+              ``tokenizer.json`` differs from it
+            - ``tokenizer.json`` cannot be read
     """
     if not FOLDER_NAME.fullmatch(name):
         raise ValueError(f"{name!r} is not a tokenizer name: use {FOLDER_NAME_RULE}")
@@ -278,7 +292,7 @@ def read_tokenizer(inputs, name):
         tokenizer = Tokenizer.from_file(str(path))
     except Exception as error:
         raise ValueError(
-            f"{path} cannot be read ({type(error).__name__}: {error}); run: {command}"
+            f"{path} cannot be read ({type(error).__name__}: {error}). Run: {command}"
         ) from error
     return tokenizer, record
 
@@ -286,13 +300,14 @@ def read_tokenizer(inputs, name):
 def train(corpus, name, vocab_size, min_frequency, inputs):
     """Learn a corpus's vocabulary, and write the tokenizer with its manifest.
 
-    The tokenizer is written to a staging folder first, and replaces the
-    previous one of that name only once it is complete.
+    train writes the tokenizer to a staging folder first. The new tokenizer
+    replaces the previous one of that name only once it is complete.
 
     Args:
         corpus (str): The corpus's name, under ``<inputs>/corpora/``.
-        name (str | None): The tokenizer's name; ``default_name`` when None.
-        vocab_size (int): The vocabulary's size.
+        name (str | None): The tokenizer's name. None uses ``default_name``.
+        vocab_size (int): The vocabulary size asked for, special tokens
+            included.
         min_frequency (int): How often a merge must occur to become a token.
         inputs (Path): The inputs folder. The tokenizer goes to its
             ``tokenizers/<name>/``.
@@ -366,8 +381,8 @@ def train(corpus, name, vocab_size, min_frequency, inputs):
     if tokenizer.get_vocab_size() < vocab_size:
         print(
             f"  note: {tokenizer.get_vocab_size():,} tokens, fewer than the"
-            f" {vocab_size:,} asked for: too few merges occur at least"
-            f" {min_frequency} times in the training texts"
+            f" {vocab_size:,} asked for: no two adjacent tokens occur together"
+            f" {min_frequency} or more times"
         )
     print(
         f"  {tokenizer.get_vocab_size():,} tokens -> {destination}\n"

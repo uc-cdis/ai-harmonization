@@ -1,9 +1,9 @@
 """A static embedding table: one vector per token, averaged over a text's tokens.
 
 sentence-transformers' ``StaticEmbedding`` holds the table, in an
-``nn.EmbeddingBag`` that averages the vectors of a text's tokens. It starts
-from the EmbeddingBag's random values, so the seed set before it is built
-decides where training starts.
+``nn.EmbeddingBag`` that averages the vectors of a text's tokens. The table
+starts from the EmbeddingBag's random values, so the seed that a run sets
+before it builds the model decides where training starts.
 """
 
 from dataclasses import dataclass, field
@@ -25,7 +25,7 @@ def build(settings, tokenizer):
     """An untrained static model over a tokenizer's vocabulary.
 
     Args:
-        settings (Settings): The static model's settings; ``embedding_dim`` is the
+        settings (Settings): The static model's settings. ``embedding_dim`` is the
             length of each token's vector.
         tokenizer (Tokenizer): The tokenizer, from ``tokenizer.read_tokenizer``.
 

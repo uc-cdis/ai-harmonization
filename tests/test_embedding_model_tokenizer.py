@@ -75,7 +75,12 @@ class TestTokenizer:
     """The tokenizer's steps, its training texts and its diagnostics."""
 
     def test_text_is_cleaned_lowercased_stripped_of_accents_and_split(self):
-        """Text is normalised as BERT's tokenizer does, then split at punctuation."""
+        """The tokenizer from new_tokenizer: its normaliser and its pre-tokenizer.
+
+        The tokenizer from new_tokenizer removes invisible characters, lowercases
+        a text and strips its accents. Its pre-tokenizer splits a text at
+        whitespace and at punctuation.
+        """
         untrained = tokenizer.new_tokenizer()
         assert untrained.normalizer.normalize_str("Café Größe") == "cafe große"
         assert untrained.normalizer.normalize_str("Ab\u200bcd\u202c") == "abcd"
@@ -90,7 +95,7 @@ class TestTokenizer:
         ]
 
     def test_training_texts_are_the_training_pairs_distinct_texts(self):
-        """Anchors first, then positives, each once, without validation pairs."""
+        """training_texts: the anchors, then the positives, each once, without validation pairs."""
         texts = tokenizer.training_texts(pd.DataFrame(corpus_rows()))
         assert texts == [anchor for anchor, _ in TRAINING] + [
             "Abcd Score (float)",
@@ -107,7 +112,11 @@ class TestTokenizer:
         assert tokenizer.training_texts(found) == ["BMI", "Abcd"]
 
     def test_the_diagnostics(self):
-        """Whole words give fertility 1; a word cut into 4 tokens gives 4; unknown characters show."""
+        """diagnostics on whole words, on a word cut into 4 tokens, and on unknown characters.
+
+        Whole words give a fertility of 1, and a word cut into 4 tokens gives 4.
+        A text of unknown characters gives an unknown rate of 1.
+        """
         trained_tokenizer = tokenizer.learn(["abcd abcd", "abcd abcd"], 100, 2)
         whole = tokenizer.diagnostics(trained_tokenizer, ["abcd abcd"])
         assert (whole["fertility"], whole["words_split"]) == (1.0, 0.0)
@@ -134,10 +143,14 @@ class TestTokenizer:
 
 
 class TestTrain:
-    """``tokenizer train`` on a fictional inputs folder."""
+    """tokenizer.train, and the ``tokenizer train`` command, on a fictional inputs folder."""
 
     def test_the_tokenizer_and_its_manifest(self, inputs, capsys):
-        """The tokenizer is written with its five special tokens and a manifest of its corpus, settings and counts."""
+        """train writes the tokenizer and its manifest.
+
+        The tokenizer has its five special tokens, with the ids 0 to 4. The
+        manifest records the corpus, the settings and the counts.
+        """
         assert tokenizer.train("abcd-corpus", None, 100, 2, inputs) == 0
         folder = inputs / "tokenizers" / "abcd-corpus-100"
         trained_tokenizer = Tokenizer.from_file(str(folder / "tokenizer.json"))
@@ -194,7 +207,7 @@ class TestTrain:
         ]
 
     def test_a_missing_corpus_names_the_command(self, tmp_path, capsys):
-        """A corpus that was not built stops the training, with the command to build it."""
+        """train stops on a corpus that is not built, and prints the command that builds it."""
         assert tokenizer.train("abcd-corpus", None, 100, 2, tmp_path) == 1
         assert "corpus build --name abcd-corpus" in capsys.readouterr().err
 
@@ -210,7 +223,7 @@ class TestTrain:
         assert not (tmp_path / "tokenizers" / "abcd-corpus-100").exists()
 
     def test_a_setting_out_of_range_is_refused(self, inputs, capsys):
-        """A vocabulary of no more than the special tokens, or a frequency of 0."""
+        """train refuses a vocabulary of no more than the special tokens, or a frequency of 0."""
         assert tokenizer.train("abcd-corpus", None, 5, 2, inputs) == 1
         assert tokenizer.train("abcd-corpus", None, 100, 0, inputs) == 1
         error = capsys.readouterr().err
@@ -218,7 +231,7 @@ class TestTrain:
         assert "--min-frequency must be at least 1" in error
 
     def test_fewer_tokens_than_asked_for_are_noted(self, inputs, capsys):
-        """A small corpus that cannot fill the vocabulary says so."""
+        """train prints a note when a small corpus cannot fill the vocabulary."""
         assert tokenizer.train("abcd-corpus", None, 10_000, 2, inputs) == 0
         assert "fewer than the 10,000 asked for" in capsys.readouterr().out
 

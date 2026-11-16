@@ -1,17 +1,19 @@
 """LOINC: each code, around its long common name.
 
 The source side holds the code's short name and display name, and its
-question texts: the survey question, and its wording on each open form row.
-RELATEDNAMES2 and the consumer names are not used, since LOINC says they are
-not synonyms. The description is the code's definition.
+question texts. These are the survey question, and the code's wording on each
+open form row. ``items`` does not use RELATEDNAMES2 and the consumer names,
+because LOINC says they are not synonyms. The description is the code's
+definition.
 
 The values are the code's default answer list, in the list's own order. A
-code's default list has no panel context, whatever its link type. The codes
-written before the answers are removed as ``common.value_labels`` says.
+code's default list has no panel context, whatever its link type.
+``common.value_labels`` removes the codes written before the answers, under
+the rules in its docstring.
 
 A deprecated or discouraged code that ``MapTo.csv`` maps to another code
-gives its names to that code. The word "Deprecated" that LOINC puts before a
-deprecated code's names is removed.
+gives its names to that code. ``unmarked`` removes the word "Deprecated" that
+LOINC puts before a deprecated code's names.
 """
 
 from collections import defaultdict

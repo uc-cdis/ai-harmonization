@@ -16,7 +16,7 @@ class TestFormats:
         assert written == "demographic.sex (string): Sex Values: F | M"
 
     def test_a_source_has_no_leading_dot(self):
-        """A source variable has no node, so its text starts with its name."""
+        """A source variable has no node, so property_text starts its text with its name."""
         formatter = texts.FORMATS[texts.DEFAULT_FORMAT]
         written = texts.property_text(
             formatter, "", "AGE01", "integer", "Age at exam", None
@@ -24,9 +24,9 @@ class TestFormats:
         assert written.startswith("AGE01")
 
     def test_stdelement_shape(self):
-        """StdElement text joins its parts with pipes, and its first 12 values with ;.
+        """stdelement joins a text's parts with pipes, and its first 12 values with ``;``.
 
-        An empty description is left out.
+        stdelement drops an empty description.
         """
         values = [str(v) for v in range(MAX_VALUES_IN_PROMPT + 3)]
         written = texts.property_text(
@@ -40,17 +40,17 @@ class TestFormats:
         )
 
     def test_a_source_keeps_its_own_leading_dot(self):
-        """Only the formatter's dot is dropped, not a dot the name starts with."""
+        """property_text drops only the formatter's dot, not a dot that the name starts with."""
         formatter = texts.FORMATS[texts.DEFAULT_FORMAT]
         written = texts.property_text(formatter, "", ".AGE", "integer", "Age", None)
         assert written.startswith(".AGE ")
 
 
 class TestCompact:
-    """The default format writes each part only when the property has it."""
+    """The default format writes the description and the values only when the property has them."""
 
     def test_neither_description_nor_values_ends_at_the_type(self):
-        """A property with no description and no values leaves no separator behind."""
+        """A property with no description and no values ends at its type, with no separator."""
         assert texts.property_text(texts.compact, "a", "doi", "string", "", None) == (
             "a.doi (string)"
         )
@@ -62,7 +62,7 @@ class TestCompact:
         ) == ("sex (string) Values: F | M")
 
     def test_only_the_first_12_values_are_written(self):
-        """The values are cut to the first 12, as the formatters cut them."""
+        """compact keeps the first 12 values, as the formatters do."""
         values = [f"v{number}" for number in range(MAX_VALUES_IN_PROMPT + 3)]
         written = texts.property_text(
             texts.compact, "", "abcd_property", "string", "", values
@@ -86,7 +86,7 @@ class TestCompact:
             )
 
     def test_the_other_formats_are_the_formatters_own(self):
-        """Every other format keeps what its formatter writes, separator included."""
+        """property_text keeps the name_type_description_values formatter's text, ": " included."""
         written = texts.property_text(
             texts.FORMATS["name_type_description_values"],
             "a",

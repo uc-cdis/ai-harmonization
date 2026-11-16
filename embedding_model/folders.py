@@ -1,16 +1,16 @@
-"""Folders that a step writes whole, such as a corpus or a tokenizer.
+"""Folders that a step writes whole, for example a corpus or a tokenizer.
 
-Each is one folder under the inputs folder, named by the user. A step writes it
-inside ``staged``, which moves it into place only once the step has written it
-all. So a failed step leaves the previous folder of that name as it was.
+Each is one folder under the inputs or the outputs folder. A step writes it
+inside ``staged``, which moves the folder into place only after the step writes
+all of it. So a failed step leaves the previous folder of that name as it was.
 
 A run that is stopped with Ctrl-C deletes its staging folder. A run that is
-killed, such as by ``scancel`` or a time limit, cannot clean up. It leaves its
-hidden staging folder, ``.<name>~<random>/``, next to the folder that it
-writes. When it was killed while it swapped the two folders, the staging
-folder holds them both, and the previous folder is its ``.previous``.
-The next run of the step warns about each staging folder that is left, prints
-its path and says what to do with it.
+killed, for example by ``scancel`` or a time limit, cannot delete it. The
+killed run leaves its hidden staging folder, ``.<name>~<random>/``, next to the
+folder that it writes. If the run was killed while it swapped the two folders,
+the staging folder holds both, with the previous folder as ``.previous``. The
+next run of the step warns about each staging folder that is left. The warning
+gives the folder's path and says what to do with it.
 """
 
 import re
@@ -38,11 +38,12 @@ STAGING_MARK = "~"
 def replace(built, destination, staging):
     """Move a complete folder into place, over the previous one, if there is one.
 
-    The previous folder, from an earlier build of the same name, is first
-    renamed out of the way: into ``staging``, as ``.previous``. No FOLDER_NAME
-    starts with a dot, so the two names cannot clash. Then the new folder
-    takes its place. If that fails, the previous folder is renamed back. If
-    even that fails, it stays in ``staging``, which ``staged`` then keeps.
+    replace first renames the previous folder, from an earlier build of the
+    same name, into ``staging``, as ``.previous``. No FOLDER_NAME starts with a
+    dot, so the two names cannot clash. Then the new folder takes the previous
+    folder's place. If that rename fails, replace renames the previous folder
+    back. If even that fails, the previous folder stays in ``staging``, which
+    ``staged`` then keeps.
 
     Args:
         built (Path): The new folder.
@@ -63,11 +64,11 @@ def replace(built, destination, staging):
 def left_warning(left, destination):
     """The warning about a staging folder that a killed run left, or that another run writes now.
 
-    A run that writes the same folder at the same time, such as the same
-    ``train`` submitted twice, has a staging folder too, and nothing tells the
-    two apart. So the warning says to delete the folder only when no such run
-    is writing. The staging folder holds the previous folder, as
-    ``.previous``, when the run was killed between the two renames of
+    Another run can write the same folder at the same time, for example the
+    same ``train`` submitted twice. That run has a staging folder too, and
+    nothing tells the two apart. So the warning says to delete the folder only
+    when no such run is writing. The staging folder holds the previous folder,
+    as ``.previous``, when the run was killed between the two renames of
     ``replace``. The destination is then missing, and ``.previous`` is the
     only copy of it. Otherwise nothing in the staging folder is needed.
 
@@ -85,22 +86,26 @@ def left_warning(left, destination):
     previous = left / PREVIOUS
     if previous.exists() and not destination.exists():
         return (
-            f"{warning} It holds the previous {destination.name}, in {previous}."
-            f" If this run fails, move it back to {destination}. Otherwise,"
-            f" once no other run writes it, delete {left}."
+            f"{warning} The staging folder holds the previous {destination.name},"
+            f" in {previous}. If this run fails, move it back to {destination}."
+            f" Otherwise, once no other run writes {destination.name}, delete"
+            f" {left}."
         )
-    return f"{warning} If no other run writes it, nothing in it is needed: delete it."
+    return (
+        f"{warning} If no other run writes {destination.name}, nothing in the"
+        " staging folder is needed: delete it."
+    )
 
 
 def staging_folders(destination):
-    """The staging folders beside ``destination``: one that a run writes now, or ones that killed runs left.
+    """The staging folders beside ``destination``, from a running write or from killed runs.
 
-    A staging folder is ``.<name>~<random>/``. No FOLDER_NAME holds a ``~``,
-    so another name's staging folder never matches, such as ``.abcd.v2~x1y2``
-    for ``abcd.v2``.
+    A staging folder is ``.<name>~<random>/``. No FOLDER_NAME holds a ``~``.
+    So the staging folders of ``abcd`` never include ``.abcd.v2~x1y2``, the
+    staging folder of ``abcd.v2``.
 
     Args:
-        destination (Path): The folder that the staging folders write.
+        destination (Path): The folder that the staging folders belong to.
 
     Returns:
         list[Path]: The staging folders, sorted.
@@ -114,10 +119,10 @@ def staged(destination):
 
     The folder sits in a staging folder beside the destination, so the move
     stays on one file system. When the block ends without an error, the new
-    folder replaces the previous one. When the block raises, the new folder
-    is deleted and the previous one is kept. If the previous folder cannot be
-    put back after a failed move, the staging folder is kept, and its path is
-    printed.
+    folder replaces the previous one. When the block raises, staged deletes
+    the new folder and keeps the previous one. If a move fails and the
+    previous folder cannot return to its place, staged keeps the staging
+    folder, and prints where the previous folder is.
 
     Args:
         destination (Path): The folder to write. Its name is a FOLDER_NAME.

@@ -1,18 +1,19 @@
 """Sources: the terminologies and data dictionaries that the training pairs come from.
 
-Each source is downloaded from its publisher into
-``<inputs>/sources/downloads/<source>/`` and kept there, so reading it again
-needs no network. Its tables are written as parquet files under
+``fetch`` downloads each source from its publisher into
+``<inputs>/sources/downloads/<source>/`` and keeps it there, so reading it
+again needs no network. It writes the source's tables as parquet files under
 ``<inputs>/sources/<source>/``, beside the manifest of the fetch.
 
 A manifest committed under ``manifests/`` pins the release that each source is
 read from, as the benchmarks' manifests do. It also holds the SHA-256 of
-every table's content. A new fetch either matches it or names what differs; see
-``embedding_model.manifests``.
+every table's content. A new fetch either matches it or names what differs.
+See ``embedding_model.manifests``.
 
-Every item of a source is kept, including retired, draft and closed ones. The
-next step, ``pairs prepare``, decides which of them become training pairs. Each
-item carries an ``open`` column, set from its source's restriction field.
+A fetch keeps every item of a source, including retired, draft and closed
+items. The next step, ``pairs prepare``, decides which of them become training
+pairs. Each item carries an ``open`` column, set from its source's restriction
+field.
 """
 
 import json
@@ -47,7 +48,7 @@ def write_source(directory, name, version, tables, sources, counts):
         name (str): The source, as in FETCHERS.
         version (str): The source's version.
         tables (dict[str, pd.DataFrame]): The tables, by name.
-        sources (list[dict]): What the tables were read from; see
+        sources (list[dict]): What the tables were read from. See
             ``embedding_model/docs/sources.md`` for the fields.
         counts (dict): What the fetch counted, as its source's module prints it.
 
@@ -79,8 +80,8 @@ def read_source(inputs, name):
     """A fetched source's tables and the manifest of its fetch.
 
     Each table's file must have the ``sha256`` that its manifest holds, so
-    it is unchanged since its fetch wrote it. A warning is printed when the
-    fetch's version is not the version committed under ``manifests/``.
+    it is unchanged since its fetch wrote it. read_source prints a warning when
+    the fetch's version is not the version committed under ``manifests/``.
 
     Args:
         inputs (Path): The inputs folder that the source was fetched into.
@@ -91,10 +92,15 @@ def read_source(inputs, name):
             fetch's manifest.
 
     Raises:
-        FileNotFoundError: If the source, or one of its tables, has not been
-            fetched there.
-        ValueError: If the manifest cannot be read or names another source,
-            or a table cannot be read or differs from its manifest.
+        FileNotFoundError: If the source, or one of its tables, is not fetched
+            there.
+        ValueError: In each of these cases:
+
+            - the manifest cannot be read, is not a JSON object, or names
+              another source
+            - the manifest does not record the fetch's version and tables
+            - the manifest holds no SHA-256 for a table
+            - a table cannot be read, or differs from its manifest
     """
     directory = Path(inputs) / "sources" / name
     manifest_path = directory / "manifest.json"
@@ -106,7 +112,7 @@ def read_source(inputs, name):
     except Exception as error:
         raise ValueError(
             f"{manifest_path} does not record the fetch's version and tables"
-            f" ({type(error).__name__}: {error}); run: {command}"
+            f" ({type(error).__name__}: {error}). Run: {command}"
         ) from error
     manifests.warn_if_not_committed(
         f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
@@ -119,8 +125,8 @@ def read_source(inputs, name):
             frame = pd.read_parquet(path)
         except Exception as error:
             raise ValueError(
-                f"{path} cannot be read ({type(error).__name__}: {error});"
-                f" run: {command}"
+                f"{path} cannot be read ({type(error).__name__}: {error})."
+                f" Run: {command}"
             ) from error
         tables[file.removesuffix(".parquet")] = frame
     return tables, manifest
@@ -129,15 +135,17 @@ def read_source(inputs, name):
 def fetch(names, inputs, update_manifest=False):
     """Fetch sources at the releases that their committed manifests pin.
 
-    Each fetch is written to a staging folder first, and kept only if it
-    matches the committed manifest or ``update_manifest`` accepts it; see
-    ``manifests.decide``. A source that cannot be fetched, such as one whose
-    download needs credentials that are not set, is reported, and the others
-    are still fetched.
+    ``manifests.write_checked`` writes each fetch to a staging folder first.
+    It keeps the fetch only if the fetch matches the committed manifest or
+    ``update_manifest`` accepts it. See ``manifests.decide``.
+
+    If a source cannot be fetched, for example because its download needs
+    credentials that are not set, ``fetch`` prints the error. It still fetches
+    the other sources.
 
     Args:
         names (list[str]): Sources to fetch, from FETCHERS.
-        inputs (Path): The inputs folder; files go to its ``sources/``.
+        inputs (Path): The inputs folder. The files go to its ``sources/``.
         update_manifest (bool): Accept a fetch that differs from its
             committed manifest, under a version not committed in git, and
             record it there.
@@ -163,14 +171,14 @@ def fetch(names, inputs, update_manifest=False):
 
 
 def fetch_one(name, committed_path, root, update_manifest):
-    """Fetch one source, and swap its folder in if the fetch may be kept.
+    """Fetch one source, and replace its working folder if the fetch may be kept.
 
     ``manifests.write_checked`` writes the tables, and keeps them only if the
     committed manifest allows.
 
     Args:
         name (str): The source, from FETCHERS.
-        committed_path (Path): Its committed manifest.
+        committed_path (Path): The source's committed manifest.
         root (Path): The inputs folder's ``sources/``.
         update_manifest (bool): As in ``fetch``.
 

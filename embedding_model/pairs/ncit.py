@@ -1,18 +1,22 @@
 """NCIt: each concept, around its preferred name.
 
-The source side holds the concept's synonyms of the same meaning: NCIt's own
-synonyms (SY), other sources' preferred terms (PT), antiquated terms (AQ, AQS),
-display names (DN), abbreviations (AB), brand names (BR, FB) and country codes,
-such as ``USA`` (CA2, CA3, CS). Number codes (CNU) are not names, so they give
-no pairs.
+The source side holds the concept's synonyms of the same meaning:
+
+- NCIt's own synonyms (SY) and other sources' preferred terms (PT)
+- antiquated terms (AQ, AQS) and display names (DN)
+- abbreviations (AB) and brand names (BR, FB)
+- country codes, for example ``USA`` (CA2, CA3, CS)
+
+Number codes (CNU) are not names, so they give no pairs.
 
 The description is the concept's first definition. A ``DEFINITION`` comes
 before an ``ALT_DEFINITION``, and NCI's definition before another source's.
-The other definitions are paired with it. NCIt can end a definition with its
-source, such as "(NCI)", and this source is removed.
+``common.star`` pairs the other definitions with it. NCIt can end a definition
+with its source, for example "(NCI)", and ``without_source`` removes this
+source.
 
 A concept with value lists gives its pairs once for each distinct list. NCIt
-gives the values no order, so they are sorted by name.
+gives the values no order, so ``items`` sorts them by name.
 
 EVS's history can name a replacement for a retired or obsolete concept. The
 concept then gives its names to the replacement.
@@ -62,10 +66,11 @@ def status_of(statuses):
 
 
 def without_source(definition, sources):
-    """A definition without a trailing source of NCIt's, such as ``(NCI)``.
+    """A definition without a trailing source of NCIt's, for example ``(NCI)``.
 
-    A source with a two-digit year, such as ``(NCI04)``, is removed too. A source
-    inside a parenthesis left open, as in ``(for the Abcd (NCI)``, is kept.
+    without_source also removes a source with a two-digit year, for example
+    ``(NCI04)``. It keeps a source inside a parenthesis left open, as in
+    ``(for the Abcd (NCI)``.
 
     Args:
         definition (str): The definition.

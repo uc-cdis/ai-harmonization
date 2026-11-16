@@ -2,15 +2,17 @@
 
 ``pairs prepare`` reads the tables that ``sources fetch`` wrote. It writes each
 source's pairs to ``<inputs>/pairs/<source>/pairs.parquet``, beside their
-manifest, ``manifest.json``. The folder is written whole, through
-``folders.staged``. Each source has its own module, which reads the
-source into items. ``common.star`` then makes the pairs the same way for every
-source. ``read_pairs`` reads them back, checked against their manifest. The
-rules are in ``embedding_model/docs/pairs.md``.
+manifest, ``manifest.json``. It writes the folder whole, through
+``folders.staged``.
+
+Each source has its own module, which reads the source into items.
+``common.star`` then makes the pairs the same way for every source.
+``read_pairs`` reads the pairs back, and checks them against their manifest.
+The rules are in ``embedding_model/docs/pairs.md``.
 
 A pair keeps both rendered texts, ``anchor`` and ``positive``, and the fields
-that they were rendered from. So a later step can compare fields rather than
-strings.
+that ``common.render`` writes them from. So a later step can compare fields
+rather than strings.
 """
 
 import json
@@ -38,9 +40,9 @@ from embedding_model.normalization import normalised
 from embedding_model.sources import read_source
 from embedding_model.texts import DEFAULT_FORMAT, recorded_format
 
-# The sources, in order. When a corpus combines them, a pair found in two
-# sources is kept in the first. CDISC is published as NCIt subsets, so NCIt
-# comes before it.
+# The sources, in order. When corpus build combines them, it keeps a pair that
+# two sources share in the first of the two. NCI EVS publishes CDISC's terms as
+# NCIt subsets, so NCIt comes before CDISC.
 READERS = {
     "ncit": ncit,
     "obo": obo,
@@ -57,7 +59,8 @@ def pairs_sha256(pairs):
     """The SHA-256 of a pairs table's content, computed by ``table_sha256``.
 
     A list read back from parquet is an array, and CSV writes an array
-    differently from a list. So each value list is written as JSON first.
+    differently from a list. So pairs_sha256 writes each value list as JSON
+    first.
 
     Args:
         pairs (pd.DataFrame): A source's pairs.
@@ -75,13 +78,13 @@ def pairs_sha256(pairs):
 def new_pairs(pairs, seen):
     """Which of a source's pairs no earlier source has, by the hash of their texts.
 
-    The texts are hashed after the tokenizer's normalisation.
+    new_pairs hashes the texts after the tokenizer's normalisation.
     ``common.distinct_pairs`` compares them the same way.
 
     Args:
         pairs (pd.DataFrame): A source's pairs.
-        seen (set[int]): The hashes of the earlier sources' pairs. This
-            source's hashes are added to it.
+        seen (set[int]): The hashes of the earlier sources' pairs. new_pairs
+            adds this source's hashes to it.
 
     Returns:
         pd.Series: True where a pair is the first copy.
@@ -110,18 +113,18 @@ def ambiguous_texts(pairs):
 
 
 def manifest(name, pairs, pairs_file_sha256, counts, fetch):
-    """The manifest of a source's pairs: what they were made from, and what they hold.
+    """The manifest of a source's pairs: what they come from, and what they hold.
 
     It has the fields of every manifest, and ``settings`` and ``counts``. Its
     one input is the source's fetch, with the fetch's own record of its tables.
-    So pairs made from another fetch can be told apart. ``settings`` holds
-    ``format``, the text format that the pairs' texts are written in.
+    So ``read_pairs`` can find pairs that come from another fetch. ``settings``
+    holds ``format``, the text format of the pairs' texts.
 
     Args:
         name (str): The source, as in READERS.
         pairs (pd.DataFrame): Its pairs.
         pairs_file_sha256 (str): The SHA-256 of the pairs' written file.
-        counts (dict[str, int]): The counts ``common.star`` returns.
+        counts (dict[str, int]): The counts that ``common.star`` returns.
         fetch (dict): The manifest of the source's fetch.
 
     Returns:
@@ -161,23 +164,24 @@ def read_pairs_file(table, manifest, field, name, columns, command):
     """A table of pairs that a step wrote, and its manifest, checked against each other.
 
     ``pairs prepare`` and ``corpus build`` each write a table of pairs, and a
-    manifest that names it and holds its checksums. Five things are checked,
-    in this order:
+    manifest that names it and holds its checksums. read_pairs_file checks five
+    things, in this order:
 
-    1. the manifest exists and can be read;
-    2. the manifest names the build asked for;
+    1. the manifest exists and can be read
+    2. the manifest names the build asked for
     3. the pairs exist, and their ``sha256`` matches the manifest, so the
-       file is unchanged since its step wrote it;
-    4. the pairs can be read;
-    5. the pairs have the columns given.
+       file is unchanged since its step wrote it
+    4. the pairs can be read
+    5. the pairs have the columns given
 
-    ``content_sha256`` is not checked here: it compares the tables of two builds.
+    read_pairs_file does not check ``content_sha256``, because that checksum
+    compares the tables of two builds.
 
     Args:
         table (Path): The parquet file of the pairs.
         manifest (Path): The manifest written with it.
-        field (str): The manifest's field that names what was built, such as
-            ``source`` or ``corpus``.
+        field (str): The manifest's field that names what was built, for
+            example ``source`` or ``corpus``.
         name (str): The name that the field must hold.
         columns (list[str]): The columns that the pairs must have, in order.
         command (str): The command that writes the pairs again, for the
@@ -187,10 +191,15 @@ def read_pairs_file(table, manifest, field, name, columns, command):
         tuple[pd.DataFrame, dict]: The pairs and their manifest.
 
     Raises:
-        FileNotFoundError: If the pairs or their manifest were not written.
-        ValueError: If the pairs or the manifest cannot be read, the manifest
-            names another build, or the pairs lack a column or differ from the
-            manifest.
+        FileNotFoundError: If the pairs or their manifest are missing.
+        ValueError: In each of these cases:
+
+            - the manifest cannot be read, is not a JSON object, or names
+              another build
+            - the manifest holds no SHA-256 for the pairs, or the pairs differ
+              from it
+            - the pairs cannot be read
+            - the pairs do not have the columns given, in order
     """
     record = manifests.read(manifest, command, field, name)
     manifests.check_file(table, record, manifest, command)
@@ -198,12 +207,12 @@ def read_pairs_file(table, manifest, field, name, columns, command):
         pairs = pd.read_parquet(table)
     except Exception as error:
         raise ValueError(
-            f"{table} cannot be read ({type(error).__name__}: {error});"
-            f" run: {command}"
+            f"{table} cannot be read ({type(error).__name__}: {error})."
+            f" Run: {command}"
         ) from error
     if list(pairs.columns) != columns:
         raise ValueError(
-            f"{table} does not have the columns that its step writes; run: {command}"
+            f"{table} does not have the columns that its step writes. Run: {command}"
         )
     return pairs, record
 
@@ -212,8 +221,8 @@ def read_pairs(inputs, name):
     """A source's pairs and their manifest, checked against each other.
 
     The manifest holds the pairs' file, the fetch that they come from, and
-    the text format of their texts. When that fetch is in the inputs folder,
-    the pairs must come from it.
+    the text format of their texts. If the inputs folder holds a fetch of the
+    source, the pairs must come from that fetch.
 
     Args:
         inputs (Path): The inputs folder that the pairs were prepared in.
@@ -224,10 +233,18 @@ def read_pairs(inputs, name):
 
     Raises:
         FileNotFoundError: If the source's pairs were not prepared there.
-        ValueError: If the pairs, their manifest or the fetch's manifest cannot
-            be read, the manifest is another source's or holds no text
-            format of FORMATS, the pairs lack a column or differ from their
-            manifest, or they come from another fetch.
+        ValueError: In each of these cases:
+
+            - the pairs or their manifest cannot be read, the manifest is not
+              a JSON object, or the manifest is another source's
+            - the manifest holds no SHA-256 for the pairs, or the pairs differ
+              from it
+            - the pairs do not have the columns of ``common.COLUMNS``, in order
+            - the manifest does not record the fetch, or holds no text format
+              of FORMATS
+            - the fetch's manifest cannot be read, is not a JSON object, or is
+              another source's
+            - the pairs come from another fetch
     """
     folder = Path(inputs) / "pairs" / name
     manifest_path = folder / "manifest.json"
@@ -244,17 +261,17 @@ def read_pairs(inputs, name):
     except Exception as error:
         raise ValueError(
             f"{manifest_path} does not record the fetch of {name}"
-            f" ({type(error).__name__}: {error}); run: {command}"
+            f" ({type(error).__name__}: {error}). Run: {command}"
         ) from error
-    recorded_format(record, manifest_path, f"run: {command}")
+    recorded_format(record, manifest_path, f"Run: {command}")
     if not fetch_path.exists():
         return pairs, record
     fetch_command = f"python -m embedding_model sources fetch --source {name}"
     fetch_manifest = manifests.read(fetch_path, fetch_command, "source", name)
     if fetch_manifest.get("files") != fetched:
         raise ValueError(
-            f"{name}'s pairs come from another fetch than {fetch_path.parent};"
-            f" run: {command}"
+            f"{name}'s pairs come from another fetch than {fetch_path.parent}."
+            f" Run: {command}"
         )
     return pairs, record
 
@@ -281,7 +298,7 @@ def prepare_one(name, inputs):
         )
         manifests.write(built / "manifest.json", pairs_manifest)
     print(
-        f"  {len(pairs):,} pairs from {counts['items']:,} items; "
+        f"  {len(pairs):,} pairs from {counts['items']:,} items, "
         f"{counts['items_not_open']:,} items not open, "
         f"{counts['duplicates_removed']:,} duplicate pairs removed -> {destination}"
     )
@@ -291,9 +308,9 @@ def prepare_one(name, inputs):
 def prepare(names, inputs):
     """Make the pairs of fetched sources, in READERS' order.
 
-    A source that cannot be read is reported, and the others are still
-    prepared. Then, for each source, ``new_pairs`` counts the pairs that an
-    earlier source in the same run also has.
+    If prepare cannot prepare a source, it prints the error, and still
+    prepares the other sources. After it prepares each source, ``new_pairs``
+    counts the source's pairs that an earlier source in the same run also has.
 
     Args:
         names (list[str]): Sources to prepare, from READERS.

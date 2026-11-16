@@ -2,10 +2,10 @@
 
 The OWL API writes NCIt's and the OBO Foundry ontologies' files. Such a file
 holds one ``owl:Class`` block per term and one ``owl:Axiom`` block per
-annotated statement. An axiom adds details to one of the class's statements: a
-synonym's type, say, or a definition's source. defusedxml parses the files: it
-refuses entity declarations and external references, which none of the files
-read here has.
+annotated statement. An axiom adds details to one of the class's statements,
+for example a synonym's type or a definition's source. defusedxml parses the
+files: it refuses entity declarations and external references, which none of
+the files read here has.
 """
 
 from defusedxml.ElementTree import iterparse
@@ -22,10 +22,10 @@ DEFINED_PARENT = OWL + "intersectionOf"
 def statements(element):
     """An element's annotations, as (property, value) tuples.
 
-    A value is the child's text, or the IRI that it points to. The text is kept
-    exactly as written, since an axiom finds the statement that it annotates by
-    that text. A defined class's parents are kept as ``DEFINED_PARENT``
-    statements. Other nested structures are skipped.
+    A value is the child's text, or the IRI that it points to. ``statements`` keeps
+    the text exactly as written, because an axiom finds the statement that it
+    annotates by that text. It keeps a defined class's parents as
+    ``DEFINED_PARENT`` statements, and skips other nested structures.
 
     Args:
         element (xml.etree.ElementTree.Element): An ``owl:Class`` or another
@@ -57,13 +57,18 @@ def read_owl(stream):
         stream (file): The OWL file, opened in binary mode.
 
     Returns:
-        dict: ``ontology``, the header's statements; ``classes`` and
-            ``properties``, each by IRI, as lists of statements; and
-            ``axioms``, keyed by (subject, property, value), each a list of
-            the axioms' annotations, every annotation a list of values. One
-            statement can carry several axioms, such as a synonym from two
-            sources. One axiom can carry several values, such as a synonym with
-            two types.
+        dict: Four keys:
+
+            - ``ontology``: the header's statements
+            - ``classes`` and ``properties``: each by IRI, as lists of
+              statements
+            - ``axioms``: by (subject, property, value), a list with one dict
+              per axiom. Each dict gives the axiom's annotations: the values
+              of each property, as a list.
+
+            One statement can carry several axioms, for example a synonym from
+            two sources. One axiom can carry several values, for example a
+            synonym with two types.
     """
     owl = {"ontology": [], "classes": {}, "properties": {}, "axioms": {}}
     depth, root = 0, None

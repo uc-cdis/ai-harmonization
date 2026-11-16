@@ -1,15 +1,15 @@
 """NHANES: each variable of each data file, around its codebook text.
 
-A variable in one data file is one item, since each data file has its own
+A variable in one data file is one item, because each data file has its own
 codebook. The canonical is the codebook's English Text: the question asked,
 without the form's number for it, or what the variable measures. When a
-codebook has none, the SAS label is used, or else the variable list's
+codebook has none, ``items`` uses the SAS label, or else the variable list's
 description. The source side holds the variable's name, and its SAS label and
 description where they differ.
 
 The values are the codebook's value labels, in its order. Three labels
-describe the codebook's rows rather than a value, so they are left out:
-``Range of Values``, ``Value was recorded`` and ``Missing``.
+describe the codebook's rows rather than a value, so ``items`` leaves them
+out: ``Range of Values``, ``Value was recorded`` and ``Missing``.
 """
 
 from embedding_model.pairs.common import Item, Text, clean, without_item_number

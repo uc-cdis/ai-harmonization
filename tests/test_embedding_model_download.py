@@ -19,7 +19,10 @@ class TestCached:
     """Downloading a file once, and keeping only the real file."""
 
     def test_downloads_once_and_leaves_no_partial_file(self, monkeypatch, tmp_path):
-        """The first call fetches and keeps the file; later calls read it back."""
+        """cached fetches and keeps the file once, and later reads the kept file.
+
+        No partial file is left.
+        """
         fetch = MagicMock(return_value=b"data")
         monkeypatch.setattr(download, "fetch", fetch)
         path = tmp_path / "sub" / "file.bin"
@@ -31,7 +34,7 @@ class TestCached:
         assert list(path.parent.iterdir()) == [path]
 
     def test_an_html_answer_is_not_kept(self, monkeypatch, tmp_path):
-        """An HTML page served for a spreadsheet raises, and nothing is kept."""
+        """cached raises when the server sends an HTML page for a spreadsheet, and keeps nothing."""
         monkeypatch.setattr(download, "session", lambda: served_html())
         path = tmp_path / "table.xlsx"
         with pytest.raises(ValueError, match="HTML page"):
@@ -39,7 +42,7 @@ class TestCached:
         assert list(tmp_path.iterdir()) == []
 
     def test_a_failed_check_keeps_nothing(self, monkeypatch, tmp_path):
-        """A download that its check refuses raises, and nothing is kept."""
+        """downloaded raises when its check refuses a download, and keeps nothing."""
         monkeypatch.setattr(download, "fetch", lambda url, **request: b"abcd")
         check = MagicMock(side_effect=ValueError("not the file"))
         with pytest.raises(ValueError, match="not the file"):
@@ -49,7 +52,7 @@ class TestCached:
         assert list(tmp_path.iterdir()) == []
 
     def test_a_listing_page_is_kept(self, monkeypatch, tmp_path):
-        """A folder listing is HTML by nature, so it is kept."""
+        """downloaded keeps an HTML page under an .html name, for example a folder listing."""
         monkeypatch.setattr(download, "session", lambda: served_html())
         path = tmp_path / "listing.html"
         assert download.downloaded("https://example.org/", path) == path
@@ -62,7 +65,7 @@ class TestGithubArchive:
     def test_the_archive_of_the_commit_is_kept_under_its_hash(
         self, monkeypatch, tmp_path
     ):
-        """The commit's archive is fetched from codeload and kept as <commit>.tar.gz."""
+        """github_archive fetches the archive from codeload, and keeps it as <commit>.tar.gz."""
         cached = MagicMock(return_value=b"archive")
         monkeypatch.setattr(download, "cached", cached)
         archive = download.github_archive(
@@ -79,7 +82,7 @@ class TestFetch:
     """How ``download.fetch`` asks a server."""
 
     def test_a_body_is_posted_and_credentials_are_sent(self, monkeypatch):
-        """Without a body the request is a GET; with one, a POST. Credentials go with both."""
+        """fetch sends a GET without a body, and a POST with one. It passes its auth to both."""
         client = MagicMock()
         client.get.return_value.content = b"abcd"
         monkeypatch.setattr(download, "session", lambda: client)
@@ -94,7 +97,7 @@ class TestFetch:
         )
 
     def test_an_html_page_is_refused_unless_asked_for(self, monkeypatch):
-        """A text/html response raises with its URL, unless html_ok asks for a page."""
+        """fetch raises on a text/html response, with its URL, unless html_ok asks for a page."""
         monkeypatch.setattr(download, "session", lambda: served_html())
         url = "https://example.org/api"
         with pytest.raises(ValueError, match=f"{url} returned an HTML page"):
@@ -102,7 +105,7 @@ class TestFetch:
         assert download.fetch(url, html_ok=True).startswith(b"<html>")
 
     def test_the_session_retries_a_busy_server(self):
-        """A busy server's answer, 429 or 503, is tried again, after a wait, for a POST too."""
+        """The session retries a busy server's 429 or 503 after a wait, for a POST too."""
         retries = download.session().get_adapter("https://example.org").max_retries
         assert retries.total > 0
         assert retries.backoff_factor > 0

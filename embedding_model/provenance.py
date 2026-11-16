@@ -1,6 +1,7 @@
-"""What a score or a trained model was made with: the code's commit, a model's revision.
+"""What a result was made with: the code's commit, a model's revision and the libraries' versions.
 
-Scoring and training both record them, so that a result can be traced back to
+``score`` records all three. ``train``, ``compare`` and ``experiment compare``
+record the commit and the libraries' versions. So a result can be traced to
 the code and the model that produced it.
 """
 
@@ -34,8 +35,8 @@ CODE_PATHS = [
 def code_commit(folder=Path(__file__).resolve().parent):
     """The ai-harmonization commit of the code that made a result.
 
-    Only what can change a result counts as an uncommitted change: CODE_PATHS,
-    the Python files of the two packages and the files that pin the
+    Only what can change a result counts as an uncommitted change. That is
+    CODE_PATHS: the Python files of the two packages and the files that pin the
     dependencies. A changed doc does not count.
 
     Args:
@@ -45,7 +46,7 @@ def code_commit(folder=Path(__file__).resolve().parent):
     Returns:
         dict: ``commit``, the commit at ``HEAD``, and ``uncommitted_changes``,
             whether a file of CODE_PATHS differs from it or is new. Both are
-            None when git cannot be asked.
+            None when git cannot answer.
     """
     try:
         commit = manifests.git(folder, "rev-parse", "HEAD").strip()
@@ -60,13 +61,14 @@ def code_commit(folder=Path(__file__).resolve().parent):
 def model_revision(model):
     """The Hugging Face commit of a model loaded by its id, read from the cache.
 
-    Loading a model by id downloads it into the Hugging Face cache, under its
-    commit. The commit is read from there, with no network, in the cache that
-    SentenceTransformer uses: ``SENTENCE_TRANSFORMERS_HOME``, where set.
+    Loading a model by its id downloads the model into the Hugging Face cache,
+    under its commit. model_revision reads the commit from there, with no
+    network, in the cache that SentenceTransformer uses:
+    ``SENTENCE_TRANSFORMERS_HOME``, where set.
 
-    The id is looked up as given. SentenceTransformer reads an id with no
-    owner, such as ``all-MiniLM-L6-v2``, as a ``sentence-transformers/``
-    model, so such an id gives None.
+    model_revision looks for the id as given. SentenceTransformer reads an id
+    with no owner, for example ``all-MiniLM-L6-v2``, as a
+    ``sentence-transformers/`` model. So such an id gives None.
 
     Args:
         model (str): A Hugging Face model id or a model folder on disk.
@@ -94,8 +96,9 @@ def library_versions(libraries=MODEL_LIBRARIES):
     """The versions of Python and of some libraries.
 
     Each version is the module's ``__version__``, as a plain str. torch's own
-    is a TorchVersion, a kind of str that YAML cannot write. It also keeps its
-    build, such as ``+cu130``, which the package's metadata leaves out.
+    ``__version__`` is a TorchVersion, a kind of str that YAML cannot write. It
+    also keeps torch's build, for example ``+cu130``, which the package's
+    metadata leaves out.
 
     Args:
         libraries (tuple[str]): The libraries, by their modules' names.

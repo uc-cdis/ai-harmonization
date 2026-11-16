@@ -2,14 +2,14 @@
 
 NHANES publishes no machine-readable variable list. Its variable-list pages,
 one per component, list every variable with its data file. Each data file has
-a codebook page. For each variable it gives the fields in CODEBOOK_FIELDS,
-such as its question ("English Text") and target group, and a table of its
-codes and their labels.
+a codebook page. For each variable, the codebook page gives the fields in
+CODEBOOK_FIELDS, for example its question ("English Text") and target group.
+It also gives a table of the variable's codes and their labels.
 
-NHANES serves only the current state of its pages, so both kinds are kept
-after the first fetch, and identified by their SHA-256. The data files whose
-codebook page is not found are kept in a list, so a later fetch needs no
-network either.
+NHANES serves only the current state of its pages. So the fetch keeps both
+kinds of page after the first fetch, and identifies them by their SHA-256. The
+fetch keeps a list of the data files whose codebook page is not found, so a
+later fetch needs no network either.
 """
 
 import hashlib
@@ -28,8 +28,9 @@ VARIABLE_LIST = (
 CODEBOOK = (
     "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/{cycle}/DataFiles/{data_file}.htm"
 )
-# A data file's name, such as "DEMO_J". It goes into a file path and an address,
-# so a variable list that names a data file with other characters is refused.
+# A data file's name, for example "DEMO_J". It goes into a file path and an
+# address, so a variable list that names a data file with other characters is
+# refused.
 DATA_FILE = re.compile(r"[A-Za-z0-9_]+")
 COMPONENTS = ["Demographics", "Dietary", "Examination", "Laboratory", "Questionnaire"]
 LIST_COLUMNS = {
@@ -48,7 +49,8 @@ LIST_COLUMNS = {
 OPEN_USE_CONSTRAINTS = {"None", "RDC Only"}
 CLOSED_USE_CONSTRAINTS = set()
 # Text that every page of each kind holds. A page without it is not that page,
-# such as a server's own error or bot-check page, though served with success.
+# for example a server's own error or bot-check page, though served with
+# success.
 LIST_MARKER = b"Use Constraints"
 CODEBOOK_MARKER = b'class="vartitle"'
 NOT_FOUND = "not_found.txt"
@@ -117,9 +119,10 @@ def read_variable_list(page):
 def read_codebook(page):
     """The variables of one codebook page, and each one's value table.
 
-    Every row of a value table is kept: a code and its label, a "Range of
-    Values" row and a "Missing" row alike. A field given more than once, such
-    as a variable's targets, keeps every value, joined by ``|``.
+    read_codebook keeps every row of a value table: a code and its label, a
+    "Range of Values" row and a "Missing" row alike. A field given more than
+    once, for example a variable's targets, keeps every value, joined by
+    ``|``.
 
     Args:
         page (bytes): The codebook page.
@@ -181,7 +184,7 @@ def page(url, path, marker):
     def check(file_bytes):
         """Raise unless the page holds its marker."""
         if marker not in file_bytes:
-            raise ValueError(f"{url} answered with another page; nothing was kept")
+            raise ValueError(f"{url} answered with another page. Nothing was kept")
 
     return downloaded(url, path, check=check).read_bytes()
 
@@ -223,26 +226,31 @@ def keep_not_found(path, data_files):
 def fetch_source(downloads, manifest):
     """Fetch the variable lists and every data file's codebook.
 
-    Some data files have no public codebook page, such as those restricted
-    to the Research Data Center. They are listed in
-    ``codebooks/not_found.txt``, and not asked for again. Any other failure
-    to download a page stops the fetch.
+    Some data files have no public codebook page, for example data files
+    restricted to the Research Data Center. fetch_source lists them in
+    ``codebooks/not_found.txt``, and does not ask for them again. Any other
+    failure to download a page stops the fetch.
 
     Args:
         downloads (Path): Where downloaded pages are kept between fetches.
-        manifest (dict): The committed manifest. Nothing is pinned ahead:
-            NHANES serves only its current pages.
+        manifest (dict): The committed manifest. Nothing is pinned ahead,
+            because NHANES serves only its current pages.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables ``variables``,
-            ``codebook`` and ``values``, which share the key ``cycle``,
-            ``data_file`` and ``name``; the manifest's sources; and the counts
-            that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables ``variables``, ``codebook`` and ``values``, which
+              share the key ``cycle``, ``data_file`` and ``name``
+            - the manifest's sources
+            - the counts that the fetch prints
 
     Raises:
-        ValueError: If a variable list is not the page it should be, or names a
-            data file with characters other than letters, digits and
-            underscores.
+        ValueError: In each of these cases:
+
+            - a variable list is not the page that it should be, or lacks one
+              of LIST_COLUMNS
+            - a variable list names a data file with characters other than
+              letters, digits and underscores
         RuntimeError: If a codebook page could not be downloaded for another
             reason than not being found. The pages kept are not downloaded
             again, so a new fetch tries only the rest.
@@ -311,7 +319,7 @@ def fetch_source(downloads, manifest):
             keep_not_found(listed, known | set(missing))
             raise RuntimeError(
                 f"the codebook page {url} could not be downloaded ({error})."
-                " Fetch again: the pages kept are not asked for again."
+                " Fetch again. The next fetch does not ask for the kept pages again."
             ) from error
         read.append(path)
         digest.update(f"{codebook_name}:".encode() + hashlib.sha256(text).digest())
@@ -329,9 +337,8 @@ def fetch_source(downloads, manifest):
     }
     print(f"  {open_count(variables.open, 'variables')}")
     print(
-        f"  {counts['data_files']:,} data files;"
-        f" {counts['data_files_without_codebook']:,} data files without a public"
-        " codebook"
+        f"  {counts['data_files']:,} data files:"
+        f" {counts['data_files_without_codebook']:,} without a public codebook"
     )
     sources.append(
         {

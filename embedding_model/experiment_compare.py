@@ -3,7 +3,7 @@
 ``experiment compare`` reads each run's score on the validation pairs, by the
 decision's metric, from the run's manifest. It compares each arm with the
 base by Welch's interval and t-test, at the decision's alpha split over the
-arms, and gives each arm its verdict and the seeds that its test needs. It
+arms. It gives each arm its verdict, and the seeds that its test needs. It
 writes ``comparison/`` in the experiment's folder whole: ``arms.csv``,
 ``differences.csv``, the figure in ``figures/`` and ``manifest.json``. It
 prints the verdicts, the recommendation, and the ``base:`` line that builds
@@ -68,12 +68,15 @@ BAND = "#f4f3f0"
 # The figure's color for the base and for each test: three of matplotlib's
 # petroff10 colors, its blue, dark orange and purple, by their places in the
 # sequence. They stay apart under each color vision deficiency, and keep a 3:1
-# contrast on white and on BAND. Red is left out, which a user could take
-# for a failed test.
+# contrast on white and on BAND. Red is left out, because a user could take
+# it for a failed test.
 ROLE_COLOR_PLACES = {"base": 0, "non-inferiority": 6, "superiority": 4}
-# Each test's verdict, by the arm's outcome: it passes its test; it does not,
-# and its interval still reaches the margin, so its question stays open; or
-# its interval lies wholly past the margin, which settles the question.
+# Each test's verdict, by the arm's outcome:
+# - passes: the arm passes its test.
+# - open: the arm does not pass, and its interval still reaches the margin.
+#   So its question stays open.
+# - settled: the arm's interval lies wholly past the margin, which settles the
+#   question.
 VERDICTS = {
     "superiority": {
         "passes": "better by at least {effect}",
@@ -94,7 +97,7 @@ DECIMALS = 5
 def metric_name(metric):
     """A decision metric as a user sees it, in the figure and the printout: MRR@10, accuracy@1.
 
-    The experiment's file and the tables keep the metric's key, such as
+    The experiment's file and the tables keep the metric's key, for example
     ``mrr@10``, as a run's manifest records it.
 
     Args:
@@ -110,7 +113,8 @@ def seed_scores(experiment, runs, path):
     """Each arm's score at each seed: the decision's metric on the validation pairs.
 
     A run's manifest records its validation metrics, as ``train`` wrote them.
-    An arm is read only when all its runs are done.
+    seed_scores reads the scores only when every run of the experiment is
+    done.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
@@ -150,21 +154,25 @@ def seed_scores(experiment, runs, path):
 def seeds_needed(test, base_sd, arm_sd, alpha, minimum_effect):
     """The fewest seeds per arm that the arm's test needs, at the two arms' seed sds.
 
-    Superiority's is the fewest seeds at which a mean gain of exactly the
-    minimum effect is significant: the sample size of a dual-criterion
-    design (Roychoudhury et al., 2018), by Welch's t. With more seeds, a gain
-    larger than the minimum effect passes more often. A gain of exactly the
-    minimum effect passes at most half the time, as its mean falls on either
-    side, and about half the time once the seeds suffice. Non-inferiority's
-    is the fewest seeds that give TARGET_POWER to show it when the arm and
-    the base do not differ: the power of Welch's test, from the noncentral
-    t. Both take Welch-Satterthwaite's degrees of freedom at the two sds,
-    with the same seeds in each arm.
+    Superiority's count is the fewest seeds at which a mean gain of exactly
+    the minimum effect is significant, by Welch's t. It is the sample size of
+    a dual-criterion design (Roychoudhury et al., 2018). With more seeds, a
+    gain larger than the minimum effect passes more often. A gain of exactly
+    the minimum effect passes at most half the time, as its mean falls on
+    either side of the minimum effect. Once the seeds suffice, it passes about
+    half the time.
+
+    Non-inferiority's count is the fewest seeds that give TARGET_POWER to show
+    non-inferiority when the arm and the base do not differ. The power is that
+    of Welch's test, from the noncentral t. Both counts take
+    Welch-Satterthwaite's degrees of freedom at the two sds, with the same
+    seeds in each arm.
 
     The count is the one at which the test's need is met exactly, rounded up.
-    scipy's optimize.elementwise finds it in two steps. bracket_root finds
-    two counts, one too few and one enough. find_root then finds the exact
-    count between them. When neither arm's scores vary, 2 seeds suffice.
+    scipy's optimize.elementwise finds that count in two steps. bracket_root
+    finds two counts, one too few and one enough. Then find_root finds the
+    exact count between them. When neither arm's scores vary, 2 seeds
+    suffice.
 
     Args:
         test (str): The arm's test, superiority or non-inferiority.
@@ -232,10 +240,10 @@ def welch_difference(scores, base_scores, alpha):
 
     scipy's ``ttest_ind``, with ``equal_var=False``, gives the interval at
     one minus alpha, the degrees of freedom and the two-sided p. When
-    neither arm's scores vary, such as when every run scores 1, the t-test
-    has no spread to measure. The difference is then exact: its interval is
-    the difference itself, and p is 1 when the difference is 0 and 0
-    otherwise, as compare's paired t-test takes the same case.
+    neither arm's scores vary, for example when every run scores 1, the
+    t-test has no spread to measure. The difference is then exact, and its
+    interval is the difference itself. Its p is 1 when the difference is 0,
+    and 0 otherwise, as compare's paired t-test takes the same case.
 
     Args:
         scores (list[float]): The arm's scores, one per seed.
@@ -302,27 +310,27 @@ def difference_rows(experiment, arm_scores):
     """Each arm minus the base: Welch's interval and test, the verdict and the seeds needed.
 
     Each arm is tested at the decision's alpha divided by the number of arms,
-    by Bonferroni, so the chance of any false finding over the experiment
-    is at most alpha. Its interval is Welch's two-sided interval at one minus
-    that alpha, and its p is Welch's t-test of no difference, so the two
-    agree.
+    by Bonferroni. So the chance of any false finding over the experiment is
+    at most alpha. The arm's interval is Welch's two-sided interval at one
+    minus that alpha. Its p is from Welch's t-test of no difference, so the
+    two agree.
 
     - The superiority test passes when the arm is significantly better, with
-      a mean gain of at least the minimum effect: a dual-criterion design
-      (Roychoudhury et al., 2018).
+      a mean gain of at least the minimum effect. This is a dual-criterion
+      design (Roychoudhury et al., 2018).
     - The non-inferiority test passes when the interval's low end is above
-      minus the minimum effect, as in the extension for non-inferiority
-      trials of CONSORT, the guideline for reporting randomized trials
-      (Piaggio et al., 2012).
+      minus the minimum effect. CONSORT's extension for non-inferiority
+      trials uses the same rule (Piaggio et al., 2012). CONSORT is the
+      guideline for reporting randomized trials.
 
     An arm that does not pass its test, while its interval still reaches the
     margin, leaves its question open: it says too little, either way. With
     fewer seeds than the test needs, it is also underpowered. An interval
-    wholly past the margin, such as a loss of -0.04 to -0.02 against -0.01,
-    settles the question, however few the seeds. VERDICTS words each
-    outcome. The verdict reads the difference and the interval as
-    differences.csv shows them, rounded to DECIMALS, so a gain shown as 0.01
-    is a gain of 0.01.
+    wholly past the margin, for example a loss of -0.04 to -0.02 against
+    -0.01, settles the question, however few the seeds. VERDICTS words each
+    outcome. For the verdict, difference_rows reads the difference and the
+    interval as differences.csv shows them, rounded to DECIMALS. So a gain
+    shown as 0.01 is a gain of 0.01.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
@@ -338,7 +346,7 @@ def difference_rows(experiment, arm_scores):
     base_scores = arm_scores[BASE]
     # statistics.stdev is exact when every seed scores the same, as
     # seeds_needed's check for no spread needs. numpy's sd can be a rounding
-    # error instead, such as 1e-16.
+    # error instead, for example 1e-16.
     base_sd = statistics.stdev(base_scores)
     rows = []
     for arm, arm_fields in experiment["arms"].items():
@@ -400,17 +408,21 @@ def recommendation(experiment, differences):
     """The arm that the comparison recommends, why, and the base lines to copy.
 
     One arm that passes its test is recommended. With none, the base is.
-    With several, none is: which is worth its cost is the user's choice,
-    and each one's line is given. The base's line names this experiment's
-    base, whose runs the next experiment reuses, wherever they were trained.
+    With several, none is, because which is worth its cost is the user's
+    choice. Each passing arm's line is then given. The base's line names this
+    experiment's base, whose runs the next experiment reuses, wherever they
+    were trained.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
         differences (list[dict]): The rows of difference_rows.
 
     Returns:
-        tuple[str | None, str, list[str]]: The recommended arm, BASE, or None;
-            the reason; and the ``base:`` line of each arm to build on.
+        tuple[str | None, str, list[str]]: Three values:
+
+            - the recommended arm, BASE, or None
+            - the reason
+            - the ``base:`` line of each arm to build on
     """
     name = experiment["name"]
     passing_rows = [row for row in differences if row["passes"]]
@@ -430,20 +442,25 @@ def arms_figure(experiment, arm_scores, arms, differences):
     """Each arm's seeds, with its mean and interval, beside each arm minus the base.
 
     Each row is one arm, the base's first, so a row reads across both panels.
-    On the left, each seed's score is a dot, in a strip just above the row,
-    and the arm's mean is a bar on its 95% t interval, on the row itself, so
-    that it lines up with the arm's diamond on the right; a gray band spans
-    the base's mean, plus and minus the minimum effect. The raw scores beside
-    their summary are the layout of an estimation plot (Ho et al., 2019).
+    The raw scores beside their summary are the layout of an estimation plot
+    (Ho et al., 2019).
+
+    On the left, each seed's score is a dot, in a strip just above the row.
+    The arm's mean is a bar on its 95% t interval. The bar sits on the row
+    itself, so that it lines up with the arm's diamond on the right. A gray
+    band spans the base's mean, plus and minus the minimum effect.
+
     On the right, each arm minus the base has Welch's interval, at the
-    confidence of its test. 0 is at the center, and a gray band spans
-    minus to plus the minimum effect, with a dashed line at each end, as in
-    the figure of CONSORT, the guideline for reporting randomized trials, for
-    non-inferiority trials (Piaggio et al., 2012). The color says the arm's
-    test, and on the right only, a filled diamond that it passes, a hollow
-    one that it does not. The legend shows the colors as swatches, so that a
-    diamond means one thing. The verdicts' words are in the printout and in
-    differences.csv: under each row, they crowd the panel past a few arms.
+    confidence of its test. 0 is at the center. A gray band spans minus to
+    plus the minimum effect, with a dashed line at each end. This follows
+    CONSORT's figure for non-inferiority trials (Piaggio et al., 2012).
+    CONSORT is the guideline for reporting randomized trials.
+
+    The color says the arm's test. On the right only, a filled diamond says
+    that the arm passes, and a hollow one that it does not. The legend shows
+    the colors as swatches, so that a diamond means one thing. The verdicts'
+    words are in the printout and in differences.csv, not under each row,
+    because there they crowd the panel past a few arms.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
@@ -717,8 +734,8 @@ def best_run_line(comparison):
     """The recommended arm's best run, by the decision's metric, and the command that scores it.
 
     The command names the benchmarks that the run's corpus was checked
-    against, since score refuses any other. With none, the line says what to
-    build instead.
+    against, because score refuses any other benchmark. When the corpus was
+    checked against none, the line says what to do instead.
 
     Args:
         comparison (Comparison): The comparison, with an arm recommended.
@@ -743,8 +760,9 @@ def best_run_line(comparison):
         )
     else:
         next_step = (
-            "Its corpus was checked against no benchmark, so score refuses every"
-            " one: build the benchmarks, then build the corpus again."
+            "The run's corpus was checked against no benchmark, so score refuses"
+            " every benchmark. Build the benchmarks, then build the corpus again."
+            " Then train again."
         )
     metric_shown = metric_name(comparison.experiment["decision"]["metric"])
     return (
@@ -804,10 +822,13 @@ def compare(path, outputs):
     It writes ``comparison/`` in the experiment's folder whole: ``arms.csv``,
     ``differences.csv``, the figure in ``figures/`` and ``manifest.json``.
     It prints each arm's verdict, the recommendation, and the ``base:`` line
-    that builds the next experiment on it, and the command that scores the
-    recommended arm's best run on the benchmarks that its corpus was checked
-    against: score refuses any other. Then it prints the folder, and the
-    figure and the tables by their full paths, as compare does.
+    of each arm to build on. When it recommends an arm, it also prints the
+    arm's best run. With the run, it prints the command that scores the run
+    on the benchmarks, or what to do instead. The command names the benchmarks
+    that the run's corpus was checked against, because score refuses any other
+    benchmark.
+    Then it prints the folder, and the figure and the tables by their full
+    paths, as the ``compare`` command does.
 
     Args:
         path (Path): The experiment's file.
@@ -817,10 +838,12 @@ def compare(path, outputs):
         int: 0.
 
     Raises:
-        ValueError: If the file or the base cannot be used, the file differs
-            from the copy that its first training kept, a base run of an
-            earlier experiment has started but not finished, or a run is not
-            done.
+        ValueError: In each of these cases:
+
+            - the file or the base cannot be used
+            - the file differs from the copy that its first training kept
+            - a base run of an earlier experiment has started but not finished
+            - a run is not done
     """
     experiment, folder = checked_experiment(path, outputs)
     _, earlier_arms = base_config(experiment["base"], outputs)

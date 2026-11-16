@@ -4,15 +4,15 @@ Each benchmark is two CSV files under ``<inputs>/benchmarks/<benchmark>/``,
 beside the manifest of its build:
 
 - ``<benchmark>_mappings.csv``: one row per source variable, with the keys of
-  its expected targets, separated by ``;`` where there are several;
-- ``<benchmark>_targets.csv``: every target property that a source is ranked
-  against, the expected ones and all the others.
+  its expected targets, separated by ``;`` where there are several
+- ``<benchmark>_targets.csv``: every target property that ``score`` ranks for
+  a source variable, the expected ones and all the others
 
-The files carry third-party text, so they are built from their published
-inputs rather than redistributed. A manifest committed under ``manifests/``
-pins those inputs, such as a commit, a record or a release. It also holds the
-SHA-256 of every file built from them. So a rebuild either matches it or names
-what differs.
+The files carry third-party text, so ``benchmarks build`` builds them from
+their published inputs, and the repository does not redistribute them. A
+manifest committed under ``manifests/`` pins those inputs, for example a
+commit, a record or a release. It also holds the SHA-256 of every file built
+from them. So a rebuild either matches it or names what differs.
 """
 
 import csv
@@ -61,12 +61,13 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
         version (str): The benchmark's version.
         targets (list[dict]): One row per target, keyed by TARGET_COLUMNS.
         mappings (list[dict]): One row per source variable, keyed by
-            MAPPING_COLUMNS. Its ``expected_target`` is a list of target keys,
-            written sorted and joined by TARGET_SEPARATOR.
-        sources (list[dict]): What the benchmark was built from; see
-            ``embedding_model/docs/benchmarks.md`` for the fields.
-        counts (dict): What the build counted, as its benchmark's module prints
-            it.
+            MAPPING_COLUMNS. Each row's ``expected_target`` is a list of target
+            keys. write_benchmark sorts the keys and joins them by
+            TARGET_SEPARATOR.
+        sources (list[dict]): The benchmark's inputs.
+            ``embedding_model/docs/benchmarks.md`` describes their fields.
+        counts (dict): What the build counted, as the benchmark's module prints
+            the counts.
 
     Returns:
         dict: The manifest, also written as ``manifest.json`` beside the
@@ -120,14 +121,15 @@ def write_benchmark(directory, name, version, targets, mappings, sources, counts
 def read_benchmark(inputs, name):
     """A built benchmark: its targets, its mappings and its manifest.
 
-    Each file must have the SHA-256 that its manifest holds. So scores made
-    from the files can name exactly what was scored. Each file is read once,
-    and the bytes checked are the bytes parsed. A warning is printed when the
-    build's version is not the version committed under ``manifests/``.
+    Each file must have the SHA-256 that the build's manifest holds. So scores
+    made from the files can name exactly what was scored. read_benchmark reads
+    each file once, and parses the same bytes that it checks. It prints a
+    warning when the build's version is not the version committed under
+    ``manifests/``.
 
     Args:
-        inputs (Path): The inputs folder that the benchmark was built into.
-        name (str): The benchmark, such as ``topmed``.
+        inputs (Path): The inputs folder that holds the built benchmark.
+        name (str): The benchmark, for example ``topmed``.
 
     Returns:
         tuple[pd.DataFrame, pd.DataFrame, dict]: The targets, the mappings and
@@ -135,10 +137,15 @@ def read_benchmark(inputs, name):
             ``""``.
 
     Raises:
-        FileNotFoundError: If the benchmark has not been built there.
-        ValueError: If the manifest cannot be read or names another
-            benchmark, a file differs from its manifest, or the files do not
-            have the columns that ``benchmarks build`` writes.
+        FileNotFoundError: If the benchmark is not built there.
+        ValueError: In each of these cases:
+
+            - the manifest cannot be read, is not a JSON object, or names
+              another benchmark
+            - the manifest does not record the benchmark's version and files
+            - a file differs from the manifest
+            - the files do not have the columns that ``benchmarks build``
+              writes
     """
     directory = Path(inputs) / "benchmarks" / name
     paths = [directory / f"{name}_{kind}.csv" for kind in ("targets", "mappings")]
@@ -146,7 +153,7 @@ def read_benchmark(inputs, name):
     command = f"python -m embedding_model benchmarks build --{name}"
     for path in paths:
         if not path.exists():
-            raise FileNotFoundError(f"{path} is missing; run: {command}")
+            raise FileNotFoundError(f"{path} is missing. Run: {command}")
     manifest = manifests.read(manifest_path, command, "benchmark", name)
     try:
         version = manifest["version"]
@@ -154,7 +161,7 @@ def read_benchmark(inputs, name):
     except Exception as error:
         raise ValueError(
             f"{manifest_path} does not record the benchmark's version and files"
-            f" ({type(error).__name__}: {error}); run: {command}"
+            f" ({type(error).__name__}: {error}). Run: {command}"
         ) from error
     manifests.warn_if_not_committed(
         f"{name} in {directory}", version, MANIFESTS / f"{name}.json", command
@@ -166,7 +173,7 @@ def read_benchmark(inputs, name):
     if changed:
         raise ValueError(
             f"{manifest_path.name} holds another SHA-256 for"
-            f" {', '.join(changed)}; run: {command}"
+            f" {', '.join(changed)}. Run: {command}"
         )
     targets, mappings = (
         pd.read_csv(io.BytesIO(file_bytes[path]), dtype=str, keep_default_na=False)
@@ -176,7 +183,7 @@ def read_benchmark(inputs, name):
     if columns != (TARGET_COLUMNS, MAPPING_COLUMNS):
         raise ValueError(
             f"the files in {directory} do not have the columns that"
-            f" `benchmarks build` writes; run: {command}"
+            f" `benchmarks build` writes. Run: {command}"
         )
     return targets, mappings, manifest
 
@@ -184,21 +191,23 @@ def read_benchmark(inputs, name):
 def build(names, inputs, update_manifest=False):
     """Build benchmarks from the inputs that their committed manifests pin.
 
-    Each build is written to a staging folder first. If it matches the
+    Each build goes to a staging folder first. If the build matches the
     committed manifest, or ``update_manifest`` accepts it, its folder replaces
-    the working one. If not, the differences are printed, the working folder
-    is left as it was, and the exit status is 1. A version committed in git
-    never changes: a differing build is accepted only under a version not
-    committed yet, and not at all when git cannot be asked. A benchmark that
-    cannot be built, such as one whose download fails, is reported, and the
-    others are still built.
+    the working one. If not, ``manifests.decide`` prints the differences,
+    and the working folder stays as it was. Then the exit status
+    is 1.
+
+    A version committed in git never changes. So a differing build is accepted
+    only under a version not committed yet, and not at all when git cannot
+    answer. If a benchmark cannot be built, for example because its download
+    fails, build prints the error and still builds the other benchmarks.
 
     Args:
         names (list[str]): Benchmarks to build, from BUILDERS.
-        inputs (Path): The inputs folder; files go to its ``benchmarks/``.
+        inputs (Path): The inputs folder. The files go to its ``benchmarks/``.
         update_manifest (bool): Accept a build that differs from its
             committed manifest, under a version not committed in git, and
-            record it there.
+            record the build in that manifest.
 
     Returns:
         int: 0 if every build matches or was accepted, 1 otherwise.
@@ -220,7 +229,7 @@ def build(names, inputs, update_manifest=False):
 
 
 def build_one(name, directory, update_manifest):
-    """Build one benchmark, and swap its folder in if the build may be kept.
+    """Build one benchmark, and replace its working folder if the build may be kept.
 
     ``manifests.write_checked`` writes the files, and keeps them only if the
     committed manifest allows.

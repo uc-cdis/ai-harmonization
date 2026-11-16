@@ -1,4 +1,4 @@
-"""Tests for embedding_model.provenance: the code's commit, a model's revision and the library versions."""
+"""Tests for embedding_model.provenance: the commit, a model's revision and library versions."""
 
 import shutil
 import subprocess
@@ -11,7 +11,7 @@ from embedding_model import provenance
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="needs git")
 class TestCodeCommit:
-    """The commit that scores and trained models record, and whether the code had uncommitted changes."""
+    """The commit that a result records, and whether the code had uncommitted changes."""
 
     def git(self, folder, *args):
         """Run git in a folder, as a fictional committer."""
@@ -35,7 +35,7 @@ class TestCodeCommit:
         return tmp_path
 
     def test_a_changed_doc_is_not_an_uncommitted_change(self, checkout):
-        """Only code and dependency files count; a doc does not."""
+        """code_commit counts only code and dependency files, not a doc."""
         (checkout / "embedding_model" / "docs" / "abcd.md").write_text("# Efgh\n")
         found = provenance.code_commit(checkout / "embedding_model")
         assert len(found["commit"]) == 40
@@ -68,7 +68,7 @@ class TestCodeCommit:
 
 
 class TestModelRevision:
-    """The Hugging Face commit of the model that was scored."""
+    """The Hugging Face commit of a scored model."""
 
     def cached(self, folder, repo_id):
         """Put a fictional model in a Hugging Face cache, at commit abcd1234."""
@@ -82,13 +82,13 @@ class TestModelRevision:
         assert provenance.model_revision(str(tmp_path)) is None
 
     def test_a_hugging_face_model_gives_its_cached_commit(self, monkeypatch, tmp_path):
-        """A model loaded by id gives the commit that its cached copy was downloaded at."""
+        """For a model given by its id, model_revision gives the commit of its cached copy."""
         self.cached(tmp_path, "abcd-org/abcd-model")
         monkeypatch.setenv("SENTENCE_TRANSFORMERS_HOME", str(tmp_path))
         assert provenance.model_revision("abcd-org/abcd-model") == "abcd1234"
 
     def test_a_model_not_in_the_cache_has_none(self, monkeypatch, tmp_path):
-        """A model that the cache does not hold gives None, and scoring goes on."""
+        """model_revision gives None for a model that the cache does not hold, and no error."""
         monkeypatch.setenv("SENTENCE_TRANSFORMERS_HOME", str(tmp_path))
         assert provenance.model_revision("abcd-org/abcd-model") is None
 

@@ -1,10 +1,10 @@
 """caDSR: NCI's data elements, with their names, question texts and values.
 
 caDSR publishes a daily snapshot of its data elements, as a zip of XML
-files. A snapshot is pinned by its date. A snapshot can hold an element's
-older versions, and exact copies of a record: only the element's latest version
-is kept, once. defusedxml parses the XML: it refuses entity declarations and
-external references, which a snapshot has none of.
+files. The manifest pins a snapshot by its date. A snapshot can hold an
+element's older versions, and exact copies of a record. The fetch keeps only
+each element's latest version, once. defusedxml parses the XML: it refuses
+entity declarations and external references, which a snapshot has none of.
 """
 
 import zipfile
@@ -86,7 +86,7 @@ def text(element, path):
 
 
 def version(element):
-    """An element's version as the decimal number caDSR stores, such as 2.31.
+    """An element's version as the decimal number caDSR stores, for example 2.31.
 
     Args:
         element (dict): The element's row, with its ``public_id`` and
@@ -190,10 +190,10 @@ def records(archive):
 def read_snapshot(archive):
     """Each data element at its latest version, once, with its lists.
 
-    Versions are compared as decimal numbers, as ``version`` reads them. A
-    row repeated within one element's lists is kept once. An element is open
-    only when each of its reference documents is of a type in
-    OPEN_DOCUMENT_TYPES, as ``open_where`` decides. A Proprietary Measure
+    read_snapshot compares versions as decimal numbers, as ``version`` reads
+    them. It keeps one copy of a row that repeats within one element's lists.
+    An element is open only when each of its reference documents is of a type
+    in OPEN_DOCUMENT_TYPES, as ``open_where`` decides. A Proprietary Measure
     Permission closes it. A type not seen before closes it too, and is
     reported.
 
@@ -241,12 +241,15 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; its snapshot entry gives the
+        manifest (dict): The committed manifest. Its snapshot entry gives the
             date.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
-            manifest's sources, and the counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables
+            - the manifest's sources
+            - the counts that the fetch prints
     """
     day = pinned(manifest, SNAPSHOT)["version"]
     url = ARCHIVE.format(date=day)

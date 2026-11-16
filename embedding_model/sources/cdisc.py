@@ -1,10 +1,10 @@
 """CDISC controlled terminology: codelists and their terms, from NCI EVS.
 
-EVS publishes each CDISC terminology package as a tab-separated file, with a
-new release each quarter. Its archive keeps every release under its date.
-Each package is read from the archive, at the release date that the manifest
-pins. So a new CDISC release does not change what the fetch reads, until the
-manifest pins the new release.
+EVS publishes each CDISC terminology package as a tab-separated file. A
+current package has a new release several times a year. EVS's archive keeps
+every release under its date. The fetch reads each package from the archive,
+at the release date that the manifest pins. So a new CDISC release does not
+change what the fetch reads until the manifest pins the new release.
 """
 
 import csv
@@ -41,16 +41,16 @@ CITATION = "embedding_model/docs/licenses.md#cdisc"
 
 
 def release_name(package):
-    """The manifest's name for a package's release, such as ``CDISC SDTM release``."""
+    """The manifest's name for a package's release, for example ``CDISC SDTM release``."""
     return f"CDISC {PACKAGES[package][0]} release"
 
 
 def read_package(file_bytes, package):
     """One package's rows, with every cell a string.
 
-    ``keep_default_na=False`` keeps submission values such as ``NA`` and
-    ``None`` as the text they are, not as missing. The files quote nothing,
-    so a double quote is read as text.
+    ``keep_default_na=False`` keeps submission values, for example ``NA`` and
+    ``None``, as the text they are, not as missing. The files quote nothing,
+    so read_package reads a double quote as text.
 
     Args:
         file_bytes (bytes): The package's tab-separated file.
@@ -79,13 +79,15 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; each package's release entry
+        manifest (dict): The committed manifest. Each package's release entry
             gives its date.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The table ``terms``,
-            every package's rows together, the manifest's sources, and the
-            counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the table ``terms``, with every package's rows together
+            - the manifest's sources
+            - the counts that the fetch prints
     """
     frames, sources, rows = [], [], {}
     for package, (folder, stem) in PACKAGES.items():

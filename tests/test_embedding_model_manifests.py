@@ -16,7 +16,7 @@ class TestIdentities:
     """What identifies a build: its files, and each source's SHA-256 or version."""
 
     def test_files_then_sources_by_sha256_or_version(self):
-        """Files come first; a source is its SHA-256, else its version."""
+        """identities identifies each file by its entry, and a source by its SHA-256 or version."""
         manifest = {
             "files": {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "aa"}},
             "sources": [
@@ -31,7 +31,7 @@ class TestIdentities:
         }
 
     def test_files_alone_are_compared_by_their_identities(self):
-        """Two sets of files without sources differ only where a file does."""
+        """differences finds a difference between two sets of files only where a file differs."""
         files = {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "aa"}}
         changed = {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "bb"}}
         assert manifests.differences({"files": files}, {"files": files}) == []
@@ -63,7 +63,7 @@ class TestDifferences:
         assert manifests.differences(self.MANIFEST, later_manifest) == []
 
     def test_changed_file_and_source_are_named(self):
-        """A file and a source with another SHA-256 are each named."""
+        """differences names a file and a source that have another SHA-256."""
         changed = {
             **self.MANIFEST,
             "files": {"abcd-benchmark_mappings.csv": {"rows": 1, "sha256": "bb"}},
@@ -112,12 +112,12 @@ class TestPinned:
     """An input as a committed manifest pins it."""
 
     def test_the_named_input(self):
-        """The input of that name is returned, with its version."""
+        """pinned returns the input of that name, with its version."""
         manifest = {"sources": [PIN, {"name": "Abcd release", "version": "2"}]}
         assert manifests.pinned(manifest, "Abcd release")["version"] == "2"
 
     def test_a_missing_input_is_named(self):
-        """A manifest without the named input raises, naming it."""
+        """pinned raises for a manifest without the named input, and names the input."""
         with pytest.raises(KeyError, match="Abcd release"):
             manifests.pinned({"sources": []}, "Abcd release")
 
@@ -132,13 +132,13 @@ class TestRead:
         return manifests.read(path, self.COMMAND, "source", "abcd-source")
 
     def test_a_manifest_reads_back(self, tmp_path):
-        """A JSON object that names its build reads back as it was written."""
+        """read returns a JSON object that names its build, as it was written."""
         path = tmp_path / "manifest.json"
         path.write_text(json.dumps({"source": "abcd-source", "files": {}}))
         assert self.read(path) == {"source": "abcd-source", "files": {}}
 
     def test_a_written_manifest_reads_back(self, tmp_path):
-        """A manifest is written as indented JSON with a final newline, and reads back."""
+        """write writes a manifest as indented JSON with a final newline, and read returns it."""
         path = tmp_path / "manifest.json"
         manifest = {
             "source": "abcd-source",
@@ -150,23 +150,23 @@ class TestRead:
         assert self.read(path) == manifest
 
     def test_a_missing_manifest_names_the_command(self, tmp_path):
-        """A manifest never written is named, with the command that writes it."""
-        with pytest.raises(FileNotFoundError, match=f"missing; run: {self.COMMAND}"):
+        """read names a manifest that does not exist, with the command that writes it."""
+        with pytest.raises(FileNotFoundError, match=f"missing. Run: {self.COMMAND}"):
             self.read(tmp_path / "manifest.json")
 
     @pytest.mark.parametrize("text", ["", "{", "[1, 2]"])
     def test_a_manifest_that_is_not_a_json_object_is_refused(self, text, tmp_path):
-        """Text that is not JSON, or JSON that is not an object, is refused."""
+        """read refuses text that is not JSON, or JSON that is not an object."""
         path = tmp_path / "manifest.json"
         path.write_text(text)
-        with pytest.raises(ValueError, match=f"manifest.json .*run: {self.COMMAND}"):
+        with pytest.raises(ValueError, match=f"manifest.json .*Run: {self.COMMAND}"):
             self.read(path)
 
     @pytest.mark.parametrize(
         "manifest", [{"source": "efgh-source"}, {"corpus": "abcd-corpus"}]
     )
     def test_another_builds_manifest_is_refused(self, manifest, tmp_path):
-        """A manifest of another source, or of another kind of build, is refused."""
+        """read refuses the manifest of another source, or of another kind of build."""
         path = tmp_path / "manifest.json"
         path.write_text(json.dumps(manifest))
         with pytest.raises(ValueError, match="is the manifest of source"):
@@ -193,25 +193,25 @@ class TestCheckFile:
         )
 
     def test_a_file_that_matches_passes(self, written):
-        """A file unchanged since its manifest was written passes."""
+        """check_file passes a file that is unchanged since its manifest was written."""
         self.check(*written)
 
     def test_a_missing_file_names_the_command(self, written):
-        """A missing file is named, with the command that writes it again."""
+        """check_file names a missing file, with the command that writes it again."""
         path, manifest = written
         path.unlink()
-        with pytest.raises(FileNotFoundError, match=f"is missing; run: {self.COMMAND}"):
+        with pytest.raises(FileNotFoundError, match=f"is missing. Run: {self.COMMAND}"):
             self.check(path, manifest)
 
     def test_a_changed_file_is_refused(self, written):
-        """A file that differs from its manifest's SHA-256 is refused."""
+        """check_file refuses a file that differs from its manifest's SHA-256."""
         path, manifest = written
         path.write_bytes(b"efgh")
         with pytest.raises(ValueError, match="differs from its manifest"):
             self.check(path, manifest)
 
     def test_a_file_that_the_manifest_does_not_record_is_refused(self, written):
-        """A manifest without the file's SHA-256 names the file."""
+        """check_file refuses a file whose SHA-256 the manifest does not hold, and names it."""
         path, _ = written
         with pytest.raises(ValueError, match="holds no SHA-256 for abcd-table"):
             self.check(path, {"files": {}})
@@ -235,7 +235,10 @@ class TestDecide:
         return path
 
     def test_a_matching_build_may_be_kept(self, tmp_path, monkeypatch):
-        """A build that matches its committed manifest is kept, and git is not asked."""
+        """decide lets a build that matches its committed manifest replace the working one.
+
+        decide does not ask git.
+        """
         path = tmp_path / "abcd-benchmark.json"
         path.write_text(json.dumps(self.BUILT))
         no_git = MagicMock(side_effect=RuntimeError("git could not run"))
@@ -246,7 +249,10 @@ class TestDecide:
     def test_a_differing_build_needs_update_manifest(
         self, committed, monkeypatch, capsys
     ):
-        """Without --update-manifest, a differing build is refused, with the command."""
+        """Without --update-manifest, decide refuses a differing build.
+
+        It prints the difference, and the command with --update-manifest.
+        """
         monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
         with pytest.raises(manifests.Refused):
             manifests.decide(committed, self.BUILT, False, self.COMMAND)
@@ -257,7 +263,7 @@ class TestDecide:
     def test_a_build_under_an_uncommitted_version_is_accepted(
         self, committed, monkeypatch
     ):
-        """With --update-manifest and a version not committed, the build is accepted."""
+        """With --update-manifest and a version not committed, decide accepts the build."""
         monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
         found = manifests.decide(committed, self.BUILT, True, self.COMMAND)
         assert found and found[0].startswith("abcd-benchmark_mappings.csv")
@@ -266,7 +272,7 @@ class TestDecide:
     def test_a_committed_version_gives_both_steps(
         self, update_manifest, committed, monkeypatch, capsys
     ):
-        """Under a version that git has committed, the refusal says to raise it first."""
+        """Under a version committed in git, the refusal says to raise the version first."""
         monkeypatch.setattr(manifests, "committed_version", lambda *_: "1")
         with pytest.raises(manifests.Refused):
             manifests.decide(committed, self.BUILT, update_manifest, self.COMMAND)
@@ -275,7 +281,7 @@ class TestDecide:
         assert f"then run: {self.COMMAND} --update-manifest" in error
 
     def test_no_answer_from_git_refuses(self, committed, monkeypatch):
-        """When git cannot say whether the version is committed, the build is refused."""
+        """When git cannot say whether the version is committed, decide refuses the build."""
         no_answer = MagicMock(side_effect=RuntimeError("not a git repository"))
         monkeypatch.setattr(manifests, "committed_version", no_answer)
         with pytest.raises(
@@ -288,7 +294,7 @@ class TestRecord:
     """Reporting a build that is in place, and recording an accepted one."""
 
     def test_an_accepted_build_is_recorded(self, tmp_path, capsys):
-        """A build with differences is written as the committed manifest."""
+        """record writes a build with differences as the committed manifest."""
         committed = tmp_path / "abcd-benchmark.json"
         built = {**TestDecide.BUILT, "counts": {"rows": 1}}
         manifests.record(
@@ -301,7 +307,7 @@ class TestRecord:
         assert "accepted, and recorded in" in capsys.readouterr().out
 
     def test_a_matching_build_leaves_the_committed_manifest(self, tmp_path, capsys):
-        """A build that matches is reported, and the committed manifest is not written."""
+        """record reports a build that matches, and does not write the committed manifest."""
         committed = tmp_path / "abcd-benchmark.json"
         committed.write_text("{}")
         manifests.record(committed, TestDecide.BUILT, [], tmp_path / "abcd-benchmark")
@@ -314,7 +320,7 @@ class TestWriteChecked:
 
     @pytest.fixture
     def committed(self, tmp_path, monkeypatch):
-        """A pins-only committed manifest, under a version that git has not committed."""
+        """A pins-only committed manifest, under a version not committed in git."""
         path = tmp_path / "abcd-benchmark.json"
         path.write_text(json.dumps({"version": "1", "files": {}, "sources": [PIN]}))
         monkeypatch.setattr(manifests, "committed_version", lambda *_: None)
@@ -327,7 +333,7 @@ class TestWriteChecked:
         return TestDecide.BUILT
 
     def test_a_refused_build_leaves_nothing(self, committed, tmp_path):
-        """Without --update-manifest, a differing build is deleted, and exits 1."""
+        """Without --update-manifest, write_checked deletes a differing build, and returns 1."""
         status = manifests.write_checked(
             tmp_path / "abcd-benchmark",
             self.write,
@@ -339,7 +345,7 @@ class TestWriteChecked:
         assert not (tmp_path / "abcd-benchmark").exists()
 
     def test_an_accepted_build_is_in_place_and_recorded(self, committed, tmp_path):
-        """An accepted build replaces the folder, and is written as the committed manifest."""
+        """write_checked puts an accepted build in place, and writes the committed manifest."""
         status = manifests.write_checked(
             tmp_path / "abcd-benchmark",
             self.write,
@@ -354,7 +360,7 @@ class TestWriteChecked:
     def test_a_build_that_cannot_move_into_place_is_not_recorded(
         self, committed, tmp_path, monkeypatch
     ):
-        """A failed swap leaves the committed manifest as it was."""
+        """When the swap fails, write_checked leaves the committed manifest as it was."""
 
         def failing(*arguments):
             """A swap that fails, as on a full disk."""
@@ -385,7 +391,7 @@ class TestCommittedVersion:
         )  # fmt: skip
 
     def test_the_version_at_head(self, tmp_path):
-        """The committed version is read from HEAD, not from the file on disk."""
+        """committed_version reads the version at HEAD, not the file on disk."""
         folder = tmp_path / "manifests"
         folder.mkdir()
         (folder / "abcd-benchmark.json").write_text(json.dumps({"version": "1"}))
@@ -403,7 +409,7 @@ class TestCommittedVersion:
             manifests.committed_version(tmp_path, "abcd-benchmark")
 
     def test_a_checkout_without_a_commit_is_an_error(self, tmp_path):
-        """Without a HEAD to read, the answer is an error, not 'not committed'."""
+        """Without a HEAD, committed_version raises an error, not the answer 'not committed'."""
         self.git(tmp_path, "init", "-q")
         with pytest.raises(RuntimeError):
             manifests.committed_version(tmp_path, "abcd-benchmark")

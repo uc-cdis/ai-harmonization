@@ -1,9 +1,9 @@
 """How a property is written as one text, the same way in every step.
 
 A model reads a target property, or a source property or variable, as one
-text. Scoring writes the benchmarks' texts this way, and ``pairs prepare``
-writes the training pairs this way. So a model is trained and scored on texts
-of one shape.
+text. ``score`` writes the benchmarks' texts this way, and ``pairs prepare``
+writes the training pairs this way. So, by default, a model trains and is
+scored on texts in one format.
 """
 
 from ai_harmonization.formatters import (
@@ -18,19 +18,20 @@ from ai_harmonization.simple_data_model import Node, Property
 
 
 def stdelement(node, prop):
-    """A property in the shape of StdElement-Mapper's NCIt training pairs.
+    """A property in the format of StdElement-Mapper's NCIt training pairs.
 
     Its model card shows ``name: ... | description: ... | values: a; b``, with
     no node and no type. The model is private, so its card needs access too.
-    This format scores the model in the shape of its training pairs.
+    With this format, ``score`` scores the model in the format of its training
+    pairs.
 
-    It is not in ai_harmonization.formatters: the approaches read a target's
-    node.property back from its text, and this shape has no node.
+    The approaches read a target's node.property from its text. This format
+    has no node, so it is not in ai_harmonization.formatters.
 
     Args:
-        node (Node): Not part of this shape.
-        prop (Property): The property. The first MAX_VALUES_IN_PROMPT of its
-            values are kept.
+        node (Node): Not part of this format.
+        prop (Property): The property. The text keeps the first
+            MAX_VALUES_IN_PROMPT of its values.
 
     Returns:
         str: The text.
@@ -47,20 +48,20 @@ def stdelement(node, prop):
 def compact(node, prop):
     """A property as ``node.name (type): description Values: a | b``, each if present.
 
-    It is the shape of ``name_type_description_values``, with one change: the
-    description and its ``": "`` are written only when the property has a
-    description. The formatters treat values the same way. A property with no
-    description and no values ends at its type, as ``a.doi (string)``. A
-    property with values only reads ``a.sex (string) Values: F | M``.
+    It is the format of ``name_type_description_values``, with one change:
+    compact writes the description and its ``": "`` only when the property has
+    a description. The formatters treat values the same way. A property with no
+    description and no values ends at its type, for example ``a.doi (string)``.
+    A property with values only reads ``a.sex (string) Values: F | M``.
 
-    It is not in ai_harmonization.formatters: the approaches read a target's
-    node.property back from its text, up to the first colon, and a text in
-    this shape may have no colon.
+    The approaches read a target's node.property from its text, up to the
+    first colon. A text in this format may have no colon, so compact is not in
+    ai_harmonization.formatters.
 
     Args:
         node (Node): The node.
-        prop (Property): The property. The first MAX_VALUES_IN_PROMPT of its
-            values are kept.
+        prop (Property): The property. The text keeps the first
+            MAX_VALUES_IN_PROMPT of its values.
 
     Returns:
         str: The text.
@@ -70,9 +71,10 @@ def compact(node, prop):
 
 
 # Each format is a formatter: (Node, Property) -> text. Four are the formatters
-# of ai_harmonization.formatters, under their own names, and two are defined
-# here. The default, compact, is the shape that this pipeline's models are
-# trained on. Models are also compared in it.
+# of ai_harmonization.formatters, under their own names, and this module
+# defines the other two. The default, compact, is the format that this
+# pipeline trains its models in. compare also compares models in compact by
+# default.
 FORMATS = {
     "compact": compact,
     "name_description": get_node_property_as_name_description,
@@ -91,10 +93,10 @@ def recorded_format(manifest, manifest_path, next_step):
 
     Args:
         manifest (dict): The manifest.
-        manifest_path (Path): Where it is, for the message.
-        next_step (str): What to do when the format is missing or unknown,
-            for the message, such as ``run: python -m embedding_model pairs
-            prepare --source ncit``.
+        manifest_path (Path): Where the manifest is, for the messages.
+        next_step (str): The messages' last part: what to do when the format
+            is missing or unknown, for example ``run: python -m embedding_model
+            pairs prepare --source ncit``.
 
     Returns:
         str: The format's name.
@@ -107,12 +109,12 @@ def recorded_format(manifest, manifest_path, next_step):
     text_format = settings.get("format") if isinstance(settings, dict) else None
     if text_format is None:
         raise ValueError(
-            f"{manifest_path} holds no text format for its texts; {next_step}"
+            f"{manifest_path} holds no text format for its texts. {next_step}"
         )
     if not isinstance(text_format, str) or text_format not in FORMATS:
         raise ValueError(
             f"{manifest_path} holds the text format {text_format!r}, which is"
-            f" not one of {', '.join(FORMATS)}; {next_step}"
+            f" not one of {', '.join(FORMATS)}. {next_step}"
         )
     return text_format
 
@@ -120,10 +122,10 @@ def recorded_format(manifest, manifest_path, next_step):
 def property_text(formatter, node, name, type_, description, values):
     """The text of a target property or a source property/variable, by a formatter.
 
-    A source variable is written without a node: its node would be its dbGaP
-    table or the paper that it comes from, which says nothing about what it
-    means. Its text then starts at its name, without the formatters' leading
-    dot.
+    A source variable's node would be its dbGaP table, or the paper that it
+    comes from. That node says nothing about what the variable means, so the
+    variable's text has no node. So the text starts at the variable's name,
+    without the formatters' leading dot.
 
     Args:
         formatter (Callable[[Node, Property], str]): A value of FORMATS.

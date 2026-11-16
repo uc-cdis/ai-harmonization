@@ -1,10 +1,11 @@
 """What the pair readers share: one item shape, one cleaning, and the star of pairs.
 
-Each source is read into items: a concept, a term, a code, an element or a
-variable. An item has one canonical text, and other texts that mean the same
-thing. ``star`` turns the items into pairs, the same way for every source:
-each other text, on the source side, against the canonical with its type,
-description and values, on the target side.
+Each source's reader reads the source into items: a concept, a term, a code,
+an element or a variable. An item has one canonical text, and other texts that
+mean the same thing. ``star`` turns the items into pairs, the same way for
+every source. Most pairs put another text on the source side, and the canonical
+with its type, description and values on the target side. docs/pairs.md lists
+the four kinds of pair.
 """
 
 import functools
@@ -69,13 +70,16 @@ NOT_ALPHANUMERIC = re.compile(r"[\W_]+")
 WORD = re.compile(r"[A-Za-z][a-z]*")
 # What joins words into one token, as in "Pre-Operative" or "Signs/Symptoms".
 JOINED = re.compile(r"[-/]")
-# The fewest letters of a long word. Joined words are a paraphrase when one of
-# them is this long, as in "Pre-Operative", and a short form when none is, as
-# in "Val-Trp".
+# The fewest letters of a long word. Joined words with a word this long, as in
+# "Pre-Operative", are a paraphrase when each part is a number or a word with
+# no capital after its first letter. So "HIV-Positive" stays an expansion.
+# Joined short words are an expansion only when they have a digit, an
+# underscore or two capitals, as "Val-Trp" has.
 LONG_WORD = 5
-# The HTML tag names that texts hold. Only these are read as tags: BeautifulSoup
-# alone reads any text in angle brackets as a tag, and removes it. So "Candida
-# <Debaryomycetaceae> infection" would lose "<Debaryomycetaceae>".
+# The HTML tag names that texts hold. without_tags reads only these as tags,
+# because BeautifulSoup alone reads any text in angle brackets as a tag, and
+# removes it. So "Candida <Debaryomycetaceae> infection" would lose
+# "<Debaryomycetaceae>".
 TAGS = (
     "a|abbr|b|big|blockquote|br|caption|center|code|col|colgroup|dd|del|div|dl|dt"
     "|em|font|h[1-6]|hr|i|img|ins|li|ol|p|pre|s|small|span|strike|strong|sub|sup"
@@ -97,18 +101,17 @@ BLOCK_TAG = re.compile(
 # A character written as an escape: R's "<U+00A0>" or a JSON-style "\u2122".
 # No codec reads R's escapes, and Python's "unicode_escape" codec garbles text
 # that is not ASCII, as "Café" to "CafÃ©". ftfy's decode_escapes reads "\u2122",
-# but it also turns the "\n" and "\t" of a text such as "C:\new\table" into a
-# line break and a tab.
+# but it also turns "\n" and "\t" into a line break and a tab, for example in
+# "C:\new\table".
 ESCAPE = re.compile(r"<U\+([0-9A-Fa-f]{4,6})>|\\u([0-9A-Fa-f]{4})")
 # The settings of ftfy's fix_text, which unescapes HTML entities and repairs
-# text read with the wrong encoding. It repeats its fixes until the text stops
-# changing. So a text that a source escaped twice, such as "&amp;lt;5", becomes
-# "<5". unescape_html is True, since
-# ftfy's default, "auto", leaves the entities of a text that has a "<", such as
-# a tag. uncurl_quotes is off, so quotes stay as the source writes them.
-# Control characters are removed and Unicode is normalised to NFC by these
-# settings too, rather than by ftfy's defaults, since clean's docstring names
-# both as its steps.
+# text read with the wrong encoding. clean repeats its passes until the text
+# stops changing, so a text that a source escaped twice, for example
+# "&amp;lt;5", becomes "<5". unescape_html is True, because ftfy's default,
+# "auto", leaves the entities of a text that has a "<", for example a tag.
+# uncurl_quotes is off, so quotes stay as the source writes them.
+# FIXES also sets remove_control_chars and normalization itself. It does not
+# leave them to ftfy's defaults, because clean's docstring names both steps.
 FIXES = ftfy.TextFixerConfig(
     unescape_html=True,
     uncurl_quotes=False,
@@ -117,7 +120,7 @@ FIXES = ftfy.TextFixerConfig(
     explain=False,
 )
 # The replacement character's UTF-8 bytes, read as Mac Roman. ftfy leaves them
-# as they are, so they are turned back into the replacement character.
+# as they are, so cleaning_pass turns them back into the replacement character.
 LOST_IN_MAC_ROMAN = "\u00d4\u00f8\u03a9"
 # A form's number for an item, before its wording: "24. ", "(5a) ", "13f-2. ",
 # "34.How", "14.02 How", "1.c During" or "W2 - ". A letter for a sub-item may
@@ -130,9 +133,9 @@ ITEM_NUMBER = re.compile(
     r")(?:[a-z]\s+(?=[A-Z]))?"
 )
 # A value's code written before its label: "0= None", "(2) = Mild", "0 -
-# absent", "999: Unknown", "(1) All of the time" or "1. Very". Only "=" may be
-# followed by anything. The others need a word or a bracket after them, so
-# "2 - 3 times" keeps its numbers.
+# absent", "999: Unknown", "(1) All of the time" or "1. Very". Any text may
+# follow "=". The others need a word or a bracket after them, so "2 - 3 times"
+# keeps its numbers.
 CODED_VALUE = re.compile(
     r"^\s*(?:"
     r"\(?-?\d{1,3}\)?\s*=\s*(?=\S)"
@@ -142,10 +145,10 @@ CODED_VALUE = re.compile(
 )
 # A code joined to its label by "-" alone, as in "0-Never".
 DASHED_CODE = re.compile(r"^\s*\(?-?\d{1,3}\)?-(?=[A-Za-z])")
-# caDSR writes an element's definition as its concepts' definitions joined by
-# "_", ":" or "-", as in "A body part._The middle of it.", or by "_" alone, as
-# in "a part_The middle". Each join becomes a space. A label such as
-# "EXAMPLE(S):" keeps its colon.
+# caDSR writes an element's definition as its concepts' definitions, joined by
+# "_", ":" or "-", as in "A body part._The middle of it.". It can also join
+# them by "_" alone, as in "a part_The middle". Each join becomes a space. A
+# label, for example "EXAMPLE(S):", keeps its colon.
 CONCEPT_JOIN = re.compile(
     r"(?:(?<=\.)|(?<=\))(?<!\([Ss]\)))\s*(?:[:_]+|-(?=\s*[A-Z]))\s*"
     r"|(?<=[a-z0-9\]])_(?=[A-Z][a-z ])"
@@ -156,14 +159,14 @@ JAVA_TYPE = re.compile(r"\s*\bjava\.(?:lang|util|sql)\.[A-Za-z]+")
 # The phrase about that Java type in the element's definition: "Generic value
 # domain for a java datatype that ...", "Value Domain for java language String
 # datatype." or "Java Date Type". It often follows the text before it with no
-# full stop, so only the phrase is removed, not its sentence.
+# full stop, so without_java removes only the phrase, not its sentence.
 JAVA_VALUE_DOMAIN = re.compile(
     r"\s*(?:Generic value domain for a (?:primitive )?java\b.*?(?:\.(?=\s|$)|$)"
     r"|Value Domain for java language \w+ datatype\b\.?"
     r"|Java (?:\w+ Type|Double Wrapper for primitive type double)\b\.?)",
     re.IGNORECASE,
 )
-# The curation mark that caDSR leaves in a definition, such as
+# The curation mark that caDSR leaves in a definition, for example
 # "[Manually-curated]" or "[Standard-based]", with a full stop after it, if any.
 CURATION = re.compile(
     r"\s*\[(?:manually|standard|system)[-_ ]\w*\](?:\.(?=\s|$))?", re.IGNORECASE
@@ -173,10 +176,13 @@ CURATION = re.compile(
 EMPTY_HEADING = re.compile(
     r"\s*\b(?:EXAMPLE|OTHER NAME|NOTE)\(S\):\s*(?=(?:EXAMPLE|OTHER NAME|NOTE)\(S\):|$)"
 )
-# The notices that publishers add to definitions about Executive Order 14168.
-# They say nothing about the concept: NCIt's, after "IMPORTANT NOTICE:" or in
-# brackets, and the one that it gives as a retired concept's whole
-# definition; caDSR's; and NIH CDE's. CDISC copies NCIt's.
+# The notices about Executive Order 14168 that publishers add to definitions.
+# They say nothing about the concept. NOTICE finds these notices:
+# - NCIt's notice, after "IMPORTANT NOTICE:" or in brackets
+# - the notice that NCIt gives as a retired concept's whole definition
+# - caDSR's notice
+# - NIH CDE's notice
+# CDISC copies NCIt's notices.
 NOTICE = re.compile(
     r"\[?(?:IMPORTANT NOTICE: )?The NCI Thesaurus contains biomedical"
     r" terminologies that NCI does not own or control\. This concept contains"
@@ -191,8 +197,8 @@ NOTICE = re.compile(
     r' not be used as a replacement for the element "sex" in the NIH CDE'
     r" repository\."
 )
-# A question's letter item, as in "C. What year?". It is taken only from a text
-# that ends with "?", since "H. Influenzae" names a germ.
+# A question's letter item, as in "C. What year?". worded takes it only from a
+# text that ends with "?", because "H. Influenzae" names a germ.
 LETTER_ITEM = re.compile(r"^[A-Z]\.\s+(?=[A-Z][a-z])")
 # How LOINC and the NIH CDE mark a deprecated name: "Deprecated", even twice
 # or with no space after it.
@@ -205,10 +211,11 @@ class Text:
 
     Attributes:
         text (str): The text.
-        term_type (str): The source's own label for it, such as ``SY``.
+        term_type (str): The source's own label for it, for example ``SY``.
         question (bool): Whether it is a question's wording, which is always a
             paraphrase.
-        study (str): The dbGaP studies it comes from, joined by ``|``, if any.
+        study (str): The dbGaP studies that it comes from, joined by ``|``, if
+            any.
     """
 
     text: str
@@ -227,7 +234,7 @@ class Item:
         type (str): The source's own type word, or "" when it has none.
         description (str): Its description, or "".
         lists (list[tuple[str, list[str]]]): Its value lists, each with the
-            list's name. Its pairs are made once per list.
+            list's name. ``star`` makes its pairs once per list.
         texts (list[Text]): Its other texts of the same meaning.
         descriptions (list[str]): Its other descriptions.
         status (str): CURRENT, RETIRED or DRAFT.
@@ -256,9 +263,9 @@ def escaped(match):
 def without_tags(text):
     """A text with its HTML tags removed by BeautifulSoup, and the rest kept.
 
-    Only what HTML_TAG finds is read as a tag. The text around the tags is
-    escaped first, so "<5", "a<b and c>d" and "&" stay as they are. A
-    superscript is written after a "^", so "10<sup>9</sup>" is "10^9".
+    Only what HTML_TAG finds counts as a tag. without_tags escapes the text
+    around the tags first, so "<5", "a<b and c>d" and "&" stay as they are. A
+    superscript's text follows a "^", so "10<sup>9</sup>" becomes "10^9".
 
     Args:
         text (str): A text with tags.
@@ -266,8 +273,8 @@ def without_tags(text):
     Returns:
         str: The text without them.
     """
-    # The text is copied piece by piece into parts. last is where the text not
-    # yet copied starts.
+    # without_tags copies the text piece by piece into parts. last is where the
+    # text not yet copied starts.
     parts, last = [], 0
     for tag in HTML_TAG.finditer(text):
         # A block tag ends a line or a cell, so a space keeps the words on its
@@ -277,7 +284,7 @@ def without_tags(text):
         # "&amp;", so BeautifulSoup cannot read any of it as markup.
         parts += [html.escape(text[last : tag.start()], quote=False), space]
         # The tag itself, not escaped, so BeautifulSoup reads it as a tag and
-        # removes it. An opening <sup> is followed by "^".
+        # removes it. A "^" follows an opening <sup>.
         parts += [tag.group(0), space, "^" if SUPERSCRIPT.match(tag.group(0)) else ""]
         last = tag.end()
     # The text after the last tag, escaped too.
@@ -286,25 +293,29 @@ def without_tags(text):
     return BeautifulSoup("".join(parts), "html.parser").get_text()
 
 
-# Values such as "Yes" or "Unknown" repeat across many items. The cache keeps
-# the last 65,536 (2^16) clean texts, so a repeated text is cleaned once: on
-# caDSR's 79,157 elements, two thirds of the calls are answered from it.
+# Values, for example "Yes" or "Unknown", repeat across many items. The cache
+# keeps the last 65,536 (2^16) clean texts, so clean cleans a repeated text
+# once. On caDSR's 79,157 elements, the cache answers two thirds of the calls.
 @functools.lru_cache(maxsize=65_536)
 def clean(text):
     """A text with its markup removed and its characters and spaces normalised.
 
-    Escapes such as R's ``<U+00A0>`` are read first. ftfy then unescapes
-    entities such as ``&gt;``, repairs text read with the wrong encoding, such
-    as ``Iâ€™m`` to ``I’m``, removes control characters and normalises Unicode
-    to NFC. HTML tags are removed, and other text in angle brackets, such as
-    ``<time point>``, is kept. A replacement character becomes a space. The
-    text cleaning of BERT's tokenizer then removes the characters that hold no
-    text, and every run of whitespace becomes one space.
+    clean runs these steps, in this order:
 
-    These steps repeat until the text stops changing, as ftfy repeats its own
-    fixes. So a clean text cleans to itself, even when one step leaves work for
-    an earlier one: ``Caf&lt;U+00E9&gt;`` becomes ``Caf<U+00E9>`` in the first
-    pass, and ``Café`` in the second.
+    1. It reads escapes, for example R's ``<U+00A0>``.
+    2. ftfy unescapes entities, for example ``&gt;``, and repairs text read
+       with the wrong encoding, for example ``Iâ€™m`` to ``I’m``. ftfy also
+       removes control characters and normalises Unicode to NFC.
+    3. It removes HTML tags, and keeps other text in angle brackets, for
+       example ``<time point>``.
+    4. A replacement character becomes a space.
+    5. The text cleaning of BERT's tokenizer removes the characters that hold
+       no text, and every run of whitespace becomes one space.
+
+    clean repeats these steps until the text stops changing, as ftfy repeats
+    its own fixes. So a clean text cleans to itself, even when one step leaves
+    work for an earlier one. For example, ``Caf&lt;U+00E9&gt;`` becomes
+    ``Caf<U+00E9>`` in the first pass, and ``Café`` in the second.
 
     Args:
         text (str | None): The text as the source gives it.
@@ -346,8 +357,9 @@ def cadsr_definition(text):
 
     caDSR joins its concepts' definitions with "_", ":" or "-", as in ``A body
     part._The middle of it.``. It marks some definitions as curated, as in
-    ``[Manually-curated]``. The mark is removed, and each join becomes a space.
-    The NCI-stewarded elements of the NIH CDE copy such definitions.
+    ``[Manually-curated]``. cadsr_definition removes the mark, and turns each
+    join into a space. The NCI-stewarded elements of the NIH CDE copy such
+    definitions.
 
     Args:
         text (str): The definition.
@@ -366,8 +378,8 @@ def undeprecated(name):
 def text_key(text):
     """The key that texts are compared by, broader than the tokenizer's rule.
 
-    The text is normalised as the tokenizer normalises it, then case-folded,
-    with punctuation as spaces. So ``Größe`` and ``GROSSE`` have one
+    text_key normalises the text as the tokenizer does, case-folds it, and
+    writes its punctuation as spaces. So ``Größe`` and ``GROSSE`` have one
     ``text_key``, and ``Abcdé_Efgh`` and ``abcde efgh`` too.
     """
     folded = TOKENIZER_NORMALIZER.normalize_str(text).casefold()
@@ -383,11 +395,16 @@ def is_expansion_token(text):
     """Whether a text is an expansion token, shaped like a short form or a code.
 
     An expansion token is one token with a digit, an underscore or two
-    capitals, such as ``BMI``, ``IL-17D`` or ``RACE_CAT_TXT``. Words joined by
-    "-" or "/" are not an expansion token when one of them has five letters or
-    more, as in ``Pre-Operative`` or ``T-Lymphocytes``. A number may be one of
-    the parts, as in ``Galectin-10``. Short parts make a short form, as in
-    ``Val-Trp``.
+    capitals, for example ``BMI``, ``IL-17D`` or ``RACE_CAT_TXT``. Words joined
+    by "-" or "/" are not an expansion token when both of these hold:
+
+    - each part is a number, or a word with no capital after its first letter
+    - one part has five letters or more, as in ``Pre-Operative``,
+      ``T-Lymphocytes`` or ``Galectin-10``
+
+    So ``HIV-Positive`` is one. Joined short words are an expansion
+    token only when they have a digit, an underscore or two capitals, as
+    ``Val-Trp`` has. So ``pre-op`` is not one.
 
     Args:
         text (str): The clean text.
@@ -440,7 +457,7 @@ def type_word(own, values):
 def render(name, type_, description, values):
     """One side's text, in the default format, which scoring also uses.
 
-    Neither side of a training pair has a node, so the node is "" and the text
+    Neither side of a training pair has a node. So the node is "", and the text
     starts at the name, as a source variable's text does in scoring.
     """
     return property_text(
@@ -451,12 +468,15 @@ def render(name, type_, description, values):
 def value_labels(values):
     """A value list's labels, without the codes written before them.
 
-    The values are cleaned first. The codes are removed only when every value
-    of the list has a code. No two codes may be the same, and no two labels may
-    be the same. So ``0 - Never | 1 | ... | 10 - Always`` keeps its numbers,
-    which are its values. A code joined by "-" alone, as in ``0-Never``, is
-    removed only from a list of three values or more, since ``2-Dimensional``
-    is a name.
+    value_labels cleans the values first. It removes the codes only when:
+
+    - every value of the list has a code
+    - no two codes are the same, and no two labels are the same
+
+    So ``0 - Never | 1 | ... | 10 - Always`` keeps its numbers, because ``1``
+    has no code. value_labels removes a code joined by "-" alone, as in
+    ``0-Never``, only from a list of three values or more, because
+    ``2-Dimensional`` is a name.
 
     Args:
         values (list[str]): The values, as the source gives them.
@@ -486,7 +506,8 @@ def worded(text):
 
     A form numbers its items, as in ``24. What is your marital status?``. The
     number is the form's layout, so a question text loses it. Other texts
-    keep their numbers, such as a study variable's ``F361. Wheezing medicine``.
+    keep their numbers, for example a study variable's ``F361. Wheezing
+    medicine``.
 
     Args:
         text (Text): The text.
@@ -506,10 +527,10 @@ def cleaned(item):
 
     When the description is empty, the first other description takes its
     place. A description loses the publishers' notices about Executive Order
-    14168, in NOTICE, and then the empty headings of the template that some
-    NCIt and caDSR definitions follow, such as ``NOTE(S):``. A description
-    that was only a notice is dropped. Value lists that clean to the same
-    values are kept once.
+    14168, in NOTICE. Then it loses the empty headings of the template that
+    some NCIt and caDSR definitions follow, for example ``NOTE(S):``. cleaned
+    drops a description that was only a notice. Of value lists that clean to
+    the same values, cleaned keeps the first.
     """
     texts = [
         Text(text, original.term_type, original.question, original.study)
@@ -546,8 +567,8 @@ def cleaned(item):
 def replacements(item, by_id):
     """The open items, current or draft, that replace a retired item.
 
-    Each chain is followed through retired items, open or not, since none of
-    their own texts are used.
+    replacements follows each chain through retired items, open or not,
+    because none of their own texts are used.
 
     Args:
         item (Item): A retired item.
@@ -572,10 +593,10 @@ def replacements(item, by_id):
 def joined_studies(studies):
     """Several study texts joined into one, each study once.
 
-    A study text holds dbGaP studies joined by STUDY_SEPARATOR. The result holds every
-    study of the texts given, once each and sorted. Empty parts are dropped.
-    For example, ``["phs999902|phs999901", "", "phs999901"]`` gives
-    ``"phs999901|phs999902"``.
+    A study text holds dbGaP studies joined by STUDY_SEPARATOR. The result holds
+    every study of the texts given, once each and sorted. joined_studies drops
+    empty parts. For example, ``["phs999902|phs999901", "", "phs999901"]``
+    gives ``"phs999901|phs999902"``.
 
     Args:
         studies (Iterable[str]): Study texts.
@@ -595,12 +616,12 @@ def normalised_text(text):
 def distinct(texts, canonical):
     """The texts that are names, each once, without texts equal to the canonical.
 
-    Texts are compared as the tokenizer normalises them, as copies are. So
-    ``ABCD`` equals ``abcd``, but ``abcd_efgh`` and ``abcd efgh`` differ, as
-    their tokens do. A question has lost its form's item number in
-    ``worded``, and other texts keep theirs. So ``F361. Abcd`` differs from
-    ``Abcd``. Equal texts become one text. It keeps the first spelling and the
-    studies of all of them.
+    distinct compares texts as the tokenizer normalises them, as
+    ``distinct_pairs`` compares copies. So ``ABCD`` equals ``abcd``, but
+    ``abcd_efgh`` and ``abcd efgh`` differ, as their tokens do. ``worded``
+    already removed the form's item number from a question, and other texts
+    keep theirs. So ``F361. Abcd`` differs from ``Abcd``. Equal texts become
+    one text, which keeps the first spelling and the studies of all of them.
     """
     by_name_key, canonical_name_key = {}, normalised_text(canonical)
     for text in texts:
@@ -623,14 +644,14 @@ def item_pairs(
     Each name gives a ``name`` pair, and a ``name_description`` pair when the
     target has a description. Each other description gives a
     ``description_description`` pair, unless it repeats the description or
-    the canonical. When no name is left, the canonical is paired with the
-    description alone, as ``name_to_description``, unless the two are the
+    the canonical. When no name is left, item_pairs pairs the canonical with
+    the description alone, as ``name_to_description``, unless the two are the
     same text.
 
     Args:
         target (Item): The item on the target side.
         names (list[Text]): The texts for the source side.
-        status (str): The status of the item the texts come from.
+        status (str): The status of the item that the texts come from.
         anchor_type (str): The source side's type.
         descriptions (list[str]): Other descriptions, for the source side.
         to_description (bool): Whether the canonical may be paired with the
@@ -733,15 +754,17 @@ def distinct_pairs(pairs):
     Two pairs are copies when their two texts, ``anchor`` and ``positive``,
     are the same once the tokenizer normalises them. The model cannot tell
     such pairs apart. For example, ``BMI`` -> ``Body Mass Index`` and ``bmi``
-    -> ``body mass index`` are copies. Only the first copy is kept, as it is
-    written. The order of ``pairs`` decides which copy comes first, such as a
-    current item's copy before a retired item's. A pair from a benchmark's
-    study must not be used for training. So the copy kept takes the studies of
-    every copy, and the study rule sees them all.
+    -> ``body mass index`` are copies.
+
+    distinct_pairs keeps only the first copy, as it is written. The order of
+    ``pairs`` decides which copy comes first, for example a current item's
+    copy before a retired item's. A pair from a benchmark's study must not be
+    used for training. So the copy kept takes the studies of every copy, and
+    the study rule sees them all.
 
     For example, three copies of ``ABCD_SC`` -> ``Abcd score`` have the
-    studies ``phs999901``, none, and ``phs999902|phs999901``. The first copy
-    is kept, and its study is updated from ``phs999901`` to
+    studies ``phs999901``, none, and ``phs999902|phs999901``. distinct_pairs
+    keeps the first copy, and updates its study from ``phs999901`` to
     ``phs999901|phs999902``.
 
     Args:
@@ -777,13 +800,13 @@ def distinct_pairs(pairs):
 def star(items, source):
     """Every pair of a source's items, with what was left out, counted.
 
-    Items whose restriction field does not allow use are left out. A retired
-    item with a replacement gives its canonical and its texts to the
+    star leaves out the items whose restriction field does not allow use. A
+    retired item with a replacement gives its canonical and its texts to the
     replacement's canonical. A retired item without a replacement keeps its own
-    canonical. Its texts are used only when no current or draft item has them.
-    When two pairs have the same two texts, one is kept: the current item's
-    copy, else the draft item's, else the retired item's. It takes the studies
-    of every copy.
+    canonical. star uses its texts only when no current or draft item has them.
+    When two pairs have the same two texts, star keeps one: the current item's
+    copy, else the draft item's, else the retired item's. The copy kept takes
+    the studies of every copy.
 
     Args:
         items (Iterable[Item]): The source's items.

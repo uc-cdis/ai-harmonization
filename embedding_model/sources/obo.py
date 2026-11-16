@@ -1,13 +1,13 @@
 """The OBO Foundry ontologies: terms, synonyms and definitions.
 
-Ontologies reuse each other's terms, so only each ontology's own terms are
-read. The file read for each:
+Ontologies reuse each other's terms, so this module reads only each
+ontology's own terms. It reads this file for each ontology:
 
 - MONDO, HP, Uberon and OBA: the base release, which leaves out the terms
-  borrowed from other ontologies, at the date that the manifest pins;
-- DUO: its main release, at the date that the manifest pins;
-- CMO and MMO: their main file. No dated file can be downloaded, so their
-  current file is kept after the first fetch, as for a service.
+  borrowed from other ontologies, at the date that the manifest pins
+- DUO: its main release, at the date that the manifest pins
+- CMO and MMO: their main file. No dated file can be downloaded, so the fetch
+  keeps their current file after the first fetch, as for a service.
 
 Each ontology's file states its license.
 """
@@ -59,8 +59,8 @@ LICENSE_IDS = {
 # A class is obsolete when deprecated, or when it is a subclass of this.
 OBSOLETE_CLASS = "http://www.geneontology.org/formats/oboInOwl#ObsoleteClass"
 # Ontologies mark an obsolete term by putting "obsolete" before its label, as
-# in "obsolete hearing loss". The word is stripped, even when written twice or
-# as "obsoleted".
+# in "obsolete hearing loss". read_ontology strips the word, even when it is
+# written twice or as "obsoleted".
 OBSOLETE_PREFIX = re.compile(r"^(obsoleted?\s+)+", re.IGNORECASE)
 VERSION_IRI = OWL + "versionIRI"
 RELEASED = re.compile(r"/releases/(\d{4}-\d{2}-\d{2})/")
@@ -68,14 +68,14 @@ CITATION = "embedding_model/docs/licenses.md#ontologies"
 
 
 def release_name(ontology):
-    """The manifest's name for an ontology's release, such as ``HP release``."""
+    """The manifest's name for an ontology's release, for example ``HP release``."""
     return f"{ONTOLOGIES[ontology][0]} release"
 
 
 def short_id(iri):
-    """An IRI as the short id OBO files write, such as ``HP:0004322``.
+    """An IRI as the short id OBO files write, for example ``HP:0004322``.
 
-    A synonym type defined inside one ontology, such as
+    A synonym type defined inside one ontology, for example
     ``http://purl.obolibrary.org/obo/hp#layperson``, keeps only its name.
 
     Args:
@@ -95,23 +95,26 @@ def short_id(iri):
 def read_ontology(stream, ontology):
     """An ontology's own terms, with their synonyms and definitions.
 
-    Only the ontology's own terms are read: those whose id has its prefix,
-    such as ``HP:``. A term needs a name, its ``rdfs:label``, such as "Short
-    stature", unless it is obsolete. An obsolete term is kept with what
-    replaced it, even without a name. A term can have several definitions,
-    and a synonym can have several types. All are kept.
+    read_ontology reads only the ontology's own terms: those whose id has the
+    ontology's prefix, for example ``HP:``. A term needs a name, its
+    ``rdfs:label``, for example "Short stature", unless it is obsolete.
+    read_ontology keeps an obsolete term with what replaced it, even without a
+    name. A term can have several definitions, and a synonym can have several
+    types.
+    read_ontology keeps them all.
 
     Args:
         stream (file): The OWL file, opened in binary mode.
-        ontology (str): The ontology's key in ONTOLOGIES, such as ``hp``.
+        ontology (str): The ontology's key in ONTOLOGIES, for example ``hp``.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], dict]: The tables ``terms`` (id, label,
-            whether obsolete, ``replaced_by`` and ``consider``), ``synonyms``
-            (with scope and types) and ``definitions``, each with an
-            ``ontology`` column; and what the file's header states: its
-            ``license`` and the ``release`` date in its version IRI, each
-            ``""`` when not stated.
+        tuple[dict[str, pd.DataFrame], dict]: Two values:
+
+            - the tables ``terms`` (id, label, whether obsolete,
+              ``replaced_by`` and ``consider``), ``synonyms`` (with scope and
+              types) and ``definitions``, each with an ``ontology`` column
+            - what the file's header states: its ``license`` and the
+              ``release`` date in its version IRI, each ``""`` when not stated
     """
     prefix = ONTOLOGIES[ontology][0] + ":"
     owl = read_owl(stream)
@@ -173,8 +176,8 @@ def read_ontology(stream, ontology):
 def spdx_license(stated, ontology):
     """The SPDX license expression of the license that an ontology's file states.
 
-    A license that LICENSE_IDS does not know stops the fetch, so its terms are
-    read before the ontology is used under them.
+    A license that LICENSE_IDS does not know stops the fetch, so the license's
+    terms are read before the ontology is used under them.
 
     Args:
         stated (str): The license that the file's header states, or ``""``.
@@ -192,8 +195,8 @@ def spdx_license(stated, ontology):
     if stated not in LICENSE_IDS:
         raise ValueError(
             f"the {ontology} file states the license {stated}, which"
-            " LICENSE_IDS does not know; add its SPDX id there, and its terms"
-            " to embedding_model/docs/licenses.md"
+            " LICENSE_IDS does not know. Add its SPDX id to LICENSE_IDS, and"
+            " its terms to embedding_model/docs/licenses.md"
         )
     return LICENSE_IDS[stated]
 
@@ -203,14 +206,16 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; each ontology's release entry
-            gives its date. CMO's and MMO's give none: their current file is
-            kept.
+        manifest (dict): The committed manifest. Each ontology's release entry
+            gives its date. CMO's and MMO's give none, and the fetch keeps
+            their current file.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, every
-            ontology's rows together, the manifest's sources, and the counts
-            that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables, with every ontology's rows together
+            - the manifest's sources
+            - the counts that the fetch prints
     """
     tables = {"terms": [], "synonyms": [], "definitions": []}
     sources, terms = [], {}

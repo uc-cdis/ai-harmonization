@@ -40,10 +40,10 @@ def made(items):
 
 
 class TestClean:
-    """The cleaning that every text goes through."""
+    """``clean``, which cleans every text, and ``text_key``."""
 
     def test_markup_entities_and_spaces(self):
-        """HTML tags go, entities are unescaped, and whitespace runs become one space."""
+        """clean removes tags, unescapes entities, and turns whitespace runs into one space."""
         assert common.clean("<u>Over the</u>  past <b>7 days</b>, how") == (
             "Over the past 7 days, how"
         )
@@ -59,25 +59,25 @@ class TestClean:
         assert common.clean("Abcd <5 <i>efgh</i>") == "Abcd <5 efgh"
 
     def test_inline_tags_join_and_block_tags_separate(self):
-        """Inline tags leave no space, so units stay whole; block tags add a space."""
+        """Inline tags leave no space, so units stay whole. Block tags add a space."""
         assert common.clean("Abcd H<sub>2</sub>O") == "Abcd H2O"
         assert common.clean("<i>in vitro</i>-abcd") == "in vitro-abcd"
         assert common.clean("Abcd<br>efgh<p>ijkl</p>") == "Abcd efgh ijkl"
 
     def test_mojibake_is_repaired(self):
-        """UTF-8 read as cp1252 is repaired, beside correct text."""
+        """clean repairs UTF-8 read as cp1252, beside correct text."""
         assert common.clean("I\u00e2\u20ac\u2122m abcd") == "I\u2019m abcd"
         assert common.clean("Caf\u00e9 \u00e2\u20ac\u2122s \u2265 5") == (
             "Caf\u00e9 \u2019s \u2265 5"
         )
 
     def test_curly_quotes_stay_curly(self):
-        """Curly quotes and apostrophes are kept, since FIXES sets uncurl_quotes to False."""
+        """clean keeps curly quotes and apostrophes, because FIXES sets uncurl_quotes to False."""
         text = "The patient\u2019s \u201cusual\u201d diet"
         assert common.clean(text) == text
 
     def test_entities_are_read_beside_a_tag_and_beside_a_less_than_sign(self):
-        """Entities are read beside a tag, and beside a "<" that is no tag.
+        """clean reads entities beside a tag, and beside a "<" that is no tag.
 
         The second needs FIXES' unescape_html=True. ftfy's own default reads
         no entity in a text that holds a "<".
@@ -103,11 +103,11 @@ class TestClean:
         assert common.clean(common.clean(text)) == common.clean(text)
 
     def test_an_escape_written_with_entities_is_read(self):
-        """An escape whose brackets are entities is read once the entities are."""
+        """clean reads an escape whose brackets are entities, after it reads the entities."""
         assert common.clean("Caf&lt;U+00E9&gt; noir") == "Caf\u00e9 noir"
 
     def test_brackets_that_are_not_a_tag_are_kept(self):
-        """Text that only starts like a tag, without a tag's attributes, is kept."""
+        """clean keeps text that only starts like a tag, and removes a tag with attributes."""
         assert common.clean("a<b and c>d <i>e</i>") == "a<b and c>d e"
         assert common.clean('<i class="abcd">e</i>') == "e"
 
@@ -121,7 +121,7 @@ class TestClean:
         assert common.clean("Age 18\ufffd65") == "Age 18 65"
 
     def test_escaped_characters_are_read(self):
-        """R's <U+00A0> and JSON-style escapes are read as their characters."""
+        """clean reads R's <U+00A0> and JSON-style escapes as their characters."""
         assert common.clean("Abcd?<U+00A0>") == "Abcd?"
         assert common.clean("Abcd" + "\\" + "u2122 480") == "Abcd\u2122 480"
 
@@ -139,7 +139,7 @@ class TestClean:
         assert common.clean("\u202aAbcd\u202c efgh\u2066") == "Abcd efgh"
 
     def test_escaped_markup_and_more_tags(self):
-        """Escaped tags are removed as tags; headings and table parts are tags too."""
+        """clean removes escaped tags as tags. Headings and table parts are tags too."""
         assert common.clean("&lt;b&gt;Abcd&lt;/b&gt;") == "Abcd"
         assert common.clean("<p>Abcd</p><hr><h3>Efgh</h3>") == "Abcd Efgh"
         assert common.clean("<table><thead><tr><th>Abcd</th></tr></thead></table>") == (
@@ -156,7 +156,7 @@ class TestClean:
         assert common.clean(float("nan")) == ""
 
     def test_a_text_key_is_the_text_as_the_tokenizer_normalises_it(self):
-        """Case, accents and punctuation do not change a ``text_key``; other letters stay."""
+        """Case, accents and punctuation do not change a ``text_key``. Other letters stay."""
         assert common.text_key("Ábcd_Éfgh (IJKL)") == "abcd efgh ijkl"
         assert common.text_key("Größe") == common.text_key("GROSSE") == "grosse"
         assert common.text_key("α-Abcd") == "α abcd"
@@ -267,7 +267,7 @@ class TestNamesAndTypes:
         assert found.study.tolist() == ["phs999997|phs999998|phs999999"]
 
     def test_pairs_that_the_tokenizer_cannot_tell_apart_are_kept_once(self):
-        """Pairs that differ only in case or accents are copies; the first is kept."""
+        """Pairs that differ only in case or accents are copies. distinct_pairs keeps the first."""
         found = pd.DataFrame(
             {
                 "anchor": ["ABCD", "abcd", "abcd_x"],
@@ -294,7 +294,9 @@ class TestStar:
     """Pairs around each item's canonical, the same for every source."""
 
     def test_each_text_twice_and_each_other_description_once(self):
-        """Each text gives two pairs, and each other description gives one pair, unless it is the first in another case or punctuation."""
+        """Each text gives two pairs. Each other description gives one pair, unless it repeats
+        the first description in another case or punctuation.
+        """
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -311,7 +313,7 @@ class TestStar:
         ]
 
     def test_texts_once_without_the_canonical_or_ids(self):
-        """Texts are compared as the tokenizer reads them: case does not count, punctuation does."""
+        """star compares texts as the tokenizer does: case does not count, punctuation does."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -413,9 +415,9 @@ class TestStar:
         assert set(interim_pairs.positive_name) == {"New abcd"}
 
     def test_a_retired_item_without_one_keeps_only_new_names(self):
-        """Without a replacement, only names that no current item has are used.
+        """A retired item without a replacement uses only names that no current item has.
 
-        Names are compared by their ``text_key``, so ``ab_cd`` is the current ``AB CD``.
+        star compares the names by their ``text_key``, so ``ab_cd`` is the current ``AB CD``.
         """
         current = Item(id="abcd1", canonical="Abcd", texts=[Text("AB CD", "AB")])
         retired = Item(
@@ -449,7 +451,7 @@ class TestStar:
         assert (found.description, found.descriptions) == ("An abcd.", [])
 
     def test_lists_equal_once_cleaned_are_kept_once(self):
-        """Lists that clean to the same values count once; a list of nothing goes."""
+        """Lists that clean to the same values count once, and a list of nothing goes."""
         found = common.cleaned(
             Item(
                 id="abcd1",
@@ -464,7 +466,7 @@ class TestStar:
         assert found.lists == [("Has_A_Value", ["A&B"])]
 
     def test_two_lists_of_one_name_are_both_kept(self):
-        """Lists without a name are told apart by their values."""
+        """cleaned tells lists without a name apart by their values."""
         found = common.cleaned(
             Item(id="abcd1", canonical="Abcd", lists=[("", ["Yes"]), ("", ["Low"])])
         )
@@ -513,7 +515,7 @@ class TestStar:
         assert made(items) == [("name", "Old", "New")]
 
     def test_a_draft_can_replace_and_a_closed_item_keeps_its_names(self):
-        """A draft replacement is used; a closed current item's names are not reused."""
+        """star uses a draft replacement, and does not reuse a closed current item's names."""
         items = [
             Item(id="abcd1", canonical="Old", status=RETIRED, replaced_by=["abcd2"]),
             Item(id="abcd2", canonical="New", status=DRAFT),
@@ -554,7 +556,7 @@ class TestStar:
         assert counts["duplicates_removed"] == 1
 
     def test_a_text_equal_to_the_canonical_is_no_description(self):
-        """A description that repeats the canonical, case and punctuation aside, gives no pair of its own."""
+        """A description that repeats the canonical, but for case and punctuation, gives no pair."""
         item = Item(
             id="abcd1",
             canonical="Abcd efgh",
@@ -564,7 +566,7 @@ class TestStar:
         assert made([item]) == []
 
     def test_a_description_without_a_name_in_it_is_not_paired(self):
-        """Another description such as "-" or "N/A" gives no pair."""
+        """Another description, for example "-" or "N/A", gives no pair."""
         item = Item(
             id="abcd1",
             canonical="Abcd",
@@ -577,8 +579,8 @@ class TestStar:
         """A form's item number goes from a question text, not from other texts.
 
         A letter item goes only from a text that ends with "?", so "H.
-        Influenzae result" keeps its "H.". A dose such as "2.5 mg" is no item
-        number, so it stays.
+        Influenzae result" keeps its "H.". A dose, for example "2.5 mg", is no
+        item number, so it stays.
         """
         item = Item(
             id="abcd1",
@@ -610,7 +612,7 @@ class TestStar:
         ]
 
     def test_a_question_that_differs_only_by_an_item_number_is_the_canonical(self):
-        """A question equal to the canonical but for a form's item number is skipped."""
+        """star skips a question that equals the canonical but for a form's item number."""
         item = Item(
             id="abcd1",
             canonical="Is it abcd?",
@@ -675,7 +677,7 @@ class TestStar:
         )
 
     def test_a_draft_is_used_and_marked(self):
-        """A draft item is used like a current item, and it keeps its status."""
+        """star uses a draft item like a current item, and the draft keeps its status."""
         found, _ = common.star(
             [
                 Item(
@@ -687,7 +689,7 @@ class TestStar:
         assert found.status.tolist() == [DRAFT]
 
     def test_closed_items_and_duplicates_are_left_out_and_counted(self):
-        """An item that is not open gives no pairs; a repeated pair is kept once."""
+        """An item that is not open gives no pairs, and star keeps a repeated pair once."""
         items = [
             Item(id="abcd1", canonical="Abcd", texts=[Text("AB", "AB")]),
             Item(id="abcd2", canonical="Abcd", texts=[Text("AB", "SY")]),
@@ -749,7 +751,11 @@ class TestNcit:
         assert ncit.status_of(statuses) == expected
 
     def test_concepts(self):
-        """Same-meaning synonyms; the NCI definition first, sources off; lists once, sorted."""
+        """Synonyms, definitions, value lists, statuses and replacements of NCIt's concepts.
+
+        items keeps only same-meaning synonyms, and puts the NCI definition first. It
+        removes the definitions' sources, and keeps each value list once, sorted.
+        """
         first, second, third = ncit.items(self.TABLES)
         assert [text.text for text in first.texts] == ["AB", "Abcd syn"]
         assert first.description == "An abcd."
@@ -768,7 +774,7 @@ class TestNcit:
         )
 
     def test_a_new_term_type_is_reported(self, capsys):
-        """A term type in neither list is not used, and is reported."""
+        """ncit.items prints a term type in neither list, and does not use it."""
         tables = dict(
             self.TABLES, synonyms=self.TABLES["synonyms"].assign(term_type="ZZ")
         )
@@ -780,7 +786,7 @@ class TestObo:
     """The ontologies' terms."""
 
     def test_terms(self):
-        """EXACT synonyms with their types; obsolete terms with their replacements."""
+        """EXACT synonyms with their types, and obsolete terms with their replacements."""
         tables = {
             "terms": table(
                 id=["ABCD:1", "ABCD:2"],
@@ -860,7 +866,10 @@ class TestLoinc:
     """LOINC's codes."""
 
     def tables(self):
-        """A code with two names, a question, two form rows and two answer lists."""
+        """Two codes: one with two names, a question, two form rows and two answer lists.
+
+        The other is a deprecated code mapped to the first.
+        """
         return {
             "codes": table(
                 LOINC_NUM=["9999-1", "9999-2"],
@@ -909,7 +918,10 @@ class TestCdisc:
     """CDISC's codelists and terms."""
 
     def test_codelists_and_terms(self):
-        """A term's rows are merged; a codelist lists its terms; a question goes to the source side."""
+        """A term's rows merge into one item, and a codelist lists its terms.
+
+        A question goes to the source side as a question text.
+        """
         tables = {
             "terms": table(
                 **{
@@ -961,7 +973,7 @@ class TestCdisc:
         assert not cdisc.is_question("Abcd - An abcd (Lifetime).")
 
     def test_a_long_note_after_the_last_sentence_is_content(self):
-        """Only a short source note after the last sentence is removed."""
+        """without_source removes only a short source note after the last sentence."""
         note = (
             "A middle abcd. (With an even number of abcds, it is halfway between two.)"
         )
@@ -971,7 +983,7 @@ class TestCdisc:
         )
 
     def test_a_source_after_a_reference_or_with_parentheses_is_removed(self):
-        """A source after a bracketed reference, or holding parentheses, is removed."""
+        """without_source removes a source after a bracketed reference, or with parentheses."""
         assert cdisc.without_source("An abcd. [After Efgh] (Abcd Glossary)") == (
             "An abcd. [After Efgh]"
         )
@@ -982,7 +994,7 @@ class TestCde:
     """The NIH CDE Repository's data elements."""
 
     def test_elements(self, capsys):
-        """The first designation is the canonical; a question tag or mark makes a question."""
+        """The first designation is the canonical, and a question tag or mark makes a question."""
         tables = {
             "elements": table(
                 tiny_id=["abcd1", "abcd2"],
@@ -1035,7 +1047,7 @@ class TestCde:
         assert "'Abcd status'" in capsys.readouterr().out
 
     def test_only_designations_tagged_as_names_are_texts(self, capsys):
-        """Instructions, consumer names and new tags are left out; a new tag is printed."""
+        """cde.items leaves out instructions, consumer names and new tags, and prints a new tag."""
         tables = {
             "elements": table(
                 tiny_id=["abcd1"],
@@ -1073,7 +1085,7 @@ class TestCde:
         assert element.canonical == "Abcd indicator"
         assert [t.text for t in element.texts] == ["Abcd ind"]
         printed = capsys.readouterr().out
-        assert "'Abcd Tag' on 2 items; its designations not used" in printed
+        assert "'Abcd Tag' on 2 items, its designations not used" in printed
         assert "Guide For Use" not in printed
 
 
@@ -1135,7 +1147,7 @@ class TestCadsr:
         )
 
     def test_a_new_alternate_name_type_is_reported(self, capsys):
-        """An alternate-name type in neither list is not used, and is reported."""
+        """cadsr.items prints an alternate-name type in neither list, and does not use it."""
         tables = {
             "elements": table(
                 public_id=["9999903"],
@@ -1159,7 +1171,7 @@ class TestCadsr:
         (element,) = cadsr.items(tables)
         assert [t.text for t in element.texts] == ["ABCD_SCR", "abcd_score"]
         printed = capsys.readouterr().out
-        assert "'Abcd Alt Type' on 1 items; not used" in printed
+        assert "'Abcd Alt Type' on 1 items, not used" in printed
         assert "USED_BY" not in printed
 
     def test_java_types_go(self):
@@ -1204,7 +1216,7 @@ class TestCadsr:
         ) == ("An abcd An efgh.")
 
     def test_joined_definitions_are_spaced(self):
-        """caDSR's joined concept definitions get a space; its curation mark goes."""
+        """caDSR's joined concept definitions get a space, and its curation mark goes."""
         assert common.cadsr_definition("An abcd._The efgh.:An ijkl. -A mnop.") == (
             "An abcd. The efgh. An ijkl. A mnop."
         )
@@ -1261,7 +1273,11 @@ class TestPhenx:
     """PhenX's variables and their dbGaP mappings."""
 
     def test_variables(self, capsys):
-        """Visible variables only, closed ones marked; comparable mappings with their studies; a new map_level is printed, and not used."""
+        """Visible variables, comparable mappings with their studies, and a new map_level.
+
+        items keeps only visible variables, and marks closed ones. It keeps the comparable
+        mappings with their studies. It prints a new map_level, and does not use its mappings.
+        """
         tables = {
             "variables": table(
                 id=["1", "2", "3"],
@@ -1292,7 +1308,7 @@ class TestPhenx:
         }
         variable, closed = phenx.items(tables)
         assert (
-            "new value of map_level: 'abcd-level' on 1 items; not used"
+            "new value of map_level: 'abcd-level' on 1 items, not used"
             in capsys.readouterr().out
         )
         assert (variable.open, closed.open) == (True, False)
@@ -1308,14 +1324,14 @@ class TestPhenx:
         ]
 
     def test_quotes_around_a_description_go(self):
-        """A description wrapped in quotes loses them; quotes inside it stay."""
+        """A description wrapped in quotes loses them, and quotes inside it stay."""
         assert phenx.unquoted('"How abcd?"') == "How abcd?"
         assert phenx.unquoted('"Abcd" or "efgh"?') == '"Abcd" or "efgh"?'
 
     def test_value_labels(self):
-        """Codes are taken off; ranges list no values; a vertical tab also separates entries.
+        """labels removes codes, drops ranges, and splits entries at a vertical tab too.
 
-        The code is taken off on either side: "Never = 0" gives Never, and
+        labels removes the code on either side: "Never = 0" gives Never, and
         "1 = Yes" gives Yes. An explanation on the right is not the label: in
         "Yes = Classify as a user", the label is Yes.
         """
@@ -1380,7 +1396,7 @@ class TestPrepare:
     """``pairs prepare``: each source's file, its manifest, and combining sources."""
 
     def test_a_failed_prepare_keeps_the_previous_pairs(self, tmp_path, monkeypatch):
-        """A run that fails while it writes leaves the previous pairs as they were."""
+        """If prepare fails while it writes, the previous pairs stay as they were."""
         fetched_nhanes(tmp_path)
         assert pairs.prepare(["nhanes"], tmp_path) == 0
         folder = tmp_path / "pairs" / "nhanes"
@@ -1396,7 +1412,7 @@ class TestPrepare:
         assert [path.name for path in folder.parent.iterdir()] == ["nhanes"]
 
     def test_prepare_writes_the_pairs_and_their_manifest(self, tmp_path, capsys):
-        """The pairs are written with a manifest of their fetch, checksum and counts."""
+        """``pairs prepare`` writes the pairs and their manifest: fetch, checksum and counts."""
         fetched_nhanes(tmp_path)
         assert (
             main(["pairs", "prepare", "--inputs", str(tmp_path), "--source", "nhanes"])
@@ -1432,12 +1448,12 @@ class TestPrepare:
         ]
 
     def test_an_unfetched_source_is_reported(self, tmp_path, capsys):
-        """A source that was not fetched is reported, with the command to fetch it."""
+        """prepare prints an error for an unfetched source, with the command to fetch it."""
         assert pairs.prepare(["nhanes"], tmp_path) == 1
         assert "sources fetch --source nhanes" in capsys.readouterr().err
 
     def test_a_source_that_fails_does_not_stop_the_others(self, tmp_path, capsys):
-        """A source that cannot be read is reported, and the next one is still prepared."""
+        """If a source cannot be read, prepare prints an error and still prepares the next one."""
         fetched_nhanes(tmp_path)
         assert pairs.prepare(["ncit", "nhanes"], tmp_path) == 1
         assert "ncit not prepared" in capsys.readouterr().err
@@ -1448,7 +1464,7 @@ class TestPrepare:
     ):
         """When two sources in one run share a pair, the later source counts it.
 
-        The run takes the sources in READERS' order, not in the order given.
+        prepare takes the sources in READERS' order, not in the order given.
         """
         fetched_nhanes(tmp_path, "abcd-source")
         fetched_nhanes(tmp_path, "efgh-source")

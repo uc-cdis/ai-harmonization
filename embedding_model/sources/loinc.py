@@ -1,14 +1,15 @@
 """LOINC: codes and their names, question texts, answer lists and replacements.
 
-A release is pinned by its version, such as ``2.83``, and by the MD5 that the
-manifest holds for it. The release zip needs a free loinc.org account. With
-``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, it is downloaded through LOINC's
-API. Without them, it can be placed by hand in the downloads folder.
+The manifest pins a release by its version, for example ``2.83``, and by the
+release's MD5. The release zip needs a free loinc.org account. With
+``LOINC_USERNAME`` and ``LOINC_PASSWORD`` set, the fetch downloads the zip
+through LOINC's API. Without them, you can place the zip by hand in the
+downloads folder.
 
-Only named columns are read. A column that a newer release adds is printed, so
-that someone can review it. The SNOMED CT codes and names that the answer
-file carries in columns of their own are never read: LOINC's license does not
-cover them.
+The fetch reads only the named columns. It prints a column that a newer
+release adds, so that someone can review it. The fetch never reads the SNOMED
+CT codes and names that the answer file carries in separate columns, because
+LOINC's license does not cover them.
 """
 
 import functools
@@ -92,8 +93,9 @@ TABLES = {
 }
 
 
-# The columns of each table that are not read. A column in neither list, such
-# as one that a newer release adds, is printed, so that someone can review it.
+# The columns of each table that are not read. read_release prints a column in
+# neither list, for example one that a newer release adds, so that someone can
+# review it.
 UNREAD_COLUMNS = {
     "codes": [
         "VersionLastChanged",
@@ -167,12 +169,12 @@ RESTRICTION_FIELDS = {
 def read_release(archive):
     """The named columns of LOINC's tables, from a release zip.
 
-    A column that is in neither TABLES nor UNREAD_COLUMNS is printed, and it is
-    not read.
+    read_release prints a column that is in neither TABLES nor UNREAD_COLUMNS,
+    and does not read it.
 
     A code, and a form's row, are open when their RESTRICTION_FIELDS are
     empty. A form's row is also closed when its code carries a notice, or when
-    a row that it is nested in is closed: forms nest panels several levels
+    a row that it is nested in is closed. Forms nest panels several levels
     deep. With closed rows left out, a code is open when it sits in an open
     row, or in no form and has no notice of its own.
 
@@ -198,7 +200,7 @@ def read_release(archive):
                 header = pd.read_csv(handle, nrows=0, encoding="utf-8-sig").columns
             known = set(columns) | set(UNREAD_COLUMNS[table])
             for name in header[~header.isin(known)]:
-                print(f"  new column in {end}: {name!r}; not read")
+                print(f"  new column in {end}: {name!r}, not read")
             with bundle.open(member) as handle:
                 frame = pd.read_csv(
                     handle,
@@ -239,7 +241,7 @@ def md5_check(expected):
 
     Args:
         expected (dict[str, str | None]): Each MD5 that the zip must have,
-            keyed by what it belongs to, such as ``LOINC 2.83's``. A missing
+            keyed by what it belongs to, for example ``LOINC 2.83's``. A missing
             MD5 is not checked.
 
     Returns:
@@ -256,8 +258,8 @@ def md5_check(expected):
         for whose, md5 in expected.items():
             if md5 and digest != md5:
                 raise ValueError(
-                    f"the download has MD5 {digest}, and {whose} is {md5}; "
-                    "nothing was kept"
+                    f"the download has MD5 {digest}, and {whose} is {md5}. "
+                    "Nothing was kept"
                 )
 
     return check
@@ -266,24 +268,32 @@ def md5_check(expected):
 def fetch_source(downloads, manifest):
     """Fetch the LOINC release that the manifest pins.
 
-    The zip is downloaded through LOINC's API when credentials are set. It
-    is kept only if it has the MD5 that the API publishes for the release, and
-    the MD5 that the manifest pins, once it pins one. A zip placed by hand must
-    have the pinned MD5 too.
+    fetch_source downloads the zip through LOINC's API when credentials are
+    set. It keeps the zip only if the zip has each of these MD5s:
+
+    - the MD5 that the API publishes for the release
+    - the MD5 that the manifest pins, once the manifest pins one
+
+    A zip placed by hand must have the pinned MD5 too.
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; its release entry gives the
+        manifest (dict): The committed manifest. Its release entry gives the
             version, and the MD5 once recorded.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
-            manifest's sources, and the counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables
+            - the manifest's sources
+            - the counts that the fetch prints
 
     Raises:
-        FileNotFoundError: If the zip is neither in the downloads folder nor
-            downloadable without credentials.
-        ValueError: If the zip's MD5 differs from the release's MD5.
+        FileNotFoundError: If the zip is not in the downloads folder, and
+            LOINC_USERNAME or LOINC_PASSWORD is not set.
+        KeyError: If the zip lacks one of the tables.
+        ValueError: If the zip's MD5 differs from the release's MD5, or a
+            table lacks one of the columns.
     """
     pin = pinned(manifest, RELEASE)
     version = pin["version"]
@@ -293,7 +303,7 @@ def fetch_source(downloads, manifest):
         if auth is None:
             raise FileNotFoundError(
                 f"{path} is missing. Set LOINC_USERNAME and LOINC_PASSWORD to "
-                f"download LOINC {version} with a loinc.org account, or download "
+                f"download LOINC {version} with a loinc.org account. Or download "
                 f"Loinc_{version}.zip from https://loinc.org/downloads/ into "
                 f"{downloads}."
             )

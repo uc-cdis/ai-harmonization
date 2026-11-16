@@ -152,9 +152,9 @@ class TestRankTargets:
         }
 
     def test_mrr_at_10_counts_a_rank_past_10_as_0(self, model):
-        """MRR counts every rank, and MRR@10 and nDCG@10 only the first ten.
+        """MRR counts every rank. MRR@10 and nDCG@10 count only the first ten.
 
-        The model puts eleven race properties, such as "Race: White", before
+        The model puts eleven race properties, for example "Race: White", before
         sex. Their other words are unknown to it, so each points along race.
         So Gender's expected target, sex, comes twelfth.
         """
@@ -187,7 +187,7 @@ class TestRankTargets:
         assert metrics["ndcg@10"] == 0.0
 
     def test_ndcg_at_10_counts_every_expected_target(self, model):
-        """nDCG@10 counts every expected target in the first ten, MRR only the best placed.
+        """nDCG@10 counts every expected target in the first ten. MRR counts only the best placed.
 
         A gender variable can map to both a gender property and a sex
         property. The model ranks gender first, race second and sex third. So
@@ -217,7 +217,7 @@ class TestRankTargets:
         assert metrics["ndcg@10"] == round(dcg / perfect_dcg, 4)
 
     def test_a_query_prompt_is_not_added(self, model, inputs):
-        """Sources are embedded as the approaches embed them, without a query prompt.
+        """rank_targets embeds the sources as the approaches do, without a query prompt.
 
         The query prompt, the word sex five times, would pull every source
         toward sex and change the ranks. Without it, they stay 1, 1 and 3.
@@ -230,7 +230,7 @@ class TestRankTargets:
         assert [ranked[q]["rank"] for q in ("0", "1", "2")] == [1, 1, 3]
 
     def test_the_default_prompt_goes_on_both_sides(self, model, inputs):
-        """A default prompt is added to sources and targets, as model.encode() adds it."""
+        """rank_targets adds a default prompt to sources and targets, as model.encode() does."""
         targets, mappings, _ = benchmarks.read_benchmark(inputs, "topmed")
         sources, target_texts, expected = scoring.benchmark_texts(
             targets, mappings, texts.DEFAULT_FORMAT
@@ -247,7 +247,7 @@ class TestRankTargets:
         assert scoring.rank_targets(model, sources, target_texts, expected) == by_hand
 
     def test_targets_are_ranked_by_cosine(self, model):
-        """Targets are ranked by cosine, even when the model's config names another similarity.
+        """rank_targets ranks by cosine, even when the model's config names another similarity.
 
         The race target's text has four unknown words. They shorten its vector
         but keep its direction. So cosine ranks it first, while a dot product
@@ -300,14 +300,14 @@ class TestScore:
     def test_another_model_of_the_same_name_is_a_warning(
         self, model, saved, inputs, capsys, tmp_path
     ):
-        """Scores of another model folder with the same name are replaced, with a warning."""
+        """score warns when the scores came from another folder of the same name, not its own."""
         other = tmp_path / "other" / "abcd-model"
         model.save(str(other))
         for folder in (saved, str(other), str(other)):
             scoring.score(
                 folder, ["topmed"], inputs, tmp_path / "outputs", device="cpu"
             )
-        assert capsys.readouterr().err.count("They are replaced by those of") == 1
+        assert capsys.readouterr().err.count("replace them.") == 1
 
     def test_a_model_folder_is_loaded_without_asking_hugging_face(
         self, saved, inputs, monkeypatch, tmp_path
@@ -325,7 +325,7 @@ class TestScore:
     def test_a_relative_model_path_is_recorded_in_full(
         self, model, inputs, monkeypatch, capsys, tmp_path
     ):
-        """Two folders given by the same relative path, from two places, are told apart."""
+        """score records a relative path in full, so it tells two folders at that path apart."""
         for place in ("a", "b"):
             model.save(str(tmp_path / place / "abcd-model"))
             monkeypatch.chdir(tmp_path / place)
@@ -337,13 +337,13 @@ class TestScore:
             (folder / texts.DEFAULT_FORMAT / "config.yaml").read_text()
         )
         assert config["model"] == str((tmp_path / "b" / "abcd-model").resolve())
-        assert "They are replaced by those of" in capsys.readouterr().err
+        assert "replace them." in capsys.readouterr().err
 
     @pytest.mark.parametrize("text", ["", "{", "[1, 2]"])
     def test_a_config_that_cannot_be_read_is_replaced_quietly(
         self, text, saved, inputs, capsys, tmp_path
     ):
-        """A config.yaml that names no model, or is not YAML, is replaced with no warning."""
+        """score replaces a config.yaml that names no model, or is not YAML, with no warning."""
         folder = tmp_path / "outputs" / "scores" / "abcd-model" / "topmed"
         folder = folder / texts.DEFAULT_FORMAT
         folder.mkdir(parents=True)
@@ -393,7 +393,7 @@ class TestReadScores:
         assert list(ranks["rank"]) == [1, 1, 3]
 
     def test_a_model_not_scored_names_the_command(self, inputs, tmp_path):
-        """A model without scores is refused, with the score command that makes them."""
+        """read_scores refuses a model without scores, and names the command that scores it."""
         manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
         with pytest.raises(ValueError, match="Score it first") as raised:
             scoring.read_scores(
@@ -411,8 +411,9 @@ class TestReadScores:
     def test_scores_of_another_build_are_refused(self, saved, inputs, tmp_path):
         """A benchmark built again under its version, with a target described anew, is another build.
 
-        Its targets file differs, so the scores of the first build are refused,
-        with the command that scores the model again.
+        Its targets file differs. So read_scores refuses the scores of the first
+        build. The message names the changed file and says to score the model
+        again.
         """
         scoring.score(saved, ["topmed"], inputs, tmp_path / "outputs", device="cpu")
         edited = [dict(row) for row in TARGETS]
@@ -427,7 +428,9 @@ class TestReadScores:
             {},
         )
         manifest = benchmarks.read_benchmark(inputs, "topmed")[2]
-        with pytest.raises(ValueError, match="another build of it") as raised:
+        with pytest.raises(
+            ValueError, match="another build of the benchmark"
+        ) as raised:
             scoring.read_scores(
                 saved, "topmed", texts.DEFAULT_FORMAT, tmp_path / "outputs", manifest
             )
@@ -437,7 +440,7 @@ class TestReadScores:
     def test_scores_of_another_model_of_the_same_name_are_refused(
         self, model, inputs, tmp_path
     ):
-        """Two model folders of one name share a scores folder, so the other one's scores are refused."""
+        """read_scores refuses the scores of another model folder with the same name."""
         first = tmp_path / "first" / "abcd-model"
         second = tmp_path / "second" / "abcd-model"
         model.save(str(first))
@@ -457,7 +460,7 @@ class TestReadScores:
 
 
 class TestScoresFolder:
-    """Where a model's scores are written."""
+    """The folder that scores_folder names for a Hugging Face id or a model folder."""
 
     def test_a_hugging_face_model_keeps_its_owner(self, tmp_path):
         """A Hugging Face model's scores sit under its owner and name."""

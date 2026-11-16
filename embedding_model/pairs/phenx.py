@@ -1,14 +1,15 @@
 """PhenX: each variable, around its description.
 
-Only the variables of protocols that are visible and available are used. A
-hidden protocol is an older version of a visible one. A variable is left out
-too when the export does not list its protocol.
+Only the variables of protocols that are visible and available give pairs. A
+hidden protocol is an older version of a visible one. A variable also gives no
+pairs when the export does not list its protocol.
 
 The canonical is the variable's description, without the quotes around some
 of them. Its type is PhenX's own. The source side holds the variable's name,
-and each dbGaP study variable that PhenX maps to it as comparable: its name
-and its description, each with its studies. Variables that PhenX calls only
-related do not mean the same thing, so they are not used.
+and each dbGaP study variable that PhenX maps to it as comparable. For such a
+study variable, the source side holds its name and its description, each with
+its studies. Variables that PhenX calls only related do not mean the same
+thing, so ``items`` does not use them.
 """
 
 import re
@@ -17,8 +18,8 @@ from collections import defaultdict
 from embedding_model.pairs.common import Item, Text, clean, is_name, joined_studies
 from embedding_model.sources.common import report_new
 
-# PhenX's map levels. Only a comparable mapping gives texts; a related one is
-# a looser link. A new level is printed, and its mappings are not used.
+# PhenX's map levels. Only a comparable mapping gives texts. A related one is a
+# looser link. items prints a new level, and does not use its mappings.
 COMPARABLE = "comparable"
 RELATED = "related"
 # A code in a value list: a number or a range, as in "9 = Refused", "None = 0"
@@ -35,17 +36,22 @@ RANGE = re.compile(r"^\s*-?[\d.]+\s*\.\.\s*-?[\d.]+\s*$")
 def label(entry):
     """An entry's label, without its code, whichever side of "=" the code is on.
 
-    The code is a number or a range, else a short token that is not a name,
-    such as ``?`` or ``n/t``, else a token in capitals on the left, such as
-    ``NA``. Otherwise the left side is the label and the right side explains
-    it, as in ``Yes = Classify as a user``. The code can be "=" itself, as in
+    label looks for the code in this order:
+
+    1. a number or a range, on either side
+    2. a short token that is not a name, for example ``?`` or ``n/t``, on
+       either side
+    3. a token in capitals on the left, for example ``NA``
+
+    Otherwise the left side is the label, and the right side explains it, as
+    in ``Yes = Classify as a user``. The code can be "=" itself, as in
     ``= = Cannot be assessed``.
 
     Args:
-        entry (str): One entry, such as ``1 = Never`` or ``Never = 1``.
+        entry (str): One entry, for example ``1 = Never`` or ``Never = 1``.
 
     Returns:
-        str: The label, such as ``Never``.
+        str: The label, for example ``Never``.
     """
     separator = " = " if " = " in entry else "="
     left, equals, right = (side.strip() for side in entry.partition(separator))
@@ -66,12 +72,12 @@ def label(entry):
 
 
 def labels(cell):
-    """The labels of a PhenX value list, such as ``9 = Refused|7 = Don't Know``.
+    """The labels of a PhenX value list, for example ``9 = Refused|7 = Don't Know``.
 
-    PhenX writes a value list as free text, in no standard format, so it is
-    split here. Entries are separated by ``|``, and some by a vertical tab or a
-    comma. Each is cleaned before its code is found. A range of numbers, such as
-    ``0..110``, lists no values.
+    PhenX writes a value list as free text, in no standard format, so labels
+    splits it. PhenX separates the entries with ``|``, and some with a vertical
+    tab or a comma. labels cleans each entry before it finds the entry's code.
+    A range of numbers, for example ``0..110``, lists no values.
 
     Args:
         cell (str): The variable's ``variable_values``.

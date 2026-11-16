@@ -30,9 +30,9 @@ VARIABLES = [
 REFERENCE = "abcd-org/abcd-model"
 OTHER = "efgh-org/efgh-model"
 RANKS = {REFERENCE: [1, 1, 1, 2, 1, 3], OTHER: [2, 1, 4, 2, 12, 3]}
-# Targets that no variable expects: the rest of the data model that each
-# variable is ranked among. With them, the benchmark has 12 targets, as many as
-# the largest rank below.
+# Targets that no variable expects: the rest of the data model, which a model
+# also ranks for each variable. With them, the benchmark has 12 targets, as
+# many as the largest rank in RANKS.
 OTHER_TARGETS = [
     ("vital_signs.respiratory_rate", "Respiratory rate"),
     ("vital_signs.body_temperature", "Body temperature"),
@@ -45,7 +45,7 @@ OTHER_TARGETS = [
 # the other a transformer of 110 million parameters.
 PARAMETERS = {REFERENCE: 8_000 * 256, OTHER: 110_000_000}
 # The target that a model puts first when it misses a variable's expected
-# target: the closest other measure, such as diastolic for systolic blood
+# target: the closest other measure, for example diastolic for systolic blood
 # pressure.
 NEAR_MISSES = {
     "SBP01": "vital_signs.diastolic_blood_pressure",
@@ -131,10 +131,12 @@ def scores(
     ``model`` is a Hugging Face id, a model folder's full path or a run's
     folder, as score records them. config.yaml records the benchmark's version
     and files. A variable whose expected target is not first has its near
-    miss, from NEAR_MISSES, as its first suggestion. ``reverse`` lists the
-    variables in reverse order. ``parameters`` defaults to the model's in
-    PARAMETERS. ``blank_ids`` leaves every variable's id empty, as GDC gives
-    none. ``folder`` defaults to the model's scores folder under ``outputs``.
+    miss, from NEAR_MISSES, as its first suggestion.
+
+    ``reverse`` lists the variables in reverse order. ``parameters`` defaults
+    to the model's in PARAMETERS. ``blank_ids`` leaves every variable's id
+    empty, as GDC gives none. ``folder`` defaults to the model's scores folder
+    under ``outputs``.
     """
     manifest = built_manifest(inputs)
     order = list(range(len(VARIABLES)))
@@ -279,25 +281,27 @@ class TestInterval:
 
     @pytest.mark.filterwarnings("error")
     def test_equal_values_give_their_value(self):
-        """When every variable has the same MRR, such as 1, the interval is that value, with no warning.
+        """When every variable has the same MRR, for example 1, the interval is that value, with no warning.
 
         The values have no spread, so the interval has no width. scipy gives
-        that interval too, but warns of a loss of precision. The code returns
-        the shared value without asking scipy, so no warning is raised.
+        that interval too, but warns of a loss of precision. t_interval
+        returns the shared value without asking scipy, so no warning is
+        raised.
         """
         assert compare.t_interval(np.ones(6)) == (1.0, 1.0)
 
     def test_the_interval_and_the_test_agree(self):
         """A difference's 95% interval excludes 0 exactly when the paired t-test's p is below 0.05.
 
-        The report shows both, so they must agree. Of 20 variables, the model
-        ranks the expected target first on a few, where the reference ranks it
-        second: a difference of 1 - 1/2 = 1/2 each. On the rest, both rank it
-        the same: a difference of 0. The t statistic is the mean / (sd /
-        sqrt(20)), where sd is the differences' standard deviation. The
-        interval is the mean +/- 2.093 x sd / sqrt(20). 2.093 is the t
-        distribution's 97.5% point, with 20 - 1 = 19 degrees of freedom: a
-        95% interval leaves 2.5% out on each side.
+        differences.csv holds both, so they must agree. Of 20 variables, the
+        model ranks the expected target first on a few, where the reference
+        ranks it second: a difference of 1 - 1/2 = 1/2 each. On the rest, both
+        rank it the same: a difference of 0.
+
+        The t statistic is the mean / (sd / sqrt(20)), where sd is the
+        differences' standard deviation. The interval is the mean +/- 2.093 x
+        sd / sqrt(20). 2.093 is the t distribution's 97.5% point, with 20 - 1
+        = 19 degrees of freedom: a 95% interval leaves 2.5% out on each side.
 
         - With 4 such variables, the 20 differences have a mean of 0.1 and an
           sd of 0.205. So t is 2.18, p is 0.042, and the interval, 0.004 to
@@ -325,9 +329,10 @@ class TestInterval:
 
         On 20 variables, each model finds 10 expected targets. Models that
         agree on every variable get a narrower interval of their difference
-        than models that agree only as often as chance gives: 5 found by
-        both, 5 by each alone, and 5 by neither. Models that agree on every
-        variable still keep an interval of some width, around 0.
+        than models that agree only as often as chance gives. Of the 20
+        variables, chance gives 5 found by both, 5 by each alone, and 5 by
+        neither. Models that agree on every variable still keep an interval of
+        some width, around 0.
         """
         agreeing = compare.newcombe_interval(*paired_values(10, 0, 0, 10))
         independent = compare.newcombe_interval(*paired_values(5, 5, 5, 5))
@@ -335,7 +340,7 @@ class TestInterval:
         assert agreeing[0] < 0 < agreeing[1]
 
     def test_swapping_the_models_negates_the_interval(self):
-        """The reference minus the model is the interval of the model minus the reference, negated."""
+        """Swapping the model and the reference turns [low, high] into [-high, -low]."""
         model, reference = paired_values(10, 5, 2, 20)
         low, high = compare.newcombe_interval(model, reference)
         assert compare.newcombe_interval(reference, model) == pytest.approx(
@@ -347,9 +352,10 @@ class TestPairedTest:
     """The paired tests of two models on the same source variables."""
 
     def test_accuracy_is_compared_by_mcnemars_exact_test(self):
-        """At k = 1, the models differ on SBP01, HR01 and WAIST01, all for the reference.
+        """At k = 1, the models differ on SBP01, HR01 and WAIST01.
 
-        Under no difference, each is a coin flip, so p = 2 x 0.5^3 = 0.25.
+        Only the reference finds those three expected targets first. Under no
+        difference, each is a coin flip, so p = 2 x 0.5^3 = 0.25.
         """
         reference = compare.variable_values(np.array(RANKS[REFERENCE]))["accuracy@1"]
         other = compare.variable_values(np.array(RANKS[OTHER]))["accuracy@1"]
@@ -389,8 +395,8 @@ class TestPairedTest:
         The reference ranks each of six targets second, and the model first:
         each variable gains 1 - 1/2. The t statistic is infinite, so p is 0.
         Two models that rank alike have nothing to test, so p is 1, where
-        scipy gives NaN. scipy warns in both cases; the code asks it in
-        neither.
+        scipy gives NaN. scipy warns in both cases, but paired_test asks scipy
+        in neither.
         """
         model, reference = np.ones(6), np.full(6, 1 / 2)
         assert compare.paired_test("mrr", model, reference) == (compare.PAIRED_T, 0.0)
@@ -429,7 +435,7 @@ class TestCompare:
     """A comparison of two scored models."""
 
     def test_metrics_differences_figures_and_manifest(self, built, capsys):
-        """The folder holds both tables, the four figures in each format, and the manifest.
+        """The folder holds both tables, the four figures as PNG, PDF and EPS, and the manifest.
 
         compare takes each mean from score's metrics.csv, rounded to four
         decimals there. The reference's MRR is (1 + 1 + 1 + 1/2 + 1 + 1/3) / 6,
@@ -442,8 +448,9 @@ class TestCompare:
         reference finds SBP01's, HR01's and WAIST01's, and neither finds
         BMI01's or GLU01's. Newcombe lowers phi's numerator for that table,
         1 x 2 - 0 x 3 = 2, by n / 2 = 3, and stops at 0. So phi is 0, and the
-        interval of 1/6 - 4/6 combines the two Wilson intervals as if apart:
-        0.0301 to 0.5635 for 1/6, and 0.3000 to 0.9032 for 4/6. It runs from
+        interval of 1/6 - 4/6 combines the two Wilson intervals as if apart.
+        They run from 0.0301 to 0.5635 for 1/6, and from 0.3000 to 0.9032 for
+        4/6. The interval of the difference runs from
         1/6 - 4/6 minus sqrt((1/6 - 0.0301)^2 + (0.9032 - 4/6)^2) to
         1/6 - 4/6 plus sqrt((0.5635 - 1/6)^2 + (4/6 - 0.3000)^2):
         -0.7732 to 0.0403.
@@ -511,7 +518,7 @@ class TestCompare:
         assert f"     table: {folder / 'differences.csv'}\n" in printed
 
     def test_without_a_reference_no_differences_are_written(self, built, capsys):
-        """A comparison with no reference writes the metrics and three figures, no differences, and says why."""
+        """Without a reference, compare writes the metrics and three figures, no differences, and says why."""
         inputs, outputs = built
         folder = compare.compare(
             "abcd-comparison", [REFERENCE, OTHER], ["topmed"], inputs, outputs
@@ -529,7 +536,7 @@ class TestCompare:
         assert "no --reference: no paired tests" in capsys.readouterr().out
 
     def test_a_run_is_read_from_its_folder_by_its_name(self, built):
-        """A run of train is named after its run, and its scores are read from its own folder."""
+        """A run of train takes its run's name, and compare reads its scores from the run's folder."""
         inputs, outputs = built
         run = scored_run(inputs, outputs, outputs / "runs" / "abcd-run_s0")
         assert compare.label_of(str(run)) == "abcd-run_s0"
@@ -542,7 +549,7 @@ class TestCompare:
         ]
 
     def test_a_moved_run_is_still_read(self, built, tmp_path):
-        """A run's scores are in its own folder, so they are read after the run has moved.
+        """A run's scores are in its own folder, so compare reads them after the run moves.
 
         Their config.yaml still names the run's first folder.
         """
@@ -660,7 +667,7 @@ class TestCompare:
             )
 
     def test_a_benchmark_named_twice_is_compared_once(self, built, monkeypatch):
-        """A benchmark named twice is read and computed once, as score scores it once."""
+        """compare reads and computes a benchmark named twice only once, as score scores it once."""
         inputs, outputs = built
         read = []
         read_benchmark_result = compare.read_benchmark_result
@@ -700,7 +707,7 @@ class TestCompare:
     def test_a_comparison_that_cannot_be_drawn_is_refused(
         self, built, name, models, reference, message
     ):
-        """A bad name, a model named twice, a reference not among the models or alone, or too many models are refused."""
+        """compare refuses a bad name, a model named twice, too many models, and a reference outside the models or alone."""
         inputs, outputs = built
         with pytest.raises(ValueError, match=message):
             compare.compare(
@@ -740,12 +747,12 @@ class TestCompare:
     def test_colors_that_do_not_fit_the_models_are_refused(
         self, built, model_colors, message
     ):
-        """Colors that do not fit the models are refused before anything is written.
+        """compare refuses colors that do not fit the models, before it writes anything.
 
-        Too few or too many colors, a misspelled color, a fully transparent
-        one, and one color for two models are each refused. "tab:bleu" is
-        "tab:blue" misspelled, which matplotlib does not read. "tab:blue" and
-        "#1f77b4" are one color in two forms.
+        It refuses each of these: too few or too many colors, a misspelled
+        color, a fully transparent one, and one color for two models.
+        "tab:bleu" is "tab:blue" misspelled, which matplotlib does not read.
+        "tab:blue" and "#1f77b4" are one color in two forms.
         """
         inputs, outputs = built
         with pytest.raises(ValueError, match=message):
@@ -769,10 +776,12 @@ def figure_results(
     first, and each other model second. On accuracy@1 the two then differ on
     all six variables, and McNemar's p is 2 * 0.5 ** 6 = 0.03125: one star. On
     MRR each variable differs by 1 - 1/2, with no spread, so the paired
-    t-test's p is 0: three stars. So each gets a bracket. At k of 5 and 10
-    the models agree. On ``tied_benchmark``, every model ranks as the
-    reference does instead. There every difference is 0 and every p is 1, so
-    nothing gets a bracket.
+    t-test's p is 0: three stars. So each other model gets a bracket on
+    accuracy@1 and on MRR.
+
+    At k of 5 and 10 the models agree. On ``tied_benchmark``, every model
+    ranks as the reference does instead. There every difference is 0 and
+    every p is 1, so nothing gets a bracket.
     """
     models = [REFERENCE] + [f"efgh-org/model-{n}" for n in range(2, count + 1)]
     benchmark_results, differences = {}, []
@@ -845,9 +854,9 @@ class TestFigures:
 
         Of twelve variables, the reference ranks six first and six third, and
         the other model ranks all second. At k of 1 the bars are 0.5 and 0,
-        and McNemar's p is 2 * 0.5 ** 6, so a bracket. The reference's Wilson
-        interval for 6 of 12 reaches 0.7462. At k of 5 both bars are 1, with
-        no bracket.
+        and McNemar's p is 2 * 0.5 ** 6, so the bars get a bracket. The
+        reference's Wilson interval for 6 of 12 reaches 0.7462. At k of 5 both
+        bars are 1, with no bracket.
         """
         models, benchmark_results, differences = figure_results(
             2, reference_ranks=(1,) * 6 + (3,) * 6, other_ranks=(2,) * 12
@@ -865,7 +874,8 @@ class TestFigures:
         """The reference is the first bar of each group, and every model keeps the color of its place in --model.
 
         The other model is given first and the reference second, so the
-        reference takes the second color, though it is drawn first.
+        reference takes the second color, though overview_figure draws it
+        first.
         """
         (reference, other), benchmark_results, differences = figure_results(2)
         with rc_context(compare.STYLE):
@@ -891,9 +901,10 @@ class TestFigures:
         """With model_colors, each model takes the color of its place in --model, in all four figures.
 
         The models are given as the other model, then the reference, with
-        purple and green, two colors that petroff10 does not hold. The
-        reference is drawn first in each figure, but takes green, the color
-        of its place. differences_from_reference draws only the other model.
+        purple and green, two colors that petroff10 does not hold.
+        accuracy_and_mrr, accuracy_by_k and mrr_by_size draw the reference
+        first, but in green, the color of its place. differences_from_reference
+        draws only the other model.
         """
         (reference, other), benchmark_results, differences = figure_results(2)
         for benchmark_result in benchmark_results.values():
@@ -942,9 +953,10 @@ class TestFigures:
         """differences_from_reference puts the model at its difference on each metric's row.
 
         The other model ranks every expected target second, and the reference
-        first. So on accuracy@1 it is 0 - 1 = -1 behind; at k of 5 and 10,
-        both find every target, 1 - 1 = 0; on MRR it is 1/2 - 1 = -0.5. The
-        rows run from accuracy@1 at the top, row 0, down to MRR, row 3.
+        first. So on accuracy@1 the other model's difference is 0 - 1 = -1.
+        At k of 5 and 10, both find every target: 1 - 1 = 0. On MRR, the
+        other model's difference is 1/2 - 1 = -0.5. The rows run from
+        accuracy@1 at the top, row 0, down to MRR, row 3.
         """
         models, benchmark_results, differences = figure_results(2)
         with rc_context(compare.STYLE):
@@ -1029,8 +1041,9 @@ class TestFigures:
     def test_each_line_carries_its_models_marker(self):
         """accuracy_by_k marks each line with the marker of its model's place in --model.
 
-        The models are given as the other model, then the reference. The
-        reference's line is drawn first, but keeps the marker of place 1.
+        The models are given as the other model, then the reference.
+        curve_figure draws the reference's line first, but the line keeps the
+        marker of place 1.
         """
         benchmark_results = {
             "topmed": {

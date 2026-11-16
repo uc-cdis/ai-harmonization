@@ -34,12 +34,11 @@ from embedding_model.texts import (
 
 ACCURACY_AT_K = (1, 3, 5, 10)
 # The cutoff of MRR@10, the evaluator's default. Training reports MRR@10 on
-# the validation pairs, and score reports it beside the full MRR, so the two
-# compare.
+# the validation pairs, and score reports it beside the full MRR. So a run
+# has MRR@10 on both its validation pairs and its benchmarks.
 MRR_CUTOFF = 10
-# The cutoff of nDCG@10, the retrieval metric that BEIR and MTEB report, and
-# the evaluator's default. score reports it so that its scores compare with
-# theirs.
+# The cutoff of nDCG@10, the evaluator's default. BEIR and MTEB report the
+# same metric, so readers know it.
 NDCG_CUTOFF = 10
 METRIC_COLUMNS = [
     "mrr",
@@ -70,7 +69,7 @@ def split_values(cell):
 
 
 def benchmark_texts(targets, mappings, text_format):
-    """A benchmark's texts, in the three dicts InformationRetrievalEvaluator takes.
+    """A benchmark's texts, in the three dicts that InformationRetrievalEvaluator takes.
 
     Args:
         targets (pd.DataFrame): The benchmark's targets.
@@ -82,11 +81,11 @@ def benchmark_texts(targets, mappings, text_format):
         documents:
 
         - source_texts: each source variable's text, by its row number in the
-          mappings;
+          mappings
         - target_texts: each target property's text, by its ``node.property``
-          key;
+          key
         - expected: each source variable's expected ``node.property`` keys, by
-          its row number.
+          its row number
     """
     formatter = FORMATS[text_format]
     target_texts = {}
@@ -126,23 +125,24 @@ def ranking_evaluator(
 ):
     """An InformationRetrievalEvaluator that ranks as the approaches rank.
 
-    Every text of the corpus is ranked for each query, by cosine similarity.
-    Scoring ranks a benchmark's targets with it. MRR is then computed over the
-    whole ranking, and MRR@10 and nDCG@10 beside it. Training ranks the
-    validation pairs' positives, with a cutoff: the evaluator keeps each
-    query's hits in Python lists, so a whole ranking of tens of thousands of
-    positives for each of tens of thousands of queries would not fit.
+    For each query, the evaluator ranks every text of the corpus by cosine
+    similarity. Scoring ranks a benchmark's targets with it, and sets no
+    cutoff. The evaluator then computes MRR over the whole ranking, and MRR@10
+    and nDCG@10 beside it. Training ranks the validation pairs' positives with a cutoff, because the
+    evaluator keeps each query's hits in Python lists. A whole ranking of tens
+    of thousands of positives, for each of tens of thousands of queries, would
+    not fit.
 
     Args:
         model (SentenceTransformer): The model, for its default prompt.
         queries (dict[str, str]): The query texts, by id.
         corpus (dict[str, str]): The texts to rank, by id.
         relevant (dict[str, set[str]]): Each query's relevant corpus ids.
-        batch_size (int): Texts encoded at a time.
+        batch_size (int): How many texts the model encodes at a time.
         name (str): The evaluator's name, which starts the names of its
-            metrics, such as ``validation_cosine_mrr@<corpus size>``.
+            metrics, for example ``validation_cosine_mrr@10``.
         write_predictions (bool): Whether the evaluator writes each query's
-            full ranking when it is given a folder.
+            full ranking when it gets a folder.
         cutoff (int | None): The last rank that the metrics count: MRR,
             nDCG and accuracy at the cutoff at most. None counts the whole
             ranking, for MRR, MRR@10 and nDCG@10.
@@ -190,12 +190,12 @@ def ranking_evaluator(
 def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_SIZE):
     """Rank every target for each source, and score the ranks.
 
-    Targets are ranked by cosine similarity. The evaluator gives the results
-    two ways. It returns the averages in memory: MRR, MRR@10, nDCG@10 and
-    accuracy@k over all source variables. Its predictions file, written to a
-    temporary folder, holds each source variable's full ranking. Each source
-    variable's rank and top-1 target are read from that file, and the folder is
-    deleted.
+    The evaluator ranks the targets by cosine similarity, and gives the
+    results in two ways. It returns the averages in memory: MRR, MRR@10,
+    nDCG@10 and accuracy@k over all source variables. It also writes a
+    predictions file to a temporary folder, with each source variable's full
+    ranking. rank_targets reads each source variable's rank and top-1 target
+    from that file. Then the folder is deleted.
 
     Args:
         model (SentenceTransformer): The model to score.
@@ -203,7 +203,7 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
         target_texts (dict[str, str]): The target properties' texts, by key.
         expected (dict[str, set[str]]): Each source variable's expected
             target keys.
-        batch_size (int): Texts encoded at a time.
+        batch_size (int): How many texts the model encodes at a time.
 
     Returns:
         tuple[dict, dict]: The metrics (METRIC_COLUMNS), and for each source
@@ -248,22 +248,23 @@ def rank_targets(model, source_texts, target_texts, expected, batch_size=BATCH_S
 
 
 def scores_folder(outputs, model, benchmark, text_format):
-    """Where a model's scores on a benchmark, in one format, are written.
+    """The folder for a model's scores on a benchmark, in one format.
 
-    ``--model`` is either a Hugging Face model id or a path to a model folder,
-    and the scores folder is named after it:
+    ``--model`` is either a Hugging Face model id or a path to a model folder.
+    The scores folder takes its name from it:
 
     - a Hugging Face model keeps its owner and name, so two models of the same
-      name from different owners stay apart:
-      ``scores/uc-ctds/StdElement-Mapper/topmed/stdelement``;
+      name from different owners get different folders:
+      ``scores/uc-ctds/StdElement-Mapper/topmed/stdelement``
     - a model folder on disk gives only its own name, whether the path is full
       or relative: ``/home/me/models/abcd-model`` gives
-      ``scores/abcd-model/topmed/compact``.
+      ``scores/abcd-model/topmed/compact``
 
-    It tells them apart as SentenceTransformer does: an existing folder is a
-    model on disk, and anything else is a Hugging Face id. A downloaded Hugging
-    Face model sits in the Hugging Face cache under another name
-    (``models--uc-ctds--StdElement-Mapper``), so its id stays an id.
+    scores_folder decides between the two as SentenceTransformer does: an
+    existing folder is a model on disk, and anything else is a Hugging Face id.
+    A downloaded Hugging Face model sits in the Hugging Face cache under
+    another name (``models--uc-ctds--StdElement-Mapper``), so its id stays an
+    id.
 
     The format has a folder of its own, so a model scored in two formats keeps
     both scores.
@@ -296,8 +297,8 @@ def model_name(model):
 def model_id(model):
     """The model as score records it in metrics.csv and config.yaml.
 
-    A run of train is recorded by its run folder, another model folder by its
-    full path, and a Hugging Face model by its id.
+    score records a run of train by its run folder, another model folder by
+    its full path, and a Hugging Face model by its id.
 
     Args:
         model (str): A Hugging Face model id, a model folder or a run folder.
@@ -315,8 +316,8 @@ def model_id(model):
 def scores_location(outputs, model, benchmark, text_format):
     """Where score writes a model's scores on a benchmark, in one format.
 
-    A run of train keeps its scores in its own folder. Any other model's go
-    under ``outputs/scores/``, as scores_folder names them.
+    A run of train keeps its scores in its own folder. Any other model's
+    scores go under ``outputs/scores/``, as scores_folder names them.
 
     Args:
         outputs (Path): The outputs folder.
@@ -336,9 +337,9 @@ def scores_location(outputs, model, benchmark, text_format):
 def write_scores(folder, row, mappings, ranked, config):
     """Write one scoring's files: metrics.csv, per_variable.csv and config.yaml.
 
-    The folder is written whole, through ``folders.staged``. So a scoring that
-    fails while it writes leaves the previous scores as they were, and the
-    files in a folder always come from one scoring.
+    It writes the folder whole, through ``folders.staged``. So if scoring
+    fails while it writes, the previous scores stay as they were. And the files
+    in a folder always come from one scoring.
 
     Args:
         folder (Path): The scores folder, from scores_folder.
@@ -360,7 +361,7 @@ def write_scores(folder, row, mappings, ranked, config):
 
 
 def scores_config(folder):
-    """What a scores folder's config.yaml records, such as the model and the benchmark's files.
+    """What a scores folder's config.yaml records, for example the model and the benchmark's files.
 
     Args:
         folder (Path): The scores folder, from scores_location.
@@ -380,9 +381,9 @@ def read_scores(model, benchmark, text_format, outputs, built_manifest):
     """A model's scores on a benchmark: its metrics row and its ranks.
 
     A run's scores are in its own folder, so they are its own, even after the
-    run's folder has moved. Any other model's scores are checked against the
-    model that config.yaml names, since two model folders of one name share a
-    scores folder.
+    run's folder moves. read_scores checks any other model's scores against
+    the model that config.yaml names, because two model folders of one name
+    share a scores folder.
 
     Args:
         model (str): The model, as ``--model`` gives it.
@@ -425,8 +426,9 @@ def read_scores(model, benchmark, text_format, outputs, built_manifest):
     )
     if changed:
         raise ValueError(
-            f"{model}'s scores on {benchmark} come from another build of it"
-            f" than the one built ({'; '.join(changed)}). Score it again: {command}"
+            f"{model}'s scores on {benchmark} come from another build of the"
+            f" benchmark than the current build ({'; '.join(changed)}). Score it"
+            f" again: {command}"
         )
     metrics = pd.read_csv(folder / "metrics.csv", dtype={"benchmark_version": str})
     row = metrics.iloc[0]
@@ -470,7 +472,7 @@ def run_record(model):
         record = json.loads(path.read_text(encoding="utf-8"))
     except Exception as error:
         raise ValueError(
-            f"{path} cannot be read ({type(error).__name__}: {error}), so the"
+            f"{path} cannot be read ({type(error).__name__}: {error}). So the"
             " run's leakage check cannot be read either"
         ) from error
     missing = [
@@ -529,8 +531,7 @@ def check_corpus_checked(record, benchmark_builds, inputs):
     """Check that a run's corpus was checked for leakage against each benchmark.
 
     A benchmark counts as checked when the run's record lists it for the
-    corpus, with the same files, by their checksums, as the benchmark that is
-    built.
+    corpus with the same files, by their checksums, as the built benchmark.
 
     Args:
         record (dict): The run's record.
@@ -561,8 +562,8 @@ def check_corpus_checked(record, benchmark_builds, inputs):
             unchecked = f"this build of benchmark {name} ({'; '.join(changed)})"
         raise ValueError(
             f"the corpus of run {record['run']} was not checked against"
-            f" {unchecked} for leakage, so the model may have learned its"
-            f" mappings. Build the corpus again, after the benchmark:"
+            f" {unchecked} for leakage. So the model may have learned the"
+            f" benchmark's mappings. Build the corpus again, after the benchmark:"
             f" {rebuild}. Then train again"
         )
 
@@ -570,11 +571,12 @@ def check_corpus_checked(record, benchmark_builds, inputs):
 def checked_model(model, benchmark_builds, inputs, text_format):
     """Check the model against the benchmarks, and find its path and texts' format.
 
-    A run of ``train`` is scored from its record. Its texts take the run's
-    training format, unless ``text_format`` names another. Its corpus must
-    have been checked against each benchmark, and its model must have the
-    checksums that its record holds. Any other model has no record, so its
-    leakage is unknown, and a note says so.
+    For a run of ``train``, checked_model reads the run's record. The texts
+    take the run's training format, unless ``text_format`` names another
+    format. The record must show that the run's corpus was checked against
+    each benchmark. The run's model must have the checksums that its record
+    holds. Any other model has no record, so its leakage is unknown, and
+    checked_model prints a note that says so.
 
     Args:
         model (str): A Hugging Face model id, a model folder or a run's
@@ -586,26 +588,33 @@ def checked_model(model, benchmark_builds, inputs, text_format):
             training format, and DEFAULT_FORMAT for any other model.
 
     Returns:
-        tuple[str, str, str]: The model, as scoring names it: the run's
-            folder for a run, and ``model`` itself for any other model; the
-            path to load it from; and the texts' format.
+        tuple[str, str, str]: Three values:
+
+            - the model, as scoring names it: the run's folder for a run, and
+              ``model`` itself for any other model
+            - the path to load the model from
+            - the texts' format
 
     Raises:
-        ValueError: If a run's record cannot be read, its corpus was not
-            checked against a benchmark, or its model differs from its record.
+        ValueError: In each of these cases:
+
+            - a run's record cannot be read, lacks a field that scoring
+              reads, or names an unknown text format
+            - a run's corpus was not checked against a benchmark
+            - a run's model differs from its record
     """
     run = run_record(model)
     if run is None:
         print(
-            f"note: {model} was not trained here, so whether its training data"
-            " leaks a benchmark is unknown"
+            f"note: {model} was not trained here. score cannot check whether its"
+            " training data leaks a benchmark"
         )
         return model, model, text_format or DEFAULT_FORMAT
     run_folder, record = run
     trained_format = recorded_format(
         record,
         run_folder / "manifest.json",
-        "train the run again from its config.yaml",
+        "Train the run again from its config.yaml",
     )
     check_corpus_checked(record, benchmark_builds, inputs)
     check_run_files(run_folder, record)
@@ -638,7 +647,7 @@ def loaded_encoder(model, model_path, device):
     except Exception as error:
         raise ValueError(
             f"the model {model} cannot be loaded ({type(error).__name__}:"
-            f" {error}); give a model folder on disk or a Hugging Face model id"
+            f" {error}). Give a model folder on disk or a Hugging Face model id"
         ) from error
 
 
@@ -657,16 +666,19 @@ def benchmark_scores(
         texts (tuple[dict, dict, dict]): The benchmark's source texts, target
             texts and expected targets, from benchmark_texts.
         text_format (str): The texts' format, a key of FORMATS.
-        batch_size (int): Texts encoded at a time.
+        batch_size (int): How many texts the model encodes at a time.
 
     Returns:
-        tuple[dict, dict, dict]: The metrics row; each source variable's rank
-            and top-1 target, from rank_targets; and what config.yaml holds.
+        tuple[dict, dict, dict]: Three values:
+
+            - the metrics row
+            - each source variable's rank and top-1 target, from rank_targets
+            - what config.yaml holds
     """
     source_texts, target_texts, expected = texts
     print(
         f"{benchmark} version {manifest['version']}: {len(source_texts):,} source "
-        f"variables, {len(target_texts):,} targets; format {text_format}"
+        f"variables, {len(target_texts):,} targets, format {text_format}"
     )
     metrics, ranked = rank_targets(
         encoder, source_texts, target_texts, expected, batch_size
@@ -710,50 +722,56 @@ def score(
 ):
     """Score a model on built benchmarks and write the results.
 
-    Every benchmark is read and checked first. So a missing or changed one
-    stops scoring before the model is loaded. The model is then loaded once,
-    and scored on each benchmark in turn. A model on disk is loaded without
-    asking Hugging Face, and recorded by its full path. A Hugging Face model
-    is recorded by its id.
+    It reads and checks every benchmark first. So a missing or changed
+    benchmark stops scoring before the model loads. Then it loads the model
+    once, and scores it on each benchmark in turn. It loads a model on disk
+    without asking Hugging Face, and records it by its full path. It records
+    a Hugging Face model by its id.
 
-    A run of ``train`` is scored from its record. Its texts take the run's
-    training format, unless ``text_format`` names another. A benchmark that
-    the run's corpus was not checked against for leakage, by its name and
-    its files' checksums, is refused: the model may have learned its
-    mappings. The run's model must have the checksums that its record holds.
-    The scores go into the run's folder. Any other model has no record, so
-    its leakage is unknown, and scoring says so.
+    For a run of ``train``, it reads the run's record. The texts take the
+    run's training format, unless ``text_format`` names another format. The
+    scores go into the run's folder.
+
+    It refuses a benchmark that the run's corpus was not checked against for
+    leakage, because the model may have learned that benchmark's mappings.
+    The check compares the benchmark's name and its files' checksums. The
+    run's model must have the checksums that its record holds. Any other model
+    has no record, so its leakage is unknown, and score prints a note.
 
     For each benchmark, it writes:
 
-    - ``metrics.csv``: one row: the model's number of parameters and its
-      metrics;
-    - ``per_variable.csv``: every source variable's rank and top-1 target;
+    - ``metrics.csv``: one row, with the model's number of parameters and its
+      metrics
+    - ``per_variable.csv``: every source variable's rank and top-1 target
     - ``config.yaml``: the settings, the model's revision, the
-      ai-harmonization commit, and the benchmark's version and checksums.
+      ai-harmonization commit, and the benchmark's version and checksums
 
     Args:
         model (str): A Hugging Face model id or a model folder on disk.
-        benchmarks (list[str]): The benchmarks, such as ``["topmed"]``.
+        benchmarks (list[str]): The benchmarks, for example ``["topmed"]``.
         inputs (Path): The inputs folder that the benchmarks were built into.
         outputs (Path): The outputs folder.
-        text_format (str | None): A key of FORMATS: the shape of the texts.
+        text_format (str | None): A key of FORMATS: the format of the texts.
             None takes a run's training format, and DEFAULT_FORMAT for any
             other model.
         device (str | None): ``cpu`` or ``cuda``. None uses a GPU if there is
             one, and the CPU otherwise.
-        batch_size (int): Texts encoded at a time.
+        batch_size (int): How many texts the model encodes at a time.
 
     Returns:
         list[dict]: The metrics rows, one per benchmark.
 
     Raises:
-        FileNotFoundError: If a benchmark has not been built.
-        ValueError: If a benchmark cannot be read, differs from its manifest
-            or lists an expected target that is not among its targets, if a
-            run's corpus was not checked against it, if a run's record cannot
-            be read or its model differs from it, or if the model cannot be
-            loaded.
+        FileNotFoundError: If a benchmark is not built.
+        ValueError: In each of these cases:
+
+            - a benchmark cannot be read, differs from its manifest, or lists
+              an expected target that is not among its targets
+            - a run's corpus was not checked against a benchmark
+            - a run's record cannot be read, lacks a field that scoring reads,
+              or names an unknown text format
+            - a run's model differs from its record
+            - the model cannot be loaded
     """
     benchmark_builds = {name: read_benchmark(inputs, name) for name in benchmarks}
     model, model_path, text_format = checked_model(
@@ -773,8 +791,8 @@ def score(
         previous = scores_config(folder).get("model")
         if previous and previous != row["model"]:
             print(
-                f"warning: {folder} held the scores of {previous}. They are "
-                f"replaced by those of {row['model']}.",
+                f"warning: {folder} held the scores of {previous}. The scores "
+                f"of {row['model']} replace them.",
                 file=sys.stderr,
             )
         write_scores(folder, row, mappings, ranked, config)

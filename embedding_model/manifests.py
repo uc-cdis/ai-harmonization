@@ -1,18 +1,21 @@
 """What a build was made from, and whether a new build is the same.
 
-Benchmarks and sources each keep a committed manifest per build, under their
-own ``manifests/`` folder. It pins what the build is made from, such as a
-commit, a release or a record, and holds the SHA-256 of every file built.
-A new build writes its own manifest, and the two are compared. A build that
-matches is kept. A build that differs is kept only when accepted as a new
-version. A version committed in git never changes.
-``embedding_model/docs/manifests.md`` describes the fields and the rules.
+Each benchmark and each source has a committed manifest, in the
+``manifests/`` folder of its package. The committed manifest pins what the
+build is made from, for example a commit, a release or a record. It also holds
+the SHA-256 of every file built.
+
+A new build writes its own manifest, and ``decide`` compares the two.
+``write_checked`` keeps a build that matches. It keeps a build that differs
+only when the build is accepted as a new version. A version committed in git
+never changes. ``embedding_model/docs/manifests.md`` describes the fields and
+the rules.
 
 The module also computes the checksums that a manifest holds:
 
 - a file's ``sha256``, by ``file_sha256`` for a file on disk, or by ``sha256``
-  for bytes in memory. Both give the same value for the same bytes;
-- a table's ``content_sha256``, by ``table_sha256``, from the table's content.
+  for bytes in memory. Both give the same value for the same bytes.
+- a table's ``content_sha256``, by ``table_sha256``, from the table's content
 """
 
 import csv
@@ -31,7 +34,8 @@ def sha256(file_bytes):
     """The SHA-256 of bytes that are in memory already, as hex.
 
     It gives the same value as ``file_sha256`` of a file with these bytes. Use
-    it when the code holds the bytes anyway, such as a download just received.
+    it when the code holds the bytes anyway, for example a download just
+    received.
     For a file on disk, use ``file_sha256``, which never holds the file whole.
 
     Args:
@@ -46,15 +50,15 @@ def sha256(file_bytes):
 def file_digest(path, algorithm):
     """A file's checksum by one of hashlib's algorithms, as hex, read in chunks.
 
-    The file is read piece by piece, so even a large file is never in memory
-    whole. ``file_sha256`` uses it for SHA-256. LOINC's fetch uses it for MD5,
-    the checksum that LOINC publishes for each release. A checksum here checks
-    a file, not a secret, so the hash is made with ``usedforsecurity=False``.
-    An OpenSSL in FIPS mode refuses MD5 without it.
+    file_digest reads the file piece by piece, so even a large file is never
+    in memory whole. ``file_sha256`` uses it for SHA-256. LOINC's fetch uses it
+    for MD5, the checksum that LOINC publishes for each release. A checksum
+    here checks a file, not a secret, so file_digest makes the hash with
+    ``usedforsecurity=False``. An OpenSSL in FIPS mode refuses MD5 without it.
 
     Args:
         path (Path): The file.
-        algorithm (str): A hashlib algorithm, such as ``sha256`` or ``md5``.
+        algorithm (str): A hashlib algorithm, for example ``sha256`` or ``md5``.
 
     Returns:
         str: The checksum, as hex.
@@ -69,7 +73,7 @@ def file_sha256(path):
     """The SHA-256 of a file's bytes, as hex, read in chunks.
 
     It gives the same value as ``sha256`` of the file's bytes, but it never
-    holds the whole file in memory. So it suits a large file, such as a
+    holds the whole file in memory. So it suits a large file, for example a
     release zip or a corpus's pairs. A manifest holds it as a file's
     ``sha256``.
 
@@ -95,8 +99,8 @@ class Digest:
     pandas streams a CSV only into a file-like object, and a hashlib hash is not
     one: it takes bytes through ``update``, not text through ``write``. With
     this object, ``table_sha256`` hashes a table as pandas writes it, piece by
-    piece. So a table of millions of rows, such as a corpus's pairs, is hashed
-    without its whole CSV text in memory.
+    piece. So a table of millions of rows, for example a corpus's pairs, is
+    hashed without its whole CSV text in memory.
     """
 
     def __init__(self):
@@ -104,7 +108,7 @@ class Digest:
         self.hash = hashlib.sha256()
 
     def write(self, text):
-        """Add text to the hash, as UTF-8, and give back its length."""
+        """Add text to the hash, as UTF-8, and return its length."""
         self.hash.update(text.encode("utf-8"))
         return len(text)
 
@@ -116,15 +120,15 @@ class Digest:
 def schema_line(frame):
     """A table's column names and their pyarrow types, as one line of text.
 
-    The types are those that pyarrow gives the frame's columns. ``large_string``
-    and ``null`` are read as ``string``, so the line does not depend on how
-    pandas holds a column.
+    The types are those that pyarrow gives the frame's columns. schema_line
+    reads ``large_string`` and ``null`` as ``string``, so the line does not
+    depend on how pandas holds a column.
 
     Args:
         frame (pd.DataFrame): The table.
 
     Returns:
-        str: The line, such as ``name: string, open: bool``.
+        str: The line, for example ``name: string, open: bool``.
     """
     schema = pa.Schema.from_pandas(frame, preserve_index=False)
     return ", ".join(
@@ -136,16 +140,18 @@ def schema_line(frame):
 def table_sha256(frame):
     """The SHA-256 of a table's content: its schema line, then its rows as CSV.
 
-    A manifest holds it as a table's ``content_sha256``. The content is hashed
-    rather than the parquet file, whose bytes depend on the library that wrote
-    it. The schema line keeps the types that CSV loses, so ``True`` and the
-    text ``"True"`` give different checksums. A missing value is written as
-    MISSING, so it differs from an empty text and from the text ``\\N``. The
-    separator, the quoting and the line ending are set, and lines end with
-    ``\\n`` on every system, so the checksum is the same on Windows. pandas
+    A manifest holds it as a table's ``content_sha256``. table_sha256 hashes the
+    content, not the parquet file, because the file's bytes depend on the
+    library that wrote it. The schema line keeps the types that CSV loses, so
+    ``True`` and the text ``"True"`` give different checksums. table_sha256
+    writes a missing value as MISSING, so it differs from an empty text and
+    from the text ``\\N``.
+
+    table_sha256 sets the separator, the quoting and the line ending. Lines end
+    with ``\\n`` on every system, so the checksum is the same on Windows. pandas
     writes the CSV to the hash piece by piece, through ``Digest``, so the whole
-    text is never held in memory. Hashed in order, the pieces give the SHA-256
-    of the whole text.
+    text is never in memory. Hashing the pieces in order gives the SHA-256 of
+    the whole text.
 
     Args:
         frame (pd.DataFrame): The table.
@@ -153,7 +159,7 @@ def table_sha256(frame):
     Returns:
         str: The SHA-256, as hex.
     """
-    # A backslash in a text is written twice, as PostgreSQL writes one, so the
+    # Each backslash in a text is written twice, as PostgreSQL writes it, so the
     # text "\N" cannot read like MISSING. Only the text columns that hold a
     # backslash are copied, to keep a large table's memory low. infer_dtype
     # finds a column of texts by its values, missing ones aside.
@@ -181,16 +187,17 @@ def table_sha256(frame):
 def file_identity(file_entry):
     """What a file is compared by, from its entry in a manifest's ``files``.
 
-    A parquet table has ``content_sha256``, the SHA-256 of its content, and is
-    compared by it and its rows. Its file's bytes depend on the library that
-    wrote it, so the same table can have another ``sha256`` on another machine.
-    Any other file is compared by its rows and its ``sha256``.
+    ``differences`` compares a parquet table by its rows and its
+    ``content_sha256``, the SHA-256 of its content. The table's file bytes
+    depend on the library that wrote them, so the same table can have another
+    ``sha256`` on another machine. ``differences`` compares any other file by
+    its rows and its ``sha256``.
 
     Args:
         file_entry (dict): The file's entry in ``files``.
 
     Returns:
-        dict: Its rows, and the one checksum that it is compared by.
+        dict: The file's rows, and the one checksum that it is compared by.
     """
     key = "content_sha256" if "content_sha256" in file_entry else "sha256"
     return {"rows": file_entry.get("rows"), key: file_entry.get(key)}
@@ -199,8 +206,8 @@ def file_identity(file_entry):
 def identities(manifest):
     """What a build is compared by: its files, then its sources.
 
-    A file is identified as ``file_identity`` says, and a source by its
-    SHA-256, or by its version where it has none.
+    identities identifies a file as ``file_identity`` says. It identifies a
+    source by its SHA-256, or by its version where the source has no SHA-256.
 
     Args:
         manifest (dict): A manifest, or only its ``files``, as in
@@ -225,17 +232,18 @@ def identities(manifest):
 def differences(committed, built_manifest):
     """What differs between a committed manifest and a new build's manifest.
 
-    A source is identified by its SHA-256 where it has one, and otherwise by
-    its version, so a file served under a new release label but with the
-    same content is the same source. Dates, counts, citations and licenses
-    are not compared.
+    differences identifies a source by its SHA-256 where the source has one,
+    and otherwise by its version. So a file with the same content, under a new
+    release label, is the same source. differences does not compare dates,
+    counts, citations or licenses.
 
     Args:
         committed (dict): The manifest under ``manifests/``.
         built_manifest (dict): The manifest of the build just made.
 
     Returns:
-        list[str]: One line per difference; empty when the two match.
+        list[str]: One line per difference, or an empty list when the two
+            match.
     """
     before, after = identities(committed), identities(built_manifest)
     keys = [*before, *(key for key in after if key not in before)]
@@ -247,19 +255,19 @@ def differences(committed, built_manifest):
 
 
 def git(folder, *args):
-    """Run git in a folder, and give back what it prints.
+    """Run git in a folder, and return what it prints.
 
     Args:
         folder (Path): Where git runs.
-        *args (str): git's own arguments, such as ``ls-tree``.
+        *args (str): git's own arguments, for example ``ls-tree``.
 
     Returns:
         str: git's output.
 
     Raises:
-        RuntimeError: If git cannot run, such as when it is missing, or if it
-            fails. The error holds git's own message, such as ``fatal: not a
-            git repository``.
+        RuntimeError: If git cannot run, for example when it is missing, or if
+            git fails. When git fails, the error holds git's own message, for
+            example ``fatal: not a git repository``.
     """
     try:
         completed = subprocess.run(
@@ -275,8 +283,9 @@ def git(folder, *args):
 def committed_version(folder, name):
     """The version of a manifest as committed in git, at ``HEAD``.
 
-    git runs in the folder, and the manifest is looked up in git's own listing
-    of it. So no text from the command line reaches a git command.
+    committed_version runs git in the folder, and finds the manifest in git's
+    own listing of the folder. So no text from the command line reaches a git
+    command.
 
     Args:
         folder (Path): The ``manifests/`` folder.
@@ -287,9 +296,15 @@ def committed_version(folder, name):
             yet.
 
     Raises:
-        RuntimeError: From ``git``, if git cannot answer: outside a checkout,
-            with git missing, when git refuses the folder, or in a checkout
-            without a commit. The error holds git's own message.
+        RuntimeError: From ``git``, if git cannot answer, in each of these
+            cases:
+
+            - outside a checkout
+            - with git missing
+            - when git refuses the folder
+            - in a checkout without a commit
+
+            The error holds git's own message, or says that git could not run.
     """
     listed = git(folder, "ls-tree", "--name-only", "HEAD").splitlines()
     manifest_file = f"{name}.json"
@@ -332,39 +347,43 @@ def write(path, manifest):
 def read(path, command, field, name):
     """A manifest that a step wrote, checked to be the manifest of ``name``.
 
-    Each step reads its inputs' manifests with this, so every error names
-    the file and the command that writes it again.
+    Each step reads its inputs' manifests with read, so every error names
+    the file and the command that writes the file again.
 
     Args:
         path (Path): The manifest.
         command (str): The command that writes the manifest again, for the
             messages.
-        field (str): The field that names what was built, such as ``source``.
-        name (str): The name that the field must hold, such as ``ncit``.
+        field (str): The field that names what was built, for example
+            ``source``.
+        name (str): The name that the field must hold, for example ``ncit``.
 
     Returns:
         dict: The manifest.
 
     Raises:
         FileNotFoundError: If there is no manifest at ``path``.
-        ValueError: If it cannot be read, it is not a JSON object, or it is
-            the manifest of another build.
+        ValueError: In each of these cases:
+
+            - the manifest cannot be read
+            - the manifest is not a JSON object
+            - the manifest is the manifest of another build
     """
     if not path.exists():
-        raise FileNotFoundError(f"{path} is missing; run: {command}")
+        raise FileNotFoundError(f"{path} is missing. Run: {command}")
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
     except Exception as error:
         raise ValueError(
-            f"{path} cannot be read ({type(error).__name__}: {error});"
-            f" run: {command}"
+            f"{path} cannot be read ({type(error).__name__}: {error})."
+            f" Run: {command}"
         ) from error
     if not isinstance(manifest, dict):
-        raise ValueError(f"{path} is not a manifest; run: {command}")
+        raise ValueError(f"{path} is not a manifest. Run: {command}")
     if manifest.get(field) != name:
         raise ValueError(
-            f"{path} is the manifest of {field} {manifest.get(field)!r};"
-            f" run: {command}"
+            f"{path} is the manifest of {field} {manifest.get(field)!r}."
+            f" Run: {command}"
         )
     return manifest
 
@@ -373,7 +392,7 @@ def check_file(path, manifest, manifest_path, command):
     """Check that a file exists, and has the SHA-256 that its manifest holds.
 
     The manifest lists each file under its name, in ``files``. So a file
-    that differs from it has changed since its step wrote it.
+    that differs from its manifest changed after its step wrote it.
 
     Args:
         path (Path): The file.
@@ -388,16 +407,16 @@ def check_file(path, manifest, manifest_path, command):
             file differs from it.
     """
     if not path.exists():
-        raise FileNotFoundError(f"{path} is missing; run: {command}")
+        raise FileNotFoundError(f"{path} is missing. Run: {command}")
     try:
         checksum = manifest["files"][path.name]["sha256"]
     except Exception as error:
         raise ValueError(
             f"{manifest_path} holds no SHA-256 for {path.name}"
-            f" ({type(error).__name__}: {error}); run: {command}"
+            f" ({type(error).__name__}: {error}). Run: {command}"
         ) from error
     if file_sha256(path) != checksum:
-        raise ValueError(f"{path} differs from its manifest; run: {command}")
+        raise ValueError(f"{path} differs from its manifest. Run: {command}")
 
 
 def warn_if_not_committed(label, version, committed_path, command):
@@ -406,8 +425,8 @@ def warn_if_not_committed(label, version, committed_path, command):
     Args:
         label (str): What was built and where, for the message.
         version (str): The build's version.
-        committed_path (Path): The committed manifest. Nothing is printed
-            when there is none.
+        committed_path (Path): The committed manifest. warn_if_not_committed
+            prints nothing when there is none.
         command (str): The command that builds the committed version.
     """
     if not committed_path.exists():
@@ -416,7 +435,7 @@ def warn_if_not_committed(label, version, committed_path, command):
     if committed != version:
         print(
             f"warning: {label} is version {version}, and the committed manifest "
-            f"is version {committed}; for version {committed}, run: {command}",
+            f"is version {committed}. For version {committed}, run: {command}",
             file=sys.stderr,
         )
 
@@ -426,23 +445,23 @@ class Refused(Exception):
 
 
 def decide(committed_path, built_manifest, update_manifest, command):
-    """Whether a build may replace the working one; raise Refused if not.
+    """Whether a build may replace the working one: raise Refused if it may not.
 
-    A build that matches its committed manifest may replace the working one. A
-    build that differs is accepted only with ``update_manifest``, under a
-    version not committed in git. Otherwise the differences are printed, with
-    the steps that accept the build, and Refused is raised. ``write_checked``
-    calls this inside ``folders.staged``, so a refused build is deleted and
-    the working one is kept.
+    A build that matches its committed manifest may replace the working one.
+    decide accepts a build that differs only with ``update_manifest``, under a
+    version not committed in git. Otherwise decide prints the differences, with
+    the steps that accept the build, and raises Refused. ``write_checked``
+    calls decide inside ``folders.staged``. So ``staged`` deletes a refused
+    build, and keeps the working one.
 
     Args:
         committed_path (Path): The committed manifest.
         built_manifest (dict): The new build's manifest.
-        update_manifest (bool): Accept a build that differs.
+        update_manifest (bool): Whether to accept a build that differs.
         command (str): The command that made the build, for the messages.
 
     Returns:
-        list[str]: The differences; empty when the build matches.
+        list[str]: The differences, or an empty list when the build matches.
 
     Raises:
         Refused: If the build differs and is not accepted.
@@ -501,17 +520,19 @@ def record(committed_path, built_manifest, differing, directory):
 def write_checked(destination, write, committed_path, update_manifest, command):
     """Write a build whole, and keep it only if its committed manifest allows.
 
-    The build is written through ``folders.staged``. ``decide`` then says
-    whether it may replace the working folder, while the build is still in
-    the staging folder. A refused build is deleted, and the working folder is
-    kept. A kept build is recorded only once it is in place.
+    write_checked writes the build through ``folders.staged``. While the build
+    is still in the staging folder, ``decide`` says whether the build may
+    replace the working folder. ``staged`` deletes a refused build, and keeps
+    the working folder. write_checked calls ``record`` only when the build is
+    in place.
 
     Args:
-        destination (Path): The build's folder, such as ``sources/<source>/``.
+        destination (Path): The build's folder, for example
+            ``sources/<source>/``.
         write (Callable[[Path], dict]): Writes the build into the folder that
             it is given, and returns the build's manifest.
         committed_path (Path): The committed manifest.
-        update_manifest (bool): Accept a build that differs.
+        update_manifest (bool): Whether to accept a build that differs.
         command (str): The command that made the build, for the messages.
 
     Returns:

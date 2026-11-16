@@ -6,10 +6,12 @@ train` learns the vocabulary from a [corpus](corpus.md)'s training pairs, by
 [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5).
 It uses Hugging Face's [`tokenizers`](https://github.com/huggingface/tokenizers) library.
 
-`tokenizer train` writes the tokenizer and its manifest to the tokenizer's
-folder. [What `tokenizer train` writes](#what-tokenizer-train-writes)
-lists them. [Details](#details) describes how a tokenizer cuts a text and
-learns its vocabulary, and its settings, diagnostics and name.
+`tokenizer train` writes the tokenizer and its [manifest](manifests.md) to
+the tokenizer's folder.
+[What `tokenizer train` writes](#what-tokenizer-train-writes) lists the
+files. [Details](#details) describes how a tokenizer cuts a text and how it
+learns its vocabulary. The section also describes the tokenizer's settings,
+diagnostics and name.
 
 [design_decisions.md](design_decisions.md#tokenizer) gives the reasons for the
 tokenizer's settings.
@@ -22,14 +24,16 @@ python -m embedding_model tokenizer train --corpus example --vocab-size 8000  # 
 ```
 
 The corpus's pairs must have the checksum that the corpus's manifest holds.
-Otherwise the training stops, and asks for the corpus to be built again.
+If they do not, `tokenizer train` stops, and the error gives the command that
+builds the corpus again.
 
 ## What `tokenizer train` writes
 
 `tokenizer train` writes to `embedding_model/inputs/tokenizers/<name>/`, or
-under the folder that `--inputs` names. It writes the folder whole, so a
-failed training leaves the previous tokenizer as it was; see
-[Inputs and outputs](../README.md#inputs-and-outputs).
+under the folder that `--inputs` names. It writes the folder whole. So if the
+training fails, the previous tokenizer stays as it was.
+[Inputs and outputs](../README.md#inputs-and-outputs) describes how a step
+writes a folder whole.
 
 ```
 tokenizers/<name>/
@@ -39,29 +43,34 @@ tokenizers/<name>/
 
 ### `tokenizer.json`
 
-The tokenizer's rules and its vocabulary, in one file. Hugging Face
-[`tokenizers`](https://huggingface.co/docs/tokenizers/v0.23.2/en/quicktour) reads it, with `Tokenizer.from_file("tokenizer.json")`, and runs
-its own code for each rule that the file names. The file holds:
+`tokenizer.json` holds the tokenizer's rules and its vocabulary, in one file.
+Hugging Face
+[`tokenizers`](https://huggingface.co/docs/tokenizers/v0.23.2/en/quicktour)
+reads the file with `Tokenizer.from_file("tokenizer.json")`, and runs its
+own code for each rule that the file names. The file holds these fields,
+among others:
 
 | field | what it holds | where it comes from |
 |---|---|---|
-| `normalizer` | [step 1](#step-1-normalize): BERT's tokenizer: cleaning, NFD, lowercase, no accents | the code, fixed |
+| `normalizer` | [step 1](#step-1-normalize), as in BERT's tokenizer: cleaning, NFD, lowercase, no accents | the code, fixed |
 | `pre_tokenizer` | [step 2](#step-2-split): `BertPreTokenizer` | the code, fixed |
 | `model` | [step 3](#step-3-cut-into-tokens): BPE's tokens and merges | learned from the training texts |
 | `added_tokens` | the [special tokens](#special-tokens) | the code, fixed |
 
 ### `manifest.json`
 
-The tokenizer's manifest, with the fields that
+`manifest.json` is the tokenizer's manifest. It has the fields that
 [manifests.md](manifests.md#its-fields) lists:
 
-- `files`: `tokenizer.json`, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4);
-- `sources`: the corpus, with its kept pairs' checksums;
+- `files`: `tokenizer.json`, with its
+  [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4)
+- `sources`: the corpus, with its kept pairs' checksums
 - `settings`: the vocabulary size asked for, the minimum frequency, and the
-  version of `tokenizers`, since the bytes of `tokenizer.json` depend on it.
-  `tokenizer.json` itself holds the rules;
-- `counts`: the training texts, the tokens learned, and the
-  [diagnostics](#diagnostics).
+  version of `tokenizers`. The manifest records the version because the
+  bytes of `tokenizer.json` depend on it. `tokenizer.json` itself holds the
+  rules.
+- `counts`: the number of training texts, the vocabulary size reached, and
+  the [diagnostics](#diagnostics)
 
 ## Details
 
@@ -80,7 +89,7 @@ with made-up ids:
 | `bodyweight` | `body`, `weight` | 812, 1407 |
 
 The first two texts get the same ids, so the model cannot tell them apart.
-Here the last one is cut into the same two tokens, so it gets the same ids
+Here BPE cuts the last one into the same two tokens, so it gets the same ids
 too. Byte-pair encoding does not promise that: it can cut another compound
 elsewhere, as `heartrate` into `hear` and `trate`.
 
@@ -88,8 +97,8 @@ A tokenizer cuts a text into tokens in three steps:
 
 | step | what it does | example |
 |---|---|---|
-| 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does; splits each accented letter into the letter and its accent (Unicode's NFD form); lowercases; and drops the accents | `Café` -> `cafe` |
-| 2. split | splits at whitespace and at every punctuation character, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
+| 1. normalize | removes control, format and private-use characters, as [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does. Then it splits most accented letters into the letter and its accents (Unicode's NFD form), lowercases the text and drops the accents. | `Café` -> `cafe` |
+| 2. split | splits at whitespace, at every punctuation character and at every ASCII symbol, for example `+`, as BERT's tokenizer does (`BertPreTokenizer`) | `SUBJECT_ID (float)` -> `subject`, `_`, `id`, `(`, `float`, `)` |
 | 3. cut into tokens | cuts each piece into vocabulary tokens, by [byte-pair encoding (BPE)](https://huggingface.co/learn/llm-course/chapter6/5) | `bodyweight` -> `body`, `weight` |
 
 The same rules run at two times:
@@ -100,8 +109,8 @@ The same rules run at two times:
   with the vocabulary, and the trained model keeps that file. All three steps
   then cut each text that the model reads.
 
-So a text that the model reads later is normalised and split exactly as the
-training texts were. The section
+So the tokenizer normalises and splits a text that the model reads later
+exactly as it normalised and split the training texts. The section
 [What `tokenizer train` writes](#what-tokenizer-train-writes) has more details.
 
 #### Step 1: normalize
@@ -109,10 +118,10 @@ training texts were. The section
 The tokenizer first removes control, format and private-use characters.
 They hold no text, and nobody can see them:
 
-- a control character, such as `\x92`, a byte left from a broken quote;
-- a format character, such as `\u200b`, a zero-width space;
-- a private-use character, such as `\ue000`, which a font can use for its
-  own icon.
+- a control character, for example `\x92`, a byte left from a broken quote
+- a format character, for example `\u200b`, a zero-width space
+- a private-use character, for example `\ue000`, which a font can use for
+  its own icon
 
 For example, a description copied from a PDF can read `body\u200bweight`.
 On the screen it looks like `bodyweight`.
@@ -124,12 +133,19 @@ On the screen it looks like `bodyweight`.
 The vocabulary has no token for the invisible character. Without this step,
 the character would become the unknown token, `[UNK]`.
 
+A tab, a line feed or a carriage return is a control character too. The
+tokenizer turns each of them into a space, so the character still separates
+two words.
+
 NFD stands for Normalization Form D, one of the four forms that Unicode
 defines in [Unicode Normalization Forms](https://www.unicode.org/reports/tr15/#Norm_Forms).
-D is for canonical decomposition. It writes each accented letter as two
-characters: the plain letter, then a separate accent mark. So `é` becomes
-`e` followed by the accent. NFD makes the accents removable. Without it, `é`
-stays one character, and there is no separate accent to drop.
+D is for canonical decomposition.
+
+NFD writes most accented letters as the plain letter, then one or more
+accent marks. So `é` becomes `e` followed by the accent. Some letters, for
+example `ø` and `ł`, have no decomposition and stay whole. NFD makes the
+accents removable. Without it, `é` stays one character, and there is no
+separate accent to drop.
 
 Lowercasing makes `BMI`, `Bmi` and `bmi` one text. Variable names come in
 any case, and their case carries no meaning. So the three get the same
@@ -137,9 +153,9 @@ tokens, and the model gives them the same embedding.
 
 #### Step 2: split
 
-The split cuts a text into pieces, at whitespace and at punctuation. BPE then
-cuts each piece on its own, so a token never runs across a space or a
-punctuation mark. For example:
+The split cuts a text into pieces, at whitespace, at punctuation and at
+ASCII symbols. BPE then cuts each piece on its own, so a token never runs
+across a space, a punctuation mark or an ASCII symbol. For example:
 
 | text | pieces | tokens |
 |---|---|---|
@@ -159,10 +175,12 @@ BPE learns those tokens.
 [BPE](https://huggingface.co/learn/llm-course/chapter6/5) starts from the single characters of the training texts. It then finds
 the two adjacent tokens that occur together most often, and merges them into
 a new token. It repeats this until the vocabulary has its size. A common word
-ends as one token. A rare word is cut into pieces that are tokens, so it is
-still represented. Two tokens that occur together fewer times than the
-minimum frequency are never merged. The minimum frequency is 2 by default, and
-`--min-frequency` sets another.
+ends as one token. BPE cuts a rare word into pieces that are tokens, so the
+vocabulary still represents the rare word.
+
+BPE never merges two tokens that occur together fewer times than the minimum
+frequency. The minimum frequency is 2 by default, and `--min-frequency` sets
+another.
 
 ### The vocabulary size
 
@@ -175,45 +193,47 @@ The vocabulary size is the main setting of a tokenizer:
 - A smaller one cuts more words into pieces, and the model must learn their
   meaning from the pieces.
 
-The default is 16,000 tokens. A small corpus, such as the README's example,
-uses 8,000. To choose between sizes, train a model on each and compare their
-MRR@10 on the validation pairs. Each run writes it in its
-[`manifest.json`](training.md#manifestjson).
+The default is 16,000 tokens. The README's small corpus, `example`, uses
+8,000. To choose between sizes, train a model on each and
+compare their MRR@10 on the validation pairs. Each run writes its validation
+MRR@10 in its [`manifest.json`](training.md#manifestjson).
 
 A small corpus can give fewer tokens than asked for. `tokenizer train` then
-prints a note, and the manifest holds the size that was reached.
+prints a note, and the manifest holds the vocabulary size reached.
 
 ### Special tokens
 
 Every tokenizer has five special tokens, with the first five ids: `[PAD]`,
-`[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them:
-`[UNK]` stands for a character that the training texts never had.
+`[UNK]`, `[CLS]`, `[SEP]` and `[MASK]`. A static model uses one of them,
+`[UNK]`, which stands for a character that the training texts never had.
 The `StaticEmbedding` module of [sentence-transformers](https://sbert.net),
-which Hugging Face maintains, pads nothing. The
-[BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
+which Hugging Face maintains, pads nothing.
+
+The [BERT](https://huggingface.co/docs/transformers/v5.17.0/en/model_doc/bert)
 model here uses `[UNK]` and `[PAD]`. `[PAD]` fills a short text in a batch.
-`[CLS]`, `[SEP]` and `[MASK]` are kept for a later BERT setting, such as
-masked-language pretraining;
+`[CLS]`, `[SEP]` and `[MASK]` are for a later BERT setting, for example
+masked-language pretraining.
 [Five special tokens](design_decisions.md#five-special-tokens) says why.
 
 ### What it learns from
 
 The tokenizer learns from the corpus's **training pairs**: their distinct
-texts, the anchors first, then the positives, each once. A text counts once
-in all its spellings: `BMI` and `bmi` are one text.
+texts, the [anchors](pairs.md) first, then the positives, each once.
+Spellings that the tokenizer normalises to one text count once: `BMI` and
+`bmi` are one text.
 
 ### Diagnostics
 
 After training, `tokenizer train` checks how the tokenizer cuts its training
-texts. Here a word is a piece of [step 2](#step-2-split), so `SUBJECT_ID`
-holds three words.
+texts. Here a word is a piece from [step 2](#step-2-split). So `SUBJECT_ID`
+holds three words: `subject`, `_` and `id`.
 
 | measure | what it says | a bad value |
 |---|---|---|
 | fertility | tokens per word | high: many words are cut into pieces, so the vocabulary does not fit the texts |
 | words split | the share of words cut into two or more tokens | a large share, for the same reason |
 | unknown rate | the share of tokens that are `[UNK]` | above 0: the training texts have characters that the vocabulary lacks, which is a sign of a broken tokenizer |
-| vocabulary used | the share of the vocabulary's tokens, the special tokens left out, that the training texts use | well below 1: many tokens never occur, so their vectors keep their random start |
+| vocabulary used | the share of the vocabulary's tokens that the training texts use, not counting the special tokens | well below 1: many tokens never occur, so their vectors keep their random start |
 
 The diagnostics show whether the tokenizer works. A broken tokenizer shows
 at once, for example as unknown tokens or a high fertility. Fertility and the

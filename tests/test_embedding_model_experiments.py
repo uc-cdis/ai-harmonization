@@ -1,8 +1,8 @@
 """Tests for embedding_model.experiments: an experiment's file, its runs and its status.
 
-Training a run is ``train``'s job, which its own tests check. Here each run's
-process is replaced by a fake that writes the run's folder as ``train`` would,
-so the tests check what an experiment adds: which runs it trains, where, with
+Training a run is ``train``'s job, which its own tests check. Here a fake
+replaces each run's process, and writes the run's folder as ``train`` would.
+So the tests check what an experiment adds: which runs it trains, where, with
 which config, and on which GPU.
 """
 
@@ -91,7 +91,7 @@ class FakeTrain:
         """Record the call, and write the run's folder unless the run fails.
 
         ``env`` is None when the run keeps this process's environment, as
-        without a GPU; the GPU is then recorded as None.
+        without a GPU. FakeTrain then records the GPU as None.
         """
         flags = dict(zip(command[4::2], command[5::2]))
         run_name = f"{Path(flags['--config']).stem}_s{flags['--seed']}"
@@ -220,12 +220,12 @@ class TestReadExperiment:
                 {"base": {**BASE, "training": {"seed": 3}}},
                 "base: the base sets training.seed",
             ),
-            ({"base": "abcd-experiment"}, "<experiment>/<arm>, such as dim/dim128"),
+            ({"base": "abcd-experiment"}, "<experiment>/<arm>, for example dim/dim128"),
             ({"base": ["data"]}, "base: it is neither the base's settings, by section"),
         ],
     )
     def test_a_field_that_cannot_be_used_is_refused(self, tmp_path, fields, message):
-        """A file that breaks a rule of an experiment, or of its fields, is refused.
+        """read_experiment refuses a file that breaks a rule of an experiment, or of its fields.
 
         The message names the file, the field, and what is wrong with it.
         """
@@ -372,7 +372,7 @@ class TestTrain:
         ]
         assert (logs / "dim8_s1.log").read_text() == "training dim8_s1\n"
         printed = capsys.readouterr().out
-        assert f"dim8_s1: failed; see {logs / 'dim8_s1.log'}" in printed
+        assert f"dim8_s1: failed. See {logs / 'dim8_s1.log'}" in printed
 
     def test_training_again_retries_only_the_failed_runs(
         self, tmp_path, inputs, fake_train, capsys
@@ -408,7 +408,7 @@ class TestTrain:
     def test_the_file_is_kept_as_it_was_first_trained(
         self, tmp_path, inputs, fake_train
     ):
-        """The experiment keeps a copy of its file. A file of the same name whose seeds differ is refused."""
+        """train keeps a copy of the experiment's file, and refuses a file of the same name whose seeds differ."""
         path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
         experiments.train(path, inputs, outputs)
         copy = outputs / "experiments" / "abcd-experiment" / "experiment.yaml"
@@ -459,7 +459,7 @@ class TestTrain:
     def test_a_setting_that_train_refuses_stops_every_run(
         self, tmp_path, inputs, fake_train
     ):
-        """An arm that names a setting that does not exist is refused by train's parser, before any run trains."""
+        """train's parser refuses an arm that names a setting that does not exist, before any run trains."""
         arms = {
             "dim8": {"test": "non-inferiority", "model": {"embedding_dimension": 8}}
         }
@@ -503,7 +503,7 @@ class TestEarlierBase:
     """A base that is an arm of an earlier experiment, whose runs are reused."""
 
     def test_the_base_reuses_the_earlier_runs(self, tmp_path, inputs, fake_train):
-        """The earlier arm's runs at seeds 0 and 1 are reused; the base at seed 2 trains here, with the arm's config."""
+        """The later experiment reuses the earlier arm's runs at seeds 0 and 1. Its base at seed 2 trains here, with the arm's config."""
         outputs = tmp_path / "outputs"
         experiments.train(experiment_file(tmp_path), inputs, outputs)
         fake_train.calls.clear()
@@ -539,8 +539,9 @@ class TestEarlierBase:
 
         abcd-later-experiment builds on abcd-experiment's dim8, and trains only
         its base at seed 2. A third experiment on abcd-later-experiment's base,
-        at seeds 0 to 2, reuses all three: dim8 at seeds 0 and 1, and the later
-        experiment's own base at seed 2. Only its arm trains.
+        at seeds 0 to 2, reuses all three base runs. They are dim8's runs at
+        seeds 0 and 1, and the later experiment's own base run at seed 2. Only
+        the third experiment's arm trains.
         """
         outputs = tmp_path / "outputs"
         experiments.train(experiment_file(tmp_path), inputs, outputs)
@@ -572,10 +573,11 @@ class TestEarlierBase:
     def test_an_earlier_run_still_training_stops_the_experiment(
         self, tmp_path, inputs, fake_train
     ):
-        """A base run of the earlier experiment that has a staging folder may be training now, so the later one waits.
+        """A base run of the earlier experiment that has a staging folder may be training now, so train stops the later one.
 
         The earlier experiment's dim8 failed at seed 1, and another job is
-        training it again: its staging folder sits beside its folder.
+        training the run again: the run's staging folder sits beside its
+        folder.
         """
         outputs = tmp_path / "outputs"
         fake_train.failing = {"dim8_s1"}
@@ -597,14 +599,14 @@ class TestEarlierBase:
             ("efgh-experiment/base", "no experiment efgh-experiment"),
             (
                 "abcd-experiment/dim64",
-                "has no arm dim64; its arms are base, dim32, dim8",
+                "has no arm dim64. Its arms are base, dim32, dim8",
             ),
         ],
     )
     def test_an_unknown_earlier_experiment_or_arm_is_refused(
         self, tmp_path, inputs, fake_train, base, message
     ):
-        """A base that names no trained experiment, or no arm of it, is refused with what there is."""
+        """train refuses a base that names no trained experiment, or no arm of it. For an arm that does not exist, the message lists the earlier experiment's arms."""
         outputs = tmp_path / "outputs"
         experiments.train(experiment_file(tmp_path), inputs, outputs)
         later_path = experiment_file(tmp_path, name="abcd-later-experiment", base=base)
@@ -616,7 +618,7 @@ class TestRunState:
     """A run's state, from its folder."""
 
     def test_a_run_is_done_started_or_not_started(self, tmp_path):
-        """A manifest means done; a staging folder beside the run means started; nothing means not started."""
+        """A manifest means done, a staging folder beside the run means started, and nothing means not started."""
         done_run, started_run, not_started_run = (
             tmp_path / name for name in ("dim8_s0", "dim8_s1", "dim8_s2")
         )
@@ -635,7 +637,7 @@ class TestGpuIds:
         "visible, ids", [("2,3", ["2", "3"]), ("0, 2", ["0", "2"]), ("", [])]
     )
     def test_cuda_visible_devices_decides(self, monkeypatch, visible, ids):
-        """CUDA_VISIBLE_DEVICES gives the GPUs, as SLURM sets it for a job's GPUs; empty means none."""
+        """CUDA_VISIBLE_DEVICES gives the GPUs, as SLURM sets it for a job's GPUs. An empty value means none."""
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", visible)
         assert experiments.gpu_ids() == ids
 
@@ -654,7 +656,7 @@ class TestStatus:
     def test_each_arm_counts_its_runs_by_state(
         self, tmp_path, inputs, fake_train, capsys
     ):
-        """After one failed run, the arm shows it as not started, and the others as done.
+        """After one failed run, status counts that run as not started, and the others as done.
 
         The base and two arms at two seeds make six runs, and five are done.
         """
@@ -671,7 +673,7 @@ class TestStatus:
     def test_the_counts_line_up_after_the_longest_arm_name(
         self, tmp_path, inputs, capsys
     ):
-        """An arm named embedding_dim_64, 16 characters, pads each name to 18, so each count starts in one column."""
+        """With an arm named embedding_dim_64, 16 characters, status pads each name to 18, so each count starts in one column."""
         long_arm = {"test": "superiority", "model": {"embedding_dim": 64}}
         path = experiment_file(tmp_path, arms={**ARMS, "embedding_dim_64": long_arm})
         assert experiments.status(path, tmp_path / "outputs") == 0
@@ -686,9 +688,12 @@ class TestCommandLine:
     def test_train_and_status(self, tmp_path, inputs, fake_train, capsys):
         """experiment train trains the runs, and experiment status counts them.
 
-        The base and two arms at two seeds make six runs. Once they are done,
-        each command names the one that compares the arms: train after it
-        trains them, train again with nothing left to train, and status.
+        The base and two arms at two seeds make six runs. Once the runs are
+        done, three printouts name the command that compares the arms:
+
+        - train, after it trains the runs
+        - train again, with nothing left to train
+        - status
         """
         path, outputs = experiment_file(tmp_path), tmp_path / "outputs"
         flags = ["--config", str(path), "--outputs", str(outputs)]

@@ -108,7 +108,7 @@ class TestReadDocumentation:
     """Reading the harmonized variables from TOPMed's documentation."""
 
     def test_variables_with_their_values_and_components(self):
-        """Each harmonized variable is read with its coded values and cited components."""
+        """read_documentation reads each variable with its coded values and cited components."""
         archive = documentation_archive(
             {
                 "harmonized-variable-documentation/demographic/sex_1.json": harmonized(
@@ -136,7 +136,7 @@ class TestReadDocumentation:
         ]
 
     def test_only_files_one_dataset_deep(self):
-        """A file beside the dataset folders, or in a look-alike folder, is not read."""
+        """read_documentation skips a file beside the dataset folders, or in a look-alike folder."""
         archive = documentation_archive(
             {
                 "harmonized-variable-documentation/demographic/sex_1.json": harmonized(
@@ -172,7 +172,7 @@ class TestBuilders:
     """Each builder reads its pins from the committed manifest."""
 
     def test_topmed_reads_its_pin_from_the_manifest(self, monkeypatch, tmp_path):
-        """The documentation is fetched at the manifest's commit."""
+        """topmed.build fetches the documentation at the manifest's commit."""
         archive = documentation_archive(
             {
                 "harmonized-variable-documentation/demographic/sex_1.json": harmonized(
@@ -183,7 +183,7 @@ class TestBuilders:
         fetched = []
 
         def fake_archive(repository, commit, folder):
-            """Serve the archive and record what was asked for."""
+            """Serve the archive, and record each request."""
             fetched.append((repository, commit, folder))
             return archive
 
@@ -226,12 +226,12 @@ class TestBuilders:
                       "location": "https://github.com/abcd-org/gdcdictionary"}  # fmt: skip
 
     def test_gdc_reads_its_dictionary_at_the_pinned_commit(self, monkeypatch, tmp_path):
-        """The dictionary's release is fetched at the manifest's commit and recorded as pinned."""
+        """gdc.build fetches the dictionary at the manifest's commit, and records it as pinned."""
         archive = dictionary_archive({**SHARED_SCHEMAS, "case.yaml": CASE_SCHEMA})
         fetched = []
 
         def fake_archive(repository, commit, folder):
-            """Serve the release and record what was asked for."""
+            """Serve the release, and record each request."""
             fetched.append((repository, commit, folder))
             return archive
 
@@ -322,7 +322,7 @@ class TestCitedVariables:
     """The cited variables of a dbGaP table, with their dbGaP text."""
 
     def test_wanted_variables_only(self, tmp_path):
-        """Only the wanted variables are returned, with their dbGaP text."""
+        """cited_variables returns only the wanted variables, with their dbGaP text."""
         dictionary = tmp_path / "phs999999.v1.pht999999.v1.Exam.data_dict.xml"
         dictionary.write_text(DATA_DICT_XML)
         report = tmp_path / "phs999999.v1.pht999999.v1.p1.Exam.var_report.xml"
@@ -339,7 +339,7 @@ class TestResolveComponents:
 
     @pytest.fixture
     def served(self, monkeypatch):
-        """Serve a fictional dbGaP study with two releases and record what is fetched."""
+        """Serve a fictional dbGaP study with two releases, and record each fetched URL."""
         base = f"{topmed.DBGAP}/phs999999/"
         summaries = f"{base}phs999999.v1.p1/pheno_variable_summaries/"
         pages = {
@@ -373,7 +373,10 @@ class TestResolveComponents:
         return fetched
 
     def test_the_cited_release_and_only_the_cited_tables(self, served, tmp_path):
-        """The cited release is used, only its cited table is fetched, dated names too."""
+        """resolve_components uses the cited release, and fetches only its cited table.
+
+        It also fetches a file with a dated name.
+        """
         found, sources = topmed.resolve_components(
             {("phs999999", "1", "pht999999", "1", "phv99999901")}, tmp_path
         )
@@ -385,7 +388,10 @@ class TestResolveComponents:
     def test_a_kept_study_listing_without_the_release_is_fetched_again(
         self, served, tmp_path
     ):
-        """A kept study listing that lacks the cited release is fetched again, once."""
+        """resolve_components fetches a kept study listing again, once, if it is stale.
+
+        A stale listing lacks the cited release.
+        """
         stale = tmp_path / "phs999999" / "listing.html"
         stale.parent.mkdir(parents=True)
         stale.write_bytes(b'<a href="phs999999.v2.p1/">')
@@ -433,7 +439,7 @@ class TestTopmedMappingRows:
         }
 
     def test_phenotypes_and_ages(self):
-        """A phenotype maps to its variable, an age to the variable's age_at_ target."""
+        """mapping_rows maps a phenotype variable to its harmonized variable's phenotype target."""
         rows = topmed.mapping_rows(self.variables(), self.resolved())
         by_name = {row["source_variable_name"]: row["expected_target"] for row in rows}
         assert by_name["CAC"] == ["atherosclerosis.cac_1"]
@@ -598,7 +604,7 @@ class TestCorrections:
         ]
 
     def test_an_excluded_mapping_is_removed_and_an_empty_row_dropped(self):
-        """An exclude removes one mapping; a row with no target left is dropped."""
+        """An exclude removes one mapping, and apply_corrections drops a row with no target left."""
         corrections = [
             correction(
                 "exclude",
@@ -668,14 +674,18 @@ class TestCorrections:
     def test_a_correction_that_does_not_match_fails(
         self, action, variable, target, use
     ):
-        """A mapping not given, an unknown target or variable, or a mapping given already fails, named."""
+        """apply_corrections fails on a correction that does not match, and names it.
+
+        The correction excludes a mapping not given, adds one to an unknown target
+        or variable, or adds a mapping given already.
+        """
         with pytest.raises(ValueError, match=f"{action} {variable} -> {target}"):
             topmed.apply_corrections(
                 self.rows(), [correction(action, variable, target, use)], self.TARGETS
             )
 
     def test_an_unknown_use_is_refused(self, tmp_path):
-        """A row whose use is not one of CORRECTION_USES fails, named."""
+        """read_corrections fails on a row whose use is not one of CORRECTION_USES, and names it."""
         path = tmp_path / "corrections.csv"
         path.write_text(
             CORRECTION_HEADER
@@ -720,11 +730,14 @@ class TestReadDictionary:
         )
 
     def test_only_the_nodes_are_read_as_nodes(self):
-        """The shared schemas and the meta-schema are not nodes, and an unused reference in them is not read."""
+        """read_dictionary returns only the nodes, not the shared schemas or the meta-schema.
+
+        It does not resolve an unused reference in the shared schemas.
+        """
         assert list(self.dictionary()) == ["case"]
 
     def test_a_reference_is_merged_over_the_nodes_own_keys(self):
-        """A node's list of references adds properties; a term's keys win over the node's own."""
+        """A node's list of references adds properties. A term's keys win over the node's own."""
         properties = self.dictionary()["case"]["properties"]
         assert sorted(properties) == ["abcd_score", "id", "type"]
         assert properties["abcd_score"] == {
@@ -791,7 +804,7 @@ class TestDictionaryTargets:
         ]
 
     def test_a_type_list_loses_its_null_and_the_values_are_joined(self):
-        """A type of ["string", "null"] is string, and the values are joined by VALUE_SEPARATOR.
+        """A type of ["string", "null"] is string, and VALUE_SEPARATOR joins the values.
 
         The description is the property's. The rest of each text is
         from_gdc_model's, which tests/test_simple_data_model.py tests.
@@ -806,7 +819,7 @@ class TestReadGroundTruth:
     """Reading the expert mappings from the GDC-SM archive."""
 
     def test_one_table_per_paper(self):
-        """Ground-truth CSVs are read by paper; other files in the archive are not."""
+        """read_ground_truth reads the ground-truth CSVs by paper, and no other file."""
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as zipped:
             zipped.writestr(
@@ -830,7 +843,10 @@ class TestReadSourceTable:
     """Reading a paper's supplementary table, repaired as GDC-SM repairs it."""
 
     def test_mcdermott_column_loses_its_tab(self):
-        """McDermott's column name ending in a tab is renamed; other names are kept as published."""
+        """read_source_table renames McDermott's column that ends in a tab.
+
+        It keeps the other names as published.
+        """
         tabbed = "Age in Months at Time of Tissue Procurement \t"
         file_bytes = spreadsheet({tabbed: [820], "Site ": ["Ovary"]})
         assert list(
@@ -852,7 +868,10 @@ class TestReadSourceTable:
         assert table["Site"].tolist() == ["Ovary", "Lung"]
 
     def test_vasaikar_loses_its_label_and_count_rows(self):
-        """As GDC-SM's script does, Vasaikar's first (type labels) and last (counts) rows go."""
+        """read_source_table drops Vasaikar's first and last rows, as GDC-SM's script does.
+
+        The first row holds type labels, and the last row holds counts.
+        """
         file_bytes = spreadsheet(
             {"Gender": ["BIN", "Male", "Female", 2], "Age": ["CON", 61, 70, 2]}
         )
@@ -861,7 +880,7 @@ class TestReadSourceTable:
         assert pd.api.types.is_numeric_dtype(table["Age"])
 
     def test_clark_and_wang_values_repaired(self):
-        """Clark's 'Whte' typo and Wang's secondhand-smoke answers are fixed as GDC-SM fixes them."""
+        """read_source_table repairs Clark's 'Whte' typo and Wang's secondhand-smoke answers."""
         clark = spreadsheet({"Ethnicity_Self_Identify": ["Whte", "Asian"]})
         assert gdc.read_source_table(clark, "Clinical", "Clark")[
             "Ethnicity_Self_Identify"
@@ -881,16 +900,16 @@ class TestGdcPapers:
     """Each paper that GDC-SM lists, maps and pins, and its manifest entry."""
 
     def test_listed_and_mapped_papers_with_entries_pass(self):
-        """Papers that are listed, mapped and in the paper table pass the check."""
+        """require_papers passes papers that are listed, mapped and in the paper table."""
         gdc.require_papers(["abcd-paper"], ["abcd-paper"], GDC_PAPERS)
 
     def test_a_paper_without_an_entry_raises(self):
-        """A listed paper missing from the paper table fails the build, and is named."""
+        """require_papers fails on a listed paper missing from the paper table, and names it."""
         with pytest.raises(ValueError, match="no dbGaP study and DOI: efgh-paper"):
             gdc.require_papers(["abcd-paper", "efgh-paper"], ["abcd-paper"], GDC_PAPERS)
 
     def test_a_mapped_paper_without_a_listed_table_raises(self):
-        """A paper that the ground truth maps but papers_info does not list is named."""
+        """require_papers fails on a mapped paper that papers_info does not list, and names it."""
         with pytest.raises(ValueError, match="no listed table: efgh-paper"):
             gdc.require_papers(["abcd-paper"], ["abcd-paper", "efgh-paper"], GDC_PAPERS)
 
@@ -993,14 +1012,14 @@ class TestGdcMappingRows:
         assert row["expected_target"] == ["clinical.gender", "demographic.sex_at_birth"]
 
     def test_target_not_in_the_dictionary_drops_the_mapping(self, capsys):
-        """A published mapping to a target the dictionary does not carry is dropped, and named."""
+        """mapping_rows skips and names a published mapping whose target the dictionary lacks."""
         truth = {"abcd-paper": ground_truth([("Stage", "tumor_stage")])}
         tables = {"abcd-paper": pd.DataFrame({"Stage": ["I"]})}
         assert gdc.mapping_rows(truth, tables, self.TARGETS, GDC_PAPERS) == []
         assert "abcd-paper: Stage -> tumor_stage" in capsys.readouterr().out
 
     def test_variable_missing_from_its_table_raises(self):
-        """A mapped variable that is not a column of its table fails the build."""
+        """mapping_rows fails on a mapped variable that is not a column of its table."""
         truth = {"abcd-paper": ground_truth([("Missing", "race")])}
         tables = {"abcd-paper": pd.DataFrame({"Race": ["Asian"]})}
         with pytest.raises(ValueError, match="abcd-paper: Missing"):
@@ -1026,7 +1045,10 @@ class TestColumnTypeAndValues:
         assert gdc.column_type_and_values(column) == ("integer", [])
 
     def test_a_column_of_true_and_false_is_two_categories(self):
-        """A column that pandas reads as True and False, such as a tumor's recurrence, is string/encoded, not an integer."""
+        """A column that pandas reads as True and False is string/encoded, not an integer.
+
+        An example is a tumor's recurrence.
+        """
         column = pd.Series([False, True, False])
         assert gdc.column_type_and_values(column) == (
             "string/encoded",
@@ -1034,7 +1056,10 @@ class TestColumnTypeAndValues:
         )
 
     def test_a_column_of_categories_lists_the_most_frequent_first(self):
-        """A column of categories is string/encoded, most frequent first; ties keep the table's order."""
+        """A column of categories is string/encoded, with the most frequent value first.
+
+        Values that are equally frequent keep the table's order.
+        """
         column = pd.Series(["White", "Asian", None, "Asian", "Black"])
         assert gdc.column_type_and_values(column) == (
             "string/encoded",
@@ -1064,7 +1089,7 @@ class TestWriteBenchmark:
     """Writing a benchmark's two files and the manifest of its build."""
 
     def test_files_and_manifest(self, tmp_path):
-        """Both files are written with their columns, and the manifest describes them."""
+        """write_benchmark writes both files with their columns, and the manifest describes them."""
         manifest = benchmarks.write_benchmark(
             tmp_path,
             "abcd-benchmark",
@@ -1084,7 +1109,7 @@ class TestWriteBenchmark:
         assert json.loads((tmp_path / "manifest.json").read_text()) == manifest
 
     def test_a_target_listed_twice_is_refused(self, tmp_path):
-        """A targets file that lists one property twice is not written."""
+        """write_benchmark refuses targets that list one property twice, and writes nothing."""
         targets = targets_of([mapping("AGE", ["a.age"])]) * 2
         with pytest.raises(ValueError, match="list a property twice: \\['a.age'\\]"):
             benchmarks.write_benchmark(
@@ -1099,7 +1124,7 @@ class TestWriteBenchmark:
         assert list(tmp_path.iterdir()) == []
 
     def test_an_expected_target_not_among_the_targets_is_refused(self, tmp_path):
-        """A mapping to a target that the targets lack is not written."""
+        """write_benchmark refuses a mapping to a missing target, and writes nothing."""
         mappings = [mapping("AGE", ["a.age", "z.missing"])]
         with pytest.raises(ValueError, match="z.missing"):
             benchmarks.write_benchmark(
@@ -1133,7 +1158,10 @@ class TestReadBenchmark:
             benchmarks.read_benchmark(tmp_path, "gdc")
 
     def test_reads_what_was_written(self, written, tmp_path):
-        """The files read back as strings, with several expected targets sorted and joined by ;."""
+        """read_benchmark reads back what write_benchmark wrote, as strings.
+
+        Several expected targets come back sorted and joined by `;`.
+        """
         targets, mappings, manifest = benchmarks.read_benchmark(
             tmp_path, "abcd-benchmark"
         )
@@ -1143,17 +1171,18 @@ class TestReadBenchmark:
         assert manifest == written
 
     def test_a_corrupt_manifest_names_the_rebuild(self, written, tmp_path):
-        """A manifest that is not JSON is named, with the rebuild command."""
+        """read_benchmark names a manifest that is not JSON, and the rebuild command."""
         (tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json").write_text("")
         with pytest.raises(
-            ValueError, match="abcd-benchmark/manifest.json cannot be read"
+            ValueError,
+            match="abcd-benchmark/manifest.json cannot be read .*. Run: .*build --abcd-benchmark",
         ):
             benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_a_version_not_committed_is_a_warning(
         self, written, monkeypatch, capsys, tmp_path
     ):
-        """A build whose version is not the committed version is read, with a warning."""
+        """read_benchmark reads a build whose version differs from the committed one, and warns."""
         (tmp_path / "manifests").mkdir()
         (tmp_path / "manifests" / "abcd-benchmark.json").write_text(
             json.dumps({"version": "2"})
@@ -1165,7 +1194,7 @@ class TestReadBenchmark:
         )
 
     def test_a_changed_file_is_refused(self, written, tmp_path):
-        """A file whose SHA-256 differs from the manifest is named, with the rebuild command."""
+        """read_benchmark refuses a changed file, and names it with the rebuild command."""
         with open(
             tmp_path / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_mappings.csv",
             "a",
@@ -1173,12 +1202,12 @@ class TestReadBenchmark:
             handle.write(",,,,,,,\n")
         with pytest.raises(
             ValueError,
-            match="SHA-256 for abcd-benchmark_mappings.csv; run: .*build --abcd-benchmark",
+            match="SHA-256 for abcd-benchmark_mappings.csv. Run: .*build --abcd-benchmark",
         ):
             benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_another_benchmarks_manifest_is_refused(self, written, tmp_path):
-        """A manifest that names another benchmark is not read as this one's."""
+        """read_benchmark refuses a manifest that names another benchmark."""
         path = tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json"
         path.write_text(json.dumps({**written, "benchmark": "efgh-benchmark"}))
         with pytest.raises(ValueError, match="manifest of benchmark 'efgh-benchmark'"):
@@ -1188,11 +1217,11 @@ class TestReadBenchmark:
         """A manifest that records no files is an error with the build command."""
         path = tmp_path / "benchmarks" / "abcd-benchmark" / "manifest.json"
         path.write_text(json.dumps({**written, "files": {}}))
-        with pytest.raises(ValueError, match="KeyError.*run: .*build --abcd-benchmark"):
+        with pytest.raises(ValueError, match="KeyError.*Run: .*build --abcd-benchmark"):
             benchmarks.read_benchmark(tmp_path, "abcd-benchmark")
 
     def test_files_with_other_columns_are_refused(self, written, tmp_path):
-        """Files whose columns are not those of benchmarks build are not read."""
+        """read_benchmark refuses files whose columns are not those of benchmarks build."""
         path = tmp_path / "benchmarks" / "abcd-benchmark" / "abcd-benchmark_targets.csv"
         path.write_text("target_property,target_type\nabcd.efgh,string\n")
         record = {**written}
@@ -1237,7 +1266,7 @@ class TestBuild:
         )
 
     def test_a_first_build_needs_accepting(self, setup, tmp_path):
-        """Against a pins-only manifest, a build differs until accepted."""
+        """Against a pins-only manifest, a build differs until update_manifest accepts it."""
         _, manifest, working = setup
         assert benchmarks.build(["topmed"], tmp_path / "inputs") == 1
         assert not (working / "topmed_mappings.csv").exists()
@@ -1250,7 +1279,7 @@ class TestBuild:
     def test_a_failing_benchmark_does_not_stop_the_others(
         self, setup, monkeypatch, capsys, tmp_path
     ):
-        """A benchmark whose build fails is reported, and the next one is still built."""
+        """benchmarks.build reports a failing benchmark, and still builds the next one."""
         _, manifest, working = setup
 
         def fail(downloads, committed):

@@ -1,10 +1,11 @@
 """PhenX: protocols' variables and their mappings to dbGaP variables.
 
 PhenX's database export holds its protocols, their variables and their
-availability, and maps each variable to dbGaP variables of real studies. Its
-address serves only the latest export, so the zip is kept after the first
-fetch. Its release, such as ``Ver 49.0``, must match the release that the
-manifest pins.
+availability. It also maps some of the variables to dbGaP variables of real
+studies.
+The export's address serves only the latest export, so the fetch keeps the zip
+after the first fetch. The export's release, for example ``Ver 49.0``, must
+match the release that the manifest pins.
 """
 
 import io
@@ -42,8 +43,10 @@ CREATE = re.compile(r"CREATE TABLE `([^`]+)`")
 COLUMN = re.compile(r"\s+`([^`]+)`\s")
 INSERT = re.compile(r"INSERT INTO `([^`]+)` VALUES ")
 ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "0": "\0", "Z": "\x1a"}
-# A token of an INSERT's values: a quoted string, with MySQL's backslash
-# escapes and doubled quotes; a bracket or comma; or a bare value.
+# A token of an INSERT's values is one of these:
+# - a quoted string, with MySQL's backslash escapes and doubled quotes
+# - a bracket or a comma
+# - a bare value
 TOKEN = re.compile(r"'(?:[^'\\]|\\.|'')*'|[(),]|[^'(),]+", re.S)
 ESCAPE = re.compile(r"\\(.)|''", re.S)
 
@@ -88,8 +91,8 @@ def read_dump(stream, tables):
     """Chosen tables of a MySQL dump, by name.
 
     sqlite3 cannot run a MySQL dump, even with its quotes changed, and
-    mysql-to-sqlite3 needs a running MySQL server. So the INSERT statements are
-    read here.
+    mysql-to-sqlite3 needs a running MySQL server. So read_dump reads the
+    INSERT statements itself.
 
     Args:
         stream (file): The dump, opened in binary mode.
@@ -101,7 +104,7 @@ def read_dump(stream, tables):
 
     Raises:
         ValueError: If a row has another number of values than its table has
-            columns: the dump was not read as written.
+            columns. Then the dump was not read as written.
     """
     columns, current, rows = {}, None, {name: [] for name in tables}
     for line in io.TextIOWrapper(stream, encoding="utf-8"):
@@ -125,7 +128,7 @@ def read_dump(stream, tables):
         wrong = sum(len(row) != expected for row in table_rows)
         if wrong:
             raise ValueError(
-                f"{wrong:,} rows of {name} do not have its {expected} columns"
+                f"{wrong:,} rows of {name} do not have the table's {expected} columns"
             )
     return {
         name: pd.DataFrame(table_rows, columns=columns.get(name, []))
@@ -144,19 +147,21 @@ def by_id(frame):
 def read_export(dump):
     """PhenX's variables, protocols, dbGaP mappings and release.
 
-    A protocol is open when its availability is "Available", and a variable
-    takes its protocol's ``open``, ``visible`` flag and availability. A
-    variable whose protocol is not in ``protocols`` has none of them, and is
-    not open.
+    A protocol is open when its availability is "Available". A variable takes
+    its protocol's ``open``, ``visible`` flag and availability. A variable
+    whose protocol is not in ``protocols`` has none of them, and is not open.
 
     Args:
         dump (dict[str, pd.DataFrame]): From ``read_dump``, with TABLES.
 
     Returns:
-        dict[str, pd.DataFrame]: ``variables``, ``protocols``, ``mappings``,
-            ``replacements`` (each replaced protocol and the one that
-            replaced it) and ``release``: the latest release, by date and
-            then by id, one row.
+        dict[str, pd.DataFrame]: Five tables:
+
+            - ``variables``, ``protocols`` and ``mappings``
+            - ``replacements``: each replaced protocol, and the protocol that
+              replaced it
+            - ``release``: the latest release, by date and then by id, in one
+              row
     """
     names = dump["protocol_availability_types"].set_index("id").name
     links = dump["protocols_protocol_availability_types"]
@@ -200,9 +205,9 @@ def read_export(dump):
             "version_num",
         ]
     ]
-    # A variable whose protocol is not in protocols, such as one of the
-    # COVID-19 library's, has no availability. So it is not open, and the count
-    # is printed for review.
+    # A variable whose protocol is not in protocols, for example one of the
+    # COVID-19 library's, has no availability. So it is not open, and
+    # read_export prints the count for review.
     unlisted = variables[~variables.protocol_id.isin(protocols.id)]
     if not unlisted.empty:
         print(
@@ -256,10 +261,10 @@ def check_export(file_bytes):
     except Exception as error:
         raise ValueError(
             f"the PhenX export cannot be read as a zip ({type(error).__name__}:"
-            f" {error}); nothing was kept"
+            f" {error}). Nothing was kept"
         ) from error
     if DUMP not in names:
-        raise ValueError(f"the PhenX export holds no {DUMP}; nothing was kept")
+        raise ValueError(f"the PhenX export holds no {DUMP}. Nothing was kept")
 
 
 def fetch_source(downloads, manifest):
@@ -267,17 +272,26 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; its export entry gives the
+        manifest (dict): The committed manifest. Its export entry gives the
             release.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
-            manifest's sources, and the counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables
+            - the manifest's sources
+            - the counts that the fetch prints
 
     Raises:
-        ValueError: If the export's release is not the pinned release. The
-            address serves only the latest export, so a new release needs a new
-            version of the manifest.
+        ValueError: In each of these cases:
+
+            - a new download is not a zip that holds PhenX's dump. Nothing is
+              kept.
+            - a row of the dump has another number of values than its table
+              has columns
+            - the export's release is not the pinned release. The address
+              serves only the latest export, so a new release needs a new
+              version of the manifest.
     """
     pin = pinned(manifest, EXPORT)
     path = downloaded(EXPORT_URL, downloads / "Phenx_DB.zip", check=check_export)

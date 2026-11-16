@@ -1,62 +1,80 @@
-"""Leakage prevention: find the training pairs that would leak a benchmark.
+"""Leakage prevention: find the pairs that would leak a benchmark.
 
 Each side of a pair is a text formatted from its fields: a name, a type, a
 description and values. For example, the anchor ``ABCD_SC (integer)`` is
-formatted from the name ``ABCD_SC`` and the type ``integer``. The step compares
-the name and description fields rather than the formatted texts. The same name
-can come with another type or other values, and its formatted text then
-differs. The fields compared are:
+formatted from the name ``ABCD_SC`` and the type ``integer``. Leakage
+prevention compares the name and description fields rather than the formatted
+texts. The same name can come with another type or other values, and its
+formatted text then differs. The fields compared are:
 
 - a pair's side texts: the name and the description of its anchor and of its
-  positive;
+  positive
 - a benchmark row's texts: the name and the description of its source
   variable and of each expected target. A target's name is its property name,
   without its node.
 
-The benchmark texts are cleaned first with ``pairs.common.clean``, the
-cleaning that ``pairs prepare`` gives every text. Two texts match when they
-have the same ``text_key``, as ``pairs.common.text_key`` writes it: normalised
-as the tokenizer normalises them, case-folded, with punctuation as spaces. A
-side text also matches any benchmark text, a name or a description, when
-their ``text_key`` values share at least MIN_OVERLAP_WORDS words in a row. A
-pair can hold a description in a name field, such as a ``name_to_description``
-pair's positive, so every side text is compared, whatever its field.
+Leakage prevention first cleans the benchmark texts with
+``pairs.common.clean``, the cleaning that ``pairs prepare`` gives every text.
+Two texts match when they have the same ``text_key``, as
+``pairs.common.text_key`` writes it. A ``text_key`` is the text as the
+tokenizer normalises it, case-folded, with punctuation as spaces. A side text
+also matches any benchmark text, a name or a description, when their
+``text_key`` values share at least MIN_OVERLAP_WORDS words in a row. A pair can
+hold a description in a name field, for example a ``name_to_description``
+pair's positive. So leakage prevention compares every side text, whatever its
+field.
 
-A name also matches by its words, with a description on the other side. When
-one side of a pair matches a benchmark row's description, the other side also
-matches a name of that row when it holds every word of the name, in any order,
-and the name has MIN_NAME_WORDS words or more. For example, the anchor
-``Waist in cm`` holds the words of the source name ``Waist.cm``. It matches
-that name when the positive holds the target's description.
+A name also matches by its words, with a description on the other side. In
+this way, one side of a pair matches a name of a benchmark row when all of
+these hold:
+
+- the name has MIN_NAME_WORDS different words or more
+- the side holds every word of the name, in any order
+- the pair's other side matches the other description of the row: an
+  expected target's for the source's name, or the source variable's for a
+  target's name
+
+For example, the anchor ``Waist in cm`` holds the words of the source name
+``Waist.cm``. It matches that name when the positive matches an expected
+target's description, equal or by at least MIN_OVERLAP_WORDS words in a row.
 
 A finding is a reason to drop a pair, found against one benchmark. There are
 two kinds:
 
-- ``answer_key``: one side's name or description matches the source
-  variable's name or description, and the other side's name or description
-  matches one of that variable's expected targets, by its property name or
-  description. Either side can match the source.
-  For example, a benchmark maps the variable ``body_weight`` to
-  ``vitals.weight``. Then the pair ``Weight`` -> ``Body Weight`` is an answer
-  key: its positive matches the source variable, and its anchor matches the
-  expected target. A pair whose anchor name and positive name read as an
-  answer key's goes with it, as its twin: an anchor gives a ``name`` pair,
-  and a ``name_description`` pair when the canonical has a description.
-  Often only the second holds the description that matches.
-- ``benchmark_study``, the study rule: the pair's ``study`` holds the source
-  study of a benchmark row. For example, a benchmark row comes from the study
-  ``phs999901``. Then every pair made from a dbGaP variable of ``phs999901``
-  is dropped, whatever its texts.
+- ``answer_key``: both of these hold:
 
-Each benchmark is checked on its own, and a pair is dropped if any benchmark
-finds it. Against one benchmark, a pair has at most one finding: an answer key
-comes before a benchmark study. A pair that leaks two benchmarks has a finding
-for each. Values are never compared.
+  - one side's name or description matches the source variable's name or
+    description
+  - the other side's name or description matches one of that variable's
+    expected targets, by the target's property name or description
+
+  Either side can match the source.
+
+- ``benchmark_study``, the study rule: the pair's ``study`` holds the source
+  study of a benchmark row
+
+For example, a benchmark maps the variable ``body_weight`` to
+``vitals.weight``. Then the pair ``Weight`` -> ``Body Weight`` is an answer
+key: its positive matches the source variable, and its anchor matches the
+expected target. And when a benchmark row comes from the study ``phs999901``,
+leakage prevention drops every pair made from a dbGaP variable of
+``phs999901``, whatever its texts.
+
+A pair whose anchor name and positive name read as an answer key's is dropped
+with the answer key, as its twin. An anchor gives a ``name`` pair, and a
+``name_description`` pair when the canonical has a description. Often only
+the second pair holds the description that matches.
+
+Leakage prevention checks each benchmark on its own. It drops a pair when the
+pair has a finding against any benchmark. Against one benchmark, a pair has at
+most one finding: an answer key comes before a benchmark study. A pair that
+leaks two benchmarks has a finding for each benchmark. Leakage prevention
+never compares values.
 
 A benchmark text can also occur in a pair without a finding. For example,
 ``age`` is one side of a pair whose other side matches no expected target of
-that benchmark row. That is not leakage: the pair is kept, and the text is
-reported as shared vocabulary.
+that benchmark row. That is not leakage. Leakage prevention keeps the pair,
+and reports the text as shared vocabulary.
 """
 
 from collections import defaultdict
@@ -69,13 +87,13 @@ from embedding_model.pairs.common import STUDY_SEPARATOR, clean, text_key
 # A side text overlaps a benchmark text when the two share at least this many
 # words in a row. GPT-3's authors check for their test data in their training
 # data the same way (Brown et al., 2020, Appendix C). Their rule gives 8 words
-# for texts as short as the benchmarks' descriptions. A shorter text, such as
-# most names, matches only an equal text or, with a description on the other
-# side, by its words.
+# for texts as short as the benchmarks' descriptions. A shorter text, for
+# example most names, can match only in the other two ways: as an equal text,
+# or by a name's words, with a description on the other side.
 MIN_OVERLAP_WORDS = 8
-# The minimum number of words of a benchmark name that a side can match by its
-# words. A one-word name, such as "age", matches only an equal text, since a
-# side that holds one shared word is mostly general vocabulary.
+# The minimum number of different words of a benchmark name that a side can
+# match by its words. A one-word name, for example "age", matches only an equal text,
+# because a side that holds one shared word is mostly general vocabulary.
 MIN_NAME_WORDS = 2
 # What a twin's ``fields`` start with, before its answer key's own fields.
 TWIN = "twin of: "
@@ -122,15 +140,16 @@ def benchmark_texts(name, targets, mappings):
     """A benchmark's source and expected-target texts, with their ``text_key``.
 
     Args:
-        name (str): The benchmark, such as ``topmed``.
+        name (str): The benchmark, for example ``topmed``.
         targets (pd.DataFrame): Its targets, from ``read_benchmark``.
         mappings (pd.DataFrame): Its mappings, from ``read_benchmark``.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame]: The source texts, one row per text:
-            ``benchmark``, ``row``, ``variable``, ``field`` and ``text_key``. The
-            expected targets' texts, one row per text: the same, and
-            ``target``.
+        tuple[pd.DataFrame, pd.DataFrame]: Two values, with one row per text:
+
+            - the source texts: ``benchmark``, ``row``, ``variable``,
+              ``field`` and ``text_key``
+            - the expected targets' texts: the same columns, and ``target``
     """
     rows = mappings.reset_index(drop=True)
     source_texts = pd.concat(
@@ -220,13 +239,15 @@ def runs(words, length):
 def overlaps(texts, references, length):
     """The texts and references that share ``length`` words in a row.
 
-    The words are whole words, as ``str.split`` cuts a ``text_key``. Each reference is
-    indexed by its runs of ``length`` words, and each text looks up its own.
+    The words are whole words, as ``str.split`` cuts a ``text_key``. overlaps
+    indexes each reference by its runs of ``length`` words. Then it looks up
+    the runs of each text in that index.
 
     Args:
         texts (Iterable[str]): ``text_key`` values, from ``text_keys``.
         references (Iterable[str]): ``text_key`` values to compare them with.
-        length (int): The words in a run, such as MIN_OVERLAP_WORDS.
+        length (int): The number of words in a run, for example
+            MIN_OVERLAP_WORDS.
 
     Returns:
         set[tuple[str, str]]: (text, reference), for each text and reference
@@ -250,15 +271,16 @@ def overlaps(texts, references, length):
 def word_matches(texts, names, min_words):
     """The texts and names where the text holds every word of the name.
 
-    The words may come in any order. Only names of ``min_words`` words or
-    more are matched. Each text is indexed by its words, and a name looks up
-    the texts that hold its rarest word, then keeps those that hold the rest.
+    The words may come in any order. Only names of ``min_words`` different
+    words or more are matched. word_matches indexes each text by its words. For each
+    name, it looks up the texts that hold the name's rarest word, then keeps
+    those that hold the rest.
 
     Args:
         texts (Iterable[str]): ``text_key`` values, from ``text_keys``.
         names (Iterable[str]): Benchmark names' ``text_key`` values.
-        min_words (int): The minimum number of words of a name that can
-            match, such as MIN_NAME_WORDS.
+        min_words (int): The minimum number of different words of a name
+            that can match, for example MIN_NAME_WORDS.
 
     Returns:
         set[tuple[str, str]]: (text, name), for each text that holds the
@@ -283,9 +305,12 @@ def word_matches(texts, names, min_words):
 def matches(sides, texts):
     """Every match of a side text with a benchmark text, in each of the three ways.
 
-    The three ways are an equal ``text_key`` (``=``), at least MIN_OVERLAP_WORDS words
-    in a row (``~``), and a name's words (``>=``), for names of MIN_NAME_WORDS
-    words or more.
+    The three ways are:
+
+    - an equal ``text_key`` (``=``)
+    - at least MIN_OVERLAP_WORDS words in a row (``~``)
+    - a name's words (``>=``), for names of MIN_NAME_WORDS different words or
+      more
 
     Args:
         sides (pd.DataFrame): From ``side_text_keys``.
@@ -334,11 +359,11 @@ def answer_keys(sides, source_texts, target_texts):
         target_texts (pd.DataFrame): Every benchmark's expected-target texts.
 
     Returns:
-        pd.DataFrame: One row per pair and benchmark that it leaks: ``pair``,
-            ``benchmark``, ``row``, ``source_variable_name``,
-            ``target_property`` and ``fields``, which names the two matches,
-            such as ``anchor name = source name, positive description ~ target
-            description``.
+        pd.DataFrame: One row per pair and benchmark that it leaks, with
+            ``pair``, ``benchmark``, ``row``, ``source_variable_name``,
+            ``target_property`` and ``fields``. ``fields`` names the two
+            matches, for example ``anchor name = source name, positive
+            description ~ target description``.
     """
     side_matches = matches(sides, pd.concat([source_texts, target_texts]))
     on_source = side_matches[side_matches.field.str.startswith("source")]
@@ -350,9 +375,10 @@ def answer_keys(sides, source_texts, target_texts):
     # that matches both, as "Race" matches the source "Race" and the target
     # "race", is shared vocabulary.
     both = both[both.side_source != both.side_target]
-    # A name's words count only when the pair's other side matched a
-    # description of the same row. That needs both sides, so it is checked
-    # here, once they are joined.
+    # A name's words count only when the pair's other side matched the other
+    # description of the row: an expected target's for the source's name, or
+    # the source variable's for a target's name. That needs both sides, so
+    # answer_keys checks it here, once the two sides are joined.
     source_counts = (both.how_source != ">=") | both.field_target.str.endswith(
         "description"
     )
@@ -362,7 +388,7 @@ def answer_keys(sides, source_texts, target_texts):
     both = both[source_counts & target_counts]
 
     def as_text(end):
-        """One of the two matches as text, such as ``anchor name = source name``."""
+        """One of the two matches as text, for example ``anchor name = source name``."""
         parts = [both[f"{part}_{end}"] for part in ("side_field", "how", "field")]
         return both[f"side_{end}"].str.cat(parts, sep=" ")
 
@@ -385,15 +411,17 @@ def answer_keys(sides, source_texts, target_texts):
 
 
 def answer_key_twins(sides, answer_key_findings):
-    """The pairs whose anchor and positive names read as an answer key's do.
+    """The pairs whose anchor and positive names read as the names of an answer key.
 
     An anchor gives a ``name`` pair, and a ``name_description`` pair when its
-    canonical has a description. The second holds that description, which can
-    match the target while the first matches nothing. Kept, the first would
-    still pair the source's text with the canonical of the answer key. The
-    names are compared by their ``text_key``, which ignores case, accents
-    and punctuation. So a pair of another item or source that reads the same
-    is a twin too.
+    canonical has a description. The second pair holds that description, which
+    can match the target while the first pair matches nothing. If the first
+    pair were kept, it would still pair the source's text with the canonical of
+    the answer key.
+
+    answer_key_twins compares the names by their ``text_key``, which ignores
+    case, accents and punctuation. So a pair of another item or source that
+    reads the same is a twin too.
 
     Args:
         sides (pd.DataFrame): The pairs' side texts, from ``side_text_keys``.
@@ -403,7 +431,7 @@ def answer_key_twins(sides, answer_key_findings):
     Returns:
         pd.DataFrame: The twins, in the columns of ``answer_keys``, except a
             pair that is an answer key of the same benchmark. A twin's
-            ``fields`` are its answer key's, after TWIN, such as ``twin of:
+            ``fields`` are its answer key's, after TWIN, for example ``twin of:
             anchor name = source name, positive description = target
             description``.
     """
@@ -452,7 +480,7 @@ def study_matches(pairs, studies):
 
 
 def shared_vocabulary(kept_sides, source_texts, target_texts):
-    """Benchmark texts that the kept pairs also hold, on their own.
+    """Benchmark texts that equal a side text of a kept pair, by ``text_key``.
 
     Args:
         kept_sides (pd.DataFrame): The side texts of the pairs that leakage
@@ -498,11 +526,13 @@ def audit(pairs, benchmarks):
             benchmark's targets and mappings, from ``read_benchmark``.
 
     Returns:
-        tuple[pd.DataFrame, dict]: The findings, one row per pair and
-            benchmark that it leaks, in COLUMNS. An answer key comes before a
-            benchmark study, so a pair has one finding per benchmark. An answer
-            key also has the benchmark's own descriptions of its variable and
-            its target. And the shared vocabulary, per benchmark.
+        tuple[pd.DataFrame, dict]: Two values:
+
+            - the findings, one row per pair and benchmark that it leaks, in
+              COLUMNS. An answer key comes before a benchmark study, so a pair
+              has one finding per benchmark. An answer key also has the
+              benchmark's own descriptions of its variable and its target.
+            - the shared vocabulary, per benchmark
     """
     per_benchmark = [
         benchmark_texts(name, *tables) for name, tables in benchmarks.items()

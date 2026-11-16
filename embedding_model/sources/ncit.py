@@ -1,9 +1,9 @@
 """NCIt: concepts, names, definitions and value lists, from its OWL release.
 
-A release is pinned by its version, such as ``26.09d``, and read from EVS's
-archive. Every concept is kept, retired ones too, with its status. The
-release's history file, in the same folder, says which concept replaced each
-retired or obsolete concept, if any.
+The manifest pins a release by its version, for example ``26.09d``, and the
+fetch reads it from EVS's archive. The fetch keeps every concept, retired ones
+too, with its status. The release's history file, in the same folder, says
+which concept replaced each retired or obsolete concept, if any.
 """
 
 import csv
@@ -49,7 +49,7 @@ RETIRED_STATUSES = {"Retired_Concept", "Obsolete_Concept"}
 
 
 def tag(code):
-    """The XML tag of one of NCIt's properties, such as ``P90``."""
+    """The XML tag of one of NCIt's properties, for example ``P90``."""
     return "{" + NCIT + "}" + code
 
 
@@ -66,7 +66,7 @@ def joined(values):
 def is_value_list(name):
     """Whether an association gives a concept's permissible values.
 
-    Only associations named ``Has_...Value`` list values, such as
+    Only associations named ``Has_...Value`` list values, for example
     ``Has_GDC_Value`` or ``Has_PCDC_AML_Authorized_Value``.
 
     Args:
@@ -85,14 +85,20 @@ def read_ncit(stream):
         stream (file): ``Thesaurus.owl``, opened in binary mode.
 
     Returns:
-        dict[str, pd.DataFrame]: ``concepts`` (one row per concept, with its
-            preferred name, display names, status, semantic types, subsets
-            and parents), ``synonyms`` (each synonym, NCIt's ``FULL_SYN``,
-            with its term type, source, source code and subsource),
-            ``definitions`` (each with its kind and source) and ``values``
-            (each value of each value list, with the list's association
-            name). Several values of one field are joined by ``|``. Rows are
-            sorted, so a table's content does not depend on the file's order.
+        dict[str, pd.DataFrame]: Four tables:
+
+            - ``concepts``: one row per concept, with its preferred name,
+              display names, status, semantic types, subsets and parents
+            - ``synonyms``: each synonym, NCIt's ``FULL_SYN``, with its term
+              type, source, source code and subsource
+            - ``definitions``: each definition, with its kind and source
+            - ``values``: each value of each value list, with the list's
+              association name
+
+            read_ncit joins several values of one field with ``|``, each
+            property's values in the file's order. ``parents`` lists the
+            asserted parents, then the defined ones, each once. It sorts the rows, so the order of a table's rows
+            does not depend on the file's order.
     """
     owl = read_owl(stream)
     concepts = {
@@ -206,7 +212,7 @@ def read_history(path):
         members = [n for n in bundle.namelist() if n.lower().endswith(".txt")]
         if not members:
             raise ValueError(
-                f"{path} holds no history file; delete it, then run:"
+                f"{path} holds no history file. Delete it, then run:"
                 " python -m embedding_model sources fetch --source ncit"
             )
         with bundle.open(members[0]) as stream:
@@ -232,10 +238,10 @@ def replacements(codes, history, names):
     """What replaced each retired concept, from the release's history file.
 
     In a merge, one concept survives and the other retires. Each of the two
-    gets a merge record that names the survivor. So a merge record of a
+    has a merge record that names the survivor. So a merge record of a
     retired concept names its replacement. A retire record names the
-    concept's old parent instead, as EVS's ReadMe_history.txt says, so it
-    names no replacement.
+    concept's old parent instead, as EVS's ReadMe_history.txt says. So a
+    retire record names no replacement.
 
     Args:
         codes (list[str]): The retired and obsolete concepts' codes.
@@ -245,9 +251,11 @@ def replacements(codes, history, names):
 
     Returns:
         pd.DataFrame: One row per merge or retire record of a retired
-            concept: ``code``, ``action``, ``date`` (as ``YYYY-MM-DD``), and
-            ``replacement_code`` and ``replacement_name`` where the record
-            names a replacement.
+            concept, with these columns:
+
+            - ``code``, ``action`` and ``date`` (as ``YYYY-MM-DD``)
+            - ``replacement_code`` and ``replacement_name``, where the record
+              names a replacement
     """
     merged_or_retired = history[
         history.code.isin(set(codes)) & history.action.isin(["merge", "retire"])
@@ -277,13 +285,15 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest; its release entry gives the
+        manifest (dict): The committed manifest. Its release entry gives the
             version.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, with
-            ``replacements`` added to ``read_ncit``'s, the manifest's sources,
-            and the counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables, with ``replacements`` added to ``read_ncit``'s
+            - the manifest's sources
+            - the counts that the fetch prints
     """
     version = pinned(manifest, RELEASE)["version"]
     url = ARCHIVE.format(version=version)
@@ -292,7 +302,7 @@ def fetch_source(downloads, manifest):
         members = [n for n in bundle.namelist() if n.lower().endswith(".owl")]
         if not members:
             raise ValueError(
-                f"{path} holds no .owl file; delete it, then run:"
+                f"{path} holds no .owl file. Delete it, then run:"
                 " python -m embedding_model sources fetch --source ncit"
             )
         with bundle.open(members[0]) as stream:

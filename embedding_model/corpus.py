@@ -3,21 +3,27 @@
 ``corpus build`` reads the pairs that ``pairs prepare`` wrote, for the sources
 named, and writes one corpus under ``<inputs>/corpora/<name>/``:
 
-1. The sources are combined in READERS' order. A pair whose two texts
-   normalise to the same two texts as an earlier source's pair is kept once,
-   in the earlier source, with the studies of every copy. The texts are
-   normalised as ``normalization.TOKENIZER_NORMALIZER`` normalises them.
+1. It combines the sources in READERS' order. A pair that copies an earlier
+   source's pair is kept once, in the earlier source, with the studies of
+   every copy. Two pairs are copies when their two texts normalise to the
+   same two texts. ``normalization.TOKENIZER_NORMALIZER`` normalises the
+   texts.
 2. Leakage prevention drops the pairs that would leak a benchmark built under
-   ``<inputs>/benchmarks/`` (see ``embedding_model.leakage``).
-3. The kept pairs are split into training and validation pairs. All pairs of
-   one group go to the same side: items that share an NCIt concept code or a
-   canonical text, as ``group_ids`` links them. A hash of the group decides,
-   so the same sources and benchmarks always give the same split.
+   ``<inputs>/benchmarks/``. ``embedding_model.leakage`` gives the rules.
+3. ``corpus build`` splits the kept pairs into training and validation pairs.
+   All pairs of one group go to the same side. A group holds the items that
+   share an NCIt concept code or a canonical text, as ``group_ids`` links
+   them. A hash of the group decides its side, so the same sources and
+   benchmarks always give the same split.
 
-The corpus holds ``pairs.parquet``, the kept pairs with their ``split``,
-``dropped.parquet``, every dropped pair with its findings, and
-``manifest.json``. It is written to a staging folder first, and replaces the
-last corpus of that name only once it is complete.
+The corpus holds three files:
+
+- ``pairs.parquet``: the kept pairs, with their ``split``
+- ``dropped.parquet``: every dropped pair, with its findings
+- ``manifest.json``
+
+``corpus build`` writes the corpus to a staging folder first. The new corpus
+replaces the last corpus of that name only once it is complete.
 """
 
 import hashlib
@@ -80,17 +86,22 @@ def read_corpus(inputs, name):
 
     Args:
         inputs (Path): The inputs folder that the corpus was built in.
-        name (str): The corpus's name.
+        name (str): The corpus's name, used as its folder's name.
 
     Returns:
         tuple[pd.DataFrame, dict]: The kept pairs, with ``split``, and the
             corpus's manifest.
 
     Raises:
-        FileNotFoundError: If no corpus of that name was built there.
-        ValueError: If the name is not a corpus name, the pairs or the manifest
-            cannot be read, the manifest is another corpus's, or the pairs
-            lack a column or differ from the manifest.
+        FileNotFoundError: If the corpus's pairs or its manifest are missing.
+        ValueError: In each of these cases:
+
+            - the name is not a corpus name
+            - the manifest cannot be read, is not a JSON object, or is another
+              corpus's
+            - the manifest holds no SHA-256 for the pairs, or the pairs differ
+              from it
+            - the pairs cannot be read, or do not have the columns of a corpus
     """
     if not FOLDER_NAME.fullmatch(name):
         raise ValueError(f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}")
@@ -108,8 +119,9 @@ def read_corpus(inputs, name):
 def built_benchmarks(inputs):
     """Every benchmark built in the inputs folder, read and checked.
 
-    A benchmark counts as built when its manifest is there. A built benchmark
-    that cannot be read, such as one with a file missing or changed, raises.
+    A benchmark counts as built when its manifest is there. read_benchmark
+    raises an error for a built benchmark that cannot be read, for example one
+    with a file missing or changed.
 
     Args:
         inputs (Path): The inputs folder.
@@ -117,6 +129,11 @@ def built_benchmarks(inputs):
     Returns:
         dict[str, tuple[pd.DataFrame, pd.DataFrame, dict]]: Each benchmark's
             targets, mappings and manifest, in BUILDERS' order.
+
+    Raises:
+        FileNotFoundError: If a built benchmark has a file missing.
+        ValueError: If a built benchmark cannot be read, or differs from its
+            manifest, as read_benchmark checks.
     """
     folder = Path(inputs) / "benchmarks"
     return {
@@ -129,10 +146,9 @@ def built_benchmarks(inputs):
 def combine(frames):
     """The sources' pairs, each pair once, with the studies of every copy.
 
-    A pair whose two texts normalise to the same two texts as an earlier
-    pair's is dropped, as ``pairs.common.distinct_pairs`` compares them. The
-    pair kept takes the studies of all its copies, so the study rule still
-    sees a later copy's study.
+    ``pairs.common.distinct_pairs`` drops a pair whose two texts normalise to
+    the same two texts as an earlier pair's. The pair kept takes the studies
+    of all its copies, so the study rule still sees a later copy's study.
 
     Args:
         frames (list[pd.DataFrame]): The sources' pairs, in READERS' order.
@@ -165,14 +181,18 @@ def canonical_texts(pairs):
 def group_ids(pairs):
     """The ``group_id`` of each pair: the ``item_id`` of its group's first item.
 
-    Two items are in one group when they share an ``item_id``, as an NCIt
-    concept and its CDISC terms do, or a canonical text's ``text_key``, as
-    ``pairs.common.text_key`` writes it. So two canonicals that differ only in
-    case or punctuation link their items. An empty ``text_key`` links nothing.
-    The links carry over, so the groups are the connected components of a
-    graph: each pair links its item to its canonical text. A group's
-    ``group_id`` is the first ``item_id`` of its items in sorted order, so the
-    same pairs always give the same ``group_id``.
+    Two items are in one group when they share an ``item_id`` or a canonical
+    text's ``text_key``. An NCIt concept and its CDISC terms share an
+    ``item_id``. ``pairs.common.text_key`` writes the ``text_key``: the text as
+    the tokenizer normalises it, with case folded and punctuation turned into
+    spaces. So two canonicals that differ only in case or punctuation link
+    their items. An empty ``text_key`` links nothing.
+
+    Items also link through other items, so the groups are the connected
+    components of a graph. In the graph, each pair links its item to its
+    canonical text. A group's ``group_id`` is the first ``item_id`` of its
+    items in sorted order, so the same pairs always give the same
+    ``group_id``.
 
     Args:
         pairs (pd.DataFrame): The pairs, with ``source``, ``item``, ``kind``,
@@ -211,14 +231,14 @@ def validation_buckets(validation_share):
 
     Args:
         validation_share (float): The share of groups held out for
-            validation, such as 0.02.
+            validation, a multiple of 1 / BUCKETS, for example 0.02.
 
     Returns:
-        int: The buckets, from 1 to BUCKETS - 1.
+        int: The number of buckets, from 1 to BUCKETS - 1.
 
     Raises:
-        ValueError: If the share is not a multiple of 1 / BUCKETS between 0
-            and 1, both left out.
+        ValueError: If the share is not a multiple of 1 / BUCKETS, or is not
+            strictly between 0 and 1.
     """
     held = round(validation_share * BUCKETS)
     if not 0 < held < BUCKETS or abs(validation_share * BUCKETS - held) > 1e-9:
@@ -232,15 +252,15 @@ def validation_buckets(validation_share):
 def splits(pairs, validation_share=VALIDATION_SHARE):
     """Each pair's split, by a hash of its group.
 
-    A group goes to validation when its bucket is below the share's buckets.
-    So a larger share keeps the groups that a smaller share holds out, and
-    adds others.
+    A group goes to validation when its bucket is below the share's number of
+    buckets. So a larger share holds out the groups that a smaller share holds
+    out, and adds others.
 
     Args:
         pairs (pd.DataFrame): The pairs, with the columns that ``group_ids``
             reads.
         validation_share (float): The share of groups held out for
-            validation, a multiple of 1 / BUCKETS.
+            validation, a multiple of 1 / BUCKETS, for example 0.02.
 
     Returns:
         pd.Series: TRAIN or VALIDATION, per pair.
@@ -267,13 +287,14 @@ def manifest(
     """The corpus's manifest, for ``manifest.json``.
 
     It has the fields of every manifest, and ``settings`` and ``counts``. Its
-    inputs are each source's pairs and each benchmark. ``settings`` holds the
-    leakage and split settings, and ``format``, the text format of the pairs,
-    which every source's pairs share.
+    ``sources`` are each source's pairs and each benchmark. ``settings`` holds
+    the leakage and split settings, and ``format``: the text format that every
+    source's pairs share.
 
     Args:
-        name (str): The corpus's name.
-        distinct (pd.DataFrame): The pairs, each once, from ``combine``.
+        name (str): The corpus's name, used as its folder's name.
+        distinct (pd.DataFrame): The sources' pairs, each once, from
+            ``combine``.
         copy_sources (pd.Series): The source of each copy dropped, from
             ``combine``.
         dropped (pd.DataFrame): The dropped pairs, one row per pair and
@@ -286,7 +307,8 @@ def manifest(
         benchmark_manifests (dict[str, dict]): Each benchmark's manifest, by
             name, as ``built_benchmarks`` reads it.
         shared_vocabulary (dict): The shared vocabulary, from ``leakage.audit``.
-        validation_share (float): The share of groups held out for validation.
+        validation_share (float): The share of groups held out for
+            validation, a multiple of 1 / BUCKETS, for example 0.02.
 
     Returns:
         dict: The manifest.
@@ -365,23 +387,26 @@ def checked_sources(name, sources, validation_share):
         name (str): The corpus's name, used as its folder's name.
         sources (list[str]): The sources to combine, from READERS.
         validation_share (float): The share of groups held out for
-            validation, a multiple of 1 / BUCKETS.
+            validation, a multiple of 1 / BUCKETS, for example 0.02.
 
     Returns:
         list[str]: The sources, each once, in READERS' order: the order in
-            which they are read and combined.
+            which build reads and combines them.
 
     Raises:
-        ValueError: If the name is not a FOLDER_NAME, no source is given or
-            one is not in READERS, or the validation share is not a multiple
-            of 1 / BUCKETS between 0 and 1.
+        ValueError: In each of these cases:
+
+            - the name is not a FOLDER_NAME
+            - no source is given, or a source is not in READERS
+            - the validation share is not a multiple of 1 / BUCKETS, or is not
+              strictly between 0 and 1
     """
     if not FOLDER_NAME.fullmatch(name):
         raise ValueError(f"{name!r} is not a corpus name: use {FOLDER_NAME_RULE}")
     unknown = sorted(set(sources) - set(READERS))
     if unknown or not sources:
         raise ValueError(
-            f"choose sources among {', '.join(READERS)}; unknown: {unknown}"
+            f"choose sources among {', '.join(READERS)}. Unknown: {unknown}"
         )
     try:
         validation_buckets(validation_share)
@@ -393,14 +418,15 @@ def checked_sources(name, sources, validation_share):
 def read_benchmarks(inputs):
     """The built benchmarks, which the corpus is checked against for leakage.
 
-    The benchmarks are printed with their versions. A benchmark that cannot be
-    read, or no benchmark built, is reported on stderr.
+    read_benchmarks prints the benchmarks with their versions. When a
+    benchmark cannot be read, or no benchmark is built, read_benchmarks says so
+    on stderr.
 
     Args:
         inputs (Path): The inputs folder that the benchmarks were built into.
 
     Returns:
-        dict | None: Each benchmark's targets, mappings and record, from
+        dict | None: Each benchmark's targets, mappings and manifest, from
             built_benchmarks, or None when the corpus cannot be checked.
     """
     try:
@@ -410,8 +436,8 @@ def read_benchmarks(inputs):
         return None
     if not benchmark_builds:
         print(
-            "no benchmark is built, so the corpus cannot be checked for leakage;"
-            " run: python -m embedding_model benchmarks build --topmed",
+            "no benchmark is built, so the corpus cannot be checked for leakage."
+            " Run: python -m embedding_model benchmarks build --topmed",
             file=sys.stderr,
         )
         return None
@@ -428,9 +454,9 @@ def read_benchmarks(inputs):
 def read_sources(inputs, sources):
     """Each source's pairs and their manifest, in the order given.
 
-    Each source read prints its number of pairs. A source that cannot be read
-    is reported on stderr, and so are sources whose pairs are in different
-    text formats.
+    read_sources prints the number of pairs of each source that it reads. It
+    names on stderr each source whose pairs cannot be used, and the sources
+    whose pairs are in different text formats.
 
     Args:
         inputs (Path): The inputs folder that the sources' pairs are in.
@@ -438,8 +464,8 @@ def read_sources(inputs, sources):
 
     Returns:
         tuple[list[pd.DataFrame] | None, list[dict] | None]: The sources'
-            pairs and their manifests, or None for both when a source cannot
-            be used.
+            pairs and their manifests. Both are None when a source's pairs
+            cannot be used or the sources' text formats differ.
     """
     frames, pairs_manifests, failed = [], [], []
     for source in sources:
@@ -454,7 +480,7 @@ def read_sources(inputs, sources):
         print(f"  {source:<7}{len(pairs):>10,} pairs")
     if failed:
         print(
-            f"the pairs of {', '.join(failed)} cannot be used, as said above",
+            f"the pairs of {', '.join(failed)} cannot be used, for the reasons above",
             file=sys.stderr,
         )
         return None, None
@@ -465,7 +491,7 @@ def read_sources(inputs, sources):
         print(
             "the sources' pairs are in different text formats: "
             + ", ".join(f"{source} {formats[source]}" for source in formats)
-            + "; prepare them again: python -m embedding_model pairs prepare"
+            + ". Prepare them again: python -m embedding_model pairs prepare"
             f" --source {' '.join(formats)}",
             file=sys.stderr,
         )
@@ -477,14 +503,18 @@ def dropped_and_kept(distinct, benchmark_builds):
     """The pairs that leak a benchmark, with their findings, and the pairs kept.
 
     Args:
-        distinct (pd.DataFrame): The sources' pairs, combined, each once.
+        distinct (pd.DataFrame): The sources' pairs, each once, from
+            ``combine``.
         benchmark_builds (dict): Each benchmark's targets, mappings and
-            record, from built_benchmarks.
+            manifest, from built_benchmarks.
 
     Returns:
-        tuple[pd.DataFrame, pd.DataFrame, dict]: The dropped pairs, each with
-            its finding's columns; the pairs kept; and each benchmark's
-            vocabulary shared with the pairs, from leakage.audit.
+        tuple[pd.DataFrame, pd.DataFrame, dict]: Three values:
+
+            - the dropped pairs, each with its finding's columns
+            - the pairs kept
+            - each benchmark's vocabulary shared with the kept pairs, from
+              leakage.audit
     """
     findings, shared_vocabulary = leakage.audit(
         distinct,
@@ -505,7 +535,7 @@ def dropped_and_kept(distinct, benchmark_builds):
 
 
 def print_summary(corpus_manifest, destination):
-    """Print the pairs dropped for leakage, the pairs kept, and where they went.
+    """Print how many pairs leakage prevention dropped and kept, and the corpus's folder.
 
     Args:
         corpus_manifest (dict): The corpus's manifest, with its counts.
@@ -538,16 +568,16 @@ def build(name, sources, inputs, validation_share=VALIDATION_SHARE):
         inputs (Path): The inputs folder. The corpus goes to its
             ``corpora/<name>/``.
         validation_share (float): The share of groups held out for
-            validation, a multiple of 1 / BUCKETS.
+            validation, a multiple of 1 / BUCKETS, for example 0.02.
 
     Returns:
-        int: 0 if the corpus was written, 1 if a name, a source, the
-            validation share or a benchmark stops the build, or no pair is
+        int: 0 if the corpus was written. 1 if a name, a source, the
+            validation share or a benchmark stops the build, or if no pair is
             left to write.
 
     Raises:
         OSError: If the corpus cannot be written or moved into place. The
-            previous corpus of that name is then kept.
+            previous corpus of that name then stays as it was.
     """
     try:
         sources = checked_sources(name, sources, validation_share)

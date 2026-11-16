@@ -1,9 +1,9 @@
 """A transformer embedding model with BERT's architecture, trained from scratch.
 
 The model is a BERT body that starts from random weights, followed by mean
-pooling over its token vectors. Nothing of a pretrained BERT is used: only the
-architecture, ``BertModel`` of transformers. The model trains on the texts
-themselves. sentence-transformers' ``Transformer`` module tokenizes each
+pooling over its token vectors. The model uses nothing of a pretrained BERT,
+only the architecture, ``BertModel`` of transformers. The model trains on the
+texts themselves. sentence-transformers' ``Transformer`` module tokenizes each
 batch, cuts each text to ``max_position_embeddings`` tokens, and pads the
 batch.
 """
@@ -28,8 +28,10 @@ def bert_config():
 def bert_default(name, help_text):
     """A setting whose default is BertConfig's own, read when it is needed.
 
-    So the defaults are BertConfig's, without a copy of its numbers, and
-    transformers is imported only when a config is read.
+    So the defaults are BertConfig's, and this module copies none of
+    BertConfig's numbers. And importing this module does not import
+    transformers: bert_config imports BertConfig only when a default is first
+    needed, for example when read_config builds its parser.
 
     Args:
         name (str): The field of BertConfig.
@@ -80,7 +82,7 @@ class Settings:
     )
     max_position_embeddings: int = field(
         default=128,
-        metadata={"help": "the longest text, in tokens; a longer one is cut"},
+        metadata={"help": "the longest text, in tokens. A longer one is cut"},
     )
     initializer_range: float = bert_default(
         "initializer_range", "the standard deviation of the random starting weights"
@@ -91,8 +93,8 @@ def build(settings, tokenizer):
     """An untrained BERT body over a tokenizer's vocabulary, with mean pooling.
 
     sentence-transformers' ``Transformer`` loads a model only from a folder.
-    So the random model and its tokenizer are written to a temporary folder
-    first, and loaded from it.
+    So build writes the random model and its tokenizer to a temporary folder
+    first, and ``Transformer`` loads them from it.
 
     Args:
         settings (Settings): The BERT's settings.
@@ -126,7 +128,7 @@ def build(settings, tokenizer):
     model = SentenceTransformer(
         modules=[body, Pooling(settings.hidden_size, pooling_mode="mean")]
     )
-    # The model card would look up the temporary folder's path on the Hugging
-    # Face Hub, as the id of a base model. The path names no model.
+    # The model card would ask the Hugging Face Hub about the temporary
+    # folder's path, as the id of a base model. The path names no model.
     model.model_card_data.local_files_only = True
     return model

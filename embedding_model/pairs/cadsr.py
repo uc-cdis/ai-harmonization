@@ -1,23 +1,27 @@
 """caDSR: each data element, around its long name.
 
 The source side holds the element's short name, some of its alternate names,
-and its question texts. An alternate name is used when its type holds names,
-in words or as codes and variable names. Alternate names of other types hold
-mostly context names, ids, model paths, table names or mixed text, so they are
-not used. A type that the reader has not seen is printed, and its names are not
-used. A question text is a reference document whose type ends in "Question
-Text", such as the preferred and alternate question texts. caDSR writes a
-placeholder sentence when an element has no question text, and this sentence
-is not used.
+and its question texts. ``items`` uses an alternate name when its type holds
+names, in words or as codes and variable names. Alternate names of other types
+hold mostly context names, ids, model paths, table names or mixed text, so
+``items`` does not use them. ``items`` prints a type that it has not seen, and
+does not use the names of that type.
 
-The description is the element's definition, its concepts' definitions joined
-by a space. Elements of old software models end their long name with a Java
-type, such as ``java.lang.String``, and their definition with a phrase about
-that type. Both are removed, since the datatype gives the type. Each value is
-its meaning, or the value itself when it has no
-meaning, in the element's order. The codes written before the values are
-removed as ``common.value_labels`` says. The type is the element's own
-datatype, such as ``CHARACTER``.
+A question text is a reference document whose type ends in "Question Text",
+for example the preferred and alternate question texts. caDSR writes a
+placeholder sentence when an element has no question text, and ``items`` does
+not use this sentence.
+
+The description is the element's definition: its concepts' definitions,
+joined by a space. Elements of old software models end their long name with a
+Java type, for example ``java.lang.String``, and their definition with a
+phrase about that type. ``common.without_java`` removes both, because the
+datatype gives the type.
+
+Each value is its meaning, or the value itself when it has no meaning, in the
+element's order. ``common.value_labels`` removes the codes written before the
+values, under the rules in its docstring. The type is the element's own
+datatype, for example ``CHARACTER``.
 """
 
 import re
@@ -45,8 +49,9 @@ STATUSES = {
     "RETIRED WITHDRAWN": RETIRED,
     "RETIRED DELETED": RETIRED,
 }
-# Reference documents that hold a question's wording, such as "Preferred
-# Question Text" or "Application Standard Question Text", end in these words.
+# The types of the reference documents that hold a question's wording end in
+# these words, for example "Preferred Question Text" or "Application Standard
+# Question Text".
 QUESTION_TYPE = "Question Text"
 # What caDSR writes when an element has no question: "Data Element Abcd Text
 # does not have Preferred Question Text."
@@ -54,7 +59,7 @@ NO_QUESTION = re.compile(
     r"^Data Element .+ does not have (?:Preferred |Alternate )?Question Text\.?$"
 )
 # The alternate-name types that hold another name for the element. The name is
-# in words, or a variable name or a code, such as the GDC Alt Name
+# in words, or a variable name or a code, for example the GDC Alt Name
 # "progression_or_recurrence" or the CDISC SDTM Variable "TRTESTCD". The other
 # types hold mostly context names, ids, model paths, table names or mixed text.
 NAME_TYPES = {
@@ -154,10 +159,10 @@ NAME_TYPES = {
     "VM Alt Name",
     "XML Tag",
 }
-# The alternate-name types that are not used as names: contexts, ids, model
-# paths, table names and mixed text. Examples are the USED_BY context "ABTC",
-# the UML Class:UML Attr "Patient:race", and "Measure Alt Name", which mixes
-# score names with ids. A type in neither list is new.
+# The alternate-name types that items does not use as names: contexts, ids,
+# model paths, table names and mixed text. Examples are the USED_BY context
+# "ABTC", the UML Class:UML Attr "Patient:race", and "Measure Alt Name", which
+# mixes score names with ids. A type in neither list is new.
 OTHER_TYPES = {
     "3.1 VM Name",
     "ABBREVIATION",

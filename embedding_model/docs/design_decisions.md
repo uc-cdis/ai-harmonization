@@ -6,23 +6,23 @@ says why. Each entry links to the documentation that describes the
 behaviour, and has these parts:
 
 - **Context:** the facts and forces that the decision answers, without
-  judgement, in a few sentences;
-- **Decision:** what was chosen, in a few sentences. The linked documentation
-  says how it works;
+  judgement, in a few sentences
+- **Decision:** the choice, in a few sentences. The linked documentation says
+  how it works.
 - **Consequences:** what follows, each one good or bad, with the evidence for
-  the choice;
-- **Confidence:** only where it is low, with what would settle it;
+  the choice
+- **Confidence:** only where it is low, with what would settle it
 - **Alternatives considered:** each option, with the facts about it and why
-  it was not chosen;
-- **Confirmation:** the tests that check the decision, if any.
+  it was not chosen
+- **Confirmation:** the tests that check the decision, if any
 
-The entries follow the shape of an architecture decision record
+The entries follow the structure of an architecture decision record
 ([Nygard, 2011](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)),
 with the alternatives and the confirmation of the
 [MADR 4.0 template](https://github.com/adr/madr/tree/4.0.0/template)
 ([Kopp et al., 2018](https://ceur-ws.org/Vol-2072/paper9.pdf)). A decision can
-change. Its entry is then rewritten, and the earlier choice joins its
-alternatives, with the reason it was replaced. Git's history keeps the
+change. Then its entry is rewritten, and the earlier choice joins the entry's
+alternatives, with the reason that it was replaced. Git's history keeps the
 earlier text.
 
 - [All steps](#all-steps)
@@ -47,26 +47,27 @@ earlier text.
 sentence-transformers (`ai_harmonization/harmonization_approaches/embeddings.py`).
 It embeds texts with the model's `encode`. The models here are a static
 embedding table and a transformer with BERT's architecture, each trained from
-pairs of texts. Training needs a loop, a loss, batches, evaluation and a saved
-format. Scoring needs ranks and metrics.
+pairs of texts. Training needs a loop, a loss, batches, evaluation and a way
+to save the model. Scoring needs ranks and metrics.
 
-**Decision.** sentence-transformers is used wherever it does the job:
+**Decision.** `embedding_model` uses sentence-transformers wherever the
+library does the job:
 
 - the model is a sentence-transformers model, built from `StaticEmbedding`
-  or `Transformer`;
-- the pairs take its column names, `anchor` and `positive`;
-- training uses its `SentenceTransformerTrainer`, its loss
-  `MultipleNegativesRankingLoss`, its batch sampler and its data collator;
-- scoring loads the model with it, and ranks with its
-  `InformationRetrievalEvaluator`.
+  or `Transformer`
+- the pairs take the library's column names, `anchor` and `positive`
+- `train` uses the library's `SentenceTransformerTrainer`, its loss
+  `MultipleNegativesRankingLoss`, its batch sampler and its data collator
+- `score` loads the model with the library, and ranks with the library's
+  `InformationRetrievalEvaluator`
 
 **Consequences.**
 
 - Good, because the code here holds only what the library does not do: the
   training data, the tokenizer, leakage prevention and the experiments.
 - Good, because a trained model loads wherever a sentence-transformers model
-  does, such as in the embedding approach or from the Hugging Face Hub. Using
-  it needs no new code.
+  does, for example in the embedding approach or from the Hugging Face Hub.
+  Using the model needs no new code.
 - Good, because the library is well established. It is the library of
   Sentence-BERT
   ([Reimers & Gurevych, 2019](https://doi.org/10.18653/v1/d19-1410)). UKP Lab
@@ -82,18 +83,18 @@ format. Scoring needs ranks and metrics.
 - Bad, because the library's defaults decide much of what happens. Each
   default that matters is checked and recorded, as in
   [A model is scored as the approaches use it](#a-model-is-scored-as-the-approaches-use-it).
-- Bad, because a new major version can change behaviour or move modules.
-  Version 6 moves `sentence_transformers.models` to
-  `sentence_transformers.sentence_transformer.modules`, for one. `uv.lock`
-  pins the version, and each score and each run writes it.
+- Bad, because a new major version can change behaviour or move modules. For
+  example, version 6 moves `sentence_transformers.models` to
+  `sentence_transformers.sentence_transformer.modules`. `uv.lock` pins the
+  version, and each score and each run records it.
 
 **Alternatives considered.**
 
 - Plain PyTorch: a static model's forward pass is short, so it could be
   written by hand. But the training loop, the loss, the batches, the
-  evaluation and the saved format would all be our code to write, test and
-  defend. And the embedding approach could not load the
-  model without a converter.
+  evaluation and saving the model would all be our code to write, test and
+  defend. And the embedding approach could not load the model without a
+  converter.
 - A training loop of our own around sentence-transformers' modules: it
   would replace the `transformers` Trainer with our code, for no known gain.
 
@@ -109,28 +110,29 @@ Much of that data is third-party text under its own license, as
 [licenses.md](licenses.md) says. So each machine builds the benchmarks and the
 sources itself, perhaps months later. Some sources serve only their current
 state, which can change without notice. The benchmarks' documentation and
-dictionary are kept on GitHub, where a commit pins every file.
+dictionary are on GitHub, where a commit pins every file.
 
-**Decision.** Each benchmark and source has a committed manifest.
-It pins each input by its version, its commit or its SHA-256, and lists each
-file built, with its checksum. A build that differs is refused, and the previous
-build's files are kept. An intended change becomes a
+**Decision.** Each benchmark and source has a committed manifest. The
+manifest pins each input by its version, its commit or its SHA-256. It also
+lists each file that the build makes, with its checksum. `benchmarks build`
+and `sources fetch` refuse a build that differs, and keep the previous build's
+files. An intended change becomes a
 [new version](manifests.md#making-a-new-version) of the benchmark or the
 source.
 
 **Consequences.**
 
 - Good, because two builds with the same checksums hold the same data. A
-  manifest works like a lock file, such as `uv.lock`. The code says how to
+  manifest works like a lock file, for example `uv.lock`. The code says how to
   build, and the manifest says from which inputs, with which checksums.
 - Good, because the data never changes silently. A source that changed shows
   as a build that differs.
 - Good, because a version names one build. A build that differs needs a new
   version, as a released package does.
 - Bad, because a build that differs needs git. When git cannot say which
-  version is committed, a build that differs is refused. It cannot tell
-  whether a raised version is new or already committed. A build that matches
-  needs no git.
+  version is committed, a build that differs is refused. Without git, the
+  build cannot tell whether a raised version is new or already committed. A
+  build that matches needs no git.
 - Bad, because a new release of a source can be built only after its new
   version is made.
 
@@ -145,16 +147,17 @@ source.
 - Writing a differing build, with a warning, when git cannot say which
   version is committed: the build could change a committed version without
   anyone noticing.
+
 **Confirmation.** The tests in
 [test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py)
 check that:
 
-- a build that differs is refused without `--update-manifest`;
+- a build that differs is refused without `--update-manifest`
 - with `--update-manifest`, a build under an uncommitted version writes its
-  checksums;
+  checksums
 - a build that differs is refused when git cannot say which version is
-  committed;
-- a matching build needs no git.
+  committed
+- a matching build needs no git
 
 ### Downloads are kept for later builds
 
@@ -162,23 +165,23 @@ check that:
 [manifests.md](manifests.md#making-a-new-version).
 
 **Context.** Each benchmark build and each source fetch downloads its inputs
-from their publishers. Some inputs serve only their current state, such as
-[NHANES](sources.md#nhanes)'s pages and [NIH CDE](sources.md#nih-cde)'s
+from their publishers. Some inputs serve only their current state, for
+example [NHANES](sources.md#nhanes)'s pages and [NIH CDE](sources.md#nih-cde)'s
 export. That state can change without notice. A change to a reader is tested
-on the files that it reads.
+on the files that the reader reads.
 
-**Decision.** Each download is kept in the inputs folder. A later build reads
-the kept file again, and downloads only what it does not have.
+**Decision.** A build keeps each download in the inputs folder. A later build
+reads the kept file again, and downloads only what it does not have.
 
 **Consequences.**
 
-- Good, because a kept download is read again without the network. So a
-  change to a reader can be tested on the same files.
+- Good, because a later build reads a kept download again without the
+  network. So a change to a reader can be tested on the same files.
 - Good, because the kept files of an input that serves only its current
   state are the only copy of the state that the manifest pins.
-- Bad, because a newer state of such an input is read only after someone
-  moves its kept copy aside. The docs say to move it, not to delete it, so
-  the copy that a committed version pins is not lost.
+- Bad, because a build reads a newer state of such an input only after
+  someone moves its kept copy aside. The docs say to move the copy, not to
+  delete it, so the copy that a committed version pins is not lost.
 - Bad, because the kept downloads take disk space.
 
 **Alternatives considered.**
@@ -190,56 +193,58 @@ the kept file again, and downloads only what it does not have.
 [test_embedding_model_download.py](../../tests/test_embedding_model_download.py)
 check that:
 
-- a file is downloaded once, and no partial file is left;
-- a failed check keeps nothing.
+- a file is downloaded once, and no partial file is left
+- a failed check keeps nothing
 
 ### Two checksums, for two questions
 
 **Described in:** [manifests.md](manifests.md#two-checksums).
 
 **Context.** Two builds are compared across machines, and a step checks each
-file that it reads. The bytes of a [parquet](https://parquet.apache.org/)
-file depend on the libraries that wrote it. The file stores each column's
-[Arrow](https://arrow.apache.org/docs/python/api/datatypes.html) type, such as
-`string`, `bool` or `int64`. CSV text loses these types: it writes `True` and
-the text `"True"` alike, and a missing value like an empty text. Hashing a
-large table's content takes far longer than hashing the file's bytes.
+file that it reads. The bytes of a
+[parquet](https://parquet.apache.org/) file depend on the libraries that wrote
+it. The file stores each column's
+[Arrow](https://arrow.apache.org/docs/python/api/datatypes.html) type, for
+example `string`, `bool` or `int64`. CSV text loses these types. It writes
+`True` and the text `"True"` alike, and it writes a missing value like an
+empty text. Hashing a large table's content takes far longer than hashing the
+file's bytes.
 
 **Decision.** A manifest holds each file's `sha256`, the SHA-256 of its
-bytes. A parquet table also gets `content_sha256`: the SHA-256 of a line
-with the column names and Arrow types, then the rows as CSV. No CSV file is
-written. Builds compare parquet tables by `content_sha256`, and other
-files by `sha256`. A step that reads a file checks its `sha256`.
+bytes. A parquet table also has `content_sha256`: the SHA-256 of a line with
+the column names and Arrow types, then the rows as CSV. No CSV file is
+written. Builds compare parquet tables by `content_sha256`, and other files by
+`sha256`. A step that reads a file checks its `sha256`.
 
 **Consequences.**
 
 - Good, because the same table has one `content_sha256` on every machine,
   whichever versions of [pyarrow](https://arrow.apache.org/docs/python/) and
-  pandas wrote it. It came out the same under pandas 2.2 with pyarrow 17 as
-  under pandas 3.0 with pyarrow 25, for every table.
+  pandas wrote it. The checksum came out the same under pandas 2.2 with
+  pyarrow 17 as under pandas 3.0 with pyarrow 25, for every table.
 - Good, because a change of type changes the checksum: `True` and the text
   `"True"` differ. A missing value differs from any text, the empty text
   included.
 - Good, because a step checks the file that it reads quickly, by its
   `sha256`. The bytes settle the step's question: is this the file that the
   earlier step wrote?
-- Good, because comparing two builds is fast. It compares their recorded
-  `content_sha256` for a parquet table, and their `sha256` for any other file.
-  No table is read again.
+- Good, because comparing two builds is fast. The check compares their
+  recorded `content_sha256` for a parquet table, and their `sha256` for any
+  other file. No table is read again.
 - Bad, because a new build hashes each parquet table twice when it writes it:
   its file's bytes for `sha256`, and its content for `content_sha256`. The
-  second hash takes longer. For a large table, such as a corpus's pairs, it
-  adds time to the build.
+  second hash takes longer. For a large table, for example a corpus's pairs,
+  the second hash adds time to the build.
 - Bad, because the checksum relies on pandas' CSV writer and on pyarrow's
   type names. pandas could change how it writes a value, or hold a type in
-  another unit, such as a timestamp in microseconds. Every checksum would then
-  change, though the data would not. The build would be refused, so nothing
-  would pass unnoticed. No table holds a timestamp.
+  another unit, for example a timestamp in microseconds. Every checksum would
+  then change, though the data would not. The check would refuse the build,
+  so nothing would pass unnoticed. No table holds a timestamp.
 
 **Alternatives considered.**
 
 - `sha256` alone: a build would differ only because other versions of pyarrow
-  or pandas wrote it. The file's metadata names them, such as
+  or pandas wrote it. The file's metadata names them, for example
   `parquet-cpp-arrow version 25.0.1` and pandas' version. And the bytes can
   differ even when the same versions write the same data again.
 - `content_sha256` alone: every read of a large table would be slow.
@@ -261,16 +266,16 @@ files by `sha256`. A step that reads a file checks its `sha256`.
 **Confirmation.** The tests check that:
 
 - a parquet table is compared by its content
-  ([test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py));
+  ([test_embedding_model_manifests.py](../../tests/test_embedding_model_manifests.py))
 - a table's checksum does not depend on the system
-  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py))
 - a change of type, or a missing value in place of an empty text, changes the
   checksum, and an empty column has one checksum
-  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py))
 - a fixed table keeps its pinned checksum
-  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py));
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py))
 - a corpus's files are checked when the corpus is read back
-  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py))
 
 ## Benchmarks
 
@@ -282,29 +287,29 @@ files by `sha256`. A step that reads a file checks its `sha256`.
 **Context.** Harmonizing a real study means searching a whole data model. A
 source variable has a few expected targets among many properties. In the TOPMed
 benchmark, nearly every target is some variable's expected target. In the GDC
-benchmark, only a small share of the targets are.
+benchmark, only a small share of the targets are expected targets.
 
 **Decision.** A benchmark is two files:
 
 - `<benchmark>_mappings.csv`, one row per source variable, with its expected
-  targets;
-- `<benchmark>_targets.csv`, every target property.
+  targets
+- `<benchmark>_targets.csv`, every target property
 
-Each source variable is ranked against every target in the targets file.
+`score` ranks every target in the targets file for each source variable.
 
 **Consequences.**
 
 - Good, because a score measures a search of the whole data model, as
   harmonizing a real study needs.
 - Good, because the layout has the three parts of standard retrieval
-  benchmarks, such as BEIR
+  benchmarks, for example BEIR
   ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and MTEB
   ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)):
-  - a corpus to search: here, the targets file;
-  - queries: here, the source variables;
+  - a corpus to search: here, the targets file
+  - queries: here, the source variables
   - the corpus entries that each query should find: here,
-    `expected_target`.
-- Good, because the targets are written once per benchmark, not once per
+    `expected_target`
+- Good, because the targets file lists each target once, not once per
   mapping. Mappings can be added without touching the targets file.
 - Bad, because the two files must agree: each expected target must be a
   property of the targets file. The build checks this, and refuses a
@@ -323,8 +328,8 @@ Each source variable is ranked against every target in the targets file.
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
 check that:
 
-- an expected target missing from the targets is refused;
-- a target listed twice is refused.
+- `write_benchmark` refuses an expected target that the targets lack
+- `write_benchmark` refuses a target listed twice
 
 ### In the GDC benchmark, a variable maps to every property that means what the experts named
 
@@ -333,21 +338,23 @@ check that:
 
 **Context.** The [GDC benchmark](benchmarks.md#gdc) starts from the mappings of
 GDC-SM ([Santos et al., 2025](https://doi.org/10.5281/zenodo.14963588)). Its
-ground truth names a property without its node, such as `race`. Several nodes
-of the GDC data dictionary can carry a property of that name, such as
-`clinical.race` and `demographic.race`. Three nodes give the name another
-meaning. GDC-SM maps columns of male and female to `gender`, in `clinical`.
-`demographic.sex_at_birth` has the same values.
+ground truth names a property without its node, for example `race`. Several
+nodes of the GDC data dictionary can carry a property of that name, for example
+`clinical.race` and `demographic.race`. Three such properties have another
+meaning in their node, for example `project.primary_site`. GDC-SM maps columns
+of male and female to `gender`, in `clinical`. `demographic.sex_at_birth` has
+the same values.
 
 **Decision.** Each node whose property of that name means the same thing
 gives an expected target. The three properties of another meaning are not
-expected targets. `demographic.sex_at_birth` is expected beside `gender`.
+expected targets. `demographic.sex_at_birth` is also an expected target for a
+variable mapped to `gender`.
 
 **Consequences.**
 
 - Good, because the experts named a property, not a node. A model that ranks
-  `clinical.race` or `demographic.race` first has found what they meant, and
-  either counts.
+  `clinical.race` or `demographic.race` first finds what the experts meant,
+  and either target counts.
 - Good, because a model that ranks `demographic.sex_at_birth` first for a
   column of male and female counts as right.
 - Good, because each variable counts once in a score, however many expected
@@ -361,10 +368,12 @@ expected targets. `demographic.sex_at_birth` is expected beside `gender`.
 
 **Alternatives considered.**
 
-- GDC-SM's ground truth as it is, with bare property names as targets, such
-  as `race`: the approaches rank `node.property` targets, so the benchmark
-  would not score them as they are used. And `project.primary_site`, which
-  describes a project, would merge with `case.primary_site`, a patient's.
+- GDC-SM's ground truth as it is, with bare property names as targets, for
+  example `race`: the approaches rank `node.property` targets. So the
+  benchmark would not score the approaches as they are used, because its
+  targets would differ from the targets that the approaches rank.
+  And `project.primary_site`, which describes a project, would merge with
+  `case.primary_site`, a patient's.
 - One node per property: a target of the same meaning in another node would
   count as wrong.
 
@@ -372,9 +381,12 @@ expected targets. `demographic.sex_at_birth` is expected beside `gender`.
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
 check that:
 
-- a property that two nodes carry is expected in both;
-- a node that gives the property another meaning is left out;
-- a variable mapped to `gender` also expects `demographic.sex_at_birth`.
+- `gdc.mapping_rows` makes a property that two nodes carry an expected target
+  in both nodes
+- `gdc.mapping_rows` leaves out a node that gives the property another
+  meaning
+- `gdc.mapping_rows` also expects `demographic.sex_at_birth` for a variable
+  mapped to `gender`
 
 ### GDC's data dictionary is read by a reader of our own
 
@@ -382,7 +394,7 @@ check that:
 
 **Context.** The GDC benchmark's targets come from a release of
 [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). The benchmark's
-manifest pins it by its commit.
+committed manifest pins the release by its commit.
 Each node is a YAML file, which refers to shared definitions by `$ref`. The
 release's own loader, `GDCDictionary`, needs `jsonschema` and `pyyaml`. On
 PyPI, the name `gdcdictionary` holds another package, a "Gen3 generic data
@@ -395,46 +407,48 @@ definition over the node's own keys, as `GDCDictionary` merges it.
 
 **Consequences.**
 
-- Good, because the dictionary is pinned like every other input, by its
-  committed manifest. A newer release is its commit, written in the
-  manifest, and a build with `--update-manifest` accepts it.
+- Good, because the committed manifest pins the dictionary, like every other
+  input. To move to a newer release, the user writes the release's commit in
+  the manifest. Then a build with `--update-manifest` accepts it.
 - Good, because the build runs no code from the download.
 - Good, because `referencing` adds no package: `uv.lock` holds it already, as
   a dependency of `jsonschema`, which
-  [resolves its references with it](https://python-jsonschema.readthedocs.io/en/stable/referencing/).
-- Bad, because the merge rule is copied from `GDCDictionary`. A change to it
-  there must be copied here.
+  [resolves its references with `referencing`](https://python-jsonschema.readthedocs.io/en/v4.26.0/referencing/).
+- Bad, because our code repeats the merge rule of `GDCDictionary`. If
+  `GDCDictionary` changes the rule, our code needs the same change.
 
 **Alternatives considered.**
 
 - gdcdictionary as a dependency of the `embedding-model` group. Its releases
   are only on GitHub, so it would need a git source in `tool.uv.sources`,
-  which only uv reads. Installed with pip, the group would get PyPI's
-  package of that name, Gen3's dictionary of 2019, instead. A new dictionary
-  would change both the dependency and the manifest.
+  which only uv reads. With pip, the group would get PyPI's package of that
+  name instead, Gen3's dictionary of 2019. A new dictionary would change both
+  the dependency and the manifest.
 - The loader of the downloaded release, imported from the archive. The build
   would run code that `uv.lock` does not cover. Each release's loader can
   need other packages, and can change how it is called.
 - `DataDictionary` of dictionaryutils, the loader of Gen3's data
   dictionaries. It reads each `$ref` as a single reference, the form that
-  Gen3's dictionaries write, such as BioData Catalyst's. In the pinned
+  Gen3's dictionaries write, for example BioData Catalyst's. In the pinned
   release, a node's `$ref` can be a list of references, so version 3.5.1
   stops with an error. It would also add three packages, dictionaryutils,
   gen3dictionary and cdislogging, for a few lines of our code. And it requires
   `jsonschema` 4.23.0 or below, which the repository's lock would then hold.
 - The dictionary that GDC's API serves, at `/v0/submission/_dictionary/_all`
   ([GDC's submission API](https://docs.gdc.cancer.gov/API/Users_Guide/Submission/)).
-  It serves only the dictionary that GDC uses now, which can change without
-  notice. So a later build could not read the pinned release. Its schemas
-  still hold `$ref`s, which the build would resolve all the same.
+  The API serves only the dictionary that GDC uses now, which can change
+  without notice. So a later build could not read the pinned release. That
+  dictionary's schemas still hold `$ref`s, which the build would resolve all
+  the same.
 
 **Confirmation.** The tests in
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
 check that:
 
-- only the nodes are read as nodes, and not the shared schemas;
-- a list of references, as GDC's nodes give, is merged over the node's own
-  keys, so that the definition's value wins.
+- `gdc.read_dictionary` reads only the nodes as nodes, and not the shared
+  schemas
+- `gdc.read_dictionary` merges a list of references, as GDC's nodes give,
+  over the node's own keys, so that the definition's value wins
 
 ### The TOPMed benchmark's mappings are corrected by a reviewed list
 
@@ -444,15 +458,15 @@ check that:
 dbGaP variable that the unit's function reads. Some of them only select
 records, check another value or time an event. Some units set a target to one
 value for every subject. The documentation does not say which variable gives
-the phenotype and which the age. And a variable's description does not say
-what the function does with it.
+the phenotype and which variable gives the age. And a variable's description
+does not say what the function does with it.
 
-**Decision.** The build applies a committed list of corrections to the
-mappings that the [age rule](benchmarks.md#which-target-a-variable-maps-to)
-gives. Each one excludes a mapping, or adds the age that the unit computes
-from the variable. It names the unit, the variable's use and a reason. A
-mapping stays when the target records the variable's value, or the unit
-computes it.
+**Decision.** The build corrects the mappings of the
+[age rule](benchmarks.md#which-target-a-variable-maps-to) with a committed
+list. Each correction excludes a mapping, or adds the age that the unit
+computes from the variable. Each correction names the unit, the variable's
+use and a reason. A mapping stays when the target records the variable's
+value, or when the unit computes the target from the variable.
 
 **Consequences.**
 
@@ -461,9 +475,9 @@ computes it.
 - Good, because each correction names its unit and its reason, so a reader
   can check it in that unit's function.
 - Good, because a correction that does not match the documentation fails
-  the build. A newer commit cannot leave a stale one in place. The build
-  matches a correction by its variable and its target. It does not check
-  the correction's harmonization unit.
+  the build. A newer commit cannot leave a stale correction in place. The
+  build matches a correction by its variable and its target. It does not
+  check the correction's harmonization unit.
 - Bad, because the corrections come from reading each unit's function by
   hand. A newer commit of the documentation needs them reviewed.
 - Bad, because some corrections rest on a judgment that could go the other
@@ -477,7 +491,7 @@ computes it.
 
 - Every cited variable as an expected target: a model would count as right
   for ranking race first for a consent group.
-- A rule on the description's words, such as "date" or "days": it would
+- A rule on the description's words, for example "date" or "days": it would
   move "Weight at index date" to the age. A description can say when a value
   was measured.
 - A rule read from the functions' code: the functions are R, written in many
@@ -487,10 +501,14 @@ computes it.
 [test_embedding_model_benchmarks.py](../../tests/test_embedding_model_benchmarks.py)
 check that:
 
-- an excluded mapping is removed, and a row with no target left is dropped;
-- an exclude and an add move a day count from its indicator to its age;
-- a correction that the documentation does not match fails, and is named;
-- the committed list reads, holds each mapping once and keeps its order.
+- `topmed.apply_corrections` removes an excluded mapping, and drops a row
+  with no target left
+- `topmed.apply_corrections` moves a day count from its indicator to its age,
+  with an exclude and an add
+- `topmed.apply_corrections` fails on a correction that the documentation
+  does not match, and names the correction
+- `topmed.read_corrections` reads the committed list, and the list holds each
+  mapping once and keeps its order
 
 ## Scoring
 
@@ -499,12 +517,13 @@ check that:
 **Described in:** [scoring.md](scoring.md#how-a-model-is-scored) and
 [scoring.md](scoring.md#the-metrics).
 
-**Context.** The harmonization approaches embed both sides with
-`model.encode()`, and rank by cosine similarity
-(`ai_harmonization/utils.py`). By default,
+**Context.** The harmonization approaches embed the source texts and the
+target texts with `model.encode()`
+(`ai_harmonization/harmonization_approaches/embeddings.py`), and rank by
+cosine similarity (`ai_harmonization/utils.py`). By default,
 [sentence-transformers](https://sbert.net)' `InformationRetrievalEvaluator`
 adds a model's `query` and `document` prompts instead. It also ranks by the
-similarity function that the model's config names, such as `dot`.
+similarity function that the model's config names, for example `dot`.
 
 **Decision.** `score` embeds both sides with the model's default prompt
 only, as `model.encode()` does. It ranks by cosine similarity, whatever the
@@ -512,32 +531,33 @@ model's config names.
 
 **Consequences.**
 
-- Good, because a score measures a model as the approaches use it, and every
-  model is ranked the same way.
-- Good, because it changes nothing for a model without prompts that ranks by
-  cosine, such as the models trained here. It guards only against a model
-  made elsewhere.
+- Good, because a score measures a model as the approaches use it, and
+  `score` ranks every model the same way.
+- Good, because the choice does not change the scores of a model that has
+  no prompts and ranks by cosine. The models trained here are such models. It
+  matters only for a model made elsewhere.
 - Bad, because a model made for the dot product, or for its own prompts, can
   score lower here than in its own setting.
-- Bad, because a model with a `Router` module would still have its two sides
-  routed apart. The evaluator embeds them with `encode_query` and
-  `encode_document`, and the approaches' `encode` takes the default route. No
-  architecture here has a `Router`, so only a model made elsewhere can have
-  one.
+- Bad, because a model with a `Router` module would still have its two
+  sides routed apart. A `Router` sends queries and documents through
+  different modules. The evaluator embeds the sources with `encode_query`
+  and the targets with `encode_document`, while the approaches' `encode`
+  takes the default route. No architecture here has a `Router`. So only a
+  model made elsewhere can have one.
 
 **Alternatives considered.**
 
-- The evaluator's defaults: a model would be scored with prompts, or a
-  similarity, that the approaches never use. Its scores would not compare
-  with the others'.
+- The evaluator's defaults: the evaluator would score a model with prompts,
+  or a similarity, that the approaches never use. Its scores would not
+  compare with the scores of the other models.
 
 **Confirmation.** The tests in
 [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
 check that:
 
-- targets are ranked by cosine;
-- a query prompt is not added;
-- the default prompt goes on both sides.
+- `rank_targets` ranks the targets by cosine
+- `rank_targets` adds no query prompt
+- the default prompt goes on both sides
 
 ### MRR, accuracy@k, the median rank and nDCG
 
@@ -545,46 +565,47 @@ check that:
 
 **Context.** A data curator harmonizes a source variable by choosing its
 target from the suggestions, and needs one expected target near the top. In
-both benchmarks, many source variables have several expected targets. By default,
-[sentence-transformers](https://sbert.net)' evaluator reports:
+both benchmarks, many source variables have several expected
+targets. By default, [sentence-transformers](https://sbert.net)' evaluator
+reports:
 
-- the mean reciprocal rank at 10, MRR@10;
-- nDCG@10, the normalized discounted cumulative gain, as its main score;
-- accuracy, precision and recall at 1, 3, 5 and 10;
-- the mean average precision at 100, MAP@100.
+- the mean reciprocal rank at 10, MRR@10
+- nDCG@10, the normalized discounted cumulative gain, as its main score
+- accuracy, precision and recall at 1, 3, 5 and 10
+- the mean average precision at 100, MAP@100
 
 **Decision.** `score` reports where each source variable's best-placed
 expected target lands:
 
-- MRR with no cut-off, as the main measure;
-- MRR@10, beside it;
-- accuracy@k at the evaluator's own cut-offs, 1, 3, 5 and 10;
-- the median rank, from the evaluator's ranks.
+- MRR with no cut-off, as the main measure
+- MRR@10, beside it
+- accuracy@k at the evaluator's own cut-offs, 1, 3, 5 and 10
+- the median rank, from the evaluator's ranks
 
-It also reports the evaluator's overall nDCG@10, the retrieval score of BEIR and
-MTEB.
+It also reports the evaluator's overall nDCG@10, the retrieval score of BEIR
+and MTEB.
 
 **Consequences.**
 
-- Good, because MRR, accuracy@k and the median rank depend only on a source
-  variable's highest expected target. MRR and accuracy@k do so by their
-  definitions, and the median rank because `score` takes that rank. A
-  curator needs only that one target to harmonize the variable. Precision,
+- Good, because a curator needs only one expected target to harmonize a
+  variable. MRR, accuracy@k and the median rank depend only on the
+  best-placed one. MRR and accuracy@k depend on it by their definitions. The
+  median rank depends on it because `score` takes that rank. Precision,
   recall, MAP and nDCG count every expected target.
 - Good, because MRR without a cut-off counts every rank. A model that moves an
   expected target from rank 50 to rank 20 scores better. MRR@10 scores every
   rank past 10 as 0.
-- Good, because MRR@10 compares with the validation MRR@10 that training
-  logs.
+- Good, because training also logs MRR@10, on the validation pairs. So the
+  user sees MRR@10 for a run's validation pairs and for each benchmark.
 - Good, because accuracy@k is what a curator who reviews the top k
   suggestions sees: whether an expected target is among them.
-- Good, because a few very low ranks do not move the median rank, as they
-  move a mean.
+- Good, because a few variables whose expected targets come very late do not
+  move the median rank, as they would move a mean rank.
 - Good, because nDCG@10 is the main score of BEIR
   ([Thakur et al., 2021](https://doi.org/10.48550/ARXIV.2104.08663)) and of
   MTEB's retrieval tasks
   ([Muennighoff et al., 2023](https://doi.org/10.18653/v1/2023.eacl-main.148)).
-  So the scores compare with theirs.
+  So readers know the metric.
 - Bad, because nDCG@10 and MRR can disagree on a variable. A variable whose
   expected targets come first and third has an MRR of 1. Its nDCG@10 is below
   1, though its first target is enough to harmonize it.
@@ -597,60 +618,60 @@ MTEB.
 - Leaving nDCG@10 out: readers who know BEIR and MTEB look for it, and it
   costs one column.
 - Recall@k or MAP: they measure how many of a variable's expected targets
-  are found. One is enough to harmonize a variable.
+  the model finds. One is enough to harmonize a variable.
 
 **Confirmation.** The tests in
 [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
 check that:
 
-- the ranks and the metrics are right on a fictional benchmark;
-- MRR@10 and nDCG@10 count a rank past 10 as 0, and MRR counts it;
-- nDCG@10 counts every expected target in the first ten, and MRR only the
-  best placed.
+- the ranks and the metrics are right on a fictional benchmark
+- MRR@10 and nDCG@10 count a rank past 10 as 0, and MRR counts it
+- nDCG@10 counts every expected target in the first ten, and MRR counts only
+  the best placed
 
 ### Models are compared in one text format
 
 **Described in:** [scoring.md](scoring.md#text-formats).
 
-**Context.** A format writes a source variable or a target as one text, such
-as `compact` or `name_description`. This pipeline's models are trained in
+**Context.** A format, for example `compact` or `name_description`, writes a
+source variable or a target as one text. This pipeline trains its models in
 `compact`. Each released model was trained on texts of its own format.
 
-**Decision.** Models are compared in `compact`. A released model can also be
-scored in the format of its own training samples.
+**Decision.** Models are compared in `compact`. `score` can also score a
+released model in the format of its own training samples.
 
 **Consequences.**
 
 - Good, because in one format, two scores differ only by the model.
-- Good, because no format is chosen on the benchmarks for each model.
+- Good, because no format is picked for each model by its benchmark scores.
 - Bad, because a released model can score lower in `compact` than in its own
-  format. So it is also scored in its own.
+  format. So `score` can also score it in its own format, with `--format`.
 
 **Alternatives considered.**
 
 - Each model in its own training format: two scores would then differ by the
-  model and by the format at once. A gap between them could not be put down
-  to the model alone. So a model's score in its own format is kept only as an
-  additional score.
+  model and by the format at once. Nobody could tell how much of a gap
+  between them comes from the model alone. So a model's score in its own
+  format is only an additional score.
 - Each model in the format that scores best for it: the scores would mix the
-  model and the format as well. And each model's format would be chosen on
+  model and the format as well. And each model's format would be picked on
   the benchmarks.
 
 **Confirmation.** The tests in
 [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
 check that:
 
-- each format has its own folder of scores.
+- each format has its own folder of scores
 
 ### A source variable's text leaves its node out
 
 **Described in:** [scoring.md](scoring.md#text-formats).
 
 **Context.** `score` writes each source variable as a text for the model. A
-TOPMed source variable comes from a table of a
-[dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study, such as `pht999999.v1`. A
-GDC source variable comes from a paper. The approaches
-read a study as a `SimpleDataModel`, with each table as a node of
+TOPMed source variable comes from a
+[dbGaP](https://www.ncbi.nlm.nih.gov/gap/) study's table, for example
+`pht999999.v1`. A GDC source variable comes from a paper. The
+approaches read a study as a `SimpleDataModel`, with each table as a node of
 properties. So they write the table first, as in
 `pht999999.v1.body_weight (float): ...`. Neither a table nor a paper says
 what the variable means.
@@ -668,20 +689,20 @@ text starts at its name, in every format, as
   while the training texts have no node on either side.
 - Bad, because variables of one name in several tables of a study read the
   same, while their targets differ by table. A model that reads only the text
-  cannot rank every one's targets first.
+  cannot rank the targets of all of them first.
 
 **Alternatives considered.**
 
 - The node, as the approaches write it: `pht999999.v1.body_weight (float):
-  ...`. The table's id would tell such variables apart, but it does not say
+  ...`. The table's id would separate such variables, but it does not say
   which exam each one belongs to.
 
 **Confirmation.** The tests in
 [test_embedding_model_texts.py](../../tests/test_embedding_model_texts.py)
 check that:
 
-- a source's text has no leading dot;
-- a text that starts with a dot of its own keeps it.
+- a source's text has no leading dot
+- a text that starts with a dot of its own keeps it
 
 ### Scoring a run uses its corpus's leakage check
 
@@ -689,45 +710,47 @@ check that:
 
 **Context.** `corpus build` checks the pairs against each benchmark built so
 far. The corpus's manifest lists those benchmarks, with their versions and
-their files' checksums. A benchmark built later, or rebuilt with other files,
-was not checked. A model
-trained on such a corpus may have learned that benchmark's mappings. A model
-trained elsewhere has no such record.
+their files' checksums. `corpus build` did not check a benchmark built later,
+or rebuilt with other files. A model trained on such a corpus may have
+learned that benchmark's mappings. A model trained elsewhere has no such
+record.
 
-**Decision.** A run's record copies its corpus's checked benchmarks, with
-their files' checksums. `score` refuses a benchmark that is not among them,
-or whose files differ, as `manifests.differences` compares them. A model
-without a run's record is still scored, with a note that its leakage is
-unknown.
+**Decision.** `train` copies its corpus's checked benchmarks, with their
+files' checksums, into the run's record. `score` refuses a benchmark that is
+not among them, or whose files differ, as `manifests.differences` compares
+them. `score` still scores a model without a run's record, and prints a note
+that its leakage is unknown.
 
 **Consequences.**
 
-- Good, because a run is never scored on a benchmark that its training data
-  may hold.
+- Good, because `score` never scores a run on a benchmark that the leakage
+  check of the run's corpus did not cover. Such a benchmark's mappings may be in the
+  run's training data.
 - Good, because the record stays with the run. So the check still holds when
   the corpus is rebuilt or deleted.
-- Good, because a benchmark rebuilt under a version not yet committed, with
-  other mappings, is refused too. Its version alone would pass.
+- Good, because `score` also refuses a benchmark rebuilt with other mappings
+  under a version not yet committed. A check of the version alone would
+  pass it.
 - Good, because a new version whose files did not change needs no new corpus
   and no new run. A version is a build's name, not its content.
-- Bad, because a released model is scored without the check.
+- Bad, because `score` scores a released model without the check.
 
 **Alternatives considered.**
 
 - Checking the corpus's current manifest: a corpus rebuilt after the run
   would describe pairs that the model never saw.
-- Refusing every model without a run's record: the released models could no
-  longer be scored on the same benchmarks.
+- Refusing every model without a run's record: `score` could no longer score
+  the released models on the same benchmarks.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a benchmark that the corpus was checked against is scored into the run's
-  folder;
-- a benchmark that it was not checked against is refused;
-- another build of a checked benchmark is refused;
-- a new version with the same files is scored.
+- `score` scores a benchmark that the corpus was checked against, into the
+  run's folder
+- `score` refuses a benchmark that the corpus was not checked against
+- `score` refuses another build of a checked benchmark
+- `score` scores a new version with the same files
 
 ## Comparing
 
@@ -745,10 +768,12 @@ keeps its scores in its own folder. `score` records the checksums of the
 benchmark's files.
 
 **Decision.** `compare` reads each model's scores, and loads no model. Each
-mean comes from `metrics.csv`. Each variable's rank, in `per_variable.csv`,
-is used for the intervals and the tests. `compare` refuses another model's
-scores, scores of another build of the benchmark, and two models' scores of
-other variables.
+mean comes from `metrics.csv`. `compare` computes the intervals and the tests
+from each variable's rank, in `per_variable.csv`. `compare` refuses:
+
+- the scores of another model
+- scores of another build of the benchmark
+- two models' scores that list other variables
 
 **Consequences.**
 
@@ -756,14 +781,15 @@ other variables.
   scored models or another reference.
 - Good, because each mean is the number that `score` reports, and its
   interval comes from the same ranking.
-- Good, because a benchmark is matched by its files' checksums, as when
-  `score` [checks a run's corpus](#scoring-a-run-uses-its-corpuss-leakage-check).
-  So a benchmark built again with other files, under the same version, is
-  refused.
+- Good, because `compare` matches a benchmark by its files' checksums, as
+  `score` does when it
+  [checks a run's corpus](#scoring-a-run-uses-its-corpuss-leakage-check). So
+  if a benchmark is built again with other files, under the same version,
+  `compare` refuses the scores of the earlier build.
 - Good, because a run's scores sit inside the run's folder. So `compare`
   finds them after the folder moves.
-- Bad, because each model must be scored first, on the same benchmarks and in
-  the same format.
+- Bad, because `score` must score each model first, on the same benchmarks
+  and in the same format.
 
 **Alternatives considered.**
 
@@ -772,24 +798,25 @@ other variables.
 - `compare` scores only the models that have no scores: it would still load
   models, and a large one needs a GPU.
 - A warning for scores that do not match, and the comparison continues: its
-  tests would match up variables that differ, or builds that differ.
+  tests would pair variables that differ, or builds that differ.
 
 **Confirmation.** The tests check that:
 
-- the scores come back as `score` wrote them, in
-  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
-- a model that is not scored is refused, with the command that scores it, in
-  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
-- the scores of another model of the same name are refused, in
-  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
-- scores of another build of the benchmark are refused, in
-  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py);
-- two models' scores that list other variables, or list them in another
-  order, are refused, with ids and without them, in
-  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py);
-- a run's scores are read from the run's own folder, also after the run has
-  moved, in
-  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py).
+- `read_scores` returns the scores as `score` wrote them, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+- `read_scores` refuses a model that is not scored, and names the command
+  that scores it, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+- `read_scores` refuses the scores of another model of the same name, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+- `read_scores` refuses scores of another build of the benchmark, in
+  [test_embedding_model_scoring.py](../../tests/test_embedding_model_scoring.py)
+- `compare` refuses two models' scores that list other variables, or list
+  them in another order, with ids and without them, in
+  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
+- `compare` reads a run's scores from the run's own folder, also after the
+  run moves, in
+  [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 
 ### One reference, which each other model is measured against
 
@@ -802,7 +829,7 @@ every other one makes n(n - 1) / 2 tests per metric. The bar plot,
 line over the two bars that it compares. A difference between two models can
 be taken either way round.
 
-**Decision.** `--reference` names one model. Each other model is tested
+**Decision.** `--reference` names one model. `compare` tests each other model
 against it, and each difference is that model minus the reference. The
 reference's bar comes first in each group. Without `--reference`, `compare`
 gives each model's intervals and makes no tests.
@@ -814,8 +841,9 @@ gives each model's intervals and makes no tests.
   n(n - 1) / 2.
 - Good, because each difference reads as its own model's gain: a positive
   difference means that the model does better than the reference.
-  Estimation plots define a difference so, as the test group minus the
-  control ([Ho et al., 2019](https://doi.org/10.1038/s41592-019-0470-3)).
+  Estimation plots define a difference in the same way, as the test group
+  minus the control
+  ([Ho et al., 2019](https://doi.org/10.1038/s41592-019-0470-3)).
 - Good, because each group of bars in `accuracy_and_mrr` has at most n - 1
   comparison brackets, which a reader can follow. Each one starts at the
   reference's bar, the first of its group.
@@ -826,19 +854,19 @@ gives each model's intervals and makes no tests.
 
 - Each model against every other one: many tests, and more comparison
   brackets than the bar plot can show clearly.
-- A default reference, such as the first model of `--model`: the tests would
-  then measure against a model that nobody chose.
+- A default reference, for example the first model of `--model`: the tests
+  would then measure against a model that nobody chose.
 
 **Confirmation.** The tests in
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- the differences are each other model minus the reference;
-- the reference is drawn first;
-- without a reference, no differences are written, and `compare` says so;
-- a reference named by a relative path is the model given by its full path;
-- a reference that is not one of the models, even in a folder of the same
-  name, or that has no other model, is refused.
+- the differences are each other model minus the reference
+- `overview_figure` draws the reference first
+- without a reference, `compare` writes no differences, and says so
+- a reference named by a relative path is the model given by its full path
+- `compare` refuses a reference that is not one of the models, even in a
+  folder of the same name, or that has no other model
 
 ### accuracy@k: Wilson intervals, Newcombe's paired interval and McNemar's exact test
 
@@ -879,7 +907,8 @@ binomial test on the variables where the two models differ.
   approximation.
 - Good, because `scipy.stats.binomtest` computes both the Wilson interval and
   McNemar's exact test.
-- Bad, because neither scipy nor statsmodels computes Newcombe's interval.
+- Bad, because scipy has no function for Newcombe's interval, and no release
+  of statsmodels has one yet.
   So `compare` computes it by Newcombe's formula, from scipy's Wilson
   limits.
 - Bad, because the exact test is conservative when few variables differ: its
@@ -902,12 +931,12 @@ binomial test on the variables where the two models differ.
   interval for one share ([Bowyer et al.,
   2025](https://proceedings.mlr.press/v267/bowyer25a.html)). For a paired
   difference, it needs sampling code of our own.
-- The Wald interval: the share plus or minus 1.96 standard errors. MRR's t
-  interval gives it on values of 1 and 0. It can leave the range from 0 to
-  1, and it has no width at 0 or 1 ([Brown et al.,
-  2001](https://doi.org/10.1214/ss/1009213286)).
+- The Wald interval: the share plus or minus 1.96 standard errors. The Wald
+  interval can leave the range from 0 to 1, and it has no width at 0 or 1
+  ([Brown et al., 2001](https://doi.org/10.1214/ss/1009213286)). On values of
+  1 and 0, MRR's t interval is close to the Wald interval.
 - Two Wilson intervals combined as if the models were independent: wider
-  than needed, since the two models agree on many variables.
+  than needed, because the two models agree on many variables.
 - The paired t-test, as for MRR: one test for every metric. On values of 1
   and 0, it approximates McNemar's test, which the binomial test gives
   exactly.
@@ -928,17 +957,17 @@ binomial test on the variables where the two models differ.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- `metrics.csv` gives a share of 1 a Wilson interval of some width;
+- `metrics.csv` gives a share of 1 a Wilson interval of some width
 - Newcombe's interval is narrower for two models that agree than for two
   that agree only by chance, with the same shares. It keeps some width when
-  they agree on every variable;
+  they agree on every variable.
 - Newcombe's interval treats the two models alike: swapping the model and
-  the reference turns [low, high] into [-high, -low];
-- `differences.csv` gives each difference of accuracy@k Newcombe's interval;
+  the reference turns [low, high] into [-high, -low]
+- `differences.csv` gives Newcombe's interval to the difference of accuracy@1
 - McNemar's p is right on an example computed by hand: three variables that
-  only the reference finds give p = 2 × 0.5³ = 0.25;
-- two models that never differ have a p of 1;
-- the stars mark the p below each level.
+  only the reference finds give p = 2 × 0.5³ = 0.25
+- two models that never differ have a p of 1
+- the stars mark the p below each level
 
 ### MRR and MRR@10: the t interval and the paired t-test
 
@@ -948,8 +977,8 @@ check that:
 and 1: 1 / rank, or 0 past rank 10 for
 [MRR@10](#mrr-accuracyk-the-median-rank-and-ndcg). Many of the values are 1.
 A benchmark is a sample of variables, so the mean has a sampling error,
-which a confidence interval shows. Two models' values match up, variable by
-variable. Two good models often give a variable the same rank, so many of
+which a confidence interval shows. Two models' values form pairs, variable
+by variable. Two good models often give a variable the same rank, so many of
 the differences are 0.
 
 **Decision.** A model's MRR gets the 95% t interval of its mean, cut at 0
@@ -970,9 +999,9 @@ differences. scipy computes both.
 - Good, because the t interval and the t-test are the standard methods for
   a mean ([Student, 1908](https://doi.org/10.2307/2331554)).
 - Bad, because the t interval assumes that the mean is about normally
-  distributed. Values that pile up at 1 need enough variables for that.
-- Good, because the cut never loses the true MRR, which lies between 0 and
-  1. An interval that held it before the cut still holds it. The cut
+  distributed. Values that cluster at 1 need enough variables for that.
+- Good, because the cut never loses the true MRR, which lies between 0
+  and 1. An interval that held it before the cut still holds it. The cut
   interval always holds the mean, so it is never empty.
 - Bad, because a cut interval is not symmetric around the mean. Its cut
   end is MRR's limit, not a t limit.
@@ -1008,29 +1037,29 @@ differences. scipy computes both.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- on 200 variables, the interval is the mean plus or minus t × sd / √200;
-- a model's MRR interval that passes 1 ends at 1, and keeps its low end;
-- when every variable has an MRR of 1, the interval is [1, 1];
+- on 200 variables, the interval is the mean plus or minus t × sd / √200
+- a model's MRR interval that passes 1 ends at 1, and keeps its low end
+- when every variable has an MRR of 1, the interval is [1, 1]
 - a difference's interval excludes 0 exactly when the paired t-test's p is
-  below 0.05;
-- MRR is compared by a paired test: it finds a difference that the spread of
-  tied ranks hides from an unpaired test;
+  below 0.05
+- `paired_test` compares MRR by the paired t-test, which finds a difference
+  that the spread of tied ranks hides from an unpaired test
 - when every variable differs by the same amount, p is 0, or 1 when that
-  amount is 0.
+  amount is 0
 
 ### Each paired test is reported alone, with no correction for the number of tests
 
 **Described in:** [comparing.md](comparing.md#what-it-shows).
 
 **Context.** Each test asks: does this model differ from the reference, on
-this metric and benchmark? Models are not tested against each other. Two
-models and a reference, on 6 metrics and 2 benchmarks, make 2 x 6 x 2 = 24
-tests. By chance, a test gives p < 0.05 about 1 time in 20.
-A correction for multiple comparisons, such as Holm's, keeps the chance of a
-false finding among the 24 below 0.05.
+this metric and benchmark? `compare` does not test the other models against
+each other. Two models and a reference, on 6 metrics and 2 benchmarks, make
+2 x 6 x 2 = 24 tests. By chance, a test gives p < 0.05 about 1 time in 20.
+A correction for multiple comparisons, for example Holm's, keeps the chance
+of a false finding among the 24 below 0.05.
 
-**Decision.** Each p is reported as its test gives it, with no correction. A
-comparison bracket marks each comparison with p < 0.05.
+**Decision.** `compare` reports each p as its test gives it, with no
+correction. A comparison bracket marks each comparison with p < 0.05.
 
 **Consequences.**
 
@@ -1049,8 +1078,8 @@ comparison bracket marks each comparison with p < 0.05.
 
 **Alternatives considered.**
 
-- Bonferroni's correction: each test is held to 0.05 divided by the number
-  of tests, such as 0.05 / 24. It is the simplest correction, and it keeps
+- Bonferroni's correction: it holds each test to 0.05 divided by the number
+  of tests, for example 0.05 / 24. It is the simplest correction, and it keeps
   the chance of any false finding in the set below 0.05. But it costs the
   most power, and a small benchmark then finds few differences.
 - Holm's correction: the same guarantee as Bonferroni's, by a step-down rule,
@@ -1068,7 +1097,7 @@ comparison bracket marks each comparison with p < 0.05.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- the p of accuracy@1 in `differences.csv` is the p of its own test.
+- the p of accuracy@1 in `differences.csv` is the p of its own test
 
 ### Four figures
 
@@ -1089,11 +1118,11 @@ A figure shows such answers at a glance. `metrics.csv` and
 
 **Decision.** `compare` draws one figure for each question:
 
-1. `accuracy_and_mrr`: accuracy@1, @5 and @10 as grouped bars, with MRR;
-2. `accuracy_by_k`: accuracy@k for every k from 1 to 50;
-3. `mrr_by_size`: MRR by the model's number of parameters;
-4. `differences_from_reference`, with a reference: each model's difference
-   from it.
+1. `accuracy_and_mrr`: accuracy@1, @5 and @10 as grouped bars, with MRR
+2. `accuracy_by_k`: accuracy@k for every k from 1 to 50
+3. `mrr_by_size`: MRR by the model's number of parameters
+4. `differences_from_reference`, with a reference: each other model's
+   difference from it
 
 The bars carry no numbers. A comparison holds at most 8 models.
 
@@ -1106,17 +1135,17 @@ The bars carry no numbers. A comparison holds at most 8 models.
   reviews more suggestions, beyond the three k of the bars.
 - Good, because `mrr_by_size` places each model by its number of
   parameters, on a log scale.
-- Good, because `differences_from_reference` shows by how much each model
-  differs from the reference, with an interval, on an axis of its own. On the
-  0-to-1 axis of `accuracy_and_mrr`, a difference of 0.01 is hard to see.
-  This is an estimation plot
+- Good, because `differences_from_reference` shows by how much each other
+  model differs from the reference, with an interval, on an axis of its own.
+  On the 0-to-1 axis of `accuracy_and_mrr`, a difference of 0.01 is hard to
+  see. `differences_from_reference` is an estimation plot
   ([Ho et al., 2019](https://doi.org/10.1038/s41592-019-0470-3)). It shows
   how large each difference is, not only whether a test finds it.
 - Good, because the figures give the answers at a glance, and the tables
   keep every value. So the bars need no numbers.
-- Bad, because a comparison of more than 8 models is refused. Its bars would
-  grow too thin to read, and its comparison brackets would fill half of each
-  panel.
+- Bad, because `compare` refuses a comparison of more than 8 models. The
+  bars of such a comparison would grow too thin to read, and its comparison
+  brackets would fill half of each panel.
 
 **Alternatives considered.**
 
@@ -1134,18 +1163,18 @@ The bars carry no numbers. A comparison holds at most 8 models.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- each figure is written as a PNG, a PDF and an EPS file;
-- `differences_from_reference` puts each model at its difference from the
-  reference;
-- a comparison of 9 models is refused.
+- `compare` writes each figure as a PNG, a PDF and an EPS file
+- `differences_from_reference` puts each other model at its difference from
+  the reference
+- `compare` refuses a comparison of 9 models
 
 ### Colors from matplotlib's petroff10, not its default tab10
 
 **Described in:** [comparing.md](comparing.md#colors).
 
 **Context.** The figures give each model a color. The default color sequence
-of matplotlib is tab10. It also ships petroff10, a sequence made for readers
-with a color vision deficiency. The repository requires matplotlib
+of matplotlib is tab10. matplotlib also ships petroff10, a sequence made for
+readers with a color vision deficiency. The repository requires matplotlib
 3.10 or later, so that it runs on Google Colab.
 
 **Decision.** By default, the figures take their colors from petroff10, in
@@ -1157,8 +1186,8 @@ the order of `--model`.
   deficiency, and for how people rated its look
   ([Petroff, 2021](https://doi.org/10.48550/ARXIV.2107.02270)).
 - Bad, because the bars of `accuracy_and_mrr` carry no marker or pattern,
-  only a color. In black-and-white print, a reader must go by the bars'
-  order, which the legend follows.
+  only a color. In black-and-white print, a reader must use the bars' order,
+  which the legend follows.
 
 **Alternatives considered.**
 
@@ -1177,7 +1206,7 @@ the order of `--model`.
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- each model's bars take petroff10's color of its place in `--model`.
+- each model's bars take petroff10's color of its place in `--model`
 
 ### A model's color can be given with `--colors`, one per model
 
@@ -1187,15 +1216,19 @@ check that:
 [petroff10](#colors-from-matplotlibs-petroff10-not-its-default-tab10) color
 of its place in `--model`. Two comparisons that list other models, or list
 them in another order, can give one model two colors. A reader who sees
-both, as in one report, may take it for two models. `--model` and
+both, as in one report, may take the two colors for two models. `--model` and
 `--benchmark` each take a list.
 
 **Decision.** `--colors` gives one color per `--model`, in the same order, in
-any form that matplotlib reads. compare refuses a count that differs from
-the models', a color that matplotlib does not read, a fully transparent
-color, and one color for two models. Without `--colors`, each model keeps
-its place's petroff10 color. The manifest records each color as drawn, in
-hex.
+any form that matplotlib reads. `compare` refuses:
+
+- more or fewer colors than models
+- a color that matplotlib does not read
+- a fully transparent color
+- one color for two models
+
+Without `--colors`, each model keeps its place's petroff10 color. The
+manifest records each color as drawn, in hex.
 
 **Consequences.**
 
@@ -1204,21 +1237,21 @@ hex.
 - Good, because the colors come as a list, as `--model` and `--benchmark`
   do, and in matplotlib's own forms
   ([matplotlib's guide to colors](https://matplotlib.org/stable/users/explain/colors/colors.html)).
-- Good, because the colors are checked before any score is read, so a
-  misspelled color stops compare at once.
+- Good, because `compare` checks the colors before it reads any score, so a
+  misspelled color stops `compare` at once.
 - Good, because no two models share a color, and none is fully transparent.
   The bars of `accuracy_and_mrr` carry only a color, so either would hide a
   model there.
-- Good, because the manifest says what the figures show, whatever form
-  each color was given in. `'tab:blue'` and `'#1f77b4'` are both recorded
-  as `#1f77b4ff`.
-- Bad, because a color can still be hard to see. White is lost on the white
-  background. Two colors can look alike, to every reader or only under a
-  color vision deficiency, which petroff10 was chosen to avoid. compare
+- Good, because the manifest says what the figures show, whatever form the
+  user gave each color in. The manifest records both `'tab:blue'` and
+  `'#1f77b4'` as `#1f77b4ff`.
+- Bad, because a color can still be hard to see. White does not show on the
+  white background. Two colors can look alike, to every reader or only under
+  a color vision deficiency, which petroff10 was chosen to avoid. `compare`
   checks neither.
-- Bad, because the list must be kept in step with `--model` by hand. A model
-  added in the middle shifts the colors after it, and compare cannot tell,
-  since any color fits any model.
+- Bad, because the user must keep the list in step with `--model` by hand. A
+  model added in the middle shifts the colors after it. `compare` cannot
+  tell, because any color fits any model.
 
 **Alternatives considered.**
 
@@ -1228,8 +1261,8 @@ hex.
   and plotly's `color_discrete_map`
   ([plotly's discrete colors](https://plotly.com/python/discrete-color/))
   take colors this way. It needs no order, and a model left out keeps its
-  default. But each model must be written again exactly as in `--model`,
-  and a model id or a run's folder can be long.
+  default. But the user must write each model again exactly as in
+  `--model`, and a model id or a run's folder can be long.
 - `--palette`, naming another of matplotlib's color sequences: it changes
   every color at once, but a model still takes the color of its place. So
   two comparisons of other models still give it two colors.
@@ -1239,14 +1272,14 @@ hex.
 check that:
 
 - in all four figures, each model takes the color that `--colors` gives its
-  place, whichever model is the reference;
-- `--colors` with fewer or more colors than models, or with one color for
-  two models, is refused before anything is written;
-- a misspelled color, and a fully transparent one, are refused too;
+  place, whichever model is the reference
+- `compare` refuses `--colors` with fewer or more colors than models, or
+  with one color for two models, before it writes anything
+- `compare` refuses a misspelled color, and a fully transparent one, too
 - the manifest records each model's color as drawn, in hex, with
-  `--colors` and without it;
-- the command passes `--colors` on to the comparison, and stops with a
-  message when the colors do not fit.
+  `--colors` and without it
+- the command passes `--colors` to the comparison, and stops with a message
+  when the colors do not fit
 
 ### nDCG@10 and the median rank get no interval, test or figure
 
@@ -1274,18 +1307,18 @@ rank. A curator needs one expected target to map a variable.
 - Each variable's nDCG@10: `score` would keep the rank of every expected
   target, and a library of IR measures would compute it. It adds files and a
   dependency, for a metric that a curator does not need.
-- nDCG@10 in the figures: it marks a model down for missing a second
+- nDCG@10 in the figures: it lowers a model's score for missing a second
   expected target, which a curator does not need.
 - The median rank in the figures, with an interval: it often shows nothing.
   When more than half of the variables rank their expected target first, the
-  median rank is 1. It stays 1 when a model moves its worst variables up, and
-  its bootstrap interval is [1, 1].
+  median rank is 1. It stays 1 when a model improves the ranks of its worst
+  variables, and its bootstrap interval is [1, 1].
 
 **Confirmation.** The tests in
 [test_embedding_model_compare.py](../../tests/test_embedding_model_compare.py)
 check that:
 
-- `metrics.csv` copies nDCG@10 from the scores.
+- `compare` copies nDCG@10 from the scores into `metrics.csv`
 
 ## Sources
 
@@ -1295,18 +1328,22 @@ check that:
 [licenses.md](licenses.md#training-sources).
 
 **Context.** The model learns from pairs of texts that mean the same thing.
-Three kinds of public source hold such texts. Terminologies and ontologies
-name medical concepts in several ways: synonyms, abbreviations and
-definitions. Collections of standard data elements hold the fields that
-studies reuse: their names, questions and values. A survey's data dictionary
-describes the variables that it collected. Each source has its own license or
-terms. Some sources also mark single items as restricted.
+Three kinds of public source hold such texts:
+
+- Terminologies and ontologies name medical concepts in several ways:
+  synonyms, abbreviations and definitions.
+- Collections of standard data elements hold the fields that studies reuse:
+  their names, questions and values.
+- A survey's data dictionary describes its variables.
+
+Each source has its own license or terms. Some sources also restrict single
+items.
 
 **Decision.** Eight sources are used, of all three kinds. The terminologies
 and ontologies are NCIt, seven OBO Foundry ontologies, LOINC and CDISC. The
 collections of data elements are NIH CDE, caDSR and PhenX. NHANES is a
-survey's data dictionary. Each source is fetched from its publisher, and is
-free to use under its own license or terms.
+survey's data dictionary. `sources fetch` downloads each source from its
+publisher. Each source is free to use under its own license or terms.
 
 **Consequences.**
 
@@ -1323,8 +1360,8 @@ free to use under its own license or terms.
 - Bad, because a large terminology whose license is not open to every user
   stays out, though it holds many synonyms. SNOMED CT, for one, needs a
   license for each user, with fees in some countries.
-- Bad, because some sources need a free registration before a download, such
-  as LOINC.
+- Bad, because some sources need a free registration before a download, for
+  example LOINC.
 
 **Alternatives considered.**
 
@@ -1333,13 +1370,13 @@ free to use under its own license or terms.
   [license agreement](https://www.nlm.nih.gov/research/umls/knowledge_sources/metathesaurus/release/license_agreement.html)
   prohibits distributing the Metathesaurus or subsets of it, except as an
   integral part of an application. Some of its sources allow only internal
-  use. So each source's terms would have to be checked within it, by its
-  restriction category.
+  use. So each source's terms would have to be checked within the
+  Metathesaurus, by the source's restriction category.
 - SNOMED CT, a large clinical terminology with many synonyms. Each person who
   downloads it needs a license of their own. NLM's
   [licensing page](https://www.nlm.nih.gov/healthit/snomedct/snomed_licensing.html)
-  says that it is free in IHTSDO member countries, such as the US. Fees may
-  apply elsewhere, so not every user could rebuild the corpus for free.
+  says that it is free in IHTSDO member countries, for example the US. Fees
+  may apply elsewhere, so not every user could rebuild the corpus for free.
 - dbGaP's public data dictionaries, of studies that no benchmark uses. They
   describe real study variables, in the shape that the task reads. They are
   not used yet. The benchmarks come from dbGaP studies too, so each added
@@ -1350,7 +1387,7 @@ free to use under its own license or terms.
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- each source records its license as an SPDX license expression.
+- each source records its license as an SPDX license expression
 
 ### An item is open only when its value is known to allow use
 
@@ -1358,20 +1395,20 @@ check that:
 
 **Context.** Some sources mark the items that may not be used:
 
-- [LOINC](sources.md#loinc), by a copyright notice, in free text;
+- [LOINC](sources.md#loinc), by a copyright notice, in free text
 - [NIH CDE](sources.md#nih-cde), by a copyright status and by
-  `noRenderAllowed`;
+  `noRenderAllowed`
 - [caDSR](sources.md#cadsr), by a Proprietary Measure Permission, one kind of
-  an element's reference documents;
-- [NHANES](sources.md#nhanes), by a data file's use constraints;
-- [PhenX](sources.md#phenx), by a protocol's availability.
+  an element's reference documents
+- [NHANES](sources.md#nhanes), by a data file's use constraints
+- [PhenX](sources.md#phenx), by a protocol's availability
 
 A source can add a new value, or a new kind of document, at any time.
 
 **Decision.** An item is open only when its restriction field holds a value
-known to allow use, for caDSR in each of its documents. A new value closes
-the item, and the fetch prints it for review. A LOINC notice is free text, so
-any notice closes its item, without a print.
+known to allow use, for caDSR in each of the element's documents. A new value
+closes the item, and the fetch prints the value for review. A LOINC notice is
+free text, so any notice closes its item, and the fetch does not print it.
 
 **Consequences.**
 
@@ -1380,7 +1417,7 @@ any notice closes its item, without a print.
   decisions on permission rather than exclusion"
   ([Saltzer & Schroeder, 1975](https://doi.org/10.1109/proc.1975.9939)).
 - Good, because the fetch keeps every item, closed ones too, and marks each in
-  its `open` column. So a later change of verdict needs no new download: a
+  its `open` column. So a verdict can change later without a new download. A
   new fetch reads the kept files again, and writes the new `open` column.
 - Good, because a restriction on a parent covers its children. An NHANES
   data file's constraints cover its variables, and a PhenX protocol's
@@ -1389,8 +1426,8 @@ any notice closes its item, without a print.
 - Good, because each allow-list holds only values whose meaning was checked.
   NHANES's "RDC Only", for one, restricts access to a data file's data, not
   to the documentation that the fetch reads. So it allows use.
-- Bad, because a harmless new value closes items until its source's
-  allow-list is updated.
+- Bad, because a harmless new value closes items until someone updates the
+  source's allow-list.
 
 **Alternatives considered.**
 
@@ -1405,12 +1442,12 @@ any notice closes its item, without a print.
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- a new value is read as closed, and reported;
-- LOINC's notices close items;
-- NIH CDE's allow-list closes items;
-- a caDSR element with a proprietary or a new kind of document is closed;
-- a new NHANES use constraint closes its variables;
-- a PhenX protocol that is not available closes its variables.
+- a new value is read as closed, and reported
+- LOINC's notices close items
+- NIH CDE's allow-list closes items
+- a caDSR element with a proprietary or a new kind of document is closed
+- a new NHANES use constraint closes its variables
+- a PhenX protocol that is not available closes its variables
 
 ### OWL files are read by a reader of our own
 
@@ -1438,9 +1475,9 @@ pass, with defusedxml.
   this reader on the base file of HP, the Human Phenotype Ontology. Only this
   file was timed with both readers.
 - pronto: it is not a dependency. It knows the annotations that OBO defines,
-  such as a synonym and its scope. NCIt writes its synonyms with properties of
-  its own, which pronto does not know. On the ontologies' base files, pronto
-  kept one definition per term and no synonym types.
+  for example a synonym and its scope. NCIt writes its synonyms with
+  properties of its own, which pronto does not know. On the ontologies' base
+  files, pronto kept one definition per term and no synonym types.
 - owlready2, not tried: it loads each file into a database of its own before
   it can be read.
 - The ontologies' OBO files, read with pronto: EVS publishes NCIt in OWL and
@@ -1453,7 +1490,7 @@ pass, with defusedxml.
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- the OWL reader keeps each statement's exact text.
+- the OWL reader keeps each statement's exact text
 
 ### PhenX's export is read by a reader of our own
 
@@ -1463,7 +1500,8 @@ check that:
 repository's dependencies read MySQL exports.
 
 **Decision.** `sources/phenx.py` reads PhenX's export as text: a regex
-tokenizer reads its `INSERT` statements, and checks each row's field count.
+tokenizer reads its `INSERT` statements, and the reader checks each row's
+field count.
 
 **Consequences.**
 
@@ -1476,17 +1514,17 @@ tokenizer reads its `INSERT` statements, and checks each row's field count.
 - sqlite3: it cannot run the export's `CREATE TABLE` statements. Turning only
   `\'` into SQL's own escape leaves many variables wrong, from `\"`, `\n`
   and `\r`.
-- sqlparse: it is not a dependency. It splits SQL into tokens, such as one
-  quoted string, and groups them. A token keeps its text as written, with its
-  quotes and backslash escapes. So the code that reads each value would still
-  be ours.
+- sqlparse: it is not a dependency. It splits SQL into tokens, for example
+  one quoted string, and groups them. A token keeps its text as written, with
+  its quotes and backslash escapes. So the code that reads each value would
+  still be ours.
 - mysql-to-sqlite3 and SQLAlchemy: both need a running MySQL server.
 
 **Confirmation.** The tests in
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- the PhenX reader reads rows with quotes, escapes and nulls.
+- the PhenX reader reads rows with quotes, escapes and nulls
 
 ### NCIt's replacements come from its merge records
 
@@ -1494,9 +1532,9 @@ check that:
 
 **Context.** A retired NCIt concept can name the concept that replaced it.
 Each release folder holds the release's history file. Each of its records has
-an action, such as `merge` or `retire`. A `merge` record names the concept
-that a retired concept was merged into. A `retire` record names the concept's
-old parent, as EVS's
+an action, for example `merge` or `retire`. A `merge` record names the
+concept that a retired concept was merged into. A `retire` record names the
+concept's old parent, as EVS's
 [ReadMe_history.txt](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/archive/26.09d_Release/ReadMe_history.txt)
 says.
 
@@ -1511,7 +1549,7 @@ of the same release, from its `merge` records only.
   same replacements.
 - Good, because the history file also holds merges that the service does not
   give.
-- Bad, because a concept retired without a merge gets no replacement. Its
+- Bad, because a concept retired without a merge has no replacement. Its
   names follow the rule for a retired item without one, as
   [Retired items are used](#retired-items-are-used) says.
 
@@ -1522,13 +1560,15 @@ of the same release, from its `merge` records only.
 - `retire` records as replacements too: they name the old parent, a broader
   concept, not one of the same meaning.
 - `split` records as replacements: a split names the concepts that each take
-  a part of the old concept's meaning. Each of them would get all its names.
+  a part of the old concept's meaning. Each of them would take all the old
+  concept's names.
 
 **Confirmation.** The tests in
 [test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)
 check that:
 
-- a merge record names a replacement, and a retire record its old parent.
+- a merge record gives a replacement, and a retire record gives no
+  replacement
 
 ### CDISC is a source of its own
 
@@ -1537,13 +1577,14 @@ check that:
 
 **Context.** NCI [EVS](https://evs.nci.nih.gov/) publishes CDISC's controlled
 terminology as four [packages](sources.md#cdisc): SDTM, ADaM, Protocol and the
-Glossary, each with dated releases of its own. Every CDISC term and codelist is also an
-[NCIt](sources.md#ncit) concept. The packages hold what CDISC adds to the
-concepts: each term's submission value, the short value that a dataset stores,
-and its CDISC synonyms. They also list each codelist with its terms.
+Glossary, each with its own dated releases. Every CDISC term and codelist is
+also an [NCIt](sources.md#ncit) concept. The packages hold what CDISC adds to
+the concepts: each term's submission value, the short value that a dataset
+stores, and its CDISC synonyms. They also list each codelist with its terms.
 
-**Decision.** CDISC is fetched as its own source, from these packages. Its
-pairs are read from the packages, not derived from NCIt.
+**Decision.** `sources fetch` fetches CDISC as a separate source, from these
+packages. `pairs prepare` reads CDISC's pairs from the packages, and does not
+derive them from NCIt.
 
 **Consequences.**
 
@@ -1573,7 +1614,7 @@ has measured what they add.
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
 check that:
 
-- a fictional package gives its codelists and terms.
+- a fictional package gives its codelists and terms
 
 ## Pairs
 
@@ -1582,7 +1623,7 @@ check that:
 **Described in:**
 [pairs.md](pairs.md#the-shape-a-star-around-each-item).
 
-**Context.** An item has a canonical and other texts, such as synonyms,
+**Context.** An item has a canonical and other texts, for example synonyms,
 descriptions and question texts. The task pairs a study's wording with a data
 model's property. Training uses in-batch negatives, as
 [sentence-transformers](https://sbert.net)' `MultipleNegativesRankingLoss`
@@ -1596,26 +1637,28 @@ with the canonical "Body Mass Index". They are never paired with each other.
 
 - Good, because the shape follows the task: a study's wording on one side, a
   property on the other.
-- Good, because every text is pulled toward the same canonical. So the texts
-  also come close to each other.
-- Good, because n texts give about 2n pairs, not n(n-1)/2. Each text gives a `name` pair, and a `name_description` pair when the item has a
+- Good, because training pulls every text toward the same canonical. So the
+  texts also come close to each other.
+- Good, because n texts give about 2n pairs, not n(n-1)/2. Each text gives a
+  `name` pair, and a `name_description` pair when the item has a
   description. These are two of the
   [kinds of pair](pairs.md#the-shape-a-star-around-each-item). So an item with
   many synonyms does not outweigh the rest of the corpus.
 - Good, because an item has few pairs, so two of them rarely share a batch.
   So an item's texts rarely work against each other as in-batch negatives.
-- Good, because each pair is marked with what it is made of. So a later
-  experiment can choose pairs by these marks, though `train` reads none of them
-  yet:
-  - `kind`, such as `name_to_description`, whose positive is a description
-    alone;
+- Good, because each pair's columns record what the pair is made of. So a
+  later experiment can choose pairs by these columns, though `train` reads
+  none of them yet:
+  - `kind`, for example `name_to_description`, whose positive is a
+    description alone
   - `term_group`: an [expansion](pairs.md#expansions-and-paraphrases) of a
-    short form, such as `BMI`, or a paraphrase;
-  - `term_type`, the source's own label for a text, such as a synonym type;
+    short form, for example `BMI`, or a paraphrase
+  - `term_type`, the source's own label for a text, for example a synonym
+    type
   - `status`: `current`, `retired` or `draft`, as
-    [Retired items are used](#retired-items-are-used) says;
-  - `value_list`: the name of the positive's value list.
-- Bad, because two of an item's other texts, such as `BMI` and "Quetelet
+    [Retired items are used](#retired-items-are-used) says
+  - `value_list`: the name of the positive's value list
+- Bad, because two of an item's other texts, for example `BMI` and "Quetelet
   Index", are never paired directly.
 
 **Confidence.** Low: no training run has compared the star with other shapes.
@@ -1634,8 +1677,8 @@ with the canonical "Body Mass Index". They are never paired with each other.
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
 check that:
 
-- a fictional item gives the pairs that the test lists;
-- each of them joins a text to the canonical.
+- a fictional item gives the pairs that the test lists
+- each of them joins a text to the canonical
 
 ### Four kinds of pair, once for each value list
 
@@ -1645,7 +1688,7 @@ check that:
 
 **Context.** An item has a canonical, and often other names and a
 description. Some items have no other name, only a description. Some have a
-second description, such as another definition. A target's text holds a
+second description, for example another definition. A target's text holds a
 description only when its data model gives one. An item can have several
 value lists, as an NCIt concept can.
 
@@ -1664,8 +1707,8 @@ values in the positive.
   `name_to_description`: its canonical, matched with its description.
 - Good, because two descriptions of one meaning teach the model that two
   wordings of a definition match.
-- Good, because each positive shows values that the item really has. Lists
-  are never merged, so a positive never mixes two lists.
+- Good, because each positive shows values that the item really has.
+  `pairs prepare` never merges lists, so a positive never mixes two lists.
 - Bad, because an item with a description gives each name twice. So items
   with descriptions weigh more in the corpus.
 - Bad, because an item with several lists repeats its names once for each
@@ -1688,10 +1731,10 @@ values in the positive.
 check that:
 
 - each name gives a `name` and a `name_description` pair, and another
-  description gives a `description_description` pair;
-- an item with no other name pairs its canonical with its description;
+  description gives a `description_description` pair
+- an item with no other name pairs its canonical with its description
 - an item with two lists gives its pairs once for each, with each list
-  named.
+  named
 
 ### An ambiguous name is paired with each item that it names
 
@@ -1713,24 +1756,24 @@ pairs manifest counts these names, as `ambiguous_texts`.
 - Good, because studies use ambiguous names too. A model that never saw them
   could not rank any of their meanings.
 - Good, because `ambiguous_texts` shows how many such names a source has. So
-  a new release that adds many of them is seen.
+  a rise in the manifest's count shows when a new release adds many of them.
 - Bad, because a name has one embedding. The model places it between its
   items, so none of them ranks clearly first.
-- Bad, because two of its pairs can share a batch. Each one's positive then
-  counts as a negative for the other.
-- Bad, because `ambiguous_texts` counts within one source. A name that two
-  sources give to different items is not counted.
+- Bad, because two pairs of one ambiguous name can share a batch. Each one's
+  positive then counts as a negative for the other.
+- Bad, because `ambiguous_texts` counts within one source. It does not count
+  a name that two sources give to different items.
 
 **Alternatives considered.**
 
 - Dropping an ambiguous name: true pairs would be lost, and studies use such
   names.
-- Keeping one of its items, such as the first: the choice would be
+- Keeping one of its items, for example the first: the choice would be
   arbitrary, and the other pairs would be lost.
 - The `NO_DUPLICATES` sampler, which keeps a text from appearing twice in a
   batch.
   [The defaults start from Hugging Face's recipe for a static model](#the-defaults-start-from-hugging-faces-recipe-for-a-static-model)
-  gives why it is not used.
+  says why training does not use it.
 
 **Confirmation.** The tests in
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
@@ -1764,15 +1807,16 @@ Each pair's `status` marks a retired item's pairs as `retired`.
 - Good, because a retired item without a replacement gives no pair for a text
   that a current item also has. For example, a retired "Blood Pressure
   Finding" and a current "Blood Pressure Measurement" can both have the text
-  `BP`. Then `BP` is paired only with "Blood Pressure Measurement". So the
-  model does not learn to map a current name to a retired item.
+  `BP`. Then `pairs prepare` pairs `BP` only with "Blood Pressure
+  Measurement". So the model does not learn to map a current name to a
+  retired item.
 - Bad, because every corpus holds the retired texts, and nothing reads
   `status` by default.
 - Bad, because a retired item with a replacement gives the replacement all
   its texts, even one that another current item has. That text then becomes
   an [ambiguous name](#an-ambiguous-name-is-paired-with-each-item-that-it-names),
-  an anchor of both items. Removing copies does not help, since the two pairs
-  have different positives.
+  an anchor of both items. Removing copies does not help, because the two
+  pairs have different positives.
 
 **Confidence.** Low: no training run has measured what retired items add.
 
@@ -1785,8 +1829,9 @@ Each pair's `status` marks a retired item's pairs as `retired`.
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
 check that:
 
-- a retired item gives its names to its replacement, marked `retired`;
-- one without a replacement keeps only the names that no current item has.
+- a retired item gives its names to its replacement, marked `retired`
+- a retired item without a replacement keeps only the names that no current
+  item has
 
 ### Draft items are used like current ones
 
@@ -1819,8 +1864,8 @@ replace a retired item. Each pair's `status` marks a draft's pairs as `draft`.
 [test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)
 check that:
 
-- a draft is used and marked;
-- a draft can replace a retired item.
+- a draft is used and marked
+- a draft can replace a retired item
 
 ### A source's own marks choose the anchors
 
@@ -1829,50 +1874,51 @@ check that:
 **Context.** Sources mark what each text of an item is. Only some marks mean
 the same thing as the item:
 
-- NCIt's term types, such as `SY`, a synonym, or `AD`, a grammar form;
-- the ontologies' synonym scopes, such as `EXACT` or `RELATED`;
-- caDSR's alternate-name types, which also mark ids and table names;
-- NIH CDE's designation tags, which also mark a form's instructions;
-- LOINC's fields: its consumer names are not synonyms.
+- NCIt's term types, for example `SY`, a synonym, or `AD`, a grammar form
+- the ontologies' synonym scopes, for example `EXACT` or `RELATED`
+- caDSR's alternate-name types, which also mark ids and table names
+- NIH CDE's designation tags, which also mark a form's instructions
+- LOINC's fields: its consumer names are not synonyms
 
-**Decision.** Each reader keeps an allow-list of the marks that mean the same
-thing as the canonical. A text is an anchor only when its mark is on that list.
-A mark that a reader has not seen is printed, and its texts are not used. For
-LOINC, whose marks are its columns, the fetch prints a new column.
+**Decision.** The NCIt, ontology, caDSR and NIH CDE readers each keep an
+allow-list of the marks that mean the same thing as the canonical. A text is
+an anchor only when its mark is on that list. A reader prints a new mark, and
+does not use the mark's texts. For LOINC, whose marks are its columns, the fetch
+prints a new column.
 
 **Consequences.**
 
 - Good, because an anchor means the same thing as the canonical. Instructions,
   ids and related or broader names stay out.
-- Good, because every reader follows one rule. NIH CDE holds copies of LOINC's
+- Good, because these readers follow one rule. NIH CDE holds copies of LOINC's
   consumer names, and its tags mark them. So they stay out, as in LOINC.
 - Good, because a new mark stays out until someone reviews it. A new
   restriction value does the same, as
   [An item is open only when its value is known to allow use](#an-item-is-open-only-when-its-value-is-known-to-allow-use)
   says.
-- Bad, because a new mark of names also stays out until its allow-list is
-  updated.
+- Bad, because a new mark of names also stays out until someone updates the
+  allow-list.
 
 **Alternatives considered.**
 
 - Every text, whatever its mark: instructions and related names would become
   anchors of the same meaning.
-- A deny-list of the marks known not to be names: a new mark would let its
-  texts in, undetected.
+- A deny-list of the marks known not to be names: the texts of a new mark
+  would become anchors, undetected.
 
 **Confirmation.** The tests check that:
 
 - NCIt and the ontologies use only their same-meaning term types and scopes
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - caDSR uses only its name types
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - NIH CDE uses only designations tagged as names
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - the NCIt, NIH CDE and caDSR readers print a term type, a tag or a type
   that they have not seen
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - the LOINC fetch prints a column that it does not know
-  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py)).
+  ([test_embedding_model_sources.py](../../tests/test_embedding_model_sources.py))
 
 ### LOINC's example answer lists are used too
 
@@ -1919,11 +1965,11 @@ check that:
 [corpus.md](corpus.md#combining-the-sources).
 
 **Context.** The same pair can come twice: from two items of one source, or
-from two sources. [CDISC](sources.md#cdisc) publishes its terms as
+from two sources. NCI EVS publishes the terms of [CDISC](sources.md#cdisc) as
 [NCIt](sources.md#ncit) subsets. The model sees only token ids, and its
-tokenizer normalises every text. Two texts that normalise to one text get the
-same ids. The tokenizer keeps punctuation as tokens, so `body_weight` and
-`Body Weight` get different ids.
+tokenizer normalises every text. Two texts that normalise to one text have
+the same ids. The tokenizer keeps punctuation as tokens, so `body_weight` and
+`Body Weight` have different ids.
 [The study rule](#leakage-the-answer-key-rule-and-the-study-rule)
 needs every study of a text.
 
@@ -1946,16 +1992,17 @@ or the canonical, is used once.
   share. When the tokenizer normalises two texts to one text, the duplicate
   rule and leakage prevention treat them as one text too.
 - Good, because `body_weight` stays an anchor of the canonical `Body Weight`.
-  A study's variable names are written that way, and the pair teaches the
-  model to read them.
-- Good, because the same sources give the same corpus on every build. A copy
-  is kept in the source that it comes from, since NCIt comes before CDISC.
+  Studies write their variable names that way, and the pair teaches the model
+  to read them.
+- Good, because the same sources give the same corpus on every build.
+  `corpus build` keeps a pair that NCIt and CDISC share in NCIt, because
+  NCIt comes before CDISC.
 - Good, because no copy's study is lost. The pair kept takes the studies of
   all its copies. So when any copy comes from a benchmark's study, the study
   rule drops the pair kept as well.
 - Good, because within a source, a current item's copy comes first, then a
-  draft's, then a retired item's. So a pair is marked `retired` only when no
-  current or draft item gives it.
+  draft's, then a retired item's. So a pair's `status` is `retired` only when
+  no current or draft item gives it.
 - Bad, because a count of pairs by source puts every shared pair under the
   earliest source.
 
@@ -1966,20 +2013,20 @@ or the canonical, is used once.
 - [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
   for an item's names too: `body_weight` would be dropped beside
   `Body Weight`, though the model reads them apart.
-- Storing the normalised texts, such as `cafe` for `Café`: the model
-  normalises every text that it reads anyway, since its normaliser is part of
-  `tokenizer.json`. A tokenizer with another normaliser, such as a cased one,
-  could not see case and accents in them. And people read the stored texts,
-  in reviews and in `dropped.parquet`.
+- Storing the normalised texts, for example `cafe` for `Café`: the model
+  normalises every text that it reads anyway, because its normaliser is part
+  of `tokenizer.json`. A tokenizer with another normaliser, for example a
+  cased one, could not see case and accents in them. And people read the
+  stored texts, in reviews and in `dropped.parquet`.
 
 **Confirmation.** The tests check that:
 
 - pairs whose texts the tokenizer normalises to the same texts are kept once
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - a duplicate keeps the studies of every copy
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - the sources combine in their own order, whatever the order named
-  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)).
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py))
 
 ## Corpus
 
@@ -2001,8 +2048,9 @@ split, retired items and descriptions compare texts by their `text_key`.
 
 **Consequences.**
 
-- Good, because the broader `text_key` finds texts that name the same thing, such as
-  `Waist.cm` and `waist cm`. In each comparison, a match prevents a harm:
+- Good, because the broader `text_key` finds texts that name the same thing,
+  for example `Waist.cm` and `waist cm`. In each comparison, a match prevents
+  a harm:
 
   | comparison | compares | a match prevents |
   |---|---|---|
@@ -2013,30 +2061,31 @@ split, retired items and descriptions compare texts by their `text_key`.
 
 - Good, because `text_key` starts from the tokenizer's normalisation. So it
   matches every text that the tokenizer reads as the same.
-- Bad, because `text_key` can join two texts that differ in meaning only by their
-  punctuation. A pair is then dropped, or moved with its group, without need.
+- Bad, because `text_key` can join two texts that differ in meaning only by
+  their punctuation. A pair is then dropped, or moved with its group, without
+  need.
 
 **Alternatives considered.**
 
 - The broader `text_key` for copies too: `body_wt -> Body Weight` and
-  `body wt -> Body Weight` would be copies, and one would be dropped. Yet the
+  `body wt -> Body Weight` would be copies, and one would be dropped. But the
   model reads them apart, and `body_wt` teaches it to read a variable name.
 - The [copy rule](#copies-are-kept-once-as-the-tokenizer-reads-them) for the
-  four comparisons too: `Waist.cm` and `waist cm` would not match. Yet a pair
+  four comparisons too: `Waist.cm` and `waist cm` would not match. But a pair
   with `waist cm` leaks a benchmark's `Waist.cm`.
 
 **Confirmation.** The tests check that:
 
-- a `text_key` is the text as the tokenizer normalises it, with case folded and
-  punctuation turned into spaces
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py));
+- a `text_key` is the text as the tokenizer normalises it, with case folded
+  and punctuation turned into spaces
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 - accents and case do not hide an answer key
-  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py));
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py))
 - canonicals that differ in punctuation share a group
-  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py));
+  ([test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py))
 - a description that repeats the canonical, or differs from it only in
   punctuation, gives no pair of its own
-  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py)).
+  ([test_embedding_model_pairs.py](../../tests/test_embedding_model_pairs.py))
 
 ### The split keeps each group on one side, by a hash
 
@@ -2050,15 +2099,17 @@ name.
 
 **Decision.** A group holds the items that an NCIt concept code or a
 canonical text's [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
-links, directly or through other items. A hash of its `group_id`, the first
-`item_id` of its items, puts it into one of 1,000 buckets. The groups in the first buckets go to validation:
-buckets 0 to 19 by default, 2% of the groups.
+links, directly or through other items. A hash of the group's `group_id`, the
+first `item_id` of its items, puts the group into one of 1,000 buckets. The
+groups in the first buckets go to validation: buckets 0 to 19 by default, 2%
+of the groups.
 
 **Consequences.**
 
-- Good, because validation never tests a canonical that the model trained on. A
-  repeat shares its canonical's `text_key`, and so its group. scikit-learn's guide to
-  grouped data asks for the same: "all the samples in the validation fold come
+- Good, because validation never tests a canonical that the model trained
+  on. A repeat shares its canonical's `text_key`, and so it shares the
+  canonical's group. scikit-learn's guide to grouped data asks for the same:
+  "all the samples in the validation fold come
   from groups that are not represented at all in the paired training fold"
   ([Cross-validation iterators for grouped
   data](https://scikit-learn.org/stable/modules/cross_validation.html#group-cv)).
@@ -2066,8 +2117,8 @@ buckets 0 to 19 by default, 2% of the groups.
   and benchmarks give the same split on every build. Géron (2022) splits a
   test set by a hash of each row's identifier, in the
   [notebook of its chapter 2](https://github.com/ageron/handson-ml3/blob/main/02_end_to_end_machine_learning_project.ipynb).
-- Good, because the groups are the connected components of a graph of items and
-  canonical texts, which
+- Good, because the groups are the connected components of a graph of items
+  and canonical texts, which
   [`scipy.sparse.csgraph.connected_components`](https://docs.scipy.org/doc/scipy/reference/generated/scipy.sparse.csgraph.connected_components.html)
   finds.
 - Good, because an added source moves only the groups that it links.
@@ -2076,8 +2127,8 @@ buckets 0 to 19 by default, 2% of the groups.
 - Bad, because the split is not stratified. Each source has many groups, so
   its share of validation pairs is close to the whole corpus's share, but not
   equal to it.
-- Bad, because a share between two steps of 0.001 is refused. It would record
-  one share and hold out another.
+- Bad, because a share between two steps of 0.001 is refused. A build with
+  such a share would record one share and hold out another.
 
 **Confidence.** Medium: grouped and hashed splits are standard practice. But a
 group links only canonicals with the same `text_key`, so two canonicals that
@@ -2086,47 +2137,49 @@ differ by a word stay in two groups.
 **Alternatives considered.**
 
 - Groups by item alone: a concept in two sources can have pairs on both
-  sides. Grouped by item, some validation pairs repeated a training pair's
+  sides. With groups by item, some validation pairs repeated a training pair's
   anchor and canonical.
-- Groups by canonical text alone: a codelist and its NCIt concept would fall
-  into two groups. So the concept code is still needed.
+- Groups by canonical text alone: a codelist and its NCIt concept would be in
+  two groups. So the concept code is still needed.
 - Canonical texts compared as the tokenizer normalises them: a validation
-  pair can then repeat a training canonical that differs only in case or
-  punctuation.
+  pair can then repeat a training canonical that differs only in
+  punctuation, for example `body-weight` for `body weight`.
 - A union-find of our own: scipy's function is the standard tool, and scipy
   was already installed.
-- A seeded random split, such as scikit-learn's `GroupShuffleSplit`: every
-  added source would redraw every group's side.
+- A seeded random split, for example scikit-learn's `GroupShuffleSplit`:
+  every added source would redraw every group's side.
 
 **Confirmation.** The tests in
 [test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
 check that:
 
-- the split follows a fixed hash of the group;
-- items with one canonical text share a group;
-- a larger share keeps the smaller share's groups;
-- a share between two buckets stops the build.
+- the split follows a fixed hash of the group
+- items with one canonical text share a group
+- a larger share keeps the smaller share's groups
+- a share between two buckets stops the build
 
 ### Leakage: the answer-key rule and the study rule
 
 **Described in:** [leakage.md](leakage.md).
 
-**Context.** A model trained on a benchmark's mappings has seen its expected
-targets. Its score there would look too good. An anchor with a described
-canonical gives twin pairs, a `name` pair and a `name_description` pair.
-Often only the second matches a benchmark row. Some sources hold
-variables of the benchmarks' own [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)
-studies: [PhenX](sources.md#phenx) maps its variables to dbGaP study variables.
-A word such as `age` occurs in many pairs and in many benchmark rows.
+**Context.** A model trained on a benchmark's mappings has seen the
+benchmark's expected targets. Its score there would look too good. An anchor
+with a described canonical gives twin pairs, a `name` pair and a
+`name_description` pair. Often only the second matches a benchmark row. Some
+sources hold variables of the benchmarks' own
+[dbGaP](https://www.ncbi.nlm.nih.gov/gap/) studies:
+[PhenX](sources.md#phenx) maps its variables to dbGaP study variables. A
+word, for example `age`, occurs in many pairs and benchmark rows.
 
-**Decision.** A pair is dropped when:
+**Decision.** Leakage prevention drops a pair when:
 
-- it is an answer key: its sides match a source variable and one of its
-  expected targets;
-- it is an answer key's twin, with the same names;
-- it comes from a dbGaP variable of a benchmark's study.
+- it is an answer key: its sides match a source variable and one of the
+  variable's expected targets
+- it is an answer key's twin, with the same names
+- it comes from a dbGaP variable of a benchmark's study
 
-A benchmark text on one side only is shared vocabulary: the pair is kept.
+Any other pair is kept, even when it holds a benchmark text. That text counts
+as shared vocabulary.
 
 **Consequences.**
 
@@ -2148,16 +2201,16 @@ A benchmark text on one side only is shared vocabulary: the pair is kept.
 **Alternatives considered.**
 
 - Dropping every pair that shares a text with a benchmark: general
-  vocabulary, such as `age`, would leave the corpus.
+  vocabulary, for example `age`, would leave the corpus.
 
 **Confirmation.** The tests in
 [test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
 plant leaks of each kind. They check that:
 
-- each planted leak is dropped, and nothing else;
-- an answer key's twin is dropped from any item or source, by its names;
-- an answer key comes before a benchmark study;
-- shared vocabulary is reported.
+- each planted leak is dropped, and nothing else
+- an answer key's twin is dropped from any item or source, by its names
+- an answer key comes before a benchmark study
+- shared vocabulary is reported
 
 ### What leakage prevention compares
 
@@ -2166,14 +2219,14 @@ plant leaks of each kind. They check that:
 **Context.** Each side of a pair is a text formatted from its fields: a name,
 a type, a description and values. The same name can come with another type
 or other values. Some pairs keep a description in a name field. A common
-value list, such as `Unknown | Not Reported | No | Yes`, matches many
+value list, for example `Unknown | Not Reported | No | Yes`, matches many
 targets.
 
 **Decision.** Leakage prevention compares four
 [fields](pairs.md#pairsparquet) of a pair: `anchor_name`,
-`anchor_description`, `positive_name` and `positive_description`. Each is
-compared with the benchmark's names and with its descriptions. It never
-compares formatted texts, and it never compares values.
+`anchor_description`, `positive_name` and `positive_description`. It
+compares each field with the benchmark's names and with its descriptions. It
+never compares formatted texts, and it never compares values.
 
 **Consequences.**
 
@@ -2196,7 +2249,7 @@ compares formatted texts, and it never compares values.
 [test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
 check that:
 
-- a dropped pair names the fields that matched.
+- a dropped pair names the fields that matched
 
 ### Two texts match when equal, by 8 words in a row, or by a name's words
 
@@ -2206,50 +2259,53 @@ check that:
 with small edits. For example, many target descriptions of
 [GDC](benchmarks.md#gdc) repeat [caDSR](sources.md#cadsr)'s or
 [NCIt](sources.md#ncit)'s definitions. Most names are shorter than 8 words. A
-study's variable names are often variants of a benchmark name, such as
+study's variable names are often variants of a benchmark name, for example
 `Waist in cm` for `Waist.cm`.
 
 **Decision.** Two texts match by their
 [`text_key`](#texts-are-compared-by-a-broader-text_key-for-leakage-the-split-retired-items-and-descriptions)
 in three ways:
 
-- `=`: they are equal;
-- `~`: they share at least 8 words in a row (`min_overlap_words`);
-- `>=`: a side holds every word of a benchmark name of 2 or more words
-  (`min_name_words`), and the other side matches the row's description.
+- `=`: they are equal
+- `~`: they share at least 8 words in a row (`min_overlap_words`)
+- `>=`: a side holds every word of a benchmark name of 2 or more different
+  words (`min_name_words`), and the other side matches the row's other
+  description
 
 The source and the target match on different sides.
 
 **Consequences.**
 
-- Good, because a copied description with a changed word still matches. The
-  run of words is the published check. GPT-3's authors write: "We define a
+- Good, because a copied description with a changed word still matches.
+- Good, because the run of words is the published check. GPT-3's authors
+  write: "We define a
   'dirty' example as one with any N-gram overlap with any training document"
   ([Brown et al., 2020](https://doi.org/10.48550/ARXIV.2005.14165), Appendix
   C). EleutherAI's evaluation tool uses the same check, as its
   [decontamination docs](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/decontamination.md)
   say. GPT-3 sets N per benchmark, from the 5th percentile of its examples'
   lengths, between 8 and 13 words. Applied to each compared text, that rule
-  gives 8 here, since the benchmarks' descriptions are short.
+  gives 8 here, because the benchmarks' descriptions are short.
 - Good, because equal texts match for every text, as Dodge et al. "measure
   exact matches, normalized for capitalization and punctuation"
   ([Dodge et al., 2021](https://doi.org/10.18653/v1/2021.emnlp-main.98)).
   Tutubalina et al. match short mentions only when equal
   ([Tutubalina et al., 2020](https://doi.org/10.18653/v1/2020.coling-main.588)).
-- Good, because a name's variants match, next to a description of the same
-  row.
+- Good, because a name's variants match when the other side matches the
+  row's other description: a target's for a source name, the source's for a
+  target name.
 - Good, because a shared phrase alone never drops a pair. An answer key needs
   both sides to match the same benchmark row.
 - Good, because each of the three ways finds answer keys that the other two
   miss.
-- Bad, because the name rule is our own combination of published parts, with
-  no published evaluation. Its closest precedent is GPT-4's check of a short
-  example whole. Its authors "use the entire example if it's less than 50
-  characters"
+- Bad, because the name rule is our own combination of published parts,
+  with no published evaluation. The rule's closest precedent is GPT-4's check
+  of a short example whole. GPT-4's authors "use the entire example if it's
+  less than 50 characters"
   ([OpenAI et al., 2023](https://doi.org/10.48550/ARXIV.2303.08774), Appendix
   C).
 - Bad, because a side must hold every word of a benchmark name. A pair whose
-  side drops one word, such as a unit, is kept, though it can hold the
+  side drops one word, for example a unit, is kept, though it can hold the
   mapping. For example, `Waist Circumference` lacks the `cm` of the source
   name `Waist_Circumference_cm`. Paired with the target's description, it
   stays in the corpus.
@@ -2264,14 +2320,14 @@ checked by counting answer keys, not by their effect on scores.
   most names are shorter. So no copied name would match.
 - One text containing the other whole, from 10 words: one changed word hides
   a copy. So it misses many copies that 8 words in a row find.
-- A longer run, such as the 13 words of EleutherAI's tool: it misses copies
-  that 8 words in a row find. GPT-3 caps N at 13 for speed.
+- A longer run, for example the 13 words of EleutherAI's tool: it misses
+  copies that 8 words in a row find. GPT-3 caps N at 13 for speed.
 - A benchmark name contained in a side, of any length: it drops many times
-  more pairs. Most come through one-word names, such as `weight`, which are
-  general vocabulary.
+  more pairs. Most of these pairs match through one-word names, for example
+  `weight`, which are general vocabulary.
 - A name's words for one-word names too: it drops more pairs, mostly through
-  common words, such as `Stage` beside a stock staging description.
-- A similarity search with a threshold, such as TF-IDF or embeddings: it
+  common words, for example `Stage` beside a stock staging description.
+- A similarity search with a threshold, for example TF-IDF or embeddings: it
   finds rephrased copies, but
   [Yang et al. (2023)](https://doi.org/10.48550/ARXIV.2311.04850) find that
   "choosing an appropriate similarity threshold ... is often challenging". It
@@ -2281,10 +2337,10 @@ checked by counting answer keys, not by their effect on scores.
 [test_embedding_model_corpus.py](../../tests/test_embedding_model_corpus.py)
 check that:
 
-- texts overlap when they share eight words in a row;
-- a long name matches that way too;
-- a one-word name matches only an equal text;
-- a text that matches the source and the target on one side is kept.
+- texts overlap when they share eight words in a row
+- a long name matches that way too
+- a one-word name matches only an equal text
+- a text that matches the source and the target on one side is kept
 
 ## Tokenizer
 
@@ -2325,16 +2381,16 @@ with the library's `BpeTrainer`.
 
 **Context.** Variable names come in any case, and their case carries no
 meaning. Texts hold accents, invisible characters, and compatibility
-characters such as `µ`, `²` and `½`.
+characters, for example `µ`, `²` and `½`.
 
 **Decision.** The tokenizer normalises a text as
 [BERT's tokenizer](https://huggingface.co/docs/tokenizers/v0.23.2/en/components) does for BERT's
 uncased models. It takes four steps: text cleaning, Unicode's
 [NFD](https://www.unicode.org/reports/tr15/#Norm_Forms), lowercase, and no
-accents. It leaves out only the spaces that BERT's tokenizer puts around
-Chinese characters. `normalization.py` builds the steps from `BertNormalizer`,
+accents. It omits only the spaces that BERT's tokenizer puts around Chinese
+characters. `normalization.py` builds the steps from `BertNormalizer`,
 `NFD`, `Lowercase` and `StripAccents` of `tokenizers`. Every step that
-compares texts uses them.
+compares texts uses the same normalisation.
 
 **Consequences.**
 
@@ -2342,9 +2398,9 @@ compares texts uses them.
   `Cafe` get the same tokens too.
 - Good, because the four steps are a standard: BERT's uncased models use
   them, and `tokenizers` provides each one.
-- Bad, because `µ` and `μ` stay two characters, and `x²` and `x2` two texts,
-  though they often mean the same thing. Leakage prevention's `text_key` folds
-  `µ` into `μ` anyway, by case folding.
+- Bad, because `µ` and `μ` stay two characters, and `x²` and `x2` stay two
+  texts, though they often mean the same thing. Leakage prevention's
+  `text_key` folds `µ` into `μ` anyway, by case folding.
 
 **Alternatives considered.**
 
@@ -2354,10 +2410,12 @@ compares texts uses them.
   same thing. But they also fold `x²` into `x2`, which can name another
   variable. Unicode warns: "Normalization Forms KC and KD must not be blindly
   applied to arbitrary text"
-  ([Unicode Consortium, 2026](https://www.unicode.org/reports/tr15/)). On a
-  corpus of all the sources, NFKD would change very few training texts. Most
-  changes are `µ`, `…`, `´` and `‑`. A few texts would become equal to another
-  training text, each a true duplicate, such as `SpO²` and `SpO2`.
+  ([Unicode Consortium, 2026](https://www.unicode.org/reports/tr15/)).
+
+  On a corpus of all the sources, NFKD would change very few training texts.
+  Most changes are `µ`, `…`, `´` and `‑`. A few texts would become equal to
+  another training text, each a true duplicate, for example `SpO²` and
+  `SpO2`.
 - Keeping case: `BMI` and `bmi` would get different tokens, though their case
   carries no meaning.
 
@@ -2365,7 +2423,8 @@ compares texts uses them.
 [test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
 check that:
 
-- a text is cleaned, lowercased, stripped of accents and split.
+- the tokenizer from `new_tokenizer` cleans a text, lowercases it, strips its
+  accents and splits it
 
 ### Only training texts shape the vocabulary
 
@@ -2374,20 +2433,21 @@ check that:
 
 **Context.** A tokenizer cuts the texts that it learned from into fewer tokens
 than new texts. A rare word in the texts that it learned from can become one
-whole token. A rare word that only new texts hold is usually cut into pieces.
+whole token. A rare word that only new texts hold usually becomes several
+tokens.
 The validation loss and the benchmark scores judge a model.
 [BPE](https://huggingface.co/learn/llm-course/chapter6/5) counts how often each
 word occurs.
 
 **Decision.** The tokenizer learns from the training pairs' distinct texts,
 each once after normalisation. A run refuses a tokenizer of another corpus
-or build. Four [diagnostics](tokenizer.md#diagnostics) are measured on the
-same texts:
+or build. `tokenizer train` measures four
+[diagnostics](tokenizer.md#diagnostics) on the same texts:
 
-- the fertility, the tokens per word;
-- the share of words split;
-- the unknown rate;
-- the share of the vocabulary used.
+- the fertility, the tokens per word
+- the share of words split
+- the unknown rate
+- the share of the vocabulary used
 
 **Consequences.**
 
@@ -2395,46 +2455,55 @@ same texts:
   any new text.
 - Good, because nothing that makes a choice looks at the data that judges the
   result.
-- Good, because a tokenizer of another corpus, or of another build, is
-  refused. Its training pairs can hold this build's validation pairs. The
-  tokenizer's manifest records the pairs that it learned from. They are
-  compared by their rows and content, as every manifest compares a table. So
-  the same pairs, written again on another machine, are still accepted.
+- Good, because a run refuses a tokenizer of another corpus, or of another
+  build. That tokenizer's training pairs can hold this build's validation
+  pairs. The tokenizer's manifest records the pairs that it learned from. A
+  run compares those pairs with the corpus's pairs by their row count and
+  their `content_sha256`, as [Two checksums](manifests.md#two-checksums)
+  describes. So a run still accepts the same pairs, written again on another
+  machine.
 - Good, because
   [Rust et al. (2021)](https://doi.org/10.18653/v1/2021.acl-long.243) found,
   across languages, that the fertility and the share of words split matter.
   A lower fertility and a smaller share of continued words, their name for
   words split, "correlate with an increase in downstream performance".
-- Bad, because the diagnostics are measured on the training texts, which the
-  tokenizer learned from. So they look a little better than on new texts, and
-  are a sanity check, not a measure of quality. A broken tokenizer still
-  gives bad numbers on them. Examples are an unknown
-  rate above 0, and a high fertility when words are cut into single letters.
+- Bad, because `tokenizer train` measures the diagnostics on the training
+  texts, which the tokenizer learned from. So the diagnostics look a little
+  better than on new texts, and are a sanity check, not a measure of
+  quality. A broken tokenizer still gives bad numbers on the training texts.
+  Examples are
+  an unknown rate above 0, and a high fertility when words are cut into
+  single letters.
 
 **Alternatives considered.**
 
 - Learning the vocabulary from the validation and benchmark texts too: the
   vocabulary would then depend on the data that judges the model. And a word that only
   validation texts hold would get a token whose row training never updates.
-- A pretrained tokenizer, such as a released model's: its vocabulary was
+- A pretrained tokenizer, for example a released model's: its vocabulary was
   learned from other texts, and its size is fixed. A rare word of the corpus,
-  such as a variable's short name, would more often be cut into pieces.
+  for example a variable's short name, would more often be cut into pieces.
 - A note, rather than a refusal, for a tokenizer of another corpus or
   build. The run would then train on a vocabulary that this build's
   validation texts may have shaped.
 
-**Confirmation.** The tests check that:
+**Confirmation.** The tests in
+[test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py)
+check that:
 
 - only training texts shape the vocabulary
-  ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
 - spellings of one text count once
-  ([test_embedding_model_tokenizer.py](../../tests/test_embedding_model_tokenizer.py));
-- a run refuses a tokenizer of another corpus or another build. Its message
-  gives the command that trains one on this build, with the same vocabulary
-  size and minimum frequency
-  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
-- a run keeps a tokenizer whose pairs were only written again
-  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py)).
+
+The tests in
+[test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
+check that:
+
+- `check_tokenizer_build` refuses a tokenizer of another corpus or another
+  build
+- the refusal gives the command that trains a tokenizer on this build, with
+  the same vocabulary size and minimum frequency
+- `check_tokenizer_build` accepts a tokenizer whose pairs were only written
+  again
 
 ### Five special tokens
 
@@ -2454,8 +2523,8 @@ Removing a token moves the id of every token after it.
 **Consequences.**
 
 - Good, because one vocabulary serves both architectures. A later BERT
-  setting that needs `[CLS]`, `[SEP]` or `[MASK]`, such as masked-language
-  pretraining, finds them in place.
+  setting that needs `[CLS]`, `[SEP]` or `[MASK]`, for example
+  masked-language pretraining, finds them in place.
 - Bad, because a static model carries four rows that it never uses.
 - Bad, because the BERT here uses only `[UNK]` and `[PAD]`. It does not yet
   add `[CLS]` or `[SEP]` to a text, or train masked tokens.
@@ -2473,7 +2542,7 @@ Removing a token moves the id of every token after it.
 check that:
 
 - a trained tokenizer gives `[PAD]`, `[UNK]`, `[CLS]`, `[SEP]` and `[MASK]` the
-  ids 0 to 4.
+  ids 0 to 4
 
 ## Training
 
@@ -2501,12 +2570,12 @@ model's own `preprocess`.
 - Good, because the training steps do not wait for the tokenizer. The
   encoding runs once, in the main process, on all the tokenizer's threads.
 - Good, because the ids cannot be stale. They come from the corpus and the
-  tokenizer that the run has just read and checked.
+  tokenizer that the run read and checked just before.
 - Good, because the code is small: one function of a few lines, and no
   collator class. Hugging Face's course encodes a dataset the same way, with
   `Dataset.map` before the `Trainer`
   ([LLM Course, chapter 3.3](https://huggingface.co/learn/llm-course/chapter3/3)).
-- Good, because the pairs are encoded once only where tokenizing is a large
+- Good, because a run encodes the pairs once only where tokenizing is a large
   share of a step. A static model's step is a table lookup. A BERT step
   spends most of its time in the model's layers. So a BERT keeps the
   standard path, with no code of ours to cut and pad its texts.
@@ -2530,9 +2599,9 @@ model's own `preprocess`.
 check that:
 
 - `features` on the ids gives what `StaticEmbedding.preprocess` gives on the
-  texts;
-- the data collator gives the same batch from the ids as from the texts;
-- a BERT run never turns its pairs into ids.
+  texts
+- the data collator gives the same batch from the ids as from the texts
+- a BERT run never turns its pairs into ids
 
 ### A config in sections, with a flag for every setting
 
@@ -2543,22 +2612,22 @@ architecture, its size and the loss's scale. The trainer has many more, in
 `SentenceTransformerTrainingArguments`. The `HfArgumentParser` of
 [`transformers`](https://huggingface.co/docs/transformers) makes a flag for
 every field of a dataclass. Its YAML reader takes one flat list of settings.
-PyYAML reads `1e-3` as text, since YAML 1.1 writes a number with a dot.
+PyYAML reads `1e-3` as text, because YAML 1.1 writes a number with a dot.
 
 **Decision.** A config has four sections: `data`, `model`, `loss` and
 `training`. `model` holds the
 [architecture and its settings](#the-model-section-holds-the-architecture-and-its-settings).
 `training` holds the trainer's arguments, under their own names. The settings
 become the defaults of one `HfArgumentParser` over their dataclasses. A flag
-then overrides any setting. A section or a setting that does not exist is
-refused.
+then overrides any setting. `train` refuses a section or a setting that does
+not exist.
 
 **Consequences.**
 
 - Good, because the trainer's settings work without code of ours, under the
-  names that the trainer's documentation gives them. A run refuses three of
+  names that the trainer's documentation gives them. A run refuses four of
   them: [`prompts` and `router_mapping`](#a-run-refuses-the-trainers-prompts-and-router_mapping),
-  and [`load_best_model_at_end`](#the-model-kept-is-the-model-at-the-last-step).
+  and [`load_best_model_at_end` and `resume_from_checkpoint`](#the-model-kept-is-the-model-at-the-last-step).
 - Good, because a flag changes one setting for one run, without a new
   config. The run's `config.yaml` holds the final values.
 - Good, because argparse reads a default that is text by the setting's type.
@@ -2570,18 +2639,18 @@ refused.
   weights, apart from the `TrainingArguments` that only the trainer reads.
   So the model's shape and the training's settings never mix.
 - Bad, because the flags have no sections, so each name must be unique
-  across them. A test checks it.
+  across them. A test checks that each name is unique.
 
 **Alternatives considered.**
 
 - `HfArgumentParser.parse_yaml_file`, the reader of Hugging Face's example
-  scripts: it takes a flat file, so the sections would be lost.
+  scripts: it takes a flat file, so the config would lose its sections.
 - A flag of our own for each setting: each setting of the trainer would need
   code of ours, under a name of ours.
 - [Hydra](https://hydra.cc/) or [OmegaConf](https://omegaconf.readthedocs.io/),
   the common config tools of machine learning: they would replace only the
   reading of the config and its overrides. The checks of each architecture
-  would stay our code. Overrides would be written as
+  would stay our code. The user would write overrides as
   `training.learning_rate=1e-2`, not as the trainer's own flags. And their
   typed configs refuse some of the trainer's settings. OmegaConf 2.4 refuses
   `batch_sampler`. Hydra 1.3 needs an older OmegaConf, and also refuses
@@ -2591,10 +2660,10 @@ refused.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a flag overrides the config, and the config overrides the defaults;
-- `1e-3` in a config becomes a number;
-- an unknown section or setting is refused;
-- no two settings share a name, in any section or architecture.
+- a flag overrides the config, and the config overrides the defaults
+- `1e-3` in a config becomes a number
+- an unknown section or setting is refused
+- no two settings share a name, in any section or architecture
 
 ### The model section holds the architecture and its settings
 
@@ -2605,8 +2674,8 @@ static model has one setting, `embedding_dim`. A BERT has eight, from
 `BertConfig`. A run uses only its own architecture's settings.
 
 **Decision.** The `model` section holds `architecture` and that
-architecture's settings. A setting of the other architecture is refused, in
-the config or as a flag.
+architecture's settings. `train` refuses a setting of the other
+architecture, in the config or as a flag.
 
 **Consequences.**
 
@@ -2633,13 +2702,13 @@ the config or as a flag.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a BERT config reads its settings from the model section;
+- a BERT config reads its settings from the model section
 - a setting of the other architecture is refused, in the model section or
-  as a flag;
+  as a flag
 - a setting in the wrong section names the section where it belongs, with
-  its architecture;
+  its architecture
 - a run's `config.yaml` holds its architecture's settings in the model
-  section, and reads back as the settings that trained it.
+  section, and reads back as the settings that trained it
 
 ### A run of the same name with other settings is refused
 
@@ -2660,38 +2729,38 @@ differ.
 
 **Consequences.**
 
-- Good, because a run with a flag cannot replace a run that other settings
-  trained, without a word.
+- Good, because a run with a flag cannot silently replace a run that other
+  settings trained.
 - Good, because the check comes before training, so it costs no training
   time.
 - Good, because a run trained again with the same settings replaces the
   earlier one, as a build of the same name does in every step.
-- Good, because the settings are compared as built, in the form that
-  `config.yaml` records. So `report_to: wandb`, which the trainer turns into
-  a list, still matches.
+- Good, because `train` compares the settings as built, in the form that
+  `config.yaml` records. So `report_to: wandb`, which `TrainingArguments`
+  changes to a list, still matches.
 - Bad, because any changed setting stops the run, even one that leaves the
-  model the same, such as `logging_steps`.
+  model the same, for example `logging_steps`.
 
 **Alternatives considered.**
 
 - Only the docs say that a flag keeps the name. A run trained with a flag
-  would still replace the earlier one, without a word.
-- A run named after its flags, such as `my_run_s1_learning_rate0.01`. Names
-  would grow long and depend on the flags' order, unlike every other name of
-  the pipeline.
-- An option such as `--overwrite`, without which any earlier run is refused.
-  A run trained again with the same settings would need it too, unlike the
-  other steps' builds.
+  would still silently replace the earlier one.
+- A run named after its flags, for example `my_run_s1_learning_rate0.01`.
+  Names would grow long and depend on the flags' order, unlike every other
+  name of the pipeline.
+- An option, for example `--overwrite`, without which `train` refuses to
+  replace any earlier run. A run trained again with the same settings would
+  need it too, unlike the other steps' builds.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
 - a run with other settings stops before it trains, and keeps the earlier
-  run;
+  run
 - a run with the same settings trains and replaces the earlier one, though
-  `config.yaml` records `report_to` as a list;
-- an earlier run whose `config.yaml` cannot be read is kept.
+  `config.yaml` records `report_to` as a list
+- an earlier run whose `config.yaml` cannot be read is kept
 
 ### A run refuses the trainer's prompts and router_mapping
 
@@ -2711,9 +2780,9 @@ setting and the reason.
 
 **Consequences.**
 
-- Good, because a model is trained the way that the approaches use it. A
-  prompt or a route that they do not add would train the model one way and
-  use it another.
+- Good, because a run trains a model the way that the approaches use it. A
+  prompt or a route that the approaches do not add would train the model one
+  way, and the approaches would use it another way.
 - Good, because both sides are entries of data dictionaries, written in one
   format. Sentence-BERT embeds the two texts that it compares with one
   encoder, without a prompt
@@ -2740,8 +2809,8 @@ setting and the reason.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
-check that `prompts` and `router_mapping` are refused, in the config and as a
-flag.
+check that `prompts` is refused in the config and as a flag, and
+`router_mapping` in the config.
 
 ### The defaults start from Hugging Face's recipe for a static model
 
@@ -2756,22 +2825,22 @@ evaluates, logs and saves every 250 steps.
 
 **Decision.** The defaults take from the recipe:
 
-- batches of 2,048 pairs, and its warmup;
-- the static model's 1,024 dimensions and learning rate of 0.2.
+- batches of 2,048 pairs, and the recipe's warmup
+- the static model's 1,024 dimensions and learning rate of 0.2
 
 The others are this pipeline's own:
 
-- five epochs, in random batches;
-- an evaluation each epoch, a log every 50 steps, no checkpoint;
-- four data loader workers.
+- five epochs, in random batches
+- an evaluation each epoch, a log every 50 steps, no checkpoint
+- four data loader workers
 
 **Consequences.**
 
 - Good, because the recipe is standard practice for this very model
   ([Aarsen, 2025](https://huggingface.co/blog/static-embeddings)).
-- Good, because every architecture shares these defaults, since none of
-  them depends on the model. Only
-  [its learning rate](#each-architecture-has-its-own-learning-rate) differs.
+- Good, because the training settings among these defaults, except
+  [the learning rate](#each-architecture-has-its-own-learning-rate), do not
+  depend on the model. So every architecture shares them.
 - Good, because an evaluation after each epoch gives the validation curve one
   point per epoch. Each evaluation ranks all the validation pairs, so it is
   not repeated within an epoch.
@@ -2787,14 +2856,14 @@ The others are this pipeline's own:
   [The star](#a-star-around-each-item) keeps an item's pairs apart, so a
   random batch rarely holds a text twice.
 - Good, because the defaults work on every machine. transformers refuses
-  bf16 on a GPU without it, and on a CPU without `use_cpu`. So it stays off,
-  as in the library, until a config turns it on.
+  bf16 on a GPU without it, and on a CPU without `use_cpu`. So bf16 stays
+  off, as in the library, until a config sets `bf16: true`.
 - Bad, because five epochs is a starting point, not a measured choice. The
   validation curve in the run's
   [`trainer_state.json`](training.md#trainer_statejson) shows whether a corpus
   needs more, and an experiment tunes the number.
-- Bad, because a run on a GPU trains in 32 bits unless its config turns bf16
-  on.
+- Bad, because a run on a GPU trains in 32 bits unless its config sets
+  `bf16: true`.
 - Bad, because the recipe was made for general text, not for metadata. An
   experiment may find better settings, and tests them as arms.
 - Bad, because the recipe's 1,024 dimensions come with `MatryoshkaLoss`, which
@@ -2811,7 +2880,7 @@ The others are this pipeline's own:
   hashed form also forks processes from a process that runs threads.
 - The recipe's single epoch: the recipe trains on far more pairs.
 - The recipe's bf16: transformers refuses it on a GPU without it, and on a
-  CPU without `use_cpu`. A config turns it on.
+  CPU without `use_cpu`. A config sets `bf16: true` to use it.
 - The recipe's `MatryoshkaLoss`: it also trains shorter embeddings, and a
   model here is used at its full length.
 - The recipe's evaluation, logging and checkpoints every 250 steps: they
@@ -2821,8 +2890,8 @@ The others are this pipeline's own:
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a config that names only its data trains at the recipe's batch size, warmup,
-  width and learning rate, for five epochs.
+- a config that names only its data gets the recipe's batch size, warmup,
+  width and learning rate, and five epochs
 
 ### A second architecture: BERT, trained from scratch
 
@@ -2840,8 +2909,8 @@ from texts that the leakage check never sees.
 **Decision.** `architecture: bert` builds `BertModel` of
 [`transformers`](https://huggingface.co/docs/transformers) from random weights,
 followed by mean pooling. It trains on the same corpus and tokenizer, with the
-same loss, trainer and defaults, except its learning rate. No special token is
-added to a text, as for the static model.
+same loss, trainer and defaults, except the learning rate. The model reads a
+text without special tokens, as the static model does.
 
 **Consequences.**
 
@@ -2877,9 +2946,9 @@ added to a text, as for the static model.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a BERT trains on a CPU, and writes its run's folder;
-- two runs of one config and one seed give the same weights, on a CPU;
-- `score` ranks a benchmark with a BERT run.
+- a BERT trains on a CPU, and writes its run's folder
+- two runs of one config and one seed give the same weights, on a CPU
+- `score` ranks a benchmark with a BERT run
 
 ### BERT defaults to BERT-Small's shape and 128 tokens
 
@@ -2904,8 +2973,8 @@ tokens. Its other settings default to `BertConfig`'s.
 - Good, because the BERT paper pretrains with "sequence length of 128 for
   90% of the steps" (Appendix A.2). Attention's work is quadratic in the
   length, so at 128 tokens it is a sixteenth of its work at 512.
-- Good, because BERT's other defaults are read from `BertConfig` itself, so
-  the code copies none of its numbers.
+- Good, because the code reads BERT's other defaults from `BertConfig`
+  itself, so the code copies none of `BertConfig`'s numbers.
 - Bad, because BERT-Small is a guess at a size that suits a corpus of short
   texts. Other shapes still need to be tested.
 - Bad, because a text longer than 128 tokens is cut, in training and in
@@ -2935,9 +3004,10 @@ paper pretrains at 1e-4: "We use Adam with learning rate of 1e-4"
 ([Devlin et al., 2019](https://doi.org/10.18653/v1/N19-1423), Appendix A.2).
 The trainer's default, 5e-5, is made for fine-tuning a pretrained model.
 
-**Decision.** The other training defaults are shared, since they concern the
-data and the loss. The learning rate is the architecture's own: 0.2 for
-`static`, and 1e-4 for `bert`. A config or a flag overrides it.
+**Decision.** The architectures share the other training defaults, because
+those defaults concern the data and the loss. The learning rate is the
+architecture's own: 0.2 for `static`, and 1e-4 for `bert`. A config or a
+flag overrides it.
 
 **Consequences.**
 
@@ -2958,8 +3028,8 @@ data and the loss. The learning rate is the architecture's own: 0.2 for
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a static config trains at 0.2, and a BERT config at 1e-4;
-- a learning rate that a flag gives is kept.
+- a static config gets a learning rate of 0.2, and a BERT config 1e-4
+- a learning rate that a flag gives is kept
 
 ### The model kept is the model at the last step
 
@@ -2971,9 +3041,9 @@ the last step. Its learning rate decays linearly to zero over the run. An
 experiment compares its runs by their validation metrics.
 
 **Decision.** A run keeps the model at the last step, and saves no
-checkpoint. A config that sets `load_best_model_at_end` or
-`resume_from_checkpoint`, or a `save_strategy` other than `no`, is refused.
-The run writes that model's validation metrics.
+checkpoint. `train` refuses a config that sets `load_best_model_at_end` or
+`resume_from_checkpoint`, or a `save_strategy` other than `no`. The run
+writes that model's validation metrics.
 
 **Consequences.**
 
@@ -2982,8 +3052,8 @@ The run writes that model's validation metrics.
   pairs would then compare it with other runs.
 - Good, because the last steps run at a learning rate near zero, so the model
   changes little at the end.
-- Good, because nothing is saved during training, so a run writes only its
-  model.
+- Good, because a run saves nothing during training. So it writes only one
+  model, the model at the last step.
 - Good, because a setting that the run cannot honour stops it at once,
   rather than doing nothing. The trainer does not read
   `resume_from_checkpoint` itself
@@ -3004,11 +3074,10 @@ The run writes that model's validation metrics.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a run writes the model at the last step, and no checkpoint;
-- a config that sets `load_best_model_at_end` or `resume_from_checkpoint` is
-  refused;
+- a run writes the model at the last step, and no checkpoint
+- `load_best_model_at_end` and `resume_from_checkpoint` are refused
 - a `save_strategy` other than `no` is refused, in the config or as a flag,
-  and `no` is read.
+  and `no` is read
 
 ### Validation pairs are ranked, with MRR@10
 
@@ -3021,24 +3090,25 @@ the targets. sentence-transformers' `InformationRetrievalEvaluator` ranks a
 corpus for each query. It keeps each query's hits in Python lists, up to the
 largest cutoff asked for. Its default cutoff for MRR is 10.
 
-**Decision.** At each evaluation, each validation anchor ranks every
-validation positive, each counted once as the tokenizer normalises it. The
-evaluator gives MRR@10, and accuracy@1, @3,
-@5 and @10. The trainer logs them with the validation loss. The evaluator is
-built as `score` builds its own, with a cutoff of 10.
+**Decision.** At each evaluation, the evaluator ranks every validation
+positive for each validation anchor. The run gives the evaluator each
+distinct text once: texts that the tokenizer normalises to one text are one
+text. The evaluator gives MRR@10, and accuracy@1, @3, @5 and @10. The trainer
+logs them with the validation loss. A run builds the evaluator as `score`
+builds its own, but with a cutoff of 10.
 
 **Consequences.**
 
-- Good, because an experiment can tune on a ranking, as the benchmarks score one,
-  without opening a benchmark.
-- Good, because every metric comes from the evaluator, with no code of our
-  own.
+- Good, because an experiment can tune on a ranking, as the benchmarks score
+  one, without opening a benchmark.
+- Good, because the ranking metrics come from the evaluator and the loss
+  from the trainer, with no code of our own.
 - Good, because the model reads `BMI` and `bmi` as one text, so they are one
   query, with the positives of both. As two queries, each would count only
   its own positive as relevant, and even a perfect model would miss one.
 - Bad, because MRR@10 counts a positive below the tenth rank as 0, while the
   benchmarks' main measure, MRR, counts every rank. `score` also reports
-  MRR@10, which compares.
+  MRR@10 on the benchmarks, the same metric as the validation MRR@10.
 - Bad, because each evaluation encodes the validation texts again.
 
 **Alternatives considered.**
@@ -3053,10 +3123,10 @@ built as `score` builds its own, with a cutoff of 10.
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- a run writes the validation loss, MRR@10 and accuracy@k at the last step;
+- a run writes the validation loss, MRR@10 and accuracy@k at the last step
 - two anchors that the tokenizer normalises to one text are one query, with
-  the positives of both;
-- the trainer's log holds MRR@10 at each evaluation.
+  the positives of both
+- the trainer's log holds MRR@10
 
 ### A run trains on one GPU, the first one it sees
 
@@ -3077,14 +3147,15 @@ them, and the one that it keeps.
 
 - Good, because a run's batch, and so its loss's in-batch negatives, does not
   depend on the number of GPUs.
-- Good, because a user changes nothing. Other processes keep their own
+- Good, because the user changes nothing. Other processes keep their own
   `CUDA_VISIBLE_DEVICES`.
 - Good, because the setting comes before CUDA starts, so it always takes
   effect, and nothing needs to check it.
 - Bad, because the first GPU may be busy with another process. The run does
-  not look for a free one; `CUDA_VISIBLE_DEVICES` chooses another.
-- Bad, because a notebook that has used CUDA before it calls `train` keeps
-  every GPU that CUDA saw. Such a notebook sets `CUDA_VISIBLE_DEVICES`
+  not search for a free GPU. The user chooses another GPU with
+  `CUDA_VISIBLE_DEVICES`.
+- Bad, because a notebook that uses CUDA before it calls `train` keeps every
+  GPU that CUDA saw. Such a notebook sets `CUDA_VISIBLE_DEVICES`
   itself, before it imports torch.
 
 **Alternatives considered.**
@@ -3102,34 +3173,35 @@ them, and the one that it keeps.
 - DistributedDataParallel (DDP), launched with `torchrun` or `accelerate`:
   each GPU would rank its pairs only against its own batch. The loss's
   `gather_across_devices` joins the batches, and it is off by default. Its
-  docstring warns that it may slow training and run out of memory. One GPU
+  docstring warns that it may slow training and exhaust memory. One GPU
   already trains the models here at a batch of 2,048 pairs.
 - Counting the GPUs first, and narrowing the list when there are several.
   Whether the list can still change after a count depends on how torch
   counts. NVIDIA's management library reads the list again, and the CUDA
-  driver keeps the first one it read. So the count needed two checks of its
-  own, for cases that the command line does not reach.
+  driver keeps the first one it read. So the count would need two checks of
+  its own, for cases that the command line does not reach.
 
 **Confirmation.** The tests in
 [test_embedding_model_training.py](../../tests/test_embedding_model_training.py)
 check that:
 
-- with `CUDA_VISIBLE_DEVICES=2,3`, the run keeps GPU 2, and names both;
-- without a list, it keeps GPU 0;
-- a list of one GPU, or an empty one, stays as it is;
-- `train` keeps to one GPU before it reads its config;
-- reading a config builds no training settings.
+- with `CUDA_VISIBLE_DEVICES=2,3`, first_gpu_only keeps GPU 2, returns both
+  GPUs, and prints that the run trains on GPU 2 only
+- without a list, the run keeps GPU 0
+- a list of one GPU, or an empty one, stays as it is
+- `train` keeps to one GPU before it reads its config
+- reading a config builds no training settings
 
 ### A run's seed is given on the command line, not in the config
 
 **Described in:** [training.md](training.md).
 
-**Context.** Runs of one config at several seeds differ only by their seed.
-A run is named after its config and its seed. An experiment trains each of
+**Context.** When no flag overrides a setting, runs of one config at several
+seeds differ only by their seed. A run is named after its config and its seed. An experiment trains each of
 its arms at several seeds.
 
-**Decision.** `train` takes the seed as `--seed`, which it needs. It overrides
-a seed in the config. An experiment lists its seeds, and refuses
+**Decision.** `train` requires the seed, as `--seed`. `--seed` overrides a
+seed in the config. An experiment lists its seeds, and refuses
 `training.seed` in its base and its arms.
 
 **Consequences.**
@@ -3148,11 +3220,11 @@ a seed in the config. An experiment lists its seeds, and refuses
 **Confirmation.** The tests check that:
 
 - the seed given reaches the run's settings, and a seed below 0 is refused
-  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py))
 - the run is named after its config and its seed
-  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py));
+  ([test_embedding_model_training.py](../../tests/test_embedding_model_training.py))
 - an experiment refuses `training.seed` in its base and in an arm
-  ([test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)).
+  ([test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py))
 
 ## Experiments
 
@@ -3162,9 +3234,9 @@ a seed in the config. An experiment lists its seeds, and refuses
 
 **Context.** Model development compares versions of a run's config, each at
 several seeds. Which change to try next depends on what the last comparison
-found. It also takes judgement, after a tie, a result near the margin, or a
-change that costs more. A comparison is fair when its arms, its seeds and
-its decision rule are fixed before its runs are read.
+found. The choice also takes judgement, after a tie, a result near the
+margin, or a change that costs more. A comparison is fair when its arms, its
+seeds and its decision rule are fixed before its runs are read.
 
 **Decision.** An experiment is one file: a base, its arms, its seeds and its
 decision rule. It asks one question. The next experiment is another file,
@@ -3175,8 +3247,9 @@ whose base names an arm of the one before.
 - Good, because each question keeps its record, its file, beside its runs.
 - Good, because the user chooses the next question, from what the results
   show.
-- Good, because the rule is written before the runs are read, and stays
-  fixed for them: a [changed file is refused](#a-changed-experiment-file-is-refused-rather-than-trained-again).
+- Good, because the user writes the rule before the runs are read, and the
+  rule stays fixed for them. The `experiment` commands
+  [refuse a changed file](#a-changed-experiment-file-is-refused-rather-than-trained-again).
 - Bad, because a series of experiments is many small files.
 
 **Alternatives considered.**
@@ -3191,38 +3264,40 @@ whose base names an arm of the one before.
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
 check that:
 
-- a file is read with the decision rule's defaults, or its own;
-- the experiment is named after its file.
+- `read_experiment` reads a file with the decision rule's defaults, or with
+  the file's own rule
+- the experiment takes its name from its file
 
 ### An experiment's file is checked with pydantic
 
 **Described in:** [experiments.md](experiments.md#the-experiments-file).
 
-**Context.** The user writes an experiment's file by hand. It is nested
+**Context.** The user writes an experiment's file by hand. The file is nested
 YAML: the decision rule's fields, and each arm's test and settings by
 section. Most of its checks are of form: a field's type, its allowed values
-and its default. A few are rules of an experiment, such as different seeds.
-ai-harmonization depends on [pydantic](https://docs.pydantic.dev/), and its
-`SimpleDataModel` is a pydantic model. A run's config is read by
-`HfArgumentParser`.
+and its default. A few are rules of an experiment, for example different
+seeds. ai-harmonization depends on [pydantic](https://docs.pydantic.dev/),
+and its `SimpleDataModel` is a pydantic model. `train` reads a run's config
+with `HfArgumentParser`.
 
-**Decision.** pydantic models check the file. What pydantic can declare is
-declared: a field's type, its values, its bounds, its length and its default.
-A validator in the same model holds each rule that pydantic cannot declare,
-such as different seeds. Each problem is reported with the file and the field.
+**Decision.** pydantic models check the file. The models declare what
+pydantic can declare: a field's type, its values, its bounds, its length and
+its default. A validator in the same model holds each rule that pydantic
+cannot declare, for example different seeds. The message reports each
+problem with the file and the field.
 
 **Consequences.**
 
 - Good, because a field's type, values and default are written once, in the
   model, and pydantic checks them.
-- Good, because every message has one form: the field, what is wrong, and
-  what was given.
+- Good, because the message lists every problem that pydantic finds, and
+  each names the field and says what is wrong.
 - Good, because pydantic is a dependency already, which ai-harmonization uses
   for its own data model.
 - Good, because each validator holds one rule of an experiment, and nothing
   that pydantic checks itself.
-- Bad, because pydantic's messages are in its own words, such as "Input should
-  be a valid integer".
+- Bad, because pydantic's messages are in its own words, for example "Input
+  should be a valid integer".
 - Bad, because some rules of form still need a validator. pydantic 2 has no
   check that a list's items differ. YAML reads an empty field as None, and
   pydantic does not replace None with the field's default.
@@ -3240,9 +3315,10 @@ such as different seeds. Each problem is reported with the file and the field.
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
 check that:
 
-- a file that breaks a rule of an experiment, or of its fields, is refused,
-  with the file, the field and what is wrong;
-- an empty section, question or decision rule is read as its default.
+- `read_experiment` refuses a file that breaks a rule of an experiment, or of
+  its fields, and names the file, the field and what is wrong
+- an empty section stays empty, and an empty question or decision rule is
+  read as its default
 
 ### The base can be an arm of an earlier experiment, whose runs are reused
 
@@ -3253,21 +3329,21 @@ one. That arm's runs, at the same seeds, are already trained, from the same
 config.
 
 **Decision.** An experiment's base can name an arm of an earlier experiment,
-as `<experiment>/<arm>`. The base is then that arm's full config, and the
-arm's runs at the same seeds are reused. The other seeds train in the new
-experiment.
+as `<experiment>/<arm>`. The base is then that arm's full config, and the new
+experiment reuses the arm's runs at the same seeds. The other seeds train in
+the new experiment.
 
 **Consequences.**
 
 - Good, because no config is trained twice at the same seed.
-- Good, because the selection is written in the new file, by name, where a
-  user sees which arm was chosen.
-- Bad, because the earlier experiment's folder must stay, since the new one
-  reads its runs. Without it, a base can still give the arm's settings in
-  full, from a copy of the arm's `configs/<arm>.yaml`. Its runs then train
-  again.
+- Good, because the new file names the selected arm, where the user sees
+  which arm was chosen.
+- Bad, because the earlier experiment's folder must stay: the new experiment
+  reads the earlier experiment's runs. Without the folder, a base can still
+  give the arm's settings in full, from a copy of the arm's `configs/<arm>.yaml`. The
+  base runs then train again.
 - Bad, because a base run that the earlier experiment is still training
-  stops the new one, until it ends.
+  stops the new experiment, until the run ends.
 
 **Alternatives considered.**
 
@@ -3280,11 +3356,11 @@ experiment.
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
 check that:
 
-- the earlier arm's runs are reused, and a seed that it lacks trains here,
-  from the earlier arm's config;
+- the earlier arm's runs are reused, and a seed that the earlier arm lacks
+  trains here, from the earlier arm's config
 - a base run that the earlier experiment is still training stops the new
-  one;
-- an earlier experiment or arm that does not exist is refused.
+  experiment
+- an earlier experiment or arm that does not exist is refused
 
 ### An experiment queues its runs itself, rather than submitting each as a job
 
@@ -3300,31 +3376,31 @@ several GPUs of one node. A run trains on one GPU, as
 **Decision.** `experiment train` queues its runs itself. Whenever one of its
 GPUs is free, it starts the next run, as `train` with that GPU in
 `CUDA_VISIBLE_DEVICES`. Without a GPU, one run trains at a time. On a
-cluster, the experiment is submitted as
+cluster, the user submits the experiment as
 [one job](experiments.md#on-a-cluster-with-slurm), and its runs train inside
-it, not as jobs of their own.
+the job, not as jobs of their own.
 
 **Consequences.**
 
 - Good, because one command trains on a laptop and on a cluster. On a
   cluster, it runs inside a job, as `train` does.
-- Good, because each run is the public `train` command, which can be run
-  again by hand.
+- Good, because each run is the public `train` command, which the user can
+  run again by hand.
 - Good, because it works with any scheduler, or none: the code holds none.
 - Good, because the experiment uses only the GPUs that its job shows it. A
   job that asks for its GPUs with `--gpus` cannot fill a shared cluster.
 - Bad, because the experiment's job holds all its GPUs until the last run
   ends, although the GPUs of finished runs then wait.
 - Bad, because the experiment's job holds the GPUs of one node. One job per
-  run could train on many nodes at once, so on a large cluster it would
-  finish sooner.
+  run could train on many nodes at once, so on a large cluster the
+  experiment would finish sooner.
 
 **Alternatives considered.**
 
-- One SLURM job per run, through an option such as `--slurm`: faster on a
-  large cluster. But it is code for SLURM alone, and its command has another
-  shape than `train`'s. It can also take every free GPU of the cluster at
-  once.
+- One SLURM job per run, through an option, for example `--slurm`: faster on
+  a large cluster. But it is code for SLURM alone, and its command has
+  another shape than `train`'s. It can also take every free GPU of the
+  cluster at once.
 - [submitit](https://github.com/facebookincubator/submitit): it submits
   pickled Python functions, so a job would not be a public command, and its
   requeues are not needed.
@@ -3338,11 +3414,11 @@ it, not as jobs of their own.
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
 check that:
 
-- with GPUs 2 and 3 visible, each run sees one of them;
-- without a GPU, each run keeps this process's environment;
-- each run is `train`'s public command, with its arm's config and its seed;
+- with GPUs 2 and 3 visible, each run sees one of them
+- without a GPU, each run keeps this process's environment
+- each run is `train`'s public command, with its arm's config and its seed
 - a failed run does not stop the others, and the next training retries only
-  it.
+  that run
 
 ### A changed experiment file is refused, rather than trained again
 
@@ -3353,10 +3429,11 @@ hours of GPU time. `corpus build` and `compare` replace an output of the
 same name. `train` refuses a run of the same name that other settings
 trained. A file can be edited after its results are seen.
 
-**Decision.** The first training keeps a copy of the file. Each command reads
-the file and the copy, with the decision rule's defaults, and refuses a file
-whose fields differ. The message names those fields, and says to delete the
-experiment's folder to start again, or to give the file a new name.
+**Decision.** At the first training, `experiment train` keeps a copy of the
+file. Each `experiment` command reads the file and the copy, with the
+decision rule's defaults, and refuses a file whose fields differ. The message
+names those fields. It says to delete the experiment's folder to start
+again, or to give the file a new name.
 
 **Consequences.**
 
@@ -3386,11 +3463,11 @@ experiment's folder to start again, or to give the file a new name.
 [test_embedding_model_experiments.py](../../tests/test_embedding_model_experiments.py)
 check that:
 
-- the first training keeps a copy of the file;
+- the first training keeps a copy of the file
 - a file of the same name whose seeds differ is refused, and the message
-  names the seeds and both ways out;
+  names the seeds and both ways out
 - a comment, another order of the fields, or a default written out is no
-  change.
+  change
 
 ### An experiment's status comes from its run folders
 
@@ -3406,19 +3483,20 @@ manifest, started with a staging folder, and not started otherwise.
 
 **Consequences.**
 
-- Good, because there is no record of jobs to keep, and it works without a
-  scheduler.
+- Good, because there is no record of jobs to keep, and the status works
+  without a scheduler.
 - Good, because training again uses the same states, so only the runs that
   are not done train.
-- Bad, because a run that was killed, such as by `scancel` or a time limit,
-  looks the same as one that is training. A later experiment whose base run
-  has started stops, and says to wait for the run, or to delete its staging
-  folder.
+- Bad, because a run that was killed, for example by `scancel` or a time
+  limit, looks the same as one that is training. If a later experiment reuses
+  a base run that has started in the earlier experiment, `experiment train`
+  and `experiment compare` stop. The
+  message says to wait for the run, or to delete its staging folder.
 
 **Alternatives considered.**
 
-- A stored table of the runs, a ledger: it can fall out of step with the
-  folders, which hold the runs themselves.
+- A stored table of the runs, a ledger: it can disagree with the folders,
+  which hold the runs themselves.
 - Asking the scheduler for the jobs, as with `squeue`: code for one
   scheduler, which knows nothing of runs on a laptop.
 
@@ -3427,8 +3505,8 @@ manifest, started with a staging folder, and not started otherwise.
 check that:
 
 - a run is done with its manifest, started with a staging folder, and not
-  started otherwise;
-- `experiment status` counts each arm's runs by state.
+  started otherwise
+- `experiment status` counts each arm's runs by state
 
 ### Arms are compared by their seeds' scores, with Welch's interval and t-test
 
@@ -3436,9 +3514,9 @@ check that:
 
 **Context.** Each run gives one validation score. An experiment trains each
 arm at the same few seeds. A seed sets a run's starting weights and the order
-of its pairs. A change such as another table size also changes the starting
-weights that a seed gives. Two arms can vary from seed to seed by different
-amounts.
+of its pairs. A change, for example another table size, also changes the
+starting weights that a seed gives. Two arms can vary from seed to seed by
+different amounts.
 
 **Decision.** An arm's score is the mean of its seeds' scores, with its 95% t
 interval. Each arm minus the base gets Welch's interval and Welch's t-test,
@@ -3466,8 +3544,8 @@ unpaired. scipy's `ttest_ind` computes both.
   and the seeds are few, it finds more false differences than its alpha says
   ([Delacre et al., 2017](https://doi.org/10.5334/irsp.82)).
 - A paired t-test, by seed: it fits when a seed gives two arms the same
-  start. A change such as another table size gives them other starting
-  weights, so matching the runs by seed would carry little.
+  start. A change, for example another table size, gives them other starting
+  weights. So matching the runs by seed would carry little.
 - A bootstrap interval: at few runs, it understates the spread. Its variance
   is short by the factor (n - 1) / n ([Knopov & Shvai, 2026](https://doi.org/10.48550/arXiv.2610.23700)).
 - A permutation test: with 5 seeds per arm, the 10 runs split into two groups
@@ -3479,10 +3557,10 @@ unpaired. scipy's `ttest_ind` computes both.
 check that:
 
 - the interval is Welch's, at Welch-Satterthwaite's degrees of freedom, not
-  at Student's pooled ones;
+  at Student's pooled ones
 - when neither arm's scores vary, the difference is exact, with p 1 at no
-  difference;
-- `arms.csv` gives each arm's mean, and each seed's score.
+  difference
+- `arms.csv` gives each arm's mean, and each seed's score
 
 ### The superiority test passes on a significant gain of at least the minimum effect
 
@@ -3505,9 +3583,10 @@ alpha, and the arm's mean gain is at least `minimum_effect`.
 - Good, because a gain too small to be worth a change does not pass the test,
   however sure it is.
 - Bad, because an arm whose true gain is exactly `minimum_effect` passes at
-  most half the time, and about half once the seeds suffice. Its mean falls
-  on either side of it.
-  The design expects this, and it does not make the study underpowered
+  most half the time. The arm's mean gain falls below `minimum_effect` about
+  half the time, so the arm then fails. Once the seeds suffice, the arm
+  passes about half the time. The design expects this, and it does not make
+  the study underpowered
   ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
 - Bad, because the verdict rests on two criteria, not on one test.
 
@@ -3524,20 +3603,20 @@ alpha, and the arm's mean gain is at least `minimum_effect`.
 [test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
 check that:
 
-- a gain of 0.02 passes;
-- a significant gain of 0.005 does not;
-- a gain of 0.012 that is not significant at the arm's alpha does not;
-- the decision's own metric and minimum effect decide, such as accuracy@1
-  and 0.02.
+- a gain of 0.02 passes
+- a significant gain of 0.005 does not
+- a gain of 0.012 that is not significant at the arm's alpha does not
+- the decision's own metric and minimum effect decide, for example
+  accuracy@1 and 0.02
 
 ### The non-inferiority test passes when the interval stays above minus the minimum effect
 
 **Described in:** [experiments.md](experiments.md#how-the-arms-are-compared).
 
-**Context.** A `non-inferiority` arm, such as a smaller table, is cheaper,
-and may lose a little. `minimum_effect` is then the largest loss worth
-taking: the margin. A non-inferiority trial sets its margin before the data,
-and reads its result from a confidence interval of the difference.
+**Context.** A `non-inferiority` arm, for example a smaller table, is
+cheaper, and may lose a little. `minimum_effect` is then the largest loss
+worth taking: the margin. A non-inferiority trial sets its margin before the
+data, and reads its result from a confidence interval of the difference.
 
 **Decision.** The non-inferiority test passes when the low end of Welch's
 interval, at the arm's confidence, is above minus `minimum_effect`.
@@ -3553,7 +3632,7 @@ interval, at the arm's confidence, is above minus `minimum_effect`.
 - Good, because `superiority` reads the same interval, so one interval
   serves both tests.
 - Bad, because an arm that passes may still be worse than the base. The test
-  bounds the loss; it does not show that there is none.
+  bounds the loss, but it does not show that there is none.
 
 **Alternatives considered.**
 
@@ -3568,8 +3647,8 @@ interval, at the arm's confidence, is above minus `minimum_effect`.
 [test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
 check that:
 
-- a loss of 0.003 passes;
-- a loss of 0.009, whose interval reaches past -0.01, does not.
+- a loss of 0.003 passes
+- a loss of 0.009, whose interval reaches past -0.01, does not
 
 ### Alpha is split over the arms, by Bonferroni
 
@@ -3583,8 +3662,8 @@ by chance. `experiment compare` reads these tests together, and names each arm
 that passes. `compare` reports each test of two models alone.
 
 **Decision.** Each arm is tested at the decision's alpha divided by the
-number of arms. Its interval has the matching confidence, such as 97.5% with
-2 arms.
+number of arms. The arm's interval has the matching confidence, for example
+97.5% with 2 arms.
 
 **Consequences.**
 
@@ -3609,8 +3688,8 @@ number of arms. Its interval has the matching confidence, such as 97.5% with
 [test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
 check that:
 
-- with 2 arms, each is tested at 0.025, with a 97.5% interval;
-- a gain that passes alone, at p = 0.043, is not shown beside a second arm.
+- with 2 arms, each is tested at 0.025, with a 97.5% interval
+- a gain that passes alone, at p = 0.043, is not shown beside a second arm
 
 ### An arm that does not pass its test is checked for enough seeds, at the minimum effect
 
@@ -3625,20 +3704,24 @@ from the two arms' seed-to-seed spreads, the arm's alpha and
 **Decision.** Each arm gets the seeds per arm that its test needs. For
 superiority, they are the fewest at which a gain of exactly `minimum_effect`
 is significant. For non-inferiority, they are the fewest for 80% power when
-the arms do not differ. An arm that fails its test, whose interval still
-reaches the margin, with fewer seeds, is marked underpowered.
+the arms do not differ. An arm is marked underpowered when all of these hold:
+
+- the arm fails its test
+- the arm's interval still reaches the margin
+- the arm had fewer seeds than its test needs
 
 **Consequences.**
 
 - Good, because superiority's count is the sample size of a dual-criterion
-  design ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)). Non-inferiority's aims at 80% power, the usual convention
+  design ([Roychoudhury et al., 2018](https://doi.org/10.1177/1740774518770661)).
+  Non-inferiority's count aims at 80% power, the usual convention
   ([Cohen, 1988/2013](https://doi.org/10.4324/9780203771587)).
 - Good, because "underpowered: k seeds needed" says how to settle the
   question: a new experiment, at k seeds.
 - Bad, because the spreads are estimated from the same few seeds, so the
   count is an estimate too.
 - Bad, because scipy has no function for a number of seeds. The count is the
-  root of the test's need, found by scipy's `optimize.elementwise`:
+  root of the test's need, and scipy's `optimize.elementwise` finds it:
   `bracket_root`, then `find_root`.
 
 **Alternatives considered.**
@@ -3659,28 +3742,29 @@ reaches the margin, with fewer seeds, is marked underpowered.
 check that:
 
 - at a seed sd of 0.0045 in both arms, superiority needs 4 seeds and
-  non-inferiority 6;
-- at a seed sd of 0.02, the count is the first that suffices;
-- scores that do not vary need 2 seeds, at any score;
+  non-inferiority 6
+- at a seed sd of 0.02, the count is the first that suffices
+- scores that do not vary need 2 seeds, at any score
 - an arm that does not pass its test, with too few seeds, is marked
-  underpowered;
-- an arm whose question stays open, with enough seeds, is not;
+  underpowered
+- an arm whose question stays open, with enough seeds, is not
 - an arm whose interval lies wholly past the margin is not, however few its
-  seeds.
+  seeds
 
 ### The comparison recommends one arm, or none when several pass
 
 **Described in:** [experiments.md](experiments.md#the-recommendation).
 
 **Context.** The next experiment builds on one arm, which its file names as
-its base. Several arms can pass their statistical tests, such as a cheaper arm
-that is no worse and a better one. Which is worth its cost depends on what
-each costs to train and to run. The code does not know these costs.
+its base. Several arms can pass their statistical tests, for example a
+cheaper arm that is no worse, and a better arm. Which is worth its cost
+depends on what each costs to train and to run. The code does not know these
+costs.
 
 **Decision.** `experiment compare` recommends the one arm that passes, or the
 base when none does. When several arms pass, it recommends none, and prints
-each one's base line, for the user to choose. The user writes the next
-experiment's base.
+each passing arm's base line, for the user to choose. The user writes the
+next experiment's base.
 
 **Consequences.**
 
@@ -3699,8 +3783,8 @@ experiment's base.
 [test_embedding_model_experiment_compare.py](../../tests/test_embedding_model_experiment_compare.py)
 check that:
 
-- one passing arm is recommended, and with none, the base;
-- with two passing arms, none is, and both base lines are printed.
+- one passing arm is recommended, and with none, the base
+- with two passing arms, none is, and both base lines are printed
 
 ## References
 

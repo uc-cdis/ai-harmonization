@@ -5,8 +5,8 @@ publish. This page gives the license or terms of each one, and the reference
 to cite. It also gives each license's id in SPDX, the
 [System Package Data Exchange](https://spdx.dev/), as the manifests record it.
 SPDX names each license by a short id from its
-[License List](https://spdx.org/licenses/), such as `CC-BY-4.0`. The page also
-says how single restricted items are left out, and what this repository
+[License List](https://spdx.org/licenses/), for example `CC-BY-4.0`. The page
+also says how single restricted items are left out, and what this repository
 shares.
 
 ## What this repository shares
@@ -60,10 +60,12 @@ papers are published under [CC BY-NC-ND
 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/), a Creative Commons
 NoDerivatives license. It allows sharing a file as published, but not a
 modified version of it. A benchmark table is a modified version: it is
-repaired and joined to the expert mappings. So GDC-SM distributes only the
-ground truth, with instructions for rebuilding the tables from the publishers'
-originals. Likewise, this repository distributes no benchmark files: the
-builder downloads the originals and makes the tables on your machine.
+repaired and joined to the expert mappings.
+
+So GDC-SM distributes only the ground truth, with instructions for rebuilding
+the tables from the publishers' originals. Likewise, this repository
+distributes no benchmark files: the builder downloads the originals and makes
+the tables on your machine.
 
 **SPDX:** the ground truth is `CC-BY-4.0`, and the dictionary is
 `Apache-2.0`. Each paper's Crossref record gives its license: `CC-BY-4.0` for
@@ -80,8 +82,9 @@ Cao, Clark and Dou, and `CC-BY-NC-ND-4.0` for the other seven.
 > of the VLDB Endowment*, *18*(8), 2681–2694.
 > https://doi.org/10.14778/3742728.3742757
 
-Each paper's table, with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4), and its article's DOI are listed in
-`embedding_model/benchmarks/manifests/gdc.json`.
+`embedding_model/benchmarks/manifests/gdc.json` lists each paper's table,
+with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4), and its
+article's DOI.
 
 ## Training sources
 
@@ -127,9 +130,9 @@ state [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 The HPO license names no standard license. It asks users to:
 
-- acknowledge and cite the HPO Consortium;
-- show the date or version of each HPO file that they display;
-- leave the files and their logical relationships unaltered;
+- acknowledge and cite the HPO Consortium
+- show the date or version of each HPO file that they display
+- leave the files and their logical relationships unaltered
 - say in a service or product: "This service/product is using the Human
   Phenotype Ontology (_version information_)."
 
@@ -194,15 +197,15 @@ published model's card, and any license file beside the weights, then carry:
   (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the
   Logical Observation Identifiers Names and Codes (LOINC) Committee and is
   available at no cost under the license at http://loinc.org/license. LOINC®
-  is a registered United States trademark of Regenstrief Institute, Inc.";
+  is a registered United States trademark of Regenstrief Institute, Inc."
 - the LOINC version that the model was trained on, from the sources
-  manifest;
+  manifest
 - a statement that Regenstrief Institute and the LOINC Committee did not
   develop, review or endorse the model. Its outputs are suggestions for
   experts to verify, not authoritative LOINC mappings.
 
-A file that holds LOINC codes, such as a label set, gives each code with a
-LOINC display name. The repository shares no such file.
+A file that holds LOINC codes, for example a label set, gives each code with
+a LOINC display name. The repository shares no such file.
 
 **SPDX:** `LicenseRef-LOINC`.
 
@@ -291,7 +294,7 @@ permission"
 **License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq) states that
 most of its protocols are freely available, and a small share have limited
 availability. Each protocol's `availability` says which: only "Available" is
-open. A variable whose protocol is not in `protocols`, such as one of the
+open. A variable whose protocol is not in `protocols`, for example one of the
 COVID-19 library's, has no availability, so it is not open.
 
 **SPDX:** `LicenseRef-PhenX`.
@@ -316,9 +319,9 @@ fetch reads these restriction fields too. Each source's main table has an
 
 Where the field holds one of a list of values, an item is open only when its
 value is known to allow use. A value that the fetch has not seen before means
-the item is not open. The value is printed, so it can be reviewed. For [caDSR](sources.md#cadsr),
-the field is the element's reference documents: each must be of a kind known
-to allow use. A Proprietary Measure Permission closes an element. A kind that
+the item is not open. The fetch prints the value, so that someone can review
+it. For [caDSR](sources.md#cadsr), the field is the element's reference
+documents: each must be of a kind known to allow use. A Proprietary Measure Permission closes an element. A kind that
 the fetch has not seen before closes it too.
 
 | source | restriction field | open when |

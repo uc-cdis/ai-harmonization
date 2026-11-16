@@ -1,16 +1,16 @@
 """CDISC: each codelist, around its name, and each term, around its preferred term.
 
-A term sits in several codelists, as one row each, so its rows are merged
-into one item per concept code. A codelist is its own item: its canonical is
-the Codelist Name, and its values are its terms' preferred terms, in the
-file's order. For both, the source side holds the submission values and the
-synonyms.
+A term can sit in several codelists, with one row in each, so ``items`` merges
+its rows into one item per concept code. A codelist is its own item: its
+canonical is the Codelist Name, and its values are its terms' preferred terms,
+in the file's order. For both, the source side holds the submission values and
+the synonyms.
 
 The description is the first definition. CDISC notes a definition's source in
-parentheses after its last sentence, and this source is removed. A definition
-that ends with a question mark is the wording of a questionnaire item. A note
-in parentheses may follow the question mark. Such a definition goes on the
-source side as a question text.
+parentheses after its last sentence, and ``without_source`` removes this
+source. A definition that ends with a question mark is the wording of a
+questionnaire item. A note in parentheses may follow the question mark. Such a
+definition goes on the source side as a question text.
 """
 
 import re
@@ -24,7 +24,7 @@ DEFINITION = "CDISC Definition"
 # a bracketed reference, as in "A thing. (NCI)" or "A thing. [ICH] (CDISC
 # Glossary)". A source can hold parentheses of its own, as "(21 CFR 3(b))".
 NOTE = re.compile(r"([.?!\]])\s*\(((?:[^()]|\([^()]*\))*)\)\s*$")
-# A source is a few words; a longer note is content.
+# A source is a few words. A longer note is content.
 SOURCE_WORDS = 6
 QUESTION = re.compile(r"\?\s*(?:\([^()]*\))?\s*\.?\s*$")
 

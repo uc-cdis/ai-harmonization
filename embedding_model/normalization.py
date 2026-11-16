@@ -1,7 +1,8 @@
 """How a text is normalised, the same way in every step that compares texts.
 
-A text is normalised as BERT's tokenizer normalises it: text cleaning,
-Unicode's NFD, lowercase, and no accents. It is used in four places:
+TOKENIZER_NORMALIZER normalises a text as BERT's tokenizer normalises it:
+text cleaning, Unicode's NFD, lowercase, and no accents. Four places use the
+normalisation:
 
 1. Preparing the training pairs, in ``pairs prepare`` and ``corpus build``.
    ``pairs.common.clean`` removes invisible characters with
@@ -23,16 +24,15 @@ step.
 
 from tokenizers import normalizers
 
-# The text cleaning of BERT's tokenizer: it removes every control, format and
-# private-use character, such as a byte left from a broken quote, a soft
-# hyphen, a zero-width space or a direction mark. It turns every whitespace
-# character, such as a tab, a line break or a no-break space, into a plain
-# space.
+# The text cleaning of BERT's tokenizer. It removes control, format and
+# private-use characters. Examples are a byte left from a broken quote, a soft
+# hyphen, a zero-width space and a direction mark. The cleaning turns a tab, a
+# line feed, a carriage return or a no-break space into a plain space.
 BERT_CLEANING = normalizers.BertNormalizer(
     clean_text=True, handle_chinese_chars=False, strip_accents=False, lowercase=False
 )
 # The tokenizer's normaliser, as BERT's tokenizer normalises a text for its
-# uncased models: text cleaning, Unicode's NFD, lower case, and no accents.
+# uncased models: text cleaning, Unicode's NFD, lowercase, and no accents.
 TOKENIZER_NORMALIZER = normalizers.Sequence(
     [
         BERT_CLEANING,
@@ -44,7 +44,9 @@ TOKENIZER_NORMALIZER = normalizers.Sequence(
 
 
 def normalised(texts):
-    """Each text as the tokenizer normalises it, each distinct text once.
+    """Each text as the tokenizer normalises it.
+
+    The normaliser runs only once for each distinct text.
 
     Args:
         texts (pd.Series): Texts.

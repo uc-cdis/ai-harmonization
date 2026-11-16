@@ -1,11 +1,11 @@
 """The NIH CDE Repository: data elements with their names, definitions and values.
 
 The repository serves only its current state, through a one-call export of
-every element: the export that ``ai_harmonization.cde`` also uses, with retired
-elements included. Each element keeps its registration status, such as
-``Retired``. The export is kept, so a later fetch reads the same elements. Its
-count must equal the total that the repository's search reports, or the export
-is not kept.
+every element. This module uses the export that ``ai_harmonization.cde`` also
+uses, with retired elements included. Each element keeps its registration
+status, for example ``Retired``. The fetch keeps the export, so a later fetch
+reads the same elements. The export's count of elements must equal the total
+that the repository's search reports, or the fetch does not keep the export.
 """
 
 import json
@@ -64,8 +64,8 @@ def export(path, url, query):
         read.append(json.loads(file_bytes))
         if len(read[0]) != total:
             raise ValueError(
-                f"the export holds {len(read[0]):,} elements and the search "
-                f"reports {total:,}; nothing was kept, try again later"
+                f"the export holds {len(read[0]):,} elements, and the search "
+                f"reports {total:,}. Nothing was kept. Try again later"
             )
 
     downloaded(url, path, json=query, check=check)
@@ -85,7 +85,8 @@ def read_export(elements):
     Returns:
         dict[str, pd.DataFrame]: ``elements``, ``designations``,
             ``definitions``, ``ids``, ``values`` and ``properties``, keyed by
-            ``tiny_id``, with each list's ``position``.
+            ``tiny_id``. ``designations``, ``definitions`` and ``values`` also
+            keep each entry's ``position`` in its list.
     """
     rows = {
         "elements": [],
@@ -187,12 +188,15 @@ def fetch_source(downloads, manifest):
 
     Args:
         downloads (Path): Where downloaded files are kept between fetches.
-        manifest (dict): The committed manifest. The export is not pinned:
-            the repository serves only its current state.
+        manifest (dict): The committed manifest. The export is not pinned,
+            because the repository serves only its current state.
 
     Returns:
-        tuple[dict[str, pd.DataFrame], list[dict], dict]: The tables, the
-            manifest's sources, and the counts that the fetch prints.
+        tuple[dict[str, pd.DataFrame], list[dict], dict]: Three values:
+
+            - the tables
+            - the manifest's sources
+            - the counts that the fetch prints
     """
     # Importing ai_harmonization.cde also imports langchain, which takes several
     # seconds. Importing it here, not at the top of this module, means only an

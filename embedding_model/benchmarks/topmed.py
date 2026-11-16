@@ -1,14 +1,16 @@
 """The TOPMed benchmark.
 
-dbGaP study variables mapped by the experts of the TOPMed Data Coordinating
-Center to its harmonized variables. For each harmonized variable, the
-documentation lists its harmonization units. A unit is a study or a subcohort
-of one. For each unit, it lists the dbGaP variables that the unit's
-harmonization function reads: "at least one representing the phenotype itself,
-and at least one for the age at measurement", in the documentation's words. It
-cites each variable by accession, release included, so the variable's text
-comes from the data dictionaries of that dbGaP release, which need no
-controlled access.
+The benchmark holds dbGaP study variables. The experts of the TOPMed Data
+Coordinating Center mapped them to the Center's harmonized variables. For each
+harmonized variable, the Center's documentation lists its harmonization units.
+A unit is a study or a subcohort of one.
+
+For each unit, the documentation lists the dbGaP variables that the unit's
+harmonization function reads. In the documentation's words, there is "at least
+one representing the phenotype itself, and at least one for the age at
+measurement". The documentation cites each variable by accession, release
+included. So the variable's text comes from the data dictionaries of that
+dbGaP release, which need no controlled access.
 
 The targets are the harmonized schema, written ``<node>.<property>``. The node
 is the dataset whose folder holds the variable's documentation
@@ -16,9 +18,9 @@ is the dataset whose folder holds the variable's documentation
 age at measurement (``age_at_cac_score_1``) where the variable has one. A
 component variable maps to the age when its dbGaP description says "age", and
 to the phenotype otherwise. A reviewed list, ``topmed_corrections.csv``, then
-corrects these mappings: it removes the ones whose variable does not carry
-the target's value, and maps a variable to the age that its unit computes
-from it.
+corrects these mappings. It removes the mappings whose variable does not carry
+the target's value. It also maps a variable to the age that its unit computes
+from the variable.
 """
 
 import csv
@@ -64,10 +66,17 @@ def read_documentation(archive):
             a ``.tar.gz``.
 
     Returns:
-        list[dict]: One per harmonized variable, sorted by dataset and name:
-            its ``dataset``, ``name``, ``type``, ``description``, ``values``,
-            ``has_age`` and ``components`` -- the dbGaP references that its
-            units cite, each a tuple (phs, release, pht, table version, phv).
+        list[dict]: One dict per harmonized variable, sorted by dataset and
+            name, with these keys:
+
+            - ``dataset``, ``name``, ``type``, ``description``, ``values`` and
+              ``has_age``
+            - ``components``: the dbGaP references that the variable's units
+              cite, each a tuple (phs, release, pht, table version, phv)
+
+    Raises:
+        ValueError: If a unit cites a component that is not a phs.v.pht.v.phv
+            accession. The error names the file.
     """
     variables = []
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
@@ -114,9 +123,9 @@ def read_documentation(archive):
 def target_rows(variables):
     """The targets: each harmonized variable's phenotype and, if it has one, age.
 
-    The age target is described the way the BioData Catalyst data model
-    describes the same properties: "age at measurement of <name> (years)".
-    Types are spelled as ``ai_harmonization.dbgap`` spells the sources' types,
+    target_rows describes the age target as the BioData Catalyst data model
+    describes the same properties: "age at measurement of <name> (years)". It
+    spells each type as ``ai_harmonization.dbgap`` spells the sources' types,
     so the two sides of a mapping name a type alike.
 
     Args:
@@ -156,18 +165,19 @@ def is_age(description):
 def cited_variables(dictionary, report, study, wanted):
     """The cited variables of one dbGaP table, as mapping rows.
 
-    The documentation names each component variable only by accession, so its
-    text comes from the table that holds it. The table is read with
-    ``parse_dbgap_table``, as any study's table is. Only the cited variables
-    are kept, each as a mapping row still without its target.
+    The documentation names each component variable only by accession, so the
+    variable's text comes from the table that holds it. ``parse_dbgap_table``
+    reads the table, as it reads any study's table. cited_variables keeps only
+    the cited variables, each as a mapping row still without its target.
     resolve_components calls this once per cited table.
 
     Args:
         dictionary (Path): The table's ``data_dict.xml``.
-        report (Path | None): Its ``var_report.xml``, which gives the types.
-        study (str): The study accession, such as ``phs999999``.
+        report (Path | None): The table's ``var_report.xml``, which gives the
+            types.
+        study (str): The study accession, for example ``phs999999``.
         wanted (set[str]): The phv accessions cited from this table, without
-            their version, such as ``phv99999901``.
+            their version, for example ``phv99999901``.
 
     Returns:
         dict[str, dict]: Each cited variable that the table has, by phv
@@ -194,24 +204,30 @@ def cited_variables(dictionary, report, study, wanted):
 
 
 def resolve_components(references, downloads):
-    """Look up every component variable in the dbGaP release that its reference cites.
+    """Find every component variable in the dbGaP release that its reference cites.
 
-    Only the tables that the references name are downloaded, each with its data
-    dictionary and variable report. Two of dbGaP's folder listings are read to
-    find them: the study's, for the folder of the release cited (a reference
-    gives ``phs999999.v1``, the folder is ``phs999999.v1.p1``), and that
-    release's, for the names of its files. A published release never changes,
-    so its listing is downloaded once and kept like any file. The study's
-    listing gains a folder with each new release, so it is fetched again when
-    the release cited is missing from the copy kept.
+    resolve_components downloads only the tables that the references name,
+    each with its data dictionary and variable report. To find them, it reads
+    two of dbGaP's folder listings:
+
+    - the study's listing, for the folder of the release cited. A reference
+      gives ``phs999999.v1``, and the folder is ``phs999999.v1.p1``.
+    - that release's listing, for the names of its files
+
+    A published release never changes, so resolve_components downloads its
+    listing once and keeps it like any file. The study's listing gains a
+    folder with each new release. So resolve_components downloads the study's
+    listing again when the release cited is missing from the kept copy.
 
     Args:
         references (set[tuple]): (phs, release, pht, table version, phv).
-        downloads (Path): Where the dbGaP files are kept.
+        downloads (Path): The folder that keeps the dbGaP files.
 
     Returns:
-        tuple[dict, list[dict]]: Each variable found, by (phs, release, phv);
-            and one manifest source per dbGaP release used.
+        tuple[dict, list[dict]]: Two values:
+
+            - each variable found, by (phs, release, phv)
+            - one manifest source per dbGaP release used
 
     Raises:
         LookupError: If a cited release, table or variable is not on dbGaP.
@@ -281,9 +297,9 @@ def mapping_rows(variables, resolved):
     """One row per component variable, with every target it maps to.
 
     A variable that several units cite is one row with all its targets. For
-    example, three cohorts of one study can cite the same age at exam. Where a
-    variable is cited from more than one release, the text of the latest
-    release cited is used.
+    example, three cohorts of one study can cite the same age at exam. If the
+    documentation cites a variable from more than one release, mapping_rows
+    uses the text of the latest release cited.
 
     Args:
         variables (list[dict]): From read_documentation.
@@ -333,7 +349,7 @@ def read_corrections(path):
 
     Raises:
         ValueError: If a row's action is not one of CORRECTION_ACTIONS, or its
-            use not one of CORRECTION_USES.
+            use is not one of CORRECTION_USES.
     """
     with open(path, newline="", encoding="utf-8") as file:
         corrections = list(csv.DictReader(file))
@@ -353,7 +369,8 @@ def apply_corrections(rows, corrections, targets):
     """The mapping rows with the reviewed corrections applied.
 
     An ``exclude`` removes a variable's mapping to a target, and an ``add``
-    gives it one. A row whose targets are all excluded is dropped.
+    gives it one. apply_corrections drops a row whose targets are all
+    excluded.
 
     Args:
         rows (list[dict]): From mapping_rows.
@@ -364,10 +381,16 @@ def apply_corrections(rows, corrections, targets):
         list[dict]: The rows that keep a target, in their order.
 
     Raises:
-        ValueError: Naming each correction that does not match the
-            documentation: an excluded mapping that it does not give, or an
-            added mapping to a variable or a target that it does not have, or
-            that it gives already.
+        ValueError: If corrections do not match the documentation, in each of
+            these cases:
+
+            - an excluded mapping that the documentation does not give
+            - an added mapping to a variable or a target that the
+              documentation does not have
+            - an added mapping that the documentation gives already
+
+            The error gives the number of such corrections, and names the
+            first 12.
     """
     expected = {row["source_variable_id"]: set(row["expected_target"]) for row in rows}
     properties = {target["target_property"] for target in targets}
@@ -390,7 +413,7 @@ def apply_corrections(rows, corrections, targets):
             )
     if stale:
         raise ValueError(
-            f"{len(stale)} corrections do not match the documentation; review "
+            f"{len(stale)} corrections do not match the documentation. Review "
             f"{CORRECTIONS}: " + "; ".join(stale[:12])
         )
     return [
@@ -404,14 +427,18 @@ def build(downloads, manifest):
     """Build the TOPMed benchmark from the inputs that its manifest pins.
 
     Args:
-        downloads (Path): Where downloaded files are kept between builds.
-        manifest (dict): The committed manifest; its documentation source
+        downloads (Path): The folder that keeps the downloaded files between
+            builds.
+        manifest (dict): The committed manifest. Its documentation source
             gives the repository and the commit.
 
     Returns:
-        tuple[list[dict], list[dict], list[dict], dict]: The targets, the
-            mappings, the manifest's sources, and the counts that the build
-            prints.
+        tuple[list[dict], list[dict], list[dict], dict]: Four values:
+
+            - the targets
+            - the mappings
+            - the manifest's sources
+            - the counts that the build prints
     """
     documentation = manifests.pinned(manifest, DOCUMENTATION)
     variables = read_documentation(
@@ -436,8 +463,8 @@ def build(downloads, manifest):
     }
     print(
         f"  {counts['harmonized_variables']} harmonized variables, "
-        f"{counts['targets']} targets; {counts['component_references']:,} "
-        f"component references in {counts['dbgap_releases']} dbGaP releases; "
+        f"{counts['targets']} targets. {counts['component_references']:,} "
+        f"component references in {counts['dbgap_releases']} dbGaP releases. "
         f"{counts['source_variables']:,} source variables, "
         f"{counts['mapped_to_an_age']:,} of them mapped to an age, after "
         f"{len(corrections)} corrections"

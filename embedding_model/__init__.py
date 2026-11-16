@@ -1,4 +1,5 @@
 """Build, train and evaluate a small embedding model for harmonization.
 
-Run as ``python -m embedding_model <step>``; see ``embedding_model/README.md``.
+Run the package as ``python -m embedding_model <step>``. ``embedding_model/README.md``
+describes the steps.
 """

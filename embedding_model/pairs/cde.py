@@ -1,19 +1,19 @@
 """The NIH CDE Repository: each data element, around its first designation.
 
 The source side holds the element's other designations whose tags are all
-name or question tags, in ``NAME_TAGS``. The word "Deprecated" is removed
-from those that start with it. A designation is a question text when a tag
-names a question, such as ``Preferred Question Text``, or when it ends with a
-question mark.
+name or question tags, in ``NAME_TAGS``. ``items`` removes the word
+"Deprecated" from those that start with it. A designation is a question text
+when a tag names a question, for example ``Preferred Question Text``, or when
+it ends with a question mark.
 
-The description is the first definition, and the other definitions are paired
-with it. NCI's elements copy their definitions from caDSR, so they are cleaned
-in the same way as caDSR's.
+The description is the first definition, and ``common.star`` pairs the other
+definitions with it. NCI's elements copy their definitions from caDSR, so
+``items`` cleans them in the same way as caDSR's.
 
 Each value is its meaning, or its permissible value when it has no meaning, in
-the element's order. The codes written before the values, as in ``0= None``,
-are removed as ``common.value_labels`` says. The type is the element's own
-datatype, such as ``Value List``.
+the element's order. ``common.value_labels`` removes the codes written before
+the values, as in ``0= None``, under the rules in its docstring. The type is
+the element's own datatype, for example ``Value List``.
 """
 
 from collections import defaultdict
@@ -31,9 +31,9 @@ from embedding_model.pairs.common import (
 from embedding_model.sources.common import report_new
 
 # The NIH CDE Repository also lists some of caDSR's elements, with NCI as their
-# steward. Their definitions are caDSR's, so they are cleaned as caDSR's are:
+# steward. Their definitions are caDSR's, so items cleans them in the same way.
 # cadsr_definition() removes caDSR's curation marks and turns its concept joins
-# into spaces, and without_java() removes the phrase about a Java type. Other
+# into spaces. without_java() removes the phrase about a Java type. Other
 # stewards' definitions get the usual cleaning only.
 CADSR_STEWARD = "NCI"
 # The registration statuses that the repository's guides list, and Retired.
@@ -74,9 +74,11 @@ NAME_TAGS = {
     "Shortname",
     "Suggested Question Text",
 }
-# The tags whose designations are not names: instructions to the person who
-# fills a form ("Answer this question only if ..."), LOINC's consumer names,
-# which the LOINC reader leaves out too, and notes about an instrument.
+# The tags whose designations are not names:
+# - instructions to the person who fills a form ("Answer this question only
+#   if ...")
+# - LOINC's consumer names, which the LOINC reader leaves out too
+# - notes about an instrument
 OTHER_TAGS = {
     "Consumer Name ALPHA",
     "Guide For Use",

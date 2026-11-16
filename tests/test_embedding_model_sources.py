@@ -86,7 +86,7 @@ class TestOwl:
     """Reading statements and axioms from an OWL file."""
 
     def test_statements_keep_exact_text_and_defined_parents(self):
-        """Text is kept as written, and an intersection's named members are parents."""
+        """read_owl keeps the text as written, and an intersection's named members as parents."""
         document = rdf(
             f"""    <owl:Class rdf:about="{NCIT}C900002">
         <P90>Abcd </P90>
@@ -111,7 +111,7 @@ class TestOwl:
         assert values[owl.RDFS + "subClassOf"] == [NCIT + "C900001"]
 
     def test_an_entity_declaration_is_refused(self):
-        """A file that declares an entity is refused, as an external reference could be."""
+        """read_owl refuses a file that declares an entity, here one that points to a file."""
         document = rdf("").replace(
             b'<?xml version="1.0"?>',
             b'<?xml version="1.0"?>\n<!DOCTYPE rdf:RDF [<!ENTITY abcd SYSTEM "file:///abcd">]>',
@@ -120,7 +120,7 @@ class TestOwl:
             owl.read_owl(io.BytesIO(document))
 
     def test_axioms_keep_every_annotation(self):
-        """Two axioms on one statement, one with two values, are all kept."""
+        """read_owl keeps both axioms on one statement, and both term types of the second axiom."""
         source, prop = NCIT + "C900001", NCIT + "P90"
         document = rdf(
             "\n".join(
@@ -137,7 +137,7 @@ class TestOwl:
 
 
 def ncit_document():
-    """A fictional NCIt release: properties, a value list and four concepts."""
+    """A fictional NCIt release: properties, a value list and five concepts."""
     ns = NCIT
 
     def prop(code, name):
@@ -200,7 +200,7 @@ class TestNcit:
     """NCIt's tables, and the replacements in its history file."""
 
     def test_concepts_synonyms_definitions_and_values(self):
-        """Each FULL_SYN keeps its own axiom, and value lists keep their association."""
+        """read_ncit keeps each FULL_SYN's own axiom, and each value list's association."""
         tables = ncit.read_ncit(io.BytesIO(ncit_document()))
         concept = tables["concepts"].set_index("code").loc["C900002"]
         assert concept.display_names == "Abcd Display|Abcd Display Two"
@@ -233,15 +233,18 @@ class TestNcit:
         )
 
     def test_a_kept_zip_without_its_owl_file_names_the_fix(self, tmp_path):
-        """A kept release zip that holds no .owl file is named, with what to do."""
+        """fetch_source names a kept release zip that holds no .owl file, and says what to do."""
         with zipfile.ZipFile(tmp_path / "Thesaurus_99.01d.OWL.zip", "w") as bundle:
             bundle.writestr("readme.txt", "abcd")
         manifest = {"sources": [{"name": ncit.RELEASE, "version": "99.01d"}]}
-        with pytest.raises(ValueError, match="holds no .owl file; delete it"):
+        with pytest.raises(ValueError, match="holds no .owl file. Delete it"):
             ncit.fetch_source(tmp_path, manifest)
 
     def test_a_merge_names_a_replacement_and_a_retire_its_old_parent(self, tmp_path):
-        """A merge record names the survivor; a retire record names no replacement."""
+        """replacements takes the survivor of a merge record as the replacement.
+
+        A retire record gives no replacement.
+        """
         path = history_zip(
             tmp_path,
             [
@@ -264,10 +267,13 @@ class TestNcit:
         ]
 
     def test_a_history_file_of_another_shape_is_refused(self, tmp_path):
-        """A zip without a history file, or with lines of other fields, is named."""
+        """read_history refuses a zip without a history file.
+
+        It also refuses lines with another number of fields.
+        """
         with zipfile.ZipFile(tmp_path / "empty.zip", "w") as bundle:
             bundle.writestr("readme.md", "abcd")
-        with pytest.raises(ValueError, match="holds no history file; delete it"):
+        with pytest.raises(ValueError, match="holds no history file. Delete it"):
             ncit.read_history(tmp_path / "empty.zip")
         path = history_zip(tmp_path, ["C900004|merge|01-Jan-26|C900002"])
         with pytest.raises(ValueError, match="has 6 fields"):
@@ -333,7 +339,10 @@ class TestObo:
     """The OBO Foundry ontologies' terms, and their releases and licenses."""
 
     def test_own_terms_with_synonyms_types_and_replacements(self, monkeypatch):
-        """Only the ontology's own terms; obsolete ones keep their replacement, label or not."""
+        """read_ontology reads only the ontology's own terms.
+
+        An obsolete term keeps its replacement, with a label or without one.
+        """
         monkeypatch.setitem(obo.ONTOLOGIES, "abcd", ("ABCD", None, None))
         tables, stated = obo.read_ontology(io.BytesIO(obo_document()), "abcd")
         terms = tables["terms"].set_index("id")
@@ -367,21 +376,24 @@ class TestObo:
         ],
     )
     def test_a_stated_license_becomes_its_spdx_expression(self, stated, expected):
-        """A file's license is written as SPDX; a file that states none is NONE."""
+        """spdx_license gives a file's license as SPDX, and NONE for a file that states none."""
         assert obo.spdx_license(stated, "abcd") == expected
 
     def test_an_unknown_license_stops_the_fetch(self):
-        """A license that LICENSE_IDS does not know is named, with what to do."""
-        with pytest.raises(ValueError, match="abcd file states the license .*add"):
+        """spdx_license names a license that LICENSE_IDS does not know, and says what to do."""
+        with pytest.raises(ValueError, match="abcd file states the license .*Add"):
             obo.spdx_license("https://abcd.org/license", "abcd")
 
     def test_short_ids(self):
-        """IRIs become OBO short ids; a local synonym type keeps only its name."""
+        """short_id turns IRIs into OBO short ids, and a local synonym type into its name."""
         assert obo.short_id(OBO + "HP_0000001") == "HP:0000001"
         assert obo.short_id(OBO + "hp#layperson") == "layperson"
 
     def test_fetch_records_each_release_and_license(self, monkeypatch, tmp_path):
-        """A dated release keeps its pin; an undated one takes its file's date. Licenses are the files'."""
+        """fetch_source records each release, and the license that its file states.
+
+        A dated release keeps its pin, and an undated release takes its file's date.
+        """
         monkeypatch.setattr(
             obo,
             "ONTOLOGIES",
@@ -491,7 +503,10 @@ class TestLoinc:
     """LOINC's tables, its restriction fields, and how its zip is obtained."""
 
     def test_named_columns_only_and_notices_close(self):
-        """SNOMED CT columns are never read; a notice closes a code, a form row and a panel's rows."""
+        """read_release never reads SNOMED CT columns, and notices close items.
+
+        A notice closes a code, a form row and a panel's rows.
+        """
         tables = loinc.read_release(io.BytesIO(loinc_zip()))
         assert "ExtCodeDisplayName" not in tables["answers"].columns
         assert tables["codes"].set_index("LOINC_NUM").open.to_dict() == {
@@ -510,12 +525,15 @@ class TestLoinc:
         }
 
     def test_a_new_column_is_reported(self, capsys):
-        """A column in neither list is printed and not read; a known column is not printed."""
+        """read_release prints a column in neither list, and does not read it.
+
+        It does not print a known column.
+        """
         file_bytes = loinc_zip({"ABCD_NEW": "abcd", "FORMULA": ""})
         tables = loinc.read_release(io.BytesIO(file_bytes))
         assert "ABCD_NEW" not in tables["codes"].columns
         printed = capsys.readouterr().out
-        assert "new column in LoincTable/Loinc.csv: 'ABCD_NEW'; not read" in printed
+        assert "new column in LoincTable/Loinc.csv: 'ABCD_NEW', not read" in printed
         assert "FORMULA" not in printed
         assert "ExtCodeDisplayName" not in printed
 
@@ -538,7 +556,7 @@ class TestLoinc:
             loinc.fetch_source(tmp_path, manifest)
 
     def test_a_download_with_another_md5_is_not_kept(self, monkeypatch, tmp_path):
-        """A download without LOINC's published MD5 is refused, and not kept."""
+        """fetch_source refuses a download without LOINC's published MD5, and does not keep it."""
         monkeypatch.setenv("LOINC_USERNAME", "abcd")
         monkeypatch.setenv("LOINC_PASSWORD", "efgh")
         monkeypatch.setattr(
@@ -559,7 +577,10 @@ class TestLoinc:
     def test_a_download_with_another_md5_than_pinned_is_refused(
         self, monkeypatch, tmp_path
     ):
-        """A download with LOINC's MD5 is refused, and not kept, when the manifest pins another."""
+        """fetch_source refuses a download whose MD5 is not the MD5 that the manifest pins.
+
+        The download has LOINC's published MD5, and fetch_source does not keep it.
+        """
         file_bytes = loinc_zip()
         monkeypatch.setenv("LOINC_USERNAME", "abcd")
         monkeypatch.setenv("LOINC_PASSWORD", "efgh")
@@ -584,7 +605,7 @@ class TestLoinc:
         assert not (tmp_path / "Loinc_9.99.zip").exists()
 
     def test_a_zip_with_the_pinned_md5_is_read(self, tmp_path):
-        """A zip placed by hand with the pinned MD5 is read, and its MD5 recorded."""
+        """fetch_source reads a zip placed by hand with the pinned MD5, and records its MD5."""
         file_bytes = loinc_zip()
         (tmp_path / "Loinc_9.99.zip").write_bytes(file_bytes)
         md5 = hashlib.md5(file_bytes, usedforsecurity=False).hexdigest()
@@ -600,7 +621,7 @@ class TestCdisc:
     """CDISC's terminology files."""
 
     def test_na_is_a_value_not_missing(self):
-        """A submission value of NA stays the text NA."""
+        """read_package keeps a submission value of NA as the text NA."""
         package_text = (
             "\t".join(cdisc.COLUMNS)
             + "\n"
@@ -622,7 +643,7 @@ class TestCdisc:
         assert frame.package.tolist() == ["sdtm"]
 
     def test_quotes_are_text_and_a_lost_column_is_an_error(self):
-        """A cell starting with a quote is read as written; a missing column raises."""
+        """read_package reads a leading quote as written, and raises on a missing column."""
         row = ["C999901", "C999902", "", "Abcd", '"Abcd', "", "Abcd", "Abcd"]
         package_text = "\t".join(cdisc.COLUMNS) + "\n" + "\t".join(row)
         frame = cdisc.read_package(package_text.encode(), "sdtm")
@@ -663,7 +684,10 @@ class TestCde:
     """The NIH CDE export's tables, restriction fields and count check."""
 
     def test_tables_and_the_allow_list(self, capsys):
-        """Only a public-domain element with noRenderAllowed false is open; a new status is reported."""
+        """In read_export, only a public-domain element with noRenderAllowed false is open.
+
+        read_export prints a new copyright status.
+        """
         unmarked = cde_element("abcd4")
         del unmarked["noRenderAllowed"]
         tables = cde.read_export(
@@ -697,7 +721,7 @@ class TestCde:
         assert tables["ids"].id.unique().tolist() == ["AbcdScore"]
 
     def test_retired_elements_are_asked_for(self, monkeypatch, tmp_path):
-        """The export and the search total both include retired elements."""
+        """The export's query and the search's query both ask for retired elements."""
         (tmp_path / "SearchExport.json").write_text("[]")
         export = MagicMock(return_value=[cde_element("abcd1")])
         monkeypatch.setattr(cde, "export", export)
@@ -710,7 +734,7 @@ class TestCde:
         assert search.call_args.kwargs["json"]["includeRetired"] is True
 
     def test_an_export_short_of_the_total_is_not_kept(self, monkeypatch, tmp_path):
-        """An export whose count is not the search's total raises, and nothing is kept."""
+        """cde.export raises on a count other than the search's total, and keeps nothing."""
         monkeypatch.setattr(cde, "search_total", lambda: 2)
         monkeypatch.setattr(
             download,
@@ -747,7 +771,10 @@ class TestCadsr:
     """caDSR's snapshot: latest versions, and its restriction field."""
 
     def test_latest_version_once_and_the_use_field(self, capsys):
-        """Each element is kept once, at its latest version; a proprietary or new document closes it."""
+        """read_snapshot keeps each element once, at its latest version.
+
+        A proprietary document, or a document of a new type, closes its element.
+        """
         xml = (
             "<DataElementsList>"
             + "".join(
@@ -784,7 +811,7 @@ class TestCadsr:
         assert tables["values"].end_date.unique().tolist() == ["2020-01-01"]
 
     def test_a_fetch_counts_every_closed_element_as_not_open(self, tmp_path, capsys):
-        """A proprietary and a new kind of document both count as not open."""
+        """fetch_source counts an element with a proprietary or a new document type as not open."""
         xml = (
             "<DataElementsList>"
             + cadsr_element("9999901", "1")
@@ -815,7 +842,7 @@ class TestCadsr:
         assert elements.long_name.tolist() == ["Abcd Newer"]
 
     def test_a_version_not_a_number_names_its_element(self):
-        """An element whose version is not a number is an error that names it."""
+        """cadsr.version names the element in its error, when the version is not a number."""
         with pytest.raises(ValueError, match="9999901"):
             cadsr.version({"public_id": "9999901", "version": "abcd"})
 
@@ -844,7 +871,7 @@ class TestNhanes:
     """NHANES' variable lists and codebook pages."""
 
     def test_variable_list(self):
-        """The variable list's columns are read under their short names."""
+        """read_variable_list reads the variable list's columns under their short names."""
         frame = nhanes.read_variable_list(VARIABLE_LIST)
         assert frame.to_dict("records") == [
             {
@@ -860,12 +887,15 @@ class TestNhanes:
         ]
 
     def test_a_list_without_a_column_is_an_error(self):
-        """A variable list that lost a column is refused, not read with it empty."""
+        """read_variable_list refuses a variable list that lost a column.
+
+        It does not read the list with the column empty.
+        """
         with pytest.raises(ValueError, match="Begin Year"):
             nhanes.read_variable_list(VARIABLE_LIST.replace(b"Begin Year", b"Start"))
 
     def test_codebook_keeps_every_value_row(self):
-        """The codebook's texts are read, every target kept, and every row of the value table."""
+        """read_codebook reads the texts, every target and every row of the value table."""
         variables, values = nhanes.read_codebook(CODEBOOK)
         assert variables == [
             {
@@ -885,7 +915,7 @@ class TestNhanes:
         ]
 
     def test_a_codebook_row_takes_open_from_its_data_file(self):
-        """A codebook row that the lists do not name takes its data file's open."""
+        """add_open gives each codebook row its data file's open, though the lists lack its variable."""
         variables = pd.DataFrame(
             {
                 "cycle": ["2017", "2017"],
@@ -903,7 +933,7 @@ class TestNhanes:
         assert nhanes.add_open(codebook, variables).open.tolist() == [True, False]
 
     def test_cycles_start_on_odd_years(self):
-        """A file beginning in 2000 is in the 1999 cycle."""
+        """cycle puts a file that begins in 2000 in the 1999 cycle."""
         assert nhanes.cycle("2000") == 1999
         assert nhanes.cycle("2017") == 2017
 
@@ -924,7 +954,7 @@ class TestNhanes:
     def test_a_codebook_not_found_is_left_out(
         self, pages, monkeypatch, capsys, tmp_path
     ):
-        """A data file whose codebook page is not found is counted, and the rest is read."""
+        """fetch_source counts a data file whose codebook page is not found, and reads the rest."""
         pages[nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")] = http_error(404)
         monkeypatch.setattr(nhanes, "downloaded", served(pages))
         tables, found, counts = nhanes.fetch_source(tmp_path, {"sources": []})
@@ -932,7 +962,7 @@ class TestNhanes:
         printed = capsys.readouterr().out
         assert "new value of Use Constraints: 'Abcd Only' on 1 items" in printed
         assert "2 variables: 1 open, 1 not open" in printed
-        assert "1 data files without a public codebook" in printed
+        assert "2 data files: 1 without a public codebook" in printed
         assert tables["variables"].set_index("name").open.to_dict() == {
             "ABCDXYZ": True,
             "EFGHXYZ": False,
@@ -947,7 +977,7 @@ class TestNhanes:
         ]
 
     def test_an_odd_data_file_name_stops_the_fetch(self, pages, monkeypatch, tmp_path):
-        """A data file name with characters other than letters, digits and _ is refused."""
+        """fetch_source refuses a data file name with characters outside letters, digits and _."""
         listing = pages[nhanes.VARIABLE_LIST.format(component="Questionnaire")]
         pages[nhanes.VARIABLE_LIST.format(component="Questionnaire")] = listing.replace(
             b"EFGH_J", b"../EFGH_J"
@@ -969,7 +999,7 @@ class TestNhanes:
         ).read_text() == "2017/EFGH_J\n"
         monkeypatch.setattr(nhanes, "downloaded", served({}))
         tables, _, _ = nhanes.fetch_source(tmp_path, {"sources": []})
-        assert "1 data files without a public codebook" in capsys.readouterr().out
+        assert "2 data files: 1 without a public codebook" in capsys.readouterr().out
         assert tables["codebook"].data_file.tolist() == ["ABCD_J"]
 
     def test_another_page_than_a_codebook_is_not_kept(
@@ -986,7 +1016,7 @@ class TestNhanes:
     def test_another_download_failure_stops_the_fetch(
         self, pages, monkeypatch, tmp_path
     ):
-        """A codebook page that fails for another reason stops the fetch, naming it."""
+        """A codebook page that fails for another reason stops the fetch, and the error names it."""
         failed = nhanes.CODEBOOK.format(cycle=2017, data_file="EFGH_J")
         pages[failed] = requests.ConnectionError("connection reset")
         monkeypatch.setattr(nhanes, "downloaded", served(pages))
@@ -1106,13 +1136,19 @@ class TestPhenx:
     """PhenX's database export: its dump, tables and release."""
 
     def test_insert_rows_with_quotes_escapes_and_null(self):
-        """Doubled and escaped quotes, NULL and bare numbers are read as MySQL writes them."""
+        """insert_rows reads values as MySQL writes them.
+
+        The values hold doubled and escaped quotes, a NULL and a bare number.
+        """
         assert phenx.insert_rows("(1,'It''s','a\\'b\\nc',NULL);") == [
             ["1", "It's", "a'b\nc", None]
         ]
 
     def test_a_row_short_of_its_columns_is_an_error(self):
-        """A row with fewer values than its table's columns is not padded, but refused."""
+        """read_dump refuses a row with fewer values than its table's columns.
+
+        It does not pad the row.
+        """
         dump = DUMP.replace("(1,'Available','Free')", "(1,'Available')")
         with pytest.raises(ValueError, match="protocol_availability_types"):
             phenx.read_dump(io.BytesIO(dump.encode()), phenx.TABLES)
@@ -1129,7 +1165,10 @@ class TestPhenx:
         assert tables["release"].name.tolist() == ["Ver 9.2"]
 
     def test_export_tables_availability_and_release(self, capsys):
-        """A variable is open when its protocol is Available; one of an unlisted protocol is not, and counted."""
+        """A variable is open when its protocol is Available.
+
+        A variable of an unlisted protocol is not open, and read_export prints the count.
+        """
         dump = phenx.read_dump(io.BytesIO(DUMP.encode()), phenx.TABLES)
         tables = phenx.read_export(dump)
         assert (
@@ -1151,7 +1190,10 @@ class TestPhenx:
         assert tables["release"].name.tolist() == ["Ver 9.1"]
 
     def test_an_export_is_downloaded_once_and_read(self, monkeypatch, tmp_path):
-        """The export is downloaded from PhenX's address, kept, and read with its release."""
+        """fetch_source downloads the export from PhenX's address, and keeps it.
+
+        It reads the export's tables, and records its release.
+        """
         monkeypatch.setattr(
             phenx, "downloaded", served({phenx.EXPORT_URL: phenx_zip()})
         )
@@ -1164,7 +1206,7 @@ class TestPhenx:
         assert found[0]["version"] == "Ver 9.1"
 
     def test_a_download_without_the_dump_is_not_kept(self, monkeypatch, tmp_path):
-        """A download that is not a zip holding phenx.sql raises, and nothing is kept."""
+        """fetch_source raises on a download that is not a zip with phenx.sql, and keeps nothing."""
         monkeypatch.setattr(
             phenx, "downloaded", served({phenx.EXPORT_URL: b"not a zip"})
         )
@@ -1174,7 +1216,7 @@ class TestPhenx:
         assert list(tmp_path.iterdir()) == []
 
     def test_another_release_than_pinned_is_refused(self, tmp_path):
-        """An export of a release that the manifest does not pin is refused."""
+        """fetch_source refuses an export of a release that the manifest does not pin."""
         (tmp_path / "Phenx_DB.zip").write_bytes(phenx_zip())
         manifest = {"sources": [{"name": phenx.EXPORT, "version": "Ver 8.0"}]}
         with pytest.raises(
@@ -1185,10 +1227,10 @@ class TestPhenx:
 
 
 class TestCommon:
-    """The helpers every source uses."""
+    """The helpers that the source readers share."""
 
     def test_a_new_value_is_closed_and_reported(self, capsys):
-        """A value in neither list is not open, and is printed with its count."""
+        """open_where reads a value in neither list as not open, and prints it with its count."""
         found = common.open_where(
             pd.Series(["yes", "no", "maybe", "maybe"]), {"yes"}, {"no"}, "abcd_field"
         )
@@ -1205,9 +1247,10 @@ class TestWriteAndRead:
     """Writing a source's tables, and reading them back."""
 
     def test_round_trip_and_content_hash(self, tmp_path):
-        """Tables written as parquet read back, checked by their content's SHA-256.
+        """read_source reads back the tables that write_source writes, unchanged.
 
-        The counts are written as the fetch gives them.
+        The manifest holds each table's file and content SHA-256, and the counts as the
+        fetch gives them.
         """
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
@@ -1226,7 +1269,10 @@ class TestWriteAndRead:
         assert read == manifest
 
     def test_texts_that_look_missing_stay_texts(self, tmp_path):
-        """Labels such as None and N/A, an empty text and true or false read back as written."""
+        """Texts that look missing, for example the labels None and N/A, read back as written.
+
+        An empty text, and true or false, read back as written too.
+        """
         table = pd.DataFrame(
             {"label": ["None", "N/A", "NA", ""], "open": [True, False, True, False]}
         )
@@ -1243,7 +1289,7 @@ class TestWriteAndRead:
         assert manifests.table_sha256(TABLE) == before
 
     def test_a_streamed_checksum_is_that_of_the_whole_text(self):
-        """The SHA-256 of a large table, written to the hash piece by piece, is that of its whole CSV text.
+        """A large table's SHA-256, hashed piece by piece, is that of its schema line and CSV text.
 
         The "É" of "Éfgh" takes two bytes in UTF-8, so the bytes are checked
         too.
@@ -1294,7 +1340,7 @@ class TestWriteAndRead:
 
     @pytest.mark.parametrize("values", [[True, None], [1, None]])
     def test_a_column_of_objects_that_are_not_texts_has_a_checksum(self, values):
-        """pandas holds True or 1 beside None as objects; the checksum still reads them."""
+        """pandas holds True or 1 beside None as objects, and the checksum still reads them."""
         held_as_objects = pd.DataFrame({"open": pd.Series(values, dtype=object)})
         as_text = pd.DataFrame({"open": [str(values[0]), None]})
         assert manifests.table_sha256(held_as_objects) != manifests.table_sha256(
@@ -1310,7 +1356,7 @@ class TestWriteAndRead:
         )
 
     def test_a_changed_table_is_refused(self, tmp_path):
-        """A table whose content changed since its fetch is refused."""
+        """read_source refuses a table whose content changed since its fetch."""
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
@@ -1319,7 +1365,7 @@ class TestWriteAndRead:
             sources.read_source(tmp_path, "abcd-source")
 
     def test_a_rewritten_table_file_is_refused(self, tmp_path):
-        """A table written again, with the same content but other bytes, is refused."""
+        """read_source refuses a table written again, with the same content but other bytes."""
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
@@ -1330,7 +1376,7 @@ class TestWriteAndRead:
     def test_another_version_than_committed_is_a_warning(
         self, monkeypatch, capsys, tmp_path
     ):
-        """A fetch whose version is not the committed version is read, with a warning."""
+        """read_source reads a fetch of another version than the committed one, with a warning."""
         folder = tmp_path / "manifests"
         folder.mkdir()
         (folder / "abcd-source.json").write_text(json.dumps({"version": "2"}))
@@ -1344,26 +1390,26 @@ class TestWriteAndRead:
         )
 
     def test_an_unfetched_source_names_the_command(self, tmp_path):
-        """Reading a source never fetched says how to fetch it."""
+        """read_source says how to fetch a source that was never fetched."""
         with pytest.raises(
             FileNotFoundError, match="sources fetch --source abcd-source"
         ):
             sources.read_source(tmp_path, "abcd-source")
 
     def test_a_missing_table_names_the_command(self, tmp_path):
-        """A table that the manifest lists but that is gone is named, with the fetch."""
+        """read_source names a missing table that the manifest lists, and the fetch command."""
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         sources.write_source(directory, "abcd-source", "1", {"items": TABLE}, [], {})
         (directory / "items.parquet").unlink()
         with pytest.raises(
             FileNotFoundError,
-            match="items.parquet is missing; run: .*--source abcd-source",
+            match="items.parquet is missing. Run: .*--source abcd-source",
         ):
             sources.read_source(tmp_path, "abcd-source")
 
     def test_another_sources_manifest_is_refused(self, tmp_path):
-        """A manifest that names another source is not read as this one's."""
+        """read_source refuses a manifest that names another source."""
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         written = sources.write_source(
@@ -1376,7 +1422,7 @@ class TestWriteAndRead:
             sources.read_source(tmp_path, "abcd-source")
 
     def test_a_manifest_without_its_files_names_the_command(self, tmp_path):
-        """A manifest that records no files is an error with the fetch command."""
+        """read_source refuses a manifest that records no files, and names the fetch command."""
         directory = tmp_path / "sources" / "abcd-source"
         directory.mkdir(parents=True)
         written = sources.write_source(
@@ -1384,7 +1430,7 @@ class TestWriteAndRead:
         )
         del written["files"]
         (directory / "manifest.json").write_text(json.dumps(written))
-        with pytest.raises(ValueError, match="KeyError.*run: .*--source abcd-source"):
+        with pytest.raises(ValueError, match="KeyError.*Run: .*--source abcd-source"):
             sources.read_source(tmp_path, "abcd-source")
 
 
@@ -1428,7 +1474,7 @@ class TestFetch:
     def test_a_refused_fetch_keeps_the_working_folder(
         self, folder, monkeypatch, tmp_path
     ):
-        """A fetch that differs, without --update-manifest, leaves the working folder."""
+        """A fetch that differs, without update_manifest, keeps the working folder as it was."""
         monkeypatch.setitem(sources.FETCHERS, "abcd-source", fictional_source())
         inputs = tmp_path / "inputs"
         assert sources.fetch(["abcd-source"], inputs, update_manifest=True) == 0
@@ -1448,7 +1494,7 @@ class TestFetch:
     def test_a_table_that_a_new_version_drops_is_gone(
         self, folder, monkeypatch, tmp_path
     ):
-        """The folder is replaced whole, so a table that the new fetch lacks goes."""
+        """fetch replaces the folder whole, so a table that the new fetch lacks is gone."""
         two = MagicMock()
         two.fetch_source.side_effect = lambda downloads, manifest: (
             {"items": TABLE, "extra": TABLE},
@@ -1465,7 +1511,7 @@ class TestFetch:
     def test_a_failing_source_does_not_stop_the_others(
         self, folder, monkeypatch, capsys, tmp_path
     ):
-        """A source that cannot be fetched is reported, and the next one is still fetched."""
+        """fetch reports a source that it cannot fetch, and still fetches the next source."""
         broken = MagicMock()
         broken.fetch_source.side_effect = FileNotFoundError("no abcd-source download")
         monkeypatch.setitem(sources.FETCHERS, "abcd-source", broken)
@@ -1496,7 +1542,7 @@ class TestLicenses:
     def test_each_source_license_is_spdx(self, name):
         """A source's LICENSE is an id of the SPDX list, a LicenseRef- id, or NONE.
 
-        So a misspelt id, such as CC-BY4.0, fails.
+        So a misspelt id, for example CC-BY4.0, fails.
         """
         module = sources.FETCHERS[name]
         licenses = getattr(module, "LICENSE_IDS", {}).values() or [module.LICENSE]
@@ -1519,7 +1565,7 @@ class TestCommandLine:
     def test_a_source_that_cannot_be_fetched_is_reported(
         self, monkeypatch, capsys, tmp_path
     ):
-        """A source that cannot be fetched names what is missing, and exits 1."""
+        """`sources fetch` names what is missing for a source that it cannot fetch, and exits 1."""
         monkeypatch.delenv("LOINC_USERNAME", raising=False)
         assert (
             main(["sources", "fetch", "--source", "loinc", "--inputs", str(tmp_path)])

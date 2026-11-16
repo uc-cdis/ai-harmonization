@@ -1,4 +1,7 @@
-"""Tests for embedding_model.train: a static model trained on a small fictional corpus, on a CPU."""
+"""Tests for embedding_model.train and its architectures.
+
+Static and BERT models are trained on a small fictional corpus, on a CPU.
+"""
 
 import argparse
 import json
@@ -82,8 +85,8 @@ def write_corpus(
         rows (list[dict]): The pairs.
         checked (tuple[tuple[str, str]]): The benchmarks that the corpus was
             checked against, each with its version.
-        text_format (str | None): The pairs' text format, or None for a
-            manifest that records none.
+        text_format (str | None): The pairs' format, or None for a manifest
+            that records none.
     """
     folder = inputs / "corpora" / CORPUS
     folder.mkdir(parents=True, exist_ok=True)
@@ -225,7 +228,10 @@ class TestFeatures:
             assert torch.equal(found[key], expected[key])
 
     def test_the_validation_pairs_become_the_evaluators_texts(self):
-        """A text the tokenizer reads as another is one entry; an anchor's positives are all relevant."""
+        """In validation_texts, two texts that the tokenizer normalises to one text are one entry.
+
+        All of an anchor's positives are relevant.
+        """
         full = "Body mass index: weight divided by height squared"
         pairs = pd.DataFrame(
             [("BMI", "Body mass index"), ("Quetelet index", "Body mass index"),
@@ -246,13 +252,13 @@ class TestConfig:
     """The config's sections, the defaults under them and the flags over them."""
 
     def test_the_readme_example_reads(self):
-        """The README's run_example.yaml is a config that train reads, on the example corpus and tokenizer."""
+        """read_config reads the README's run_example.yaml, on the example corpus and tokenizer."""
         path = Path(train.__file__).parent / "examples" / "run_example.yaml"
         values, _ = train.read_config(path, 0)
         assert (values["corpus"], values["tokenizer"]) == ("example", "example-8k")
 
     def test_flags_override_the_config_and_the_config_the_defaults(self, config):
-        """A flag wins over the config, and the config over TRAINING_DEFAULTS."""
+        """A flag overrides the config, and the config overrides TRAINING_DEFAULTS."""
         values, given = train.read_config(
             config, 3, ["--learning_rate", "2e-2", "--embedding_dim", "32"]
         )
@@ -265,7 +271,7 @@ class TestConfig:
         assert {"learning_rate", "num_train_epochs"} <= given
 
     def test_the_defaults_are_the_recipes(self, tmp_path):
-        """A config that names only its data trains at the recipe's settings, with this pipeline's own.
+        """A config that names only its data gets the recipe's settings, with this pipeline's own.
 
         The recipe gives the batch size, the warmup, the learning rate and the
         width. This pipeline gives 5 epochs. The loss's scale is 20.
@@ -283,7 +289,7 @@ class TestConfig:
         assert settings["loss"].scale == 20.0
 
     def test_a_number_that_yaml_reads_as_text_becomes_a_number(self, tmp_path):
-        """YAML reads 1e-3 as text; the parser reads it by the setting's type."""
+        """YAML reads 1e-3 as text, and the parser reads it by the setting's type."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump({"data": CONFIG["data"]})
@@ -297,10 +303,10 @@ class TestConfig:
         [
             ("abcd_section:\n  efgh_setting: 1\n", "no section abcd_section"),
             ("model:\n  dimension: 8\n", "no setting dimension"),
-            ("model: 8\n", "holds no settings"),
+            ("model: 8\n", "is not a mapping of settings"),
             (
                 "model:\n  learning_rate: 0.1\n",
-                "the model section has no setting learning_rate;"
+                "the model section has no setting learning_rate."
                 " learning_rate belongs in the training section",
             ),
             (
@@ -314,7 +320,12 @@ class TestConfig:
         ],
     )
     def test_an_unknown_section_or_setting_is_refused(self, tmp_path, text, message):
-        """A section or a setting that does not exist names the config and itself."""
+        """read_config refuses an unknown section or setting, and the message names it.
+
+        It also refuses a section that is not a mapping of settings, for
+        example ``model: 8``. For a setting of another section, the message
+        names the section where the setting belongs.
+        """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(text)
         with pytest.raises(ValueError, match=message):
@@ -345,7 +356,10 @@ class TestConfig:
     def test_a_setting_that_a_run_cannot_honour_is_refused(
         self, tmp_path, training, overrides, message
     ):
-        """Each setting of REFUSED_TRAINING is refused, in the config or as a flag, before training."""
+        """read_config refuses each setting of REFUSED_TRAINING, before training.
+
+        Each case gives the setting in the config or as a flag.
+        """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
         with pytest.raises(ValueError, match=message):
@@ -358,14 +372,14 @@ class TestConfig:
     def test_a_save_strategy_other_than_no_is_refused(
         self, tmp_path, training, overrides
     ):
-        """A save_strategy other than "no" is refused, in the config or as a flag."""
+        """read_config refuses a save_strategy other than "no", in the config or as a flag."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], "training": training}))
         with pytest.raises(ValueError, match="save_strategy must be 'no'"):
             train.read_config(path, 0, overrides)
 
     def test_a_save_strategy_of_no_is_read(self, tmp_path):
-        """save_strategy "no", which every run's config.yaml records, is read."""
+        """read_config reads save_strategy "no", which every run's config.yaml records."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump(
@@ -387,7 +401,10 @@ class TestConfig:
             train.read_config(path, 0)
 
     def test_a_value_of_the_wrong_type_raises_an_error(self, tmp_path):
-        """A value that does not fit its setting's type raises, rather than exiting the process."""
+        """read_config raises an error for a value that does not fit its setting's type.
+
+        It does not end the process.
+        """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump({"data": CONFIG["data"], "model": {"embedding_dim": "abcd"}})
@@ -396,7 +413,10 @@ class TestConfig:
             train.read_config(path, 0)
 
     def test_a_bert_config_reads_its_settings_from_the_model_section(self, tmp_path):
-        """A BERT run reads its settings from the model section, at the BERT paper's learning rate, 1e-4."""
+        """read_config reads a BERT's settings from the model section.
+
+        The learning rate is the BERT paper's, 1e-4.
+        """
         path = tmp_path / "abcd-run.yaml"
         path.write_text(
             yaml.safe_dump(
@@ -431,7 +451,7 @@ class TestConfig:
         assert settings.max_position_embeddings == 128
 
     def test_a_given_learning_rate_is_kept(self, config):
-        """The architecture's learning rate holds only when no config or flag gives one."""
+        """A learning rate that a flag gives replaces the architecture's own."""
         values, _ = train.read_config(config, 0, ["--learning_rate", "1e-3"])
         assert values["learning_rate"] == 1e-3
 
@@ -458,14 +478,14 @@ class TestConfig:
     def test_another_architectures_settings_are_refused(
         self, tmp_path, sections, flags, message
     ):
-        """A setting of another architecture, in the model section or as a flag, is refused."""
+        """read_config refuses another architecture's setting, in the model section or as a flag."""
         path = tmp_path / "abcd-run.yaml"
         path.write_text(yaml.safe_dump({"data": CONFIG["data"], **sections}))
         with pytest.raises(ValueError, match=message):
             train.read_config(path, 0, flags)
 
     def test_each_setting_lives_in_one_section(self):
-        """No two settings classes share a setting's name, since each setting has one flag."""
+        """No two settings classes share a setting's name, because each setting has one flag."""
         names = [
             setting.name
             for classes in train.sections().values()
@@ -477,7 +497,10 @@ class TestConfig:
     def test_the_run_name_is_the_trainers_unless_the_config_names_one(
         self, config, tmp_path
     ):
-        """The run's name becomes run_name, which W&B names the run after."""
+        """read_config sets run_name to the run's name, which W&B names the run after.
+
+        A --run_name flag overrides it.
+        """
         values, _ = train.read_config(config, 0, run_name="abcd-run_s0")
         assert values["run_name"] == "abcd-run_s0"
         values, _ = train.read_config(
@@ -499,7 +522,7 @@ class TestConfig:
         assert {"bf16", "learning_rate"} <= given
 
     def test_reading_a_config_builds_no_settings(self, config, monkeypatch):
-        """read_config builds no training settings, so it sets up no device."""
+        """read_config builds no training settings, so it chooses no device."""
         from sentence_transformers import SentenceTransformerTrainingArguments
 
         monkeypatch.setattr(
@@ -511,7 +534,10 @@ class TestConfig:
         assert values["corpus"] == CORPUS
 
     def test_the_settings_are_built_from_the_values(self, config):
-        """Each settings class becomes settings, with the values read. Of the architectures, only the run's own, static, is built."""
+        """apply_config builds settings from each settings class, with the values read.
+
+        Of the architectures, it builds only the run's own, static.
+        """
         values, _ = train.read_config(config, 3, ["--use_cpu"])
         settings = train.apply_config(values)
         assert list(settings) == ["data", "model", "static", "loss", "training"]
@@ -524,14 +550,14 @@ class TestFirstGpuOnly:
     """A run keeps its process to one GPU, before torch is imported."""
 
     def test_the_first_listed_gpu_is_kept(self, monkeypatch, capsys):
-        """With CUDA_VISIBLE_DEVICES=2,3, the run keeps GPU 2, and names both."""
+        """With CUDA_VISIBLE_DEVICES=2,3, first_gpu_only keeps GPU 2, and returns both GPUs."""
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
         assert train.first_gpu_only() == ["2", "3"]
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "2"
         assert "trains on GPU 2 only" in capsys.readouterr().out
 
     def test_without_a_list_gpu_0_is_kept(self, monkeypatch):
-        """Without CUDA_VISIBLE_DEVICES, the run keeps GPU 0."""
+        """Without CUDA_VISIBLE_DEVICES, first_gpu_only keeps GPU 0."""
         monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
         assert train.first_gpu_only() == []
         assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
@@ -566,7 +592,11 @@ class TestTrain:
     """A run: the folder it writes and the inputs that stop it."""
 
     def test_a_run_writes_its_folder(self, inputs, config, tmp_path):
-        """The model at the last step, its config, its record and the trainer's log."""
+        """train writes the run's folder.
+
+        The folder holds the model at the last step, the run's config, the
+        run's record and the trainer's log.
+        """
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
         run = outputs / train.RUNS / "abcd-run_s0"
@@ -632,7 +662,7 @@ class TestTrain:
     def test_a_run_with_other_settings_keeps_the_earlier_run(
         self, inputs, config, tmp_path, monkeypatch, capsys
     ):
-        """A flag keeps the run's name, so --learning_rate 0.05 is refused before it trains.
+        """A flag keeps the run's name, so train refuses --learning_rate 0.05 before it trains.
 
         The earlier run trained at the static architecture's rate, 0.2.
         """
@@ -652,7 +682,7 @@ class TestTrain:
     ):
         """A run trained again with the same settings trains, and replaces the earlier one.
 
-        config.yaml records report_to "none" as the list that the trainer
+        config.yaml records report_to "none" as the list that TrainingArguments
         makes of it, [], and the two still compare equal.
         """
         path = tmp_path / "abcd-run.yaml"
@@ -673,7 +703,7 @@ class TestTrain:
     def test_an_earlier_run_whose_config_cannot_be_read_is_kept(
         self, inputs, config, tmp_path, capsys
     ):
-        """An earlier run of the same name whose config.yaml is broken is not replaced."""
+        """train does not replace an earlier run of the same name whose config.yaml is broken."""
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
         earlier_config = outputs / train.RUNS / "abcd-run_s0" / "config.yaml"
@@ -685,7 +715,11 @@ class TestTrain:
     def test_the_last_evaluation_is_not_repeated(
         self, inputs, config, tmp_path, monkeypatch
     ):
-        """When the trainer evaluated the last step, the run uses it, and evaluates no more."""
+        """When the trainer evaluated the last step, the run uses that evaluation.
+
+        The run then evaluates no more. Otherwise it evaluates the model once
+        more.
+        """
         from sentence_transformers import SentenceTransformerTrainer
 
         calls = []
@@ -736,7 +770,7 @@ class TestTrain:
         assert record["ai_harmonization"]["commit"] == "abcd123"
 
     def test_the_run_records_its_corpus_text_format(self, inputs, config, tmp_path):
-        """The run copies the text format from the corpus's manifest."""
+        """The run copies the format from the corpus's manifest."""
         write_corpus(inputs, corpus_rows(), text_format="name_type_description")
         outputs = tmp_path / "outputs"
         assert train.train(config, 0, [], inputs, outputs) == 0
@@ -748,7 +782,10 @@ class TestTrain:
     def test_a_corpus_without_a_text_format_is_refused(
         self, inputs, config, tmp_path, capsys
     ):
-        """A corpus whose manifest names no text format asks for corpus build again."""
+        """train refuses a corpus whose manifest names no format.
+
+        The error gives the corpus build command.
+        """
         write_corpus(inputs, corpus_rows(), text_format=None)
         assert train.train(config, 0, [], inputs, tmp_path / "outputs") == 1
         error = capsys.readouterr().err
@@ -767,12 +804,13 @@ class TestTrain:
         assert "tokenizer train --name efgh-tokenizer" in capsys.readouterr().err
 
     def test_a_tokenizer_from_another_corpus_or_build_is_refused(self):
-        """A tokenizer is refused when it learned from another corpus, or from another build of this one.
+        """check_tokenizer_build refuses a tokenizer that learned from another corpus or build.
 
-        Each message gives the command that trains one on this build, with
-        the tokenizer's own settings: 8,000 tokens, a minimum frequency of 3.
-        A build is told by the content of the pairs that the tokenizer
-        learned from, as manifests.file_identity compares a table.
+        Each message gives the command that trains a tokenizer on this build,
+        with the tokenizer's own settings: 8,000 tokens and a minimum frequency
+        of 3. check_tokenizer_build identifies a build by the content of the
+        pairs that the tokenizer learned from, as manifests.file_identity
+        compares a table.
         """
         learned_pairs_entry = {
             "rows": 12,
@@ -838,8 +876,8 @@ class TestTrain:
     def test_a_tokenizer_of_the_same_pairs_written_again_is_kept(self):
         """Pairs whose file was written again, with other bytes but the same content, are the same build.
 
-        A parquet file's bytes depend on the library that wrote it, so only
-        its rows and its content's checksum tell a build.
+        A parquet file's bytes depend on the library that wrote it. So only
+        the file's number of rows and its content's checksum identify a build.
         """
         learned_pairs_entry = {
             "rows": 12,
@@ -867,7 +905,7 @@ class TestTrain:
     def test_a_seed_out_of_range_is_refused(
         self, inputs, config, tmp_path, capsys, seed
     ):
-        """A seed below 0, or past numpy's 32 bits, is refused before anything is read."""
+        """train refuses a seed below 0, or past numpy's 32 bits, before it reads anything."""
         assert train.train(config, seed, [], inputs, tmp_path / "outputs") == 1
         assert "--seed must be from 0 to 4,294,967,295" in capsys.readouterr().err
 
@@ -889,7 +927,7 @@ class TestTrain:
         assert "no validation pairs" in capsys.readouterr().err
 
     def test_the_command(self, inputs, config, tmp_path):
-        """python -m embedding_model train passes its other flags on as settings."""
+        """main runs the train step with a setting given as a flag, --num_train_epochs 1."""
         outputs = tmp_path / "outputs"
         assert main(["train", "--config", str(config), "--seed", "1",
                      "--inputs", str(inputs), "--outputs", str(outputs),
@@ -914,7 +952,10 @@ class TestScoreRun:
         return outputs / train.RUNS / "abcd-run_s0", outputs
 
     def test_a_checked_benchmark_is_scored_into_the_run(self, run, inputs):
-        """A run whose corpus was checked against the benchmark is scored into its folder."""
+        """score scores a run whose corpus was checked against the benchmark, into the run's folder.
+
+        It scores the run in the run's format.
+        """
         folder, outputs = run
         rows = scoring.score(
             str(folder), ["abcd-benchmark"], inputs, outputs, device="cpu"
@@ -925,7 +966,7 @@ class TestScoreRun:
         ).exists()
 
     def test_the_run_is_found_from_its_model_folder(self, run, inputs):
-        """The run's model folder also finds the run's record."""
+        """score also finds the run's record from the run's model folder."""
         folder, outputs = run
         scoring.score(
             str(folder / "model"), ["abcd-benchmark"], inputs, outputs, device="cpu"
@@ -975,7 +1016,7 @@ class TestScoreRun:
             )
 
     def test_a_record_with_an_unknown_text_format_stops_scoring(self, run, inputs):
-        """A run's text format must be one of FORMATS, rather than fail on lookup."""
+        """score refuses a run whose format is not one of FORMATS, rather than fail on a lookup."""
         folder, outputs = run
         record = json.loads((folder / "manifest.json").read_text())
         record["settings"]["format"] = "abcd-format"
@@ -1096,7 +1137,10 @@ class TestBert:
         assert model.encode(["Body weight"]).shape == (1, 32)
 
     def test_a_bert_model_card_looks_up_nothing_on_the_hub(self, inputs):
-        """The model card does not look up the temporary folder's path on the Hub."""
+        """bert.build makes the model card use local files only.
+
+        So the model card does not ask the Hub about the temporary folder's path.
+        """
         settings = bert.Settings(**BERT_SETTINGS)
         model = bert.build(settings, trained_tokenizer(inputs))
         assert model.model_card_data.local_files_only
@@ -1122,7 +1166,10 @@ class TestBert:
     def test_a_run_sets_the_tokenizers_threads_only_when_unset(
         self, inputs, config, bert_config, tmp_path, monkeypatch
     ):
-        """Unset, a BERT run turns the threads off and a static run on. A user's own setting is kept."""
+        """If TOKENIZERS_PARALLELISM is unset, a BERT run sets it to false and a static run to true.
+
+        A run keeps a value that the user set.
+        """
         monkeypatch.delenv("TOKENIZERS_PARALLELISM", raising=False)
         assert train.train(bert_config, 0, [], inputs, tmp_path / "bert") == 0
         assert os.environ["TOKENIZERS_PARALLELISM"] == "false"

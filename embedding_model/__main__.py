@@ -22,10 +22,11 @@ PACKAGE = Path(__file__).resolve().parent
 
 
 def main(argv=None):
-    """Parse the command line and run the step it names.
+    """Parse the command line and run the step that it names.
 
     Args:
-        argv (list[str] | None): The arguments; ``sys.argv[1:]`` when None.
+        argv (list[str] | None): The arguments, or None to read
+            ``sys.argv[1:]``.
 
     Returns:
         int: The exit status, 0 on success.
@@ -35,14 +36,17 @@ def main(argv=None):
         "--inputs",
         type=Path,
         default=PACKAGE / "inputs",
-        help="where prepared data is written and read (default: %(default)s)",
+        help="where the steps write and read prepared data (default: %(default)s)",
     )
     writes_outputs = argparse.ArgumentParser(add_help=False)
     writes_outputs.add_argument(
         "--outputs",
         type=Path,
         default=PACKAGE / "outputs",
-        help="where models and scores are written (default: %(default)s)",
+        help=(
+            "where the steps write runs, scores, experiments and comparisons"
+            " (default: %(default)s)"
+        ),
     )
 
     parser = argparse.ArgumentParser(
@@ -112,7 +116,10 @@ def main(argv=None):
     corpus_build = corpus_actions.add_parser(
         "build",
         parents=[common],
-        help="combine the sources' pairs, drop what leaks a benchmark, and split",
+        help=(
+            "combine the sources' pairs, drop the pairs that leak a benchmark,"
+            " and split the rest into training and validation pairs"
+        ),
     )
     corpus_build.add_argument("--name", required=True, help="the corpus's name")
     corpus_build.add_argument(
@@ -143,7 +150,7 @@ def main(argv=None):
     tokenizer_train.add_argument(
         "--name",
         help="the tokenizer's name (default: the corpus and the vocabulary size,"
-        " such as example-16k)",
+        " for example all-sources-16k)",
     )
     tokenizer_train.add_argument(
         "--vocab-size",
@@ -164,16 +171,20 @@ def main(argv=None):
         parents=[common, writes_outputs],
         help="train one model on a corpus, from a config",
         description=(
-            "Train one model on a corpus. Any setting of the config can also be"
-            " given as a flag, which overrides it, such as --learning_rate"
-            " 1.0e-2 or --use_cpu. docs/training.md lists the settings."
+            "Train one model on a corpus. A flag can also give any setting of the"
+            " config, and the flag overrides the config: for example"
+            " --learning_rate 1.0e-2 or --use_cpu. docs/training.md lists the"
+            " settings."
         ),
     )
     train_step.add_argument(
         "--config",
         required=True,
         type=Path,
-        help="the run's config, a YAML file. The run is named after it and the seed.",
+        help=(
+            "the run's config, a YAML file. train names the run after the config"
+            " and the seed."
+        ),
     )
     train_step.add_argument(
         "--seed",
@@ -193,9 +204,9 @@ def main(argv=None):
         help="train each run of an experiment that is not done",
         description=(
             "Train each run of an experiment that is not done, on this"
-            " machine: one run per visible GPU at a time, or one at a time on"
-            " the CPU. docs/experiments.md says how to write its file, and how"
-            " to train it through SLURM."
+            " machine. The command trains one run per visible GPU at a time, or"
+            " one at a time on the CPU. docs/experiments.md says how to write an"
+            " experiment's file, and how to train the experiment through SLURM."
         ),
     )
     status_action = experiment_actions.add_parser(
@@ -217,8 +228,8 @@ def main(argv=None):
             required=True,
             type=Path,
             help=(
-                "the experiment's file, a YAML file. The experiment is named"
-                " after it."
+                "the experiment's file, a YAML file. The experiment takes its name"
+                " from the file."
             ),
         )
 
@@ -244,13 +255,13 @@ def main(argv=None):
         nargs="+",
         action="extend",
         choices=sorted(benchmarks.BUILDERS),
-        help="one or more benchmarks. The model is loaded once for all of them.",
+        help="one or more benchmarks. score loads the model once for all of them.",
     )
     score.add_argument(
         "--format",
         choices=sorted(texts.FORMATS),
         help=(
-            "the shape of the source and target texts (default: a run's"
+            "the format of the source and target texts (default: a run's"
             f" training format, and {texts.DEFAULT_FORMAT} for any other model)"
         ),
     )
@@ -262,7 +273,7 @@ def main(argv=None):
         "--batch-size",
         type=int,
         default=scoring.BATCH_SIZE,
-        help="texts encoded at a time (default: %(default)s)",
+        help="how many texts the model encodes at a time (default: %(default)s)",
     )
 
     compare_step = steps.add_parser(
@@ -290,7 +301,7 @@ def main(argv=None):
     )
     compare_step.add_argument(
         "--reference",
-        help="one of the models, which each other model is measured against",
+        help="one of the models: compare measures each other model against it",
     )
     compare_step.add_argument(
         "--benchmark",
@@ -313,9 +324,9 @@ def main(argv=None):
         nargs="+",
         action="extend",
         help=(
-            "one color per --model, in its order, as matplotlib reads it, such"
-            " as '#3f90da' or 'tab:blue' (default: matplotlib's petroff10, by"
-            " each model's place in --model)"
+            "one color per --model, in its order, as matplotlib reads it, for"
+            " example '#3f90da' or 'tab:blue' (default: matplotlib's petroff10,"
+            " by each model's place in --model)"
         ),
     )
 

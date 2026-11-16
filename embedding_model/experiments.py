@@ -2,12 +2,12 @@
 
 An experiment asks one question: does a change to the base help? Its file
 gives the base, the arms, the seeds and the rule that decides. ``experiment
-train`` trains each run that the file declares, on the machine where it
-runs: one run per visible GPU at a time, or one at a time on the CPU. Each
-run is the public command ``python -m embedding_model train``, in a process
-of its own. ``experiment status`` says which runs are done.
-``experiment compare``, in experiment_compare.py, then compares each arm with
-the base.
+train`` trains each run that the file declares and that is not done, on the
+machine where it runs. It trains one run per visible GPU at a time, or one
+at a time without a CUDA GPU. Each run is the public command
+``python -m embedding_model train``, in a process of its own.
+``experiment status`` says which runs are done. ``experiment compare``, in
+experiment_compare.py, then compares each arm with the base.
 """
 
 import os
@@ -86,9 +86,15 @@ class Run:
 class Decision(BaseModel):
     """The rule that decides between the arms, with its defaults.
 
-    The validation pairs decide, by MRR@10. A difference under 0.01 is not
-    worth deciding on, and 0.05 is split over the arms. The metric can be any
-    of the validation metrics that a run's manifest records.
+    The validation pairs decide, the only choice for now. The defaults:
+
+    - the metric is MRR@10
+    - the minimum effect is 0.01: the smallest gain worth a change, or the
+      largest loss worth taking
+    - the alpha, 0.05, is split over the arms
+
+    The metric can be any of the validation metrics that a run's manifest
+    records.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -126,9 +132,9 @@ class Arm(BaseModel):
         sections = self.model_extra
         if "corpus" in (sections.get("data") or {}):
             raise ValueError(
-                "the arm changes data.corpus, so it would be scored on other"
-                " validation pairs than the base. Remove it, or start another"
-                " experiment on that corpus"
+                "the arm changes data.corpus, so the arm would be scored on other"
+                " validation pairs than the base. Remove data.corpus from the arm,"
+                " or start another experiment on that corpus"
             )
         if "seed" in (sections.get("training") or {}):
             raise ValueError(f"the arm {SEED_SET}")
@@ -176,13 +182,13 @@ class Experiment(BaseModel):
             ):
                 raise ValueError(
                     f"{base!r} is not an arm of an earlier experiment, which is"
-                    " written <experiment>/<arm>, such as dim/dim128"
+                    " written <experiment>/<arm>, for example dim/dim128"
                 )
         elif not isinstance(base, dict) or not all(
             section is None or isinstance(section, dict) for section in base.values()
         ):
             raise ValueError(
-                "it is neither the base's settings, by section, such as data: and"
+                "it is neither the base's settings, by section, for example data: and"
                 " training:, nor an arm of an earlier experiment, written"
                 " <experiment>/<arm>"
             )
@@ -203,7 +209,7 @@ class Experiment(BaseModel):
         """
         if len(set(seeds)) != len(seeds):
             raise ValueError(
-                f"{seeds} lists a seed twice. List each seed once, such as"
+                f"{seeds} lists a seed twice. List each seed once, for example"
                 " [0, 1, 2, 3, 4]"
             )
         return seeds
@@ -235,9 +241,10 @@ def problems(error):
         error (ValidationError): pydantic's error.
 
     Returns:
-        list[str]: One line per problem, as ``<location>: <what is wrong>``.
-            The location is pydantic's path to the value in the file, such as
-            ``seeds.1`` for the second seed, or ``arms.dim8.test``.
+        list[str]: One line per problem, which names its location and says
+            what is wrong. The location is pydantic's path to the value in the
+            file, for example ``seeds.1`` for the second seed, or
+            ``arms.dim8.test``.
     """
     # The model at each location whose fields are fixed: the file itself, and
     # its decision. An arm takes any section, and train checks the sections.
@@ -270,8 +277,8 @@ def read_experiment(path):
     values. Experiment's validators add the rules of an experiment.
 
     Args:
-        path (Path): The experiment's file, a YAML file. The experiment is
-            named after it, as a run is named after its config.
+        path (Path): The experiment's file, a YAML file. The experiment takes
+            its name from the file, as a run takes its name from its config.
 
     Returns:
         dict: The experiment: its ``name``, its ``question`` (None when the
@@ -279,9 +286,11 @@ def read_experiment(path):
             with every field, and ``arms``.
 
     Raises:
-        ValueError: If the file cannot be read, its name cannot be an
-            experiment's, or a field is missing, unknown or holds a value
-            that cannot be used.
+        ValueError: In each of these cases:
+
+            - the file's name cannot be an experiment's
+            - the file cannot be read, or holds no fields
+            - a field is missing, unknown or holds a value that cannot be used
     """
     path = Path(path)
     if not FOLDER_NAME.fullmatch(path.stem):
@@ -310,12 +319,12 @@ def read_experiment(path):
 def checked_experiment(path, outputs):
     """An experiment's file, read, and checked against the copy that its first training kept.
 
-    The copy holds the file as its runs were trained from. A file of the same
-    name that reads otherwise, in any field, would mix the runs of two
-    questions in one folder, so it is refused. Both are compared as
-    read_experiment reads them, with the decision rule's defaults. So a
-    comment, the order of the fields, or a default written out changes
-    nothing.
+    The copy holds the file that the runs were trained from. A file of the
+    same name that reads otherwise, in any field, would mix the runs of two
+    questions in one folder. So checked_experiment refuses such a file. It
+    compares the two as read_experiment reads them, with the decision rule's
+    defaults. So a comment, the order of the fields, or a default written out
+    changes nothing.
 
     Args:
         path (Path): The experiment's file.
@@ -326,8 +335,11 @@ def checked_experiment(path, outputs):
             folder, ``outputs/experiments/<name>/``.
 
     Raises:
-        ValueError: If the file cannot be used, as read_experiment says, or
-            it differs from the copy.
+        ValueError: In each of these cases:
+
+            - the file cannot be used, as read_experiment says
+            - the copy cannot be read
+            - the file differs from the copy
     """
     experiment = read_experiment(path)
     name = experiment["name"]
@@ -337,7 +349,7 @@ def checked_experiment(path, outputs):
         return experiment, folder
     next_steps = (
         f"To start it again, delete {folder}. To ask a new question, give the"
-        f" file a new name; its base can reuse these runs, as base: {name}/{BASE}"
+        f" file a new name. Its base can reuse these runs, as base: {name}/{BASE}"
     )
     try:
         trained_experiment = read_experiment(copy)
@@ -365,8 +377,8 @@ def base_config(base, outputs):
     A base ``<experiment>/base`` reuses that experiment's base runs. That
     experiment's base may itself be an arm of an earlier experiment, whose
     runs it reused at some seeds. Those runs are in the earlier experiment's
-    folder. So the chain of bases is followed, to a base that a file gives
-    itself, or to an arm that is not a base.
+    folder. So base_config follows the chain of bases, to a base that a file
+    gives itself, or to an arm that is not a base.
 
     Args:
         base (dict | str): The file's base: the settings themselves, or an
@@ -374,10 +386,10 @@ def base_config(base, outputs):
         outputs (Path): The outputs folder.
 
     Returns:
-        tuple[dict, list[tuple[Path, str]]]: The base's sections; and each
-            earlier experiment's folder and arm whose runs are the base's, the
-            one that the file names first. The list is empty for a base that
-            the file gives itself.
+        tuple[dict, list[tuple[Path, str]]]: The base's sections, and each
+            earlier experiment's folder and arm whose runs are the base's.
+            The list starts with the arm that the file names, and is empty
+            for a base that the file gives itself.
 
     Raises:
         ValueError: If the earlier experiment has not been trained, or has no
@@ -397,7 +409,7 @@ def base_config(base, outputs):
                 f"base: no experiment {earlier_name} has been trained in {earlier_folder.parent}"
             )
         raise ValueError(
-            f"base: experiment {earlier_name} has no arm {arm}; its arms are"
+            f"base: experiment {earlier_name} has no arm {arm}. Its arms are"
             f" {', '.join(earlier_arm_names)}"
         )
     earlier_arms = [(earlier_folder, arm)]
@@ -408,7 +420,7 @@ def base_config(base, outputs):
         earlier_name, arm = earlier_base.split("/")
         earlier_folder = Path(outputs) / EXPERIMENTS / earlier_name
         # An experiment deleted and trained again can name a later one as its
-        # base, so the chain stops where it would go round.
+        # base, so the chain stops where it would loop.
         if (earlier_folder, arm) in earlier_arms:
             break
         earlier_arms.append((earlier_folder, arm))
@@ -440,9 +452,10 @@ def arm_configs(experiment, base_sections):
 def written_configs(configs, folder, seed):
     """Write each arm's full config, and check it as ``train`` reads it.
 
-    The configs are written whole, to ``configs/`` in the experiment's
-    folder. Each one is then read by ``train``'s own parser, so a setting
-    that ``train`` would refuse stops the experiment before any run trains.
+    written_configs writes the configs whole, to ``configs/`` in the
+    experiment's folder. Then ``train``'s own parser reads each one, so a
+    setting that ``train`` would refuse stops the experiment before any run
+    trains.
 
     Args:
         configs (dict[str, dict]): Each arm's full config, from arm_configs.
@@ -476,9 +489,10 @@ def check_inputs(arm_values, inputs):
 
     Raises:
         FileNotFoundError: If the corpus or a tokenizer is not built. The
-            message gives the command that builds it.
-        ValueError: If its manifest cannot be read, or the tokenizer differs
-            from its manifest.
+            message gives the command that builds the corpus or trains the
+            tokenizer.
+        ValueError: If a manifest cannot be read, or a tokenizer's file
+            differs from the tokenizer's manifest.
     """
     corpus_name = arm_values[BASE]["corpus"]
     corpus_folder = Path(inputs) / "corpora" / corpus_name
@@ -497,9 +511,9 @@ def check_inputs(arm_values, inputs):
 def run_state(run_folder):
     """Whether a run is done, has started, or has not started.
 
-    A run that ``train`` finished has its ``manifest.json``. One that is
-    training has a staging folder beside its folder, and so does one that
-    was killed before it finished, such as by ``scancel`` or a time limit.
+    A run that ``train`` finished has its ``manifest.json``. A run that is
+    training has a staging folder beside its folder. So does a run that was
+    killed before it finished, for example by ``scancel`` or a time limit.
 
     Args:
         run_folder (Path): The run's folder.
@@ -517,12 +531,13 @@ def run_state(run_folder):
 def experiment_runs(experiment, folder, earlier_arms):
     """Every run that the experiment needs, the base's first, each arm's in seed order.
 
-    A base run comes from the first earlier experiment that has a run at the
-    same seed, done or started, when this experiment has not trained it
-    itself. For example, with ``base: lr/base``, where lr's base is
-    ``dim/dim128``, ``base_s0`` is lr's own ``base_s0`` when lr trained it, and
-    dim's ``dim128_s0`` otherwise. A seed that no earlier experiment has is
-    trained here.
+    A base run is this experiment's own run when that run is done or started.
+    Otherwise it is the run at the same seed of the first earlier experiment
+    that has one, done or started. For example, take ``base: lr/base``, where
+    lr's base is ``dim/dim128``. Then ``base_s0`` is lr's own ``base_s0`` when
+    lr has that run, done or started. Otherwise it is dim's ``dim128_s0``,
+    when dim has that run. A seed that no earlier experiment has is trained
+    here.
 
     Args:
         experiment (dict): The experiment, from read_experiment.
@@ -553,8 +568,8 @@ def experiment_runs(experiment, folder, earlier_arms):
 def gpu_ids():
     """The CUDA GPUs that the runs can train on, by the ids that CUDA_VISIBLE_DEVICES takes.
 
-    CUDA_VISIBLE_DEVICES, when it is set, lists them, as SLURM sets it for a
-    job's GPUs. Otherwise every GPU that torch counts is one.
+    When CUDA_VISIBLE_DEVICES is set, it lists them, as SLURM sets it for a
+    job's GPUs. Otherwise they are the GPUs that torch counts.
 
     Returns:
         list[str]: Each GPU's id, or an empty list when there is none.
@@ -598,9 +613,10 @@ def train_runs(runs, gpus, inputs, folder):
     """Train each run in a process of its own, one per GPU at a time, or one at a time without a GPU.
 
     Each process sees one GPU, through CUDA_VISIBLE_DEVICES. Without a CUDA
-    GPU, its environment is left as it is, and ``train`` picks the device, as
-    it does on its own. Each process writes its output to
-    ``logs/<run>.log``. A run that fails does not stop the others.
+    GPU, train_runs leaves the process's environment as it is, and ``train``
+    picks the device, as it does when you run it yourself. Each process
+    writes its output to ``logs/<run>.log``. A run that fails does not stop
+    the others.
 
     Args:
         runs (list[Run]): The runs to train.
@@ -636,7 +652,7 @@ def train_runs(runs, gpus, inputs, folder):
                     check=False,
                 )
             succeeded = process.returncode == 0
-            outcome = "done" if succeeded else f"failed; see {log_path}"
+            outcome = "done" if succeeded else f"failed. See {log_path}"
             print(f"  {run_name}: {outcome}", flush=True)
             return succeeded
         finally:
@@ -652,11 +668,13 @@ def train_runs(runs, gpus, inputs, folder):
 def keep_copy(path, folder):
     """Copy the experiment's file to experiment.yaml in the experiment's folder, at its first training.
 
-    The experiment's folder is ``outputs/experiments/<name>/``. A later
-    training compares the file with this copy, in checked_experiment. The
-    copy is written in a staging folder first and then moved, so it is never
-    half written, as staged writes a folder. shutil.copyfile creates it as
-    any new file, so it is as readable as the run folders beside it.
+    The experiment's folder is ``outputs/experiments/<name>/``. Each later
+    ``experiment train``, ``status`` and ``compare`` compares the file with
+    this copy, in checked_experiment.
+    keep_copy writes the copy in a staging folder first and then moves it,
+    as staged writes a folder. So the copy is never half written.
+    shutil.copyfile creates the copy as any new file, so it is as readable
+    as the run folders beside it.
 
     Args:
         path (Path): The experiment's file.
@@ -677,8 +695,9 @@ def keep_copy(path, folder):
 def check_earlier_runs(runs, folder):
     """Refuse a base run of an earlier experiment that has started but not finished.
 
-    Such a run may be training in another job. Its experiment trains it, so
-    this one neither trains it again nor reads it before it is done.
+    Such a run may be training in another job. The earlier experiment trains
+    the run. So this experiment neither trains the run again nor reads it
+    before it is done.
 
     Args:
         runs (list[Run]): The experiment's runs, from experiment_runs.
@@ -711,8 +730,10 @@ def checked_runs(path, inputs, outputs):
         tuple[dict, Path, list[Run]]: The experiment, its folder and its runs.
 
     Raises:
-        ValueError: If the file, the base or a config cannot be used, or a
-            base run of an earlier experiment has started but not finished.
+        ValueError: In each of these cases:
+
+            - the file, the base or a config cannot be used
+            - a base run of an earlier experiment has started but not finished
         FileNotFoundError: If the corpus or a tokenizer is not built.
     """
     experiment, folder = checked_experiment(path, outputs)
@@ -783,7 +804,7 @@ def train(path, inputs, outputs):
 
 
 def counted(count, noun):
-    """A count with its noun, plural unless the count is 1, such as ``1 run`` or ``4 runs``.
+    """A count with its noun, plural unless the count is 1, for example ``1 run`` or ``4 runs``.
 
     Args:
         count (int): The count.

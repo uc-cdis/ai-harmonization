@@ -4,20 +4,25 @@
 more benchmarks in one text format. It writes one folder,
 ``outputs/comparisons/<name>/``:
 
-- ``metrics.csv``: each model's metrics on each benchmark, with their 95%
-  confidence intervals;
+- ``metrics.csv``: each model's metrics on each benchmark, with the 95%
+  confidence intervals of MRR, MRR@10 and accuracy@k
 - ``differences.csv``: each other model minus the reference model, with the
-  interval of the difference and a paired test;
-- the figures, in ``figures/``, as EPS, PDF and PNG: accuracy@1, @5 and @10
-  with MRR, accuracy at every k from 1 to 50, MRR by the model's size, and,
-  with a reference, each model's difference from it;
-- ``manifest.json``: the models, the scores read and the settings.
+  interval of the difference and a paired test
+- the figures, in ``figures/``, as EPS, PDF and PNG:
+
+  - accuracy@1, @5 and @10, with MRR
+  - accuracy at every k from 1 to 50
+  - MRR by the model's size
+  - with a reference, each other model's difference from it
+
+- ``manifest.json``: the models, the scores read and the settings
 
 Each metric's mean comes from ``score``'s ``metrics.csv``, as its evaluator
-computed it. Every interval and test needs each source variable's own value,
-so it comes from the variable's rank in ``per_variable.csv``, as does the
-curve of accuracy at every k. nDCG@10, the median rank and each model's
-number of parameters come from ``metrics.csv`` too, as plain numbers.
+computed it. Every interval and test needs each source variable's own value.
+So ``compare`` computes each value from the variable's rank in
+``per_variable.csv``. The curve of accuracy at every k comes from those ranks
+too. nDCG@10, the median rank and each model's number of parameters come
+from ``metrics.csv`` too, as plain numbers.
 """
 
 from dataclasses import dataclass, field
@@ -45,7 +50,7 @@ from embedding_model.scoring import (
 )
 from embedding_model.texts import DEFAULT_FORMAT
 
-# Where comparisons are written, under the outputs folder.
+# The folder of the comparisons, under the outputs folder.
 COMPARISONS = "comparisons"
 # The subfolder of a comparison that holds its figures, beside its tables.
 FIGURES = "figures"
@@ -68,9 +73,9 @@ T_INTERVAL = "t interval"
 # Each tested metric's intervals, for a model's metric and for a difference
 # from the reference. accuracy@k is a share of 1s and 0s: Wilson's interval
 # for one model, and Newcombe's for a paired difference. MRR and MRR@10 take
-# values between 0 and 1: the t interval of the mean for one model, and of
-# the variables' differences for a difference, the paired t-test's own
-# interval.
+# values between 0 and 1. For one model, they get the t interval of the
+# mean. For a difference, they get the t interval of the variables'
+# differences, which is the paired t-test's own interval.
 INTERVALS = {
     metric: WILSON if metric.startswith("accuracy@") else T_INTERVAL
     for metric in TESTED_METRICS
@@ -94,8 +99,8 @@ CURVE_K = np.arange(1, 51)
 # curator.
 K_LABEL = "k: suggestions a data curator reviews"
 # The palette without --colors: one color per model, by its place in the
-# order that the models are given, so that a model keeps its color in every
-# figure. It is matplotlib's petroff10 color sequence, made for readers with
+# order that --model gives the models. So a model keeps its color in every figure. It is
+# matplotlib's petroff10 color sequence, made for readers with
 # a color vision deficiency (Petroff, 2021,
 # https://doi.org/10.48550/arXiv.2107.02270).
 DEFAULT_PALETTE = "petroff10"
@@ -116,14 +121,14 @@ BRACKET_RISE = 0.015
 BRACKET_STEP = 0.06
 STARS_ROOM = 0.06
 # A marker per model in accuracy_by_k, mrr_by_size and
-# differences_from_reference, beside its color, so that models
-# are not told apart by color alone. matplotlib names only four line styles,
+# differences_from_reference, beside its color, so that a reader can tell
+# models apart by more than color. matplotlib names only four line styles,
 # so the lines of accuracy_by_k also take one of them, as a second cue.
 MARKERS = ("o", "s", "^", "D", "v", "P", "X", "h")
 LINE_STYLES = ("-", "--", ":", "-.") * 2
 # The markers of accuracy_by_k: matplotlib's markevery spaces them a tenth of
-# the panel's diagonal apart. Each model's start is shifted, so that two lines
-# that run together do not put their markers on one spot.
+# the panel's diagonal apart. curve_figure shifts each model's start, so that
+# two lines that run together do not put their markers on one spot.
 MARK_EVERY = 0.1
 # Models of the same size sit side by side in mrr_by_size, this factor apart on
 # its log axis, so that their points and intervals do not hide each other.
@@ -135,10 +140,11 @@ MUTED = "#898781"
 GRID = "#e1e0d9"
 AXIS = "#c3c2b7"
 SURFACE = "#ffffff"
-# The figures are drawn 7.2 inches wide, about the width of a printed page,
-# with text at 7 to 9 points, so they need no scaling. EPS and PDF are vector
-# files, which stay sharp at any size, and PNG is a raster. Fonts are
-# embedded as TrueType, so that a drawing program can edit the text.
+# The figures are 7.2 inches wide, about the width of a printed page, with
+# text at 7 to 9 points, so they need no scaling. EPS and PDF are vector
+# files, which stay sharp at any size, and PNG is a raster. The EPS and PDF
+# files embed their fonts as TrueType, so that a drawing program can edit the
+# text.
 PRINT_WIDTH = 7.2
 FORMATS = ("png", "pdf", "eps")
 PNG_DPI = 300
@@ -219,9 +225,12 @@ def variable_values(ranks):
     """Each source variable's value of each tested metric, from its rank.
 
     A metric of TESTED_METRICS is the mean of these values over the
-    variables: 1 / rank for MRR, the same with every rank past 10 counted as 0
-    for MRR@10, and 1 or 0 for accuracy@k, as the variable's expected target
-    is among the first k or not.
+    variables:
+
+    - MRR: 1 / rank
+    - MRR@10: 1 / rank, with every rank past 10 counted as 0
+    - accuracy@k: 1 if the variable's expected target is among the first k,
+      and 0 if not
 
     Args:
         ranks (np.ndarray): Each source variable's rank.
@@ -244,7 +253,7 @@ def t_interval(values):
 
     It is the interval of scipy's one-sample t-test. On each source
     variable's difference between two models, it is the paired t-test's
-    interval. When every value is the same, such as an MRR of 1 for every
+    interval. When every value is the same, for example an MRR of 1 for every
     variable, the values have no spread: the interval is that value.
 
     Args:
@@ -287,9 +296,10 @@ def newcombe_interval(model_values, reference_values):
     intervals with the correlation of the two models' values. Two models that
     agree on many variables get a narrower interval than their two Wilson
     intervals would give apart. The correlation is Newcombe's phi, from the
-    2 x 2 table of the two models' values, with his correction of a positive
-    numerator by n / 2. scipy has no such interval. statsmodels has added it
-    as ``confint_proportions_paired``, but has no release with it yet.
+    2 x 2 table of the two models' values. A positive numerator of phi takes
+    Newcombe's correction by n / 2. scipy has no such interval. statsmodels
+    has added it as ``confint_proportions_paired``, but has no release with it
+    yet.
 
     Args:
         model_values (np.ndarray): The model's value for each variable: 1
@@ -309,9 +319,9 @@ def newcombe_interval(model_values, reference_values):
     only_model = int(((model_values == 1) & (reference_values == 0)).sum())
     only_reference = int(((model_values == 0) & (reference_values == 1)).sum())
     neither = count - both - only_model - only_reference
-    # Newcombe's phi, the correlation of the two models' values. A positive
-    # numerator, ad - bc, is lowered by count / 2, his correction. phi is 0
-    # when a row or a column of the table is empty.
+    # Newcombe's phi, the correlation of the two models' values. His
+    # correction lowers a positive numerator, ad - bc, by count / 2, but not
+    # below 0. phi is 0 when a row or a column of the table is empty.
     phi_numerator = both * neither - only_model * only_reference
     if phi_numerator > 0:
         phi_numerator = max(phi_numerator - count / 2, 0)
@@ -331,11 +341,11 @@ def newcombe_interval(model_values, reference_values):
     reference_down = reference_share - reference_low
     reference_up = reference_high - reference_share
     # The lower end takes the model's reach down and the reference's reach
-    # up, since both make the difference smaller. The upper end takes the
+    # up, because both make the difference smaller. The upper end takes the
     # other two. The two reaches at each end combine as the errors of two
-    # independent estimates do, the square root of the sum of their squares,
-    # less a term for phi. Two models that succeed on the same variables move
-    # together, so their difference moves less.
+    # independent estimates do. That is the square root of the sum of their
+    # squares, less a term for phi. Two models that succeed on the same
+    # variables move together, so their difference moves less.
     lower_distance = np.sqrt(
         model_down**2 - 2 * phi * model_down * reference_up + reference_up**2
     )
@@ -350,12 +360,12 @@ def paired_test(metric, model_values, reference_values):
     """The paired test of two models' values of a metric, on the same variables.
 
     For accuracy@k, each variable's value is 1 or 0. McNemar's exact test
-    counts the variables where the two models differ: under no difference,
-    each is a coin flip, so p is the binomial test's. For MRR and MRR@10,
-    scipy's paired t-test compares the two models' values on each variable. When
-    every variable differs by the same amount, the differences have no
-    spread, and the test cannot be computed: p is then 1 when that amount
-    is 0, and 0 otherwise.
+    counts the variables where the two models differ. Under no difference,
+    each such variable is a coin flip, so p is the binomial test's. For MRR
+    and MRR@10, scipy's paired t-test compares the two models' values on each
+    variable. When every variable differs by the same amount, the differences
+    have no spread, and the test cannot be computed. paired_test then gives a
+    p of 1 when that amount is 0, and 0 otherwise.
 
     Args:
         metric (str): A metric of TESTED_METRICS.
@@ -401,8 +411,8 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
     """One model's metrics on one benchmark, each tested one with its interval.
 
     Each mean is the one that ``score`` reported. Its interval comes from the
-    source variables' values, by the metric's method in INTERVALS. A t
-    interval is cut at 0 and 1, the range of MRR. The true MRR lies in that
+    source variables' values, by the metric's method in INTERVALS. metrics_row
+    cuts a t interval at 0 and 1, the range of MRR. The true MRR lies in that
     range, so an interval that holds it still holds it after the cut.
 
     Args:
@@ -443,7 +453,7 @@ def metrics_row(label, benchmark, built_version, text_format, row, values):
 def difference_rows(benchmark, reference, others, values):
     """Each other model minus the reference model, on each tested metric.
 
-    Each difference's interval comes by the metric's method in
+    Each difference's interval comes from the metric's method in
     DIFFERENCE_INTERVALS.
 
     Args:
@@ -488,7 +498,7 @@ def difference_rows(benchmark, reference, others, values):
 def bracket(axes, x_from, x_to, height, mark):
     """Draw a bracket on ``axes`` from one bar to another, with its stars above it.
 
-    It returns nothing: the line and the stars are drawn onto ``axes``. The
+    It draws the line and the stars onto ``axes``, and returns nothing. The
     line has the gid ``bracket``, so that a test can find it.
 
     Args:
@@ -513,15 +523,16 @@ def bars(axes, groups, legend_labels, heights, errors, bar_colors):
     """Draw grouped bars: one group per item of ``groups``, one bar per model.
 
     The bars of a group sit side by side, each model at its own offset from
-    the group's middle. The offsets and the interval tops come back, so that
-    the caller can draw each comparison bracket over its two bars.
+    the group's middle. bars returns the offsets and the interval tops, so
+    that the caller can draw each comparison bracket over its two bars.
 
     Args:
         axes (Axes): Where the bars go.
-        groups (list[str]): The groups' labels, such as the k of accuracy@k.
+        groups (list[str]): The groups' labels, for example the k of
+            accuracy@k.
         legend_labels (list[str]): Each model's text in the legend, in the
-            bars' order: its name, such as ``abcd-run_s0 (reference)`` for
-            the reference.
+            bars' order: its name, for example ``abcd-run_s0 (reference)``
+            for the reference.
         heights (list[list[float]]): Each model's bar heights, by group.
         errors (list[list[tuple[float, float]]]): Each bar's interval.
         bar_colors (list): Each model's color.
@@ -569,17 +580,17 @@ def bars(axes, groups, legend_labels, heights, errors, bar_colors):
 def benchmark_title(benchmark, benchmark_result):
     """A benchmark's title in a figure: its name, its version, its source variables and its targets.
 
-    The source variables set how precise each number is, and the targets how
-    many candidates each variable is ranked among.
+    The source variables set how precise each number is. The targets set how
+    many candidates a model ranks for each variable.
 
     Args:
-        benchmark (str): The benchmark's name, such as ``topmed``.
+        benchmark (str): The benchmark's name, for example ``topmed``.
         benchmark_result (dict): The benchmark's results, with its version, its
             number of source variables and its number of targets.
 
     Returns:
-        str: The title, such as ``Benchmark: TOPMed v2 (900 source variables,
-            120 targets)``.
+        str: The title, for example ``Benchmark: TOPMed v2 (900 source
+            variables, 120 targets)``.
     """
     name = benchmarks.TITLES[benchmark]
     return (
@@ -596,7 +607,7 @@ def legend(figure, axes, count, note=None):
         figure (Figure): The figure.
         axes (Axes): A panel that holds every entry.
         count (int): The number of entries.
-        note (str | None): A line under the entries, such as STARS_NOTE.
+        note (str | None): A line under the entries, for example STARS_NOTE.
     """
     handles, labels = axes.get_legend_handles_labels()
     figure.legend(
@@ -614,17 +625,19 @@ def drawn(models, reference):
     """The models in the order that the figures draw them, each with its look.
 
     The reference comes first. Each model keeps the color, the line style and
-    the marker of its place in ``models``, so it looks the same in every
-    figure, whichever model is the reference.
+    the marker of its place in ``models``. So the model looks the same in
+    every figure, whichever model is the reference.
 
     Args:
         models (list[str]): The models' names, in the order given.
         reference (str | None): The reference model's name.
 
     Returns:
-        list[tuple[str, str, int]]: Each model's name, its label in the
-            legends, with " (reference)" for the reference, and its place in
-            ``models``.
+        list[tuple[str, str, int]]: One tuple per model, with three values:
+
+            - the model's name
+            - its label in the legends, with " (reference)" for the reference
+            - its place in ``models``
     """
     if reference is None:
         order = models
@@ -647,11 +660,12 @@ def overview_figure(
 
     Each benchmark has a row, under its title: accuracy@k on the left, MRR on
     the right, on its own axis. Each bar has its 95% confidence interval. The
-    reference comes first in each group. A bracket joins the reference to
-    each model that differs from it, with p below 0.05: a group's brackets
-    start just above its highest interval. A note under the legend says what
-    the stars mean. Draw it under STYLE. The bars carry no numbers:
-    metrics.csv holds every value.
+    reference comes first in each group. The bars carry no numbers:
+    metrics.csv holds every value. Draw the figure under STYLE.
+
+    A bracket joins the reference to each model that differs from it, with p
+    below 0.05. A group's brackets start just above its highest interval. A
+    note under the legend says what the stars mean.
 
     Args:
         benchmark_results (dict): Each benchmark's results: its version, its
@@ -737,7 +751,7 @@ def curve_figure(benchmark_results, models, reference, model_colors=None):
     """``accuracy_by_k``: accuracy at every k from 1 to 50, a line per model.
 
     Accuracy@k at every k is the empirical distribution function of the
-    variables' ranks, which scipy's ``ecdf`` gives. Draw it under STYLE.
+    variables' ranks, which scipy's ``ecdf`` gives. Draw the figure under STYLE.
 
     Args:
         benchmark_results (dict): Each benchmark's results, as for
@@ -874,8 +888,8 @@ def mark_sides(axes, compared_with):
     Args:
         axes (Axes): The panel, whose x axis holds the differences, with 0 in
             view.
-        compared_with (str): What each point is measured against, such as
-            ``the reference``.
+        compared_with (str): What each point is measured against, for
+            example ``the reference``.
     """
     for offset, text, align in (
         (-4, f"\u2190 worse than {compared_with}", "right"),
@@ -899,13 +913,14 @@ def mark_sides(axes, compared_with):
 def differences_figure(
     benchmark_results, models, reference, differences, model_colors=None
 ):
-    """``differences_from_reference``: each model minus the reference, per benchmark.
+    """``differences_from_reference``: each other model minus the reference, per benchmark.
 
-    Each benchmark has a panel, and each metric of accuracy_and_mrr a row. Each model
-    is a point at its difference from the reference, which is the line at 0.
+    Each benchmark has a panel, and each metric of accuracy_and_mrr a row.
+    Each other model is a point at its difference from the reference, which
+    is the line at 0.
     Right of 0, the model does better than the reference. The panels share
     one x axis, so their 0s line up, and a difference has the same length in
-    each. Draw it under STYLE.
+    each. Draw the figure under STYLE.
 
     Args:
         benchmark_results (dict): Each benchmark's results, as for
@@ -1044,19 +1059,27 @@ def checked_models(name, models, reference):
 
     Args:
         name (str): The comparison's name, a FOLDER_NAME.
-        models (list[str]): The models, as ``score`` was given them.
-        reference (str | None): One of ``models``, which may name it another
-            way, such as by a relative path, or None.
+        models (list[str]): The models, as ``--model`` gives them.
+        reference (str | None): One of ``models``, or None. It may name the
+            model another way, for example by a relative path.
 
     Returns:
-        tuple[dict[str, str], str | None]: Each model by its name in the
-            tables, in the order given, and the reference's name, or None.
+        tuple[dict[str, str], str | None]: Two values:
+
+            - each model, by its name in the tables, in the order given
+            - the reference's name, or None
 
     Raises:
-        ValueError: If the name is not a FOLDER_NAME, there are more than
-            MAX_MODELS models, a model is named twice, two models have one
-            name, or the reference is not one of the models or has no other
-            model to be measured against.
+        ValueError: In each of these cases:
+
+            - the name is not a FOLDER_NAME
+            - there are more than MAX_MODELS models
+            - ``models`` names one model twice
+            - two models have one name
+            - the reference is not one of the models, or has no other model to
+              be measured against
+            - a run's record cannot be read, or lacks a field that scoring
+              reads
     """
     if not FOLDER_NAME.fullmatch(name):
         raise ValueError(f"{name!r} is not a comparison name: use {FOLDER_NAME_RULE}")
@@ -1096,9 +1119,9 @@ def checked_models(name, models, reference):
 def checked_colors(model_colors, models):
     """Check that ``--colors`` gives each model a color of its own, one that shows.
 
-    The bars of accuracy_and_mrr carry only a color, so two models of one
-    color could not be told apart there. A fully transparent color, such as
-    ``none``, would draw nothing.
+    The bars of accuracy_and_mrr carry only a color, so a reader could not
+    tell two models of one color apart there. A fully transparent color, for
+    example ``none``, would draw nothing.
 
     Args:
         model_colors (list[str] | None): Each model's color, in the order of
@@ -1109,9 +1132,12 @@ def checked_colors(model_colors, models):
         list[str] | None: The colors, as given, or None.
 
     Raises:
-        ValueError: If the colors are not one per model, one is not a color
-            that matplotlib reads or is fully transparent, or two models
-            have one color.
+        ValueError: In each of these cases:
+
+            - the colors are not one per model
+            - a color is not one that matplotlib reads
+            - a color is fully transparent
+            - two models have one color
     """
     from matplotlib.colors import is_color_like, to_rgba
 
@@ -1128,7 +1154,7 @@ def checked_colors(model_colors, models):
         if not is_color_like(color):
             raise ValueError(
                 f"--colors: {color!r} is not a color: give one that matplotlib"
-                " reads, such as '#3f90da' or 'tab:blue'"
+                " reads, for example '#3f90da' or 'tab:blue'"
             )
         if to_rgba(color)[3] == 0:
             raise ValueError(
@@ -1153,19 +1179,31 @@ def read_benchmark_result(comparison, benchmark, inputs, outputs):
     Args:
         comparison (Comparison): The comparison.
         benchmark (str): The benchmark.
-        inputs (Path): The inputs folder that the benchmark was built into.
+        inputs (Path): The inputs folder that holds the built benchmark.
         outputs (Path): The outputs folder.
 
     Returns:
-        dict: The benchmark's ``version`` and ``n``, its source variables.
-            By each model's name: its row of ``metrics``, its ``values`` and
-            its ``ranks``. Then the scores read, as the manifest's
-            ``sources``, and the rows of ``differences``, with a reference.
+        dict: The benchmark's results, with these keys:
+
+            - ``version``: the benchmark's version
+            - ``n`` and ``targets``: its numbers of source variables and of
+              targets
+            - ``metrics``, ``values`` and ``ranks``: by each model's name, its
+              row of the comparison's ``metrics.csv``, its values of each
+              tested metric, and its ranks
+            - ``sources``: the scores read, for the manifest's ``sources``
+            - ``differences``: the rows of difference_rows, with a reference,
+              and an empty list without one
 
     Raises:
-        ValueError: If a model's scores cannot be read, as read_scores says,
-            or list other source variables than the first model's.
-        FileNotFoundError: If the benchmark has not been built.
+        ValueError: In each of these cases:
+
+            - the benchmark cannot be read, or differs from its manifest, as
+              benchmarks.read_benchmark says
+            - a model's scores cannot be read, as read_scores says
+            - a model's scores list other source variables than the first
+              model's, or list them in another order
+        FileNotFoundError: If the benchmark is not built.
     """
     _, _, manifest = benchmarks.read_benchmark(inputs, benchmark)
     version = manifest["version"]
@@ -1185,9 +1223,10 @@ def read_benchmark_result(comparison, benchmark, inputs, outputs):
             variables = per_variable[list(VARIABLE_KEY)]
         elif not per_variable[list(VARIABLE_KEY)].equals(variables):
             raise ValueError(
-                f"{model}'s scores on {benchmark} list other source variables,"
-                f" or list them in another order, than {comparison.labels[0]}'s,"
-                " though both were scored on this build of it. Score both again."
+                f"{model}'s scores on {benchmark} list other source variables"
+                f" than {comparison.labels[0]}'s, or list them in another order."
+                " But both come from the current build of the benchmark. Score"
+                " both again."
             )
         values = variable_values(per_variable["rank"].to_numpy())
         benchmark_result["targets"] = int(row["targets"])
@@ -1222,8 +1261,8 @@ def read_benchmark_result(comparison, benchmark, inputs, outputs):
 def write_comparison(comparison, destination):
     """Write the comparison's folder whole: its tables, figures and manifest.
 
-    ``differences.csv`` and ``differences_from_reference`` come only with a
-    reference.
+    write_comparison writes ``differences.csv`` and
+    ``differences_from_reference`` only with a reference.
 
     Args:
         comparison (Comparison): The comparison, with every benchmark's
@@ -1296,9 +1335,9 @@ def write_comparison(comparison, destination):
 def print_destination(destination):
     """Print where a comparison went: its folder, then each figure and table by its full path.
 
-    One path per line, so that a terminal that links paths, such as VS
-    Code's, opens each with a click. Each figure is a PNG, with its PDF and
-    EPS beside it.
+    It prints one path per line, so that a terminal that links paths, for
+    example VS Code's, opens each with a click. Each figure is a PNG, with its
+    PDF and EPS beside it.
 
     Args:
         destination (Path): The comparison's folder.
@@ -1349,18 +1388,20 @@ def compare(
 ):
     """Compare scored models and write the comparison's folder.
 
-    A benchmark named twice is compared once, as ``score`` scores it once.
+    If ``benchmark_names`` names a benchmark twice, compare compares it once,
+    as ``score`` scores it once.
 
     Args:
         name (str): The comparison's name, a FOLDER_NAME.
-        models (list[str]): The models, as ``score`` was given them.
-        benchmark_names (list[str]): The benchmarks, such as ``["topmed"]``.
-        inputs (Path): The inputs folder that the benchmarks were built into.
+        models (list[str]): The models, as ``--model`` gives them.
+        benchmark_names (list[str]): The benchmarks, for example
+            ``["topmed"]``.
+        inputs (Path): The inputs folder that holds the built benchmarks.
         outputs (Path): The outputs folder.
         text_format (str): The text format of the scores.
         reference (str | None): One of ``models``, which each other model is
             measured against by paired tests. It may name the model another
-            way, such as by a relative path. None writes no differences.
+            way, for example by a relative path. None writes no differences.
         model_colors (list[str] | None): Each model's color, in the order of
             ``models``, as ``--colors`` gives them. None gives each model
             DEFAULT_PALETTE's color of its place.
@@ -1369,10 +1410,14 @@ def compare(
         Path: The comparison's folder.
 
     Raises:
-        ValueError: If the models, the colors or the name are refused, as
-            checked_models and checked_colors say, or a model's scores cannot
-            be read or list other variables, as read_benchmark_result says.
-        FileNotFoundError: If a benchmark has not been built.
+        ValueError: In each of these cases:
+
+            - checked_models refuses the name or the models
+            - checked_colors refuses the colors
+            - read_benchmark_result cannot read a benchmark or a model's
+              scores, or two models' scores list other source variables, or
+              list them in another order
+        FileNotFoundError: If a benchmark is not built.
     """
     named_models, reference_name = checked_models(name, models, reference)
     comparison = Comparison(

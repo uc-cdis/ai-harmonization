@@ -6,6 +6,7 @@ from pathlib import Path
 
 from embedding_model import (
     benchmarks,
+    corpus,
     pairs,
     sources,
 )
@@ -92,6 +93,32 @@ def main(argv=None):
         help="the sources to prepare (default: all of them)",
     )
 
+    corpus_step = steps.add_parser("corpus", help="build a training corpus")
+    corpus_actions = corpus_step.add_subparsers(dest="action", required=True)
+    corpus_build = corpus_actions.add_parser(
+        "build",
+        parents=[common],
+        help=(
+            "combine the sources' pairs, drop the pairs that leak a benchmark,"
+            " and split the rest into training and validation pairs"
+        ),
+    )
+    corpus_build.add_argument("--name", required=True, help="the corpus's name")
+    corpus_build.add_argument(
+        "--source",
+        nargs="+",
+        choices=list(pairs.READERS),
+        default=list(pairs.READERS),
+        help="the sources to combine (default: all of them)",
+    )
+    corpus_build.add_argument(
+        "--validation-share",
+        type=float,
+        default=corpus.VALIDATION_SHARE,
+        help="the share of groups held out for validation, in steps of 0.001"
+        f" (default: {corpus.VALIDATION_SHARE})",
+    )
+
     args = parser.parse_args(argv)
     if args.step == "benchmarks" and args.action == "build":
         names = [name for name in benchmarks.BUILDERS if getattr(args, name)]
@@ -105,6 +132,8 @@ def main(argv=None):
         return sources.fetch(args.source, args.inputs, args.update_manifest)
     if args.step == "pairs" and args.action == "prepare":
         return pairs.prepare(args.source, args.inputs)
+    if args.step == "corpus" and args.action == "build":
+        return corpus.build(args.name, args.source, args.inputs, args.validation_share)
     return 0
 
 

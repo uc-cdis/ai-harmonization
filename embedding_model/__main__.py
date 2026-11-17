@@ -12,6 +12,7 @@ from embedding_model import (
     sources,
     texts,
     tokenizer,
+    train,
 )
 
 PACKAGE = Path(__file__).resolve().parent
@@ -162,6 +163,33 @@ def main(argv=None):
         f" (default: {tokenizer.MIN_FREQUENCY})",
     )
 
+    train_step = steps.add_parser(
+        "train",
+        parents=[common, writes_outputs],
+        help="train one model on a corpus, from a config",
+        description=(
+            "Train one model on a corpus. A flag can also give any setting of the"
+            " config, and the flag overrides the config: for example"
+            " --learning_rate 1.0e-2 or --use_cpu. docs/training.md lists the"
+            " settings."
+        ),
+    )
+    train_step.add_argument(
+        "--config",
+        required=True,
+        type=Path,
+        help=(
+            "the run's config, a YAML file. train names the run after the config"
+            " and the seed."
+        ),
+    )
+    train_step.add_argument(
+        "--seed",
+        required=True,
+        type=int,
+        help="the seed, which decides the starting weights and the order of the pairs",
+    )
+
     score = steps.add_parser(
         "score",
         parents=[common, writes_outputs],
@@ -205,7 +233,12 @@ def main(argv=None):
         help="how many texts the model encodes at a time (default: %(default)s)",
     )
 
-    args = parser.parse_args(argv)
+    # Only train takes more flags: the settings that override its config.
+    args, overrides = parser.parse_known_args(argv)
+    if overrides and args.step != "train":
+        parser.error(f"unrecognized arguments: {' '.join(overrides)}")
+    if args.step == "train":
+        return train.train(args.config, args.seed, overrides, args.inputs, args.outputs)
     if args.step == "score":
         try:
             scoring.score(

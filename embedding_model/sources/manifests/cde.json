@@ -1,0 +1,52 @@
+{
+  "source": "cde",
+  "version": "1",
+  "fetched": "2026-11-16",
+  "files": {
+    "elements.parquet": {
+      "rows": 40937,
+      "sha256": "08150611d7a76dc49c6828f770becf315b80ce18c35d8e051df7151b4e1d0e77",
+      "content_sha256": "e22186c2693932d6049836a2c797ec1f28c6c2ec00dc2fe3fd31ad784cc0729e"
+    },
+    "designations.parquet": {
+      "rows": 72733,
+      "sha256": "28f4af6bf3e31c067956bdc3ead5d9a9a723106052ff9f604167955ad9d85cb2",
+      "content_sha256": "79fd17f3d17d2e3422a2daee9e5fe3b76502d8fd1e8ab29383c17d693f0d708a"
+    },
+    "definitions.parquet": {
+      "rows": 24982,
+      "sha256": "96a63d76ae27c2842b494a3f1b0e9556e257f6eaabac33e3b6d738bef8851af2",
+      "content_sha256": "b16b1a32a892c1c1c8317310301a773b5c966e0cb6f83b500e8c05683c21eeb1"
+    },
+    "ids.parquet": {
+      "rows": 59457,
+      "sha256": "9498f512c27de5ec43875e53e8cb38cbcc285f16e4c9322c87ab1367fc9e7440",
+      "content_sha256": "d4de24fb278d2142c63bd6eb6c68bda941de0657d149d92dbcb26ba312d3a670"
+    },
+    "values.parquet": {
+      "rows": 132532,
+      "sha256": "963725b6872699725bce61c4581985c8ed4da5772ddd069d7e9e169a0d8a9827",
+      "content_sha256": "538ebe5aa741f7b1ed2f8da40447571fe89d64b7052864eb26f548b486ec3281"
+    },
+    "properties.parquet": {
+      "rows": 43066,
+      "sha256": "27715752babacdfd22448ffabcb627e563e31516b30d4869a051e178ad2d7b57",
+      "content_sha256": "605121975bac7a98ae8f42d45d0737ed56ad6964eec7f2c9b44638b857ab6848"
+    }
+  },
+  "sources": [
+    {
+      "role": "service",
+      "name": "NIH CDE Repository export",
+      "location": "https://cde.nlm.nih.gov/server/de/searchExport",
+      "fetched": "2026-11-16",
+      "sha256": "c62fd8594d16973be25c3e1a970ae378bca9cf4cdc1d2fb5bb120c329578a813",
+      "license": "LicenseRef-NLM-Web-Policies",
+      "citation": "embedding_model/docs/licenses.md#nih-cde"
+    }
+  ],
+  "counts": {
+    "elements": 40937,
+    "not_open": 796
+  }
+}

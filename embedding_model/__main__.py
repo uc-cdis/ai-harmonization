@@ -6,6 +6,7 @@ from pathlib import Path
 
 from embedding_model import (
     benchmarks,
+    pairs,
     sources,
 )
 
@@ -76,6 +77,21 @@ def main(argv=None):
         ),
     )
 
+    pair_step = steps.add_parser("pairs", help="make the training pairs")
+    pair_actions = pair_step.add_subparsers(dest="action", required=True)
+    prepare = pair_actions.add_parser(
+        "prepare",
+        parents=[common],
+        help="make each fetched source's pairs of texts that mean the same thing",
+    )
+    prepare.add_argument(
+        "--source",
+        nargs="+",
+        choices=list(pairs.READERS),
+        default=list(pairs.READERS),
+        help="the sources to prepare (default: all of them)",
+    )
+
     args = parser.parse_args(argv)
     if args.step == "benchmarks" and args.action == "build":
         names = [name for name in benchmarks.BUILDERS if getattr(args, name)]
@@ -87,6 +103,8 @@ def main(argv=None):
         return benchmarks.build(names, args.inputs, args.update_manifest)
     if args.step == "sources" and args.action == "fetch":
         return sources.fetch(args.source, args.inputs, args.update_manifest)
+    if args.step == "pairs" and args.action == "prepare":
+        return pairs.prepare(args.source, args.inputs)
     return 0
 
 

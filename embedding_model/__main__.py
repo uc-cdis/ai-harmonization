@@ -8,7 +8,9 @@ from embedding_model import (
     benchmarks,
     corpus,
     pairs,
+    scoring,
     sources,
+    texts,
     tokenizer,
 )
 
@@ -32,6 +34,17 @@ def main(argv=None):
         default=PACKAGE / "inputs",
         help="where the steps write and read prepared data (default: %(default)s)",
     )
+    writes_outputs = argparse.ArgumentParser(add_help=False)
+    writes_outputs.add_argument(
+        "--outputs",
+        type=Path,
+        default=PACKAGE / "outputs",
+        help=(
+            "where the steps write runs, scores, experiments and comparisons"
+            " (default: %(default)s)"
+        ),
+    )
+
     parser = argparse.ArgumentParser(
         prog="python -m embedding_model",
         description="Build, train and evaluate a small embedding model.",
@@ -149,7 +162,65 @@ def main(argv=None):
         f" (default: {tokenizer.MIN_FREQUENCY})",
     )
 
+    score = steps.add_parser(
+        "score",
+        parents=[common, writes_outputs],
+        help=(
+            "score a model on benchmarks: each source variable's rank, MRR and"
+            " accuracy@k"
+        ),
+    )
+    score.add_argument(
+        "--model",
+        required=True,
+        help=(
+            "a Hugging Face model id, a model folder on disk, or the folder of"
+            " a run that train wrote"
+        ),
+    )
+    score.add_argument(
+        "--benchmark",
+        required=True,
+        nargs="+",
+        action="extend",
+        choices=sorted(benchmarks.BUILDERS),
+        help="one or more benchmarks. score loads the model once for all of them.",
+    )
+    score.add_argument(
+        "--format",
+        choices=sorted(texts.FORMATS),
+        help=(
+            "the format of the source and target texts (default: a run's"
+            f" training format, and {texts.DEFAULT_FORMAT} for any other model)"
+        ),
+    )
+    score.add_argument(
+        "--device",
+        help="cpu or cuda (default: a GPU if there is one, else the CPU)",
+    )
+    score.add_argument(
+        "--batch-size",
+        type=int,
+        default=scoring.BATCH_SIZE,
+        help="how many texts the model encodes at a time (default: %(default)s)",
+    )
+
     args = parser.parse_args(argv)
+    if args.step == "score":
+        try:
+            scoring.score(
+                args.model,
+                args.benchmark,
+                args.inputs,
+                args.outputs,
+                args.format,
+                args.device,
+                args.batch_size,
+            )
+        except Exception as error:
+            print(f"score: {type(error).__name__}: {error}", file=sys.stderr)
+            return 1
+        return 0
     if args.step == "benchmarks" and args.action == "build":
         names = [name for name in benchmarks.BUILDERS if getattr(args, name)]
         if not names:

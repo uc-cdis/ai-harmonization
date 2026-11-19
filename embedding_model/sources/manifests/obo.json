@@ -1,0 +1,100 @@
+{
+  "source": "obo",
+  "version": "1",
+  "fetched": "2026-11-16",
+  "files": {
+    "terms.parquet": {
+      "rows": 103613,
+      "sha256": "6383d13dfe64de729fa19c6ff2833544c06db0d1d9c66cea26d90838d712ce4f",
+      "content_sha256": "7b7267ffcdad8f45c46d0b0b06df0fc161d22bc878f2ff1cf019db49f91d83f4"
+    },
+    "synonyms.parquet": {
+      "rows": 225176,
+      "sha256": "0519b19fd474989e9564ffd2af83bfd148ccd4ba0e7588af0e73bf48e30f566a",
+      "content_sha256": "f2c0de0b2131739f822500710d74d5d9371d2fcedb0eeb071547011cc5695dd9"
+    },
+    "definitions.parquet": {
+      "rows": 80205,
+      "sha256": "44ad15768af8ad80cf0a92d6db0050e4288d810b839e16550eed55e4e745102c",
+      "content_sha256": "f6d3efa071d41876f8ffc18971935defccec0a1c30113678f0d840c283ac300a"
+    }
+  },
+  "sources": [
+    {
+      "role": "release",
+      "name": "MONDO release",
+      "location": "https://purl.obolibrary.org/obo/mondo/releases/2026-10-06/mondo-base.owl",
+      "version": "2026-10-06",
+      "sha256": "dc62a6809cce0954f3a59a9c4b6e1a644bd56b411d8d2538b6eaa79d1ebf4f30",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "release",
+      "name": "HP release",
+      "location": "https://purl.obolibrary.org/obo/hp/releases/2026-09-01/hp-base.owl",
+      "version": "2026-09-01",
+      "sha256": "42c7e775d590837d838701d264740c79c8f343fd67ef0f5a68d6569965445558",
+      "license": "LicenseRef-HPO",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "release",
+      "name": "UBERON release",
+      "location": "https://purl.obolibrary.org/obo/uberon/releases/2026-10-01/uberon-base.owl",
+      "version": "2026-10-01",
+      "sha256": "e69b77112e073da633d60b20aeec48dfc70eca98d7500707bbb3b43bcef2971c",
+      "license": "CC-BY-3.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "release",
+      "name": "OBA release",
+      "location": "https://purl.obolibrary.org/obo/oba/releases/2026-10-10/oba-base.owl",
+      "version": "2026-10-10",
+      "sha256": "3c69ad2dbf9154f7eb546cae0196ec71869dac06711b585181b3a17091b34715",
+      "license": "CC0-1.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "service",
+      "name": "CMO release",
+      "location": "https://purl.obolibrary.org/obo/cmo.owl",
+      "version": "2026-10-31",
+      "fetched": "2026-11-16",
+      "sha256": "784c1188833994f1e8676412406d7fb42a8b21834456de3b6eb761531e0d96a0",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "service",
+      "name": "MMO release",
+      "location": "https://purl.obolibrary.org/obo/mmo.owl",
+      "version": "2026-10-10",
+      "fetched": "2026-11-16",
+      "sha256": "b5e26e3769989a64d9c536fb7306ee33e0f8df291b70ca28980fbc19c26f2d2e",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    },
+    {
+      "role": "release",
+      "name": "DUO release",
+      "location": "https://purl.obolibrary.org/obo/duo/releases/2021-02-23/duo.owl",
+      "version": "2021-02-23",
+      "sha256": "6a34ce09ae07b1e37c6756e049c12129fd1104e7d9e6e2f8cee84d2ab374c45b",
+      "license": "CC-BY-4.0",
+      "citation": "embedding_model/docs/licenses.md#ontologies"
+    }
+  ],
+  "counts": {
+    "terms": {
+      "mondo": 36129,
+      "hp": 20482,
+      "uberon": 16432,
+      "oba": 25462,
+      "cmo": 4200,
+      "mmo": 869,
+      "duo": 39
+    }
+  }
+}

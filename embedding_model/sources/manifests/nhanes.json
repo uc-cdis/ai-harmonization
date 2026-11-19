@@ -1,0 +1,83 @@
+{
+  "source": "nhanes",
+  "version": "1",
+  "fetched": "2026-11-16",
+  "files": {
+    "variables.parquet": {
+      "rows": 60170,
+      "sha256": "9fb4ab377e44c2244dded9c27be7ff809f54ebaeea9cd3a0b5678ef28fbe162f",
+      "content_sha256": "c8bb8b75f83291ba0de35fd14086086a765ac06dcbb1cb7fc72e98f332b07569"
+    },
+    "codebook.parquet": {
+      "rows": 58949,
+      "sha256": "b7400358653899e6ae9df85d8e5b9d1dc134d91b059fcb82b2d527e6109ba6fe",
+      "content_sha256": "d2fa200f197b78376933e47f198c7b34d7deb36970cfb3a085c4e273dddd68be"
+    },
+    "values.parquet": {
+      "rows": 201467,
+      "sha256": "d021085e948912c510f88842fc5e8f9773eb50b5b0b59005772fe0c4572aba18",
+      "content_sha256": "b9c308da14d017fb4595cd099a8553756e189ea7b9a378be781ef844cb942a25"
+    }
+  },
+  "sources": [
+    {
+      "role": "service",
+      "name": "NHANES variable list, Demographics",
+      "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Demographics",
+      "fetched": "2026-11-16",
+      "sha256": "d0b88e8b88a4988934ac4d5ba835e82f218c30868383240814872074c04319e1",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    },
+    {
+      "role": "service",
+      "name": "NHANES variable list, Dietary",
+      "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Dietary",
+      "fetched": "2026-11-16",
+      "sha256": "19e4e2f12fd405c8f2517cefbddebf12f4c56b0957a96fe589e5ed273f07f26b",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    },
+    {
+      "role": "service",
+      "name": "NHANES variable list, Examination",
+      "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Examination",
+      "fetched": "2026-11-16",
+      "sha256": "8cc3cce7b251d9d226f7e402bda82448569d24bc73d9c9057a4d4207b495a439",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    },
+    {
+      "role": "service",
+      "name": "NHANES variable list, Laboratory",
+      "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Laboratory",
+      "fetched": "2026-11-16",
+      "sha256": "ae1fe77fda5b135e181cd40122928f9993a3e552287d89558ce9ff4d7e1d2730",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    },
+    {
+      "role": "service",
+      "name": "NHANES variable list, Questionnaire",
+      "location": "https://wwwn.cdc.gov/nchs/nhanes/search/variablelist.aspx?Component=Questionnaire",
+      "fetched": "2026-11-16",
+      "sha256": "ee9925e3c4be70d6af2b974099e4ceea5e40db1438038f8fe4aee37cf81c8ea4",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    },
+    {
+      "role": "service",
+      "name": "NHANES codebooks",
+      "location": "https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/{cycle}/DataFiles/{data_file}.htm",
+      "fetched": "2026-11-16",
+      "sha256": "68db0a1456f70f1b544900e8af64e318dae61eca709b82d16fb681c86db1e629",
+      "license": "LicenseRef-CDC-Agency-Materials",
+      "citation": "embedding_model/docs/licenses.md#nhanes"
+    }
+  ],
+  "counts": {
+    "variables": 60170,
+    "data_files": 1855,
+    "data_files_without_codebook": 48
+  }
+}

@@ -8,6 +8,10 @@ outputs/
 # PFBs, dbGaP XML and mapping CSVs — gigabytes of data, none of it source.
 inputs/
 
+# The user's own configs for the embedding model's runs and experiments, which
+# embedding_model/docs/training.md and experiments.md suggest keeping here.
+/embedding_model/configs/
+
 # Gen3 API keys. Never commit these.
 gen3-credentials/
 **/bdc.json

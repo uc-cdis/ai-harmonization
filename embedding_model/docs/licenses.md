@@ -1,24 +1,24 @@
 # Licenses and references
 
 The benchmarks and the sources of training data are built from public data
-that others publish. This page gives the license or terms of each one, and the reference
-to cite. It also gives each license's id in SPDX, the
-[System Package Data Exchange](https://spdx.dev/), as the manifests record it.
-SPDX names each license by a short id from its
-[License List](https://spdx.org/licenses/), for example `CC-BY-4.0`. The page
-also says how single restricted items are left out, and what this repository
-shares.
+that others publish. This page gives the license or terms of each one, and the
+reference to cite. It also gives each license's id in
+[SPDX](https://spdx.org/licenses/), as the manifests record it, for example
+`CC-BY-4.0`. [Restricted items](#restricted-items) says how single restricted
+items are left out.
 
 ## What this repository shares
 
-The repository shares no data. Each benchmark build and each source fetch
-downloads the originals from their publishers. It makes its files on your
-machine, under `embedding_model/inputs/`. The pairs are made there too.
+The repository shares no third-party data. Each benchmark build and each
+source fetch downloads the originals from their publishers. Then it makes its
+files on your machine, under `embedding_model/inputs/`. The pairs are made
+there too.
 
-The manifests are committed. They record each input's version, checksum,
-license and citation, but they hold no data (see [manifests.md](manifests.md)).
+The manifests are committed. They record each input's version or checksum,
+and its license. For a third-party input, they also record its citation. They
+hold no data (see [manifests.md](manifests.md)).
 
-For the GDC benchmark, building on your machine is required: see [GDC](#gdc).
+You must build the GDC benchmark on your machine: see [GDC](#gdc).
 
 ## Benchmarks
 
@@ -50,8 +50,9 @@ cover them.
 
 **Website:** GDC-SM's [Zenodo record](https://doi.org/10.5281/zenodo.14963588),
 the [GDC Data Dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/), released
-as [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary), and Magneto's code,
-[VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher).
+as [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). Magneto's code,
+[VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher), comes
+with the paper that publishes GDC-SM. The build does not read it.
 
 **License:** The ground truth is [CC BY
 4.0](https://creativecommons.org/licenses/by/4.0/), and the GDC dictionary is
@@ -64,9 +65,8 @@ benchmark table is a modified version: it is repaired and joined to the
 expert mappings.
 
 So GDC-SM distributes only the ground truth, with instructions for rebuilding
-the tables from the publishers' originals. Likewise, this repository
-distributes no benchmark files: the builder downloads the originals and makes
-the tables on your machine.
+the tables from the publishers' originals. This repository distributes no
+benchmark files either.
 
 **SPDX:** the ground truth is `CC-BY-4.0`, and the dictionary is
 `Apache-2.0`. Each paper's Crossref record gives its license: `CC-BY-4.0` for
@@ -89,8 +89,7 @@ article's DOI.
 
 ## Sources of training data
 
-Each source's license was checked. Every source is free to use, under the
-license or terms below.
+Every source is free to use, under the license or terms below.
 
 ### NCIt
 
@@ -243,10 +242,9 @@ licensing restrictions", on its
 state that U.S. government works on its sites "may be freely used or reproduced
 without permission in the U.S.". NLM asks you to name it as the source, with
 "Courtesy of the National Library of Medicine" or "Source: National Library
-of Medicine". Content contributed by others may be
-copyrighted. Each element's `copyrightStatus` and `noRenderAllowed` say which:
-an element is open when its status is "Public domain, free to use" and
-`noRenderAllowed` is false. An element without `noRenderAllowed` is closed.
+of Medicine". Content contributed by others may be copyrighted. Each
+element's `copyrightStatus` and `noRenderAllowed` say which, as
+[Restricted items](#restricted-items) shows.
 
 **SPDX:** `LicenseRef-NLM-Web-Policies`.
 
@@ -263,9 +261,8 @@ an element is open when its status is "Public domain, free to use" and
 National Cancer Institute (NCI) products is free of copyright"
 ([Reuse of NCI Information](https://www.cancer.gov/policies/copyright-reuse)).
 The same page asks you to "credit the National Cancer Institute as the
-source".
-An element of a proprietary measure has a Proprietary Measure Permission
-document, and is not open.
+source". An element of a proprietary measure is not open (see
+[Restricted items](#restricted-items)).
 
 **SPDX:** `LicenseRef-NCI-Reuse`.
 
@@ -299,9 +296,8 @@ permission"
 
 **License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq#question-11) states that
 most of its protocols are freely available, and a small share have limited
-availability. Each protocol's `availability` says which: only "Available" is
-open. A variable whose protocol is not in `protocols`, for example one of the
-COVID-19 library's, has no availability, so it is not open.
+availability. Each protocol's `availability` says which, as
+[Restricted items](#restricted-items) shows.
 
 **SPDX:** `LicenseRef-PhenX`.
 
@@ -320,21 +316,17 @@ Some sources also mark single items as restricted, in a field of their own.
 For example, [LOINC](sources.md#loinc) marks a code whose content belongs to a third party. The
 fetch reads these restriction fields too. Each source's main table has an
 `open` column: true when the item's restriction field allows its use.
-`pairs prepare` uses only open items (see
-[pairs.md](pairs.md#only-open-items)).
+`pairs prepare` uses only open items.
 
 Where the field holds one of a list of values, an item is open only when its
 value is known to allow use. A value that the fetch has not seen before means
-the item is not open. The fetch prints the value, so that someone can review
-it. For [caDSR](sources.md#cadsr), the field is the element's reference
-documents: each must be of a kind known to allow use. A Proprietary Measure Permission closes an element. A kind that
-the fetch has not seen before closes it too.
+the item is not open. The fetch prints the value, so that you can review it.
 
 | source | restriction field | open when |
 |---|---|---|
 | [NCIt](sources.md#ncit), [ontologies](sources.md#ontologies), [CDISC](sources.md#cdisc) | none per item | always: the source's license covers every item |
-| LOINC | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | they are empty, on the item and on the panels that it sits in. With closed panels left out, a code is open when it sits in an open panel, or in no panel and has no notice. A notice marks third-party content. |
+| [LOINC](sources.md#loinc) | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | two things hold. First, the code has no notice of its own. Second, it sits in at least one open panel, or in no panel. A panel is closed when it or its code has a notice, or when a panel that it sits in is closed. A notice marks third-party content. |
 | [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is false. Without `noRenderAllowed`, it is closed. |
-| caDSR | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission" |
+| [caDSR](sources.md#cadsr) | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission". A kind that the fetch has not seen before closes the element. |
 | [NHANES](sources.md#nhanes) | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
-| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available". A variable whose protocol has none is closed. |
+| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available". A variable whose protocol is not in the PhenX `protocols` table, for example one of the COVID-19 library's, has none, so it is closed. |

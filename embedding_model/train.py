@@ -53,10 +53,10 @@ RUNS = "runs"
 MAX_SEED = 2**32 - 1
 # The training settings whose defaults here differ from the library's. The
 # batch sizes and the warmup are those of Hugging Face's recipe for training a
-# static model from scratch. The others are this pipeline's own, as
-# design_decisions.md says. Every architecture shares these defaults, because
-# none of them depends on the model. Each architecture sets its own learning
-# rate. The config overrides these defaults.
+# static model from scratch. The others are this pipeline's own. Every
+# architecture shares these defaults, because none of them depends on the
+# model. Each architecture sets its own learning rate. The config overrides
+# these defaults.
 TRAINING_DEFAULTS = {
     "num_train_epochs": 5,
     "per_device_train_batch_size": 2048,

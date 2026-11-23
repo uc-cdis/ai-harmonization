@@ -8,7 +8,7 @@ manifest, ``manifest.json``. It writes the folder whole, through
 Each source has its own module, which reads the source into items.
 ``common.star`` then makes the pairs the same way for every source.
 ``read_pairs`` reads the pairs back, and checks them against their manifest.
-The rules are in ``embedding_model/docs/pairs.md``.
+``embedding_model/docs/pairs.md`` describes the pairs.
 
 A pair keeps both rendered texts, ``anchor`` and ``positive``, and the fields
 that ``common.render`` writes them from. So a later step can compare fields

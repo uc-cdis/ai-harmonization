@@ -3,26 +3,13 @@
 An experiment asks one question: does a change to a run's config help? Its
 file gives the **base**, which is a run's config, and one or more **arms**.
 Each arm is a version of the base that changes some settings.
-`experiment train` trains the base and each arm at several seeds. So
-`experiment compare` can tell a difference between the arms from the
-difference between seeds. One arm at one seed is one [run](training.md), as
-`train` trains it.
-
-`experiment train` writes the runs, the arms' configs and the runs' logs to one
-folder, the experiment's folder. `experiment compare` then compares each arm
-with the base, and recommends an arm to build on. It writes its comparison to
-the same folder. [What `experiment` writes](#what-experiment-writes) lists the
-files. [Details](#details) describes:
-
-- the experiment's file, in full
-- the checks before training
-- the GPUs, and clusters with SLURM
-- how `experiment compare` compares the arms
+`experiment train` trains the base and each arm at several seeds. The base or
+one arm, at one seed, is one [run](training.md), as `train` trains it.
+`experiment compare` then compares each arm with the base, and recommends an
+arm to build on.
 
 Model development is a series of experiments. Each one builds on an arm of the
 one before. You choose that arm.
-[design_decisions.md](design_decisions.md#experiments) gives the reasons for
-the rules below.
 
 ## Running `experiment`
 
@@ -32,16 +19,18 @@ python -m embedding_model experiment status --config embedding_model/configs/exp
 python -m embedding_model experiment compare --config embedding_model/configs/experiments/dim.yaml  # compare the arms, once every run is done
 ```
 
+- **Give the same `--outputs` to all three commands.** `experiment status` and
+  `experiment compare` read the folder that `experiment train` wrote.
+
 ### Writing an experiment's file
 
 An experiment's file is a YAML file. The experiment takes its name from the
-file, as a run takes its name from its config: `dim.yaml` is the experiment
-`dim`. Keep your experiments' files in `embedding_model/configs/experiments/`,
-apart from `inputs/` and `outputs/`, which the tools write. Git ignores all
-three.
+file: `dim.yaml` is the experiment `dim`. Keep your experiments' files in
+`embedding_model/configs/experiments/`, apart from `inputs/` and `outputs/`,
+which the tools write. Git ignores all three.
 
-The file names the base, the seeds, and the arms, each with the settings that
-it changes. This one varies `embedding_dim`, the length of each token's vector
+The file names the base, the seeds and the arms. Each arm names the settings
+that it changes. This one varies `embedding_dim`, the length of each token's vector
 in the table of a [static model](training.md#static-a-static-embedding-model).
 It asks whether a smaller table loses
 [validation MRR@10](training.md#manifestjson), or a larger one gains it:
@@ -54,6 +43,7 @@ base:
     corpus: example
     tokenizer: example-8k
   training:
+    # The example is small enough for a CPU, where pinned memory has no use.
     dataloader_pin_memory: false
 seeds: [0, 1, 2, 3, 4]
 decision:
@@ -70,35 +60,38 @@ arms:
     model: {embedding_dim: 2048}
 ```
 
-Vary one setting per experiment, as `dim.yaml` varies `embedding_dim`. Then
-each arm's difference from the base comes from that one setting.
-
-[The experiment's file](#the-experiments-file) lists every field, and the two
-tests that an arm can ask of the base.
+Vary one setting per experiment, as `dim.yaml` varies `embedding_dim`.
+[The experiment's file](#the-experiments-file) lists every field and its
+default.
 
 ### Training it
 
-`experiment train` trains each run of the experiment that is not done. Each
-run is the `train` command, `python -m embedding_model train`, with the arm's
-config and the seed. Each run's output goes to the run's log, in `logs/`. A
-run that fails does not stop the others. At the end, `experiment train` lists
-the runs that failed, and exits with 1. If you train the same file again,
-`experiment train` trains only the runs that are not done.
+`experiment train` trains each run of the experiment that is not done:
 
-[Details](#details) says more:
+- Each run is the `train` command, `python -m embedding_model train`, with
+  the arm's config and the seed.
+- Each run's output goes to the run's log, `logs/<run>.log` in the
+  experiment's folder.
+- A run that fails does not stop the others, and leaves no folder. At the
+  end, `experiment train` lists the runs that failed, and exits with status
+  1.
+- If you train the same file again, `experiment train` trains only the runs
+  that are not done, the failed ones included.
+- After you build the corpus again, the runs that are done stay as they are.
+  To train them on the new build:
+  1. Train each tokenizer that the experiment uses again, with the same
+     [`tokenizer train`](tokenizer.md#running-tokenizer-train) command as
+     before: the same `--corpus`, `--vocab-size`, `--min-frequency` and
+     `--name`. The tokenizer's `manifest.json` holds its settings.
+  2. Delete the experiment's folder.
+  3. Train the experiment again.
 
-- [What it checks before training](#what-it-checks-before-training): the file,
-  the configs and the inputs
-- [A changed file](#a-changed-file): after the first training, the
-  `experiment` commands refuse a file whose fields changed
-- [GPUs and CPUs](#gpus-and-cpus): one run per GPU at a time, or one at a time
-  without a GPU
-- [On a cluster with SLURM](#on-a-cluster-with-slurm): the whole experiment as
-  one job
+  Do the same for each experiment that builds on it, the earlier experiment
+  first.
 
 ### Following it
 
-For each arm, `experiment status` counts the runs that are done, started and
+For the base and each arm, `experiment status` counts the runs that are done, started and
 not started:
 
 ```
@@ -109,15 +102,10 @@ experiment dim: 11 of 15 runs done
   dim2048  3 done, 2 not started
 ```
 
-A run is done when its folder has its manifest. A run has started when a
-staging folder sits beside its folder.
-[Inputs and outputs](../README.md#inputs-and-outputs) describes staging
-folders. A started run is training now, or it was killed before it finished,
-for example by `scancel` or a time limit. A run that you stop with Ctrl-C
-deletes its staging folder.
-
-[design_decisions.md](design_decisions.md#an-experiments-status-comes-from-its-run-folders)
-gives the reasons for these states.
+A run is done when its folder has its manifest. A run has started when its
+hidden staging folder, `.<run>~<random>/`, sits beside its folder. A started
+run is training now, or it was killed before it finished, for example by
+`scancel` or a time limit.
 
 ### Comparing the arms
 
@@ -141,41 +129,17 @@ experiment dim: validation MRR@10, the base and 2 arms at 5 seeds
      table: /home/abcd/ai-harmonization/embedding_model/outputs/experiments/dim/comparison/differences.csv
 ```
 
-The last lines give the figure and the tables by their full paths, as
-[`compare`](comparing.md#running-compare) gives its own. In a terminal that
-links paths, for example VS Code's, each path opens with a click.
+To build on an arm, copy its `base:` line into the next experiment's file,
+as [Building on an earlier experiment](#building-on-an-earlier-experiment)
+says. [How the arms are compared](#how-the-arms-are-compared) gives the verdicts,
+and [The recommendation](#the-recommendation) says which arm
+`experiment compare` recommends.
 
-To build on an arm, copy its `base:` line into the next experiment's file.
-[Building on an earlier experiment](#building-on-an-earlier-experiment)
-describes such a base. [How the arms are compared](#how-the-arms-are-compared)
-explains each line and each verdict.
-[The recommendation](#the-recommendation) says which arm `experiment compare`
-recommends.
-
-`experiment compare` stops, and says why, when:
-
-- a run is not done. The message names the runs, and the command that trains
-  them.
-- a base run of an earlier experiment has started but not finished. The
-  message says to wait for the run. If no job is training the run, the
-  message says to delete its staging folder.
-- the base names an earlier experiment that has not been trained in the
-  outputs folder, or an arm that the earlier experiment does not have
-- the file differs from the copy that its first training kept.
-  [A changed file](#a-changed-file) says more.
 
 ## What `experiment` writes
 
-`experiment train` writes to `embedding_model/outputs/experiments/<name>/`, or
-under the folder that `--outputs` names. `train` writes each run whole, and
-`experiment train` writes the arms' configs whole. A run that fails leaves no
-folder. If you train the file again, `experiment train` trains the run again.
-[Inputs and outputs](../README.md#inputs-and-outputs) describes how a step
-writes a folder whole.
-
-`experiment compare` writes `comparison/` in the same folder, whole too. So if
-a comparison fails, the previous comparison stays as it was. A new comparison
-replaces it.
+`experiment train` writes to `embedding_model/outputs/experiments/<name>/`.
+`experiment compare` writes `comparison/` in the same folder.
 
 ```
 experiments/<name>/
@@ -203,14 +167,9 @@ copy.
 ### `configs/`
 
 Each arm's full config: the base's settings, with the arm's changes. The
-base's config is `base.yaml`. `train` trains each run from its arm's config.
-You can also give a config to `train` yourself, as a run's config. Then
-`train` writes the run to `embedding_model/outputs/runs/dim128_s0/`, not into
-the experiment's folder:
-
-```
-python -m embedding_model train --config embedding_model/outputs/experiments/dim/configs/dim128.yaml --seed 0
-```
+base's config is `base.yaml`. You can also give an arm's config to `train`
+yourself, as a run's config. `train` then writes the run to
+`embedding_model/outputs/runs/`, not into the experiment's folder.
 
 ### `runs/`
 
@@ -230,11 +189,11 @@ What `experiment compare` writes: two tables, a figure and a manifest.
 
 #### `arms.csv`
 
-One row per arm, the base's first:
+One row for the base, then one row per arm:
 
 | column | what it holds |
 |---|---|
-| `arm`, `test`, `metric` | the arm, its test (empty for the base), and the metric that decides |
+| `arm`, `test`, `metric` | the arm's name (`base` for the base), its test (empty for the base), and the metric that decides |
 | `seeds` | the number of seeds |
 | `mean`, `sd` | the mean of the seeds' scores, and their spread from seed to seed |
 | `low`, `high` | the mean's 95% interval |
@@ -242,7 +201,7 @@ One row per arm, the base's first:
 
 #### `differences.csv`
 
-One row per arm:
+One row per arm. The base has no row:
 
 | column | what it holds |
 |---|---|
@@ -251,20 +210,19 @@ One row per arm:
 | `low`, `high` | Welch's interval of the difference |
 | `confidence` | the interval's level, for example 0.975 with 2 arms |
 | `df` | Welch's degrees of freedom |
-| `p` | the p of Welch's t-test of no difference |
+| `p` | the p-value of Welch's t-test of no difference |
 | `alpha` | the arm's alpha: the decision's, divided by the number of arms |
 | `minimum_effect` | the decision's minimum effect |
 | `passes` | whether the arm passes its test |
-| `seeds_needed` | the seeds per arm that its test needs, by Welch's t-test and its power, as [How the arms are compared](#how-the-arms-are-compared) says |
-| `underpowered` | whether the arm did not pass its test, with fewer seeds than the test needs, while its interval still reaches the margin that `minimum_effect` sets |
+| `seeds_needed` | the seeds per arm that its test needs |
+| `underpowered` | whether the arm's question is still open, with fewer seeds than `seeds_needed`, as [How the arms are compared](#how-the-arms-are-compared) says |
 | `verdict` | the verdict, as printed |
 
 #### `figures/`
 
 `arms_and_differences`: each arm's seeds on the left, and each arm minus the
-base on the right. [What it shows](#what-it-shows) says how to read it. The
-figure comes in three files, as the [figures of `compare`](comparing.md#figures)
-do: a `.png`, at 300 dpi, and a `.pdf` and an `.eps`.
+base on the right. [Reading the figure](#reading-the-figure) says how to read
+it.
 
 #### `manifest.json`
 
@@ -275,9 +233,10 @@ The comparison's manifest, with the fields that
 - `built`: the date of the comparison
 - `sources`: the experiment's `experiment.yaml`, and each run's
   `manifest.json`, each with its SHA-256
-- `settings`: the decision's fields, the arm's alpha, the intervals, the
-  test, and the power that `seeds_needed` aims at, with the method that
-  computes the power
+- `settings`: the decision's fields, each arm's alpha and its correction, the
+  intervals and the test. It also holds `target_power`, the power that
+  `seeds_needed` aims at for non-inferiority, and `power`, the method that
+  computes it.
 
 It also has four fields of its own:
 
@@ -297,41 +256,31 @@ It also has four fields of its own:
 |---|---|---|
 | `question` | no | one sentence: what the experiment asks |
 | `base` | yes | the base's settings, by the sections of a run's [config](training.md#the-config). Or an arm of an earlier experiment, as `<experiment>/<arm>`: see [Building on an earlier experiment](#building-on-an-earlier-experiment) |
-| `seeds` | yes | the seeds, as a list of at least 2 different whole numbers, from 0 to 4,294,967,295. One seed has no seed-to-seed spread, so `experiment compare` could not compare the arms |
+| `seeds` | yes | the seeds, as a list of at least 2 different whole numbers, from 0 to 4,294,967,295 |
 | `decision` | no | the rule that decides between the arms: see the next table |
-| `arms` | yes | each arm, by its name: its `test`, and the settings that it changes, by section. An arm is not named `base`, and does not change `data.corpus` |
+| `arms` | yes | each arm, by its name: its `test`, and the settings that it changes, by section. An arm is not named `base`, and does not change `data.corpus`. |
 
 Neither the base nor an arm sets `training.seed`: each run's seed comes from
-`seeds`.
+`seeds`. An arm changes only the settings that it names. Each other setting
+is the base's.
 
 The `decision` block has a default for each of its fields:
 
 | field | what it holds | default |
 |---|---|---|
 | `scored_on` | the data whose scores decide: `validation`, the corpus's validation pairs, the only choice for now | `validation` |
-| `metric` | the validation metric that decides: `mrr@10`, `accuracy@1`, `accuracy@3`, `accuracy@5` or `accuracy@10`, as each run's manifest records it | `mrr@10` |
-| `minimum_effect` | the margin, on the metric's scale. For `superiority`, the smallest gain worth a change. For `non-inferiority`, the largest loss worth taking | `0.01` |
-| `alpha` | the chance, over the whole experiment, that an arm passes by chance alone. `experiment compare` splits it over the arms | `0.05` |
+| `metric` | the validation metric that decides: `mrr@10`, `accuracy@1`, `accuracy@3`, `accuracy@5` or `accuracy@10` | `mrr@10` |
+| `minimum_effect` | the margin, on the metric's scale, greater than 0 and less than 1. For `superiority`, the smallest gain worth a change. For `non-inferiority`, the largest loss worth taking. | `0.01` |
+| `alpha` | the chance, over the whole experiment, that an arm passes by chance alone, greater than 0 and less than 1. `experiment compare` splits it over the arms. | `0.05` |
 
-Each arm names its `test`: the statistical test, the question that it asks of
-the base:
+Each arm names its `test`, the question that it asks of the base:
 
 - `superiority`: is the arm better than the base, by at least
-  `minimum_effect`? Use it for an arm that costs the same as the base, or more,
-  for example a larger table.
+  `minimum_effect`? Use it for an arm that costs the same as the base, or
+  more, for example a larger table.
 - `non-inferiority`: is the arm no worse than the base, by more than
   `minimum_effect`? Use it for an arm that is cheaper to train or to run, for
   example a smaller table.
-
-An arm changes only the settings that it names. Each other setting is the
-base's.
-
-An arm cannot change `data.corpus`: the arms would then be scored on different
-validation pairs.
-
-[design_decisions.md](design_decisions.md#one-experiment-asks-one-question-in-one-file)
-gives the reasons for one file per question, and for
-[its checks](design_decisions.md#an-experiments-file-is-checked-with-pydantic).
 
 ### Building on an earlier experiment
 
@@ -350,75 +299,53 @@ arms:
     training: {learning_rate: 0.4}
 ```
 
-The base is then that arm's full config, from the earlier experiment's
-`configs/`. The new experiment reuses the arm's runs at the same seeds, and
-does not train them again. At a seed where the earlier experiment has no run,
-`experiment train` trains the base here, as `base_s<seed>`. If the earlier
-experiment is still training one of the arm's runs, `experiment train` stops,
-so that two experiments do not train the run at once. But if the earlier
-experiment has not started the arm's run at a seed yet, `experiment train`
-trains the run here too. So train a later experiment once the earlier one is
-done.
+- The base is that arm's full config, from the earlier experiment's
+  `configs/`. The new experiment reuses the arm's runs at the same seeds. At
+  a seed where the earlier experiment has no run, `experiment train` trains
+  the base in the new experiment's folder, as `base_s<seed>`.
+- Train a later experiment only when the earlier one is done. Otherwise both
+  can train the same base run.
+- `base: dim/base` builds on the earlier experiment's own base, and reuses
+  its runs.
+- The earlier experiment's folder must stay.
+- You may delete an earlier experiment and train it again with other
+  settings. Then delete the folder of each experiment that builds on it, and
+  train that experiment again. No command checks that you did this. Without
+  it, the later experiment compares runs of two different bases.
 
-`base: dim/base` builds on the earlier experiment's own base. The new
-experiment asks a new question of the same config, and reuses the base's runs.
-When `dim`'s own base is an arm of another experiment, for example
-`base: size/dim512`, the new experiment reuses the runs of that arm too.
+To delete the earlier experiment's folder:
 
-The earlier experiment's folder must stay, because the new experiment reads
-the earlier experiment's runs. To delete the folder, first copy the arm's
-config, for example
-`embedding_model/outputs/experiments/dim/configs/dim128.yaml`. A later
-experiment can give those settings in full, as its `base`. Its base runs then
-train again.
+1. Copy the arm's config, for example
+   `embedding_model/outputs/experiments/dim/configs/dim128.yaml`.
+2. Paste that config's sections under `base:` in the later experiment's
+   file.
+3. If the later experiment has trained, delete its folder, or save its file
+   under a new name. `experiment` refuses a trained file whose base changed,
+   as [A changed file](#a-changed-file) says.
 
-If you delete an earlier experiment and train it again with other settings,
-train again each experiment that builds on it too. Its done runs keep the old
-base's settings, while the base runs that it reuses change. Nothing checks
-this, so its comparison would mix runs of two bases.
-
-[design_decisions.md](design_decisions.md#the-base-can-be-an-arm-of-an-earlier-experiment-whose-runs-are-reused)
-gives the reasons.
-
-### What it checks before training
-
-Before any run trains, `experiment train` checks that:
-
-- the file's fields can be used
-- each arm's config is one that `train` reads, so a setting that does not
-  exist stops the experiment
-- the corpus and each tokenizer are built. If one is not, the message gives
-  the command that builds the corpus or trains the tokenizer.
-- no base run of an earlier experiment is still training
+The later experiment then trains all its runs again.
 
 ### A changed file
 
-You write the experiment's file, for example
-`embedding_model/configs/experiments/dim.yaml`. At the first training,
-`experiment train` keeps a copy of the file in the experiment's folder,
-`embedding_model/outputs/experiments/dim/`, as `experiment.yaml`. After that,
-each `experiment` command refuses a `dim.yaml` whose fields differ from the
-copy, for example one with another seed or another arm. A comment, another
-order of the fields, or a default written out is no change. The message names
-the fields that differ, and gives two next steps:
+After the first training, each `experiment` command refuses a file whose
+fields differ from its copy, [`experiment.yaml`](#experimentyaml). An
+example is a file with another seed or another arm. A comment, another order of the
+fields, or a default written out is no change. The message names the fields
+that differ, and gives two next steps:
 
-- to train the changed file from the start, delete the folder,
-  `embedding_model/outputs/experiments/dim/`. This deletes the experiment's
-  runs too.
+- to train the changed file from the start, delete the experiment's folder,
+  for example `embedding_model/outputs/experiments/dim/`. This deletes the
+  experiment's runs too.
 - to keep the runs, and ask a new question, save the changed file under a new
   name, for example `dim-small.yaml`. Its base can reuse the earlier runs, as
   `base: dim/base`.
-
-[design_decisions.md](design_decisions.md#a-changed-experiment-file-is-refused-rather-than-trained-again)
-gives the reasons.
 
 ### GPUs and CPUs
 
 The runs train on the machine where `experiment train` runs:
 
 - with GPUs, one run per GPU at a time. Each run sees one GPU of its own,
-  through `CUDA_VISIBLE_DEVICES`. When a run ends, the next run starts on the
-  same GPU.
+  through `CUDA_VISIBLE_DEVICES`.
 - without a CUDA GPU, one run at a time. `train` picks the device, as
   [training.md](training.md#gpus-and-cpus) says.
 
@@ -427,9 +354,6 @@ The runs train on the machine where `experiment train` runs:
 ```
 CUDA_VISIBLE_DEVICES=1,2 python -m embedding_model experiment train --config embedding_model/configs/experiments/dim.yaml
 ```
-
-[design_decisions.md](design_decisions.md#an-experiment-queues-its-runs-itself-rather-than-submitting-each-as-a-job)
-gives the reasons.
 
 ### On a cluster with SLURM
 
@@ -443,14 +367,12 @@ sbatch --nodes=1 --gpus=4 --cpus-per-task=20 --mem=128G --time=04:00:00 \
 ```
 
 - `--gpus=4`: four runs train at a time, one on each GPU. Always ask for the
-  GPUs with `--gpus`, because a job that asks for none gets no GPU from SLURM.
-  Some clusters do not hide the node's GPUs from such a job. Its runs would
-  then use GPUs that another job may hold.
-- `--cpus-per-task=20`: about 5 CPUs for each run that trains at a time. Each
-  run reads its pairs with 4 worker processes.
+  GPUs with `--gpus`, as [training.md](training.md#on-a-cluster-with-slurm)
+  says.
+- `--cpus-per-task=20`: about 5 CPUs for each run that trains at a time.
 - `--mem`: enough memory for the runs that train at a time.
-- `--time`: a limit. It only stops a job that takes too long. The job ends,
-  and frees its GPUs, when its last run ends.
+- `--time`: a limit. The job ends, and frees its GPUs, when its last run
+  ends.
 - `--nodes=1`: the runs train on the GPUs of the node where the job starts.
 
 Your cluster may need other options too, for example a partition, `-p`. The
@@ -463,130 +385,81 @@ option. These SLURM commands show the cluster and your jobs, and stop a job:
 - `squeue --me` shows your jobs
 - `scancel <job id>` stops a job
 
-The job keeps its GPUs until its last run ends. While the last runs train, the
-GPUs of the runs that are done wait. The runs that are done stay. So if the
-job stops, for example at its time limit, it loses only the runs that were
-training. If you submit the job again, it trains those runs. Train an
-experiment in one job at a time, because a second job would train again the
-runs that the first job is training.
+If the job stops, for example at its time limit, it loses only the runs that
+were training. Submit it again, and it trains those runs. Train an experiment
+in one job at a time.
 
 ### How the arms are compared
 
 Each run gives one number: its score on the validation pairs, by the
-decision's `metric`, from the run's manifest. An arm's score is the mean over
-its seeds, with its 95% t interval.
+decision's `metric`. An arm's score is the mean over its seeds, with its 95%
+t interval. For each arm, `experiment compare` takes the arm's mean minus the
+base's mean. It gives this difference Welch's interval and Welch's t-test.
+The decision's `alpha` is split over the arms. With 2 arms, each arm's test is
+at 0.05 / 2 = 0.025, and its interval is a 97.5% interval.
 
-In the printout, the base's line gives its mean, with its interval. Each
-arm's line gives its mean minus the base's, and the interval of that
-difference. Then the line gives the p of a test of no difference, and the
-verdict of the arm's test.
+- The `superiority` test passes when the p-value is below the arm's alpha,
+  and the arm's mean is at least `minimum_effect` above the base's.
+- The `non-inferiority` test passes when the interval's low end is above
+  minus `minimum_effect`, for example above -0.01.
 
-Each arm minus the base gets [Welch's interval and Welch's t-test](design_decisions.md#arms-are-compared-by-their-seeds-scores-with-welchs-interval-and-t-test),
-unpaired. The interval excludes 0 exactly when the test's p is below the arm's
-alpha. When neither arm's scores vary, for example when every run scores 1,
-the difference is exact. The interval is then the difference itself. Its p is
-1 when the difference is 0, and 0 otherwise.
-
-The decision's `alpha` is [split over the arms](design_decisions.md#alpha-is-split-over-the-arms-by-bonferroni).
-With 2 arms, `experiment compare` tests each arm at 0.05 / 2 = 0.025, and the
-arm's interval is a 97.5% interval.
-
-- The [`superiority` test passes](design_decisions.md#the-superiority-test-passes-on-a-significant-gain-of-at-least-the-minimum-effect)
-  when both hold: the p is below the arm's alpha, and the arm's mean is at
-  least `minimum_effect` above the base's. With the default `minimum_effect`
-  of 0.01, a significant gain of 0.005 does not pass the test.
-- The [`non-inferiority` test passes](design_decisions.md#the-non-inferiority-test-passes-when-the-interval-stays-above-minus-the-minimum-effect)
-  when the interval's low end is above minus `minimum_effect`, for example
-  above -0.01.
-
-| test | when it passes | when it does not, and the interval still reaches the margin | when it does not, and the interval lies wholly past the margin |
+| test | passes | open | settled |
 |---|---|---|---|
 | `superiority` | `better by at least 0.01` | `not shown better by at least 0.01` | `not better by at least 0.01` |
 | `non-inferiority` | `no more than 0.01 worse` | `may be more than 0.01 worse` | `more than 0.01 worse` |
 
-A verdict in the middle column says too little, either way. A verdict in the
-last column settles the question: more seeds would most likely not make the
-arm pass.
+- **passes:** the arm passes its test.
+- **open:** the arm does not pass, but its interval still holds a difference
+  that would pass. More seeds could change the verdict.
+- **settled:** the arm does not pass, and its interval lies wholly past the
+  margin.
 
-Each arm's row also gives [`seeds_needed`](design_decisions.md#an-arm-that-does-not-pass-its-test-is-checked-for-enough-seeds-at-the-minimum-effect), the seeds per arm
-that its test needs, at the two arms' seed-to-seed spreads:
-
-- for `superiority`, the fewest seeds at which a mean gain of exactly
-  `minimum_effect` would be significant, by Welch's t-test
-- for `non-inferiority`, the fewest seeds that give an 80% chance to pass,
-  when the arm and the base do not differ. This is the power of Welch's
-  t-test, from the noncentral t distribution, scipy's `stats.nct`.
-
-scipy's `optimize.elementwise` finds both counts. `bracket_root` finds a count
-that is too few and a count that is enough. Then `find_root` finds the exact
-count between them, and `experiment compare` rounds that count up.
-
-`experiment compare` also marks an arm `underpowered: <k> seeds needed` when
-all of these hold:
+`experiment compare` marks an arm `underpowered: <k> seeds needed` when all of
+these hold:
 
 - the arm does not pass its test
-- the arm's interval still reaches the margin
+- the arm's interval still holds a difference that would pass
 - the arm had fewer seeds than its test needs
 
 To settle the arm's question, ask it again in a new experiment, with the same
-number of arms, at k seeds or more. Build the new experiment on the same base.
-Then the new experiment reuses the base's runs at the seeds already trained.
-[Building on an earlier experiment](#building-on-an-earlier-experiment) says
-how.
-
-When `experiment compare` gives the verdict, it reads the difference and the
-interval as `differences.csv` shows them, to 5 decimals. So a gain shown as
-0.01 is a gain of at least 0.01.
+number of arms, at k seeds or more. Write its base as `base: <experiment>/base`,
+for example `base: dim/base`. Then it reuses the base's runs.
 
 ### The recommendation
 
-`experiment compare` [recommends an arm](design_decisions.md#the-comparison-recommends-one-arm-or-none-when-several-pass), and you choose:
+`experiment compare` recommends an arm, and you choose:
 
 - one arm passes its test: `experiment compare` recommends that arm
 - no arm passes: it recommends the base
 - several arms pass: it recommends none, and prints the `base:` line of each
   arm that passes
 
-When `experiment compare` recommends the base, the base's line names this
-experiment's base, for example `base: dim/base`. The next experiment then
-reuses the base's runs, wherever they were trained.
+When `experiment compare` recommends the base, the printed `base:` line
+names this experiment's base, for example `base: dim/base`.
 
 The comparison uses the validation pairs only, never the benchmarks. So
-`experiment compare` prints the recommended arm's best run, with the command
-that scores the run on the benchmarks. When the run's corpus was checked
-against no benchmark, the line says what to do instead. It says to build the
-benchmarks, then build the corpus again, then train again. The command names the benchmarks that the run's corpus was
-checked against for [leakage](leakage.md), because `score` refuses any other
-benchmark.
-[Scoring a run](training.md#scoring-a-run) says how `score` checks them. Then
+`experiment compare` prints the recommended arm's best run: its run with the
+highest score on the decision's `metric`. It also prints the command that
+scores the run on the benchmarks. The command names the benchmarks that the
+run's corpus was checked against for [leakage](leakage.md).
+[Scoring a run](training.md#scoring-a-run) describes `score --model`. Then
 [`compare`](comparing.md) compares the run with other models.
 
-### What it shows
+### Reading the figure
 
-The figure, `arms_and_differences`, has two panels. Each row is one arm, the
-base's first, and reads across both panels.
+The figure, `arms_and_differences`, has two panels. Each row is the base or
+one arm, the base first, and reads across both panels.
 
-| in the figure or table | what it shows | how it is computed |
-|---|---|---|
-| the title | the experiment, the metric, and the number of seeds | from the experiment's file |
-| a row | one arm, the base's first, named on the left | |
-| a dot, in the left panel, just above its row | one seed's score | the run's validation score, from its manifest |
-| a bar with an error bar, in the left panel, on its row | the arm's mean, with its 95% interval | the t interval of the mean of the seeds' scores, from scipy's `ttest_1samp` |
-| the gray band, in the left panel | the base's mean, minus and plus `minimum_effect` | from the base's mean and the decision |
-| a diamond with an error bar, in the right panel | the arm minus the base, with Welch's interval at the confidence of the arm's test. That is 95%, or the Bonferroni level with several arms, as the axis says. A filled diamond: the arm passes its test. A hollow diamond: it does not | scipy's `ttest_ind`, with `equal_var=False`: the rows of `differences.csv` |
-| the solid line at 0, in the right panel | no difference from the base | |
-| the gray band and its dashed edges, in the right panel | minus to plus `minimum_effect` | from the decision |
-| a color | blue for the base, dark orange for a non-inferiority arm, purple for a superiority arm | three colors of matplotlib's `petroff10`, which stay apart under each color vision deficiency |
-| the legend | the colors, as swatches, then the right panel's filled and hollow diamonds, and the bands | |
-| `arms.csv` | each arm's mean, sd and interval, and each seed's score | as the left panel |
-| `differences.csv` | each arm minus the base: the difference with its interval, the p of a test of no difference, the verdict, and the seeds that the arm's test needs | Welch's interval and t-test: scipy's `ttest_ind`, with `equal_var=False`. The seeds needed: by Welch's t-test, and for non-inferiority by its power, from scipy's noncentral t, `stats.nct`. Each count: scipy's `optimize.elementwise`, `bracket_root` then `find_root` |
+- **The left panel:** a dot is one seed's score. A bar is the arm's mean,
+  with its 95% confidence interval. The gray band is the base's mean, minus
+  and plus `minimum_effect`.
+- **The right panel:** a diamond is the arm minus the base, with Welch's
+  interval at the confidence of the arm's test. The gray band runs from
+  minus to plus `minimum_effect`.
+- **A filled diamond** passes its test, and a hollow one does not. A
+  `non-inferiority` arm passes when its interval stays right of the band's
+  left edge. A `superiority` arm passes when its interval stays right of 0,
+  and its diamond is on or right of the band's right edge.
 
-In the right panel, 0 is at the center. So the side where an arm is worse and
-the side where it is better have the same length. A `non-inferiority` arm
-passes when its interval stays right of the band's left edge. A `superiority`
-arm passes when its interval stays right of 0, and its diamond is on or right
-of the band's right edge.
-
-The left panel's band only helps you read the scores. The verdicts come from
-the right panel's intervals. The printout and `differences.csv` give each
-verdict in words.
+The verdicts come from the right panel's intervals, not from the left
+panel's band. The printout and `differences.csv` give each verdict in words.

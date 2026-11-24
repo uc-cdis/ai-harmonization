@@ -1,4 +1,4 @@
-"""Tests for SimpleDataModel.from_linkml_yaml() and from_gdc_model() in ai_harmonization.simple_data_model."""
+"""Tests for ai_harmonization.simple_data_model."""
 
 import json
 import textwrap
@@ -434,3 +434,125 @@ class TestFromGdcModel:
         assert [(n.name, [p.name for p in n.properties]) for n in model.nodes] == [
             (n.name, [p.name for p in n.properties]) for n in expected.nodes
         ]
+
+
+class TestFromGen3Model:
+    """from_gen3_model: which entries are nodes, how a link reads, and that each other property reads as in from_gdc_model."""
+
+    DICTIONARY = {
+        "_terms": {"race": {"description": "Self-reported race."}},
+        "metaschema": {"properties": {"links": {"type": "array"}}},
+        "root": {
+            "description": "The root of the dictionary.",
+            "properties": {"schema_version": {"type": "string"}},
+        },
+        "demographic": {
+            "description": "Demographic data.",
+            "properties": {
+                "race": {
+                    "type": ["string", "null"],
+                    "term": {"description": "Self-reported race."},
+                    "enum": ["Asian", "White"],
+                },
+                "age_at_index": {
+                    "description": "Age at index.",
+                    "oneOf": [{"type": "integer"}, {"type": "null"}],
+                },
+                "state": {
+                    "oneOf": [
+                        {"enum": ["uploaded", "validated"]},
+                        {"enum": ["released"]},
+                    ]
+                },
+                "subjects": {
+                    "anyOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "properties": {
+                                    "id": {
+                                        "type": "string",
+                                        "term": {
+                                            "description": "A 128-bit identifier."
+                                        },
+                                    },
+                                    "submitter_id": {
+                                        "oneOf": [{"type": "string"}, {"type": "null"}]
+                                    },
+                                }
+                            },
+                        }
+                    ]
+                },
+            },
+        },
+    }
+
+    def properties(self):
+        """The demographic node's properties, by name."""
+        model = SimpleDataModel.from_gen3_model(json.dumps(self.DICTIONARY))
+        (node,) = model.nodes
+        return {p.name: p for p in node.properties}
+
+    def test_shared_sections_metaschema_and_root_give_no_nodes(self):
+        """Only demographic is a node: _terms, metaschema and root are not."""
+        model = SimpleDataModel.from_gen3_model(json.dumps(self.DICTIONARY))
+        assert [node.name for node in model.nodes] == ["demographic"]
+
+    def test_a_link_becomes_the_linked_nodes_id_and_submitter_id(self):
+        """subjects becomes subject.id and subject.submitter_id, each with its own fields."""
+        props = self.properties()
+        assert list(props) == [
+            "race",
+            "age_at_index",
+            "state",
+            "subject.id",
+            "subject.submitter_id",
+        ]
+        assert props["subject.id"].description == "A 128-bit identifier."
+        assert props["subject.submitter_id"].type == "string"
+
+    def test_a_link_ending_in_ies_becomes_its_singular(self):
+        """A link named studies becomes study.id, as subjects becomes subject.id."""
+        dictionary = {
+            "subject": {
+                "description": "A study participant.",
+                "properties": {
+                    "studies": {
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {"properties": {"id": {"type": "string"}}},
+                            }
+                        ]
+                    }
+                },
+            }
+        }
+        (node,) = SimpleDataModel.from_gen3_model(json.dumps(dictionary)).nodes
+        assert [p.name for p in node.properties] == ["study.id"]
+
+    def test_types_and_values_come_from_where_the_dictionary_keeps_them(self):
+        """An enum gives its values. A oneOf gives a type, or the values of all its enums."""
+        props = self.properties()
+        assert props["race"].values == ["Asian", "White"]
+        assert props["age_at_index"].type == "integer"
+        assert (props["state"].type, props["state"].values) == (
+            "enum",
+            ["uploaded", "validated", "released"],
+        )
+
+    def test_a_property_has_the_fields_that_from_gdc_model_gives(self):
+        """Each property that is not a link has the same type, description and values in both readers."""
+        gen3_props = self.properties()
+        nodes = {
+            n.name: n for n in SimpleDataModel.from_gdc_model(self.DICTIONARY).nodes
+        }
+        gdc_props = {p.name: p for p in nodes["demographic"].properties}
+        for name in ("race", "age_at_index", "state"):
+            gen3_prop, gdc_prop = gen3_props[name], gdc_props[name]
+            assert (gen3_prop.type, gen3_prop.description, gen3_prop.values) == (
+                gdc_prop.type,
+                gdc_prop.description,
+                gdc_prop.values,
+            )

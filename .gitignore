@@ -16,6 +16,8 @@ inputs/
 gen3-credentials/
 **/bdc.json
 **/credentials.json
+# Keep the BDC benchmark's manifest.
+!/embedding_model/benchmarks/manifests/bdc.json
 
 # PFB files
 *.avro

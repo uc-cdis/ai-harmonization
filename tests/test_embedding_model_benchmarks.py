@@ -1,4 +1,4 @@
-"""Tests for embedding_model.benchmarks: building the TOPMed and GDC benchmarks, and checking each build."""
+"""Tests for embedding_model.benchmarks: building the TOPMed, GDC and BDC benchmarks, and checking each build."""
 
 import csv
 import io
@@ -15,7 +15,7 @@ import yaml
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from embedding_model import benchmarks, manifests
 from embedding_model.__main__ import main
-from embedding_model.benchmarks import gdc, topmed
+from embedding_model.benchmarks import bdc, gdc, topmed
 
 COMMIT_FOLDER = "topmed-dcc-harmonized-phenotypes-abcd1234"
 AGE_REFERENCE = "phs999999.v1.pht999999.v1.phv99999901.v1"
@@ -249,7 +249,7 @@ class TestBuilders:
         assert [target["target_property"] for target in targets] == ["case.abcd_score"]
         assert sources[-1] == self.DICTIONARY_PIN
 
-    @pytest.mark.parametrize("builder", [topmed, gdc])
+    @pytest.mark.parametrize("builder", [topmed, gdc, bdc])
     def test_a_missing_pin_is_named(self, builder, tmp_path):
         """A manifest without the builder's pinned source fails with the source named."""
         with pytest.raises(KeyError, match="has no source named"):
@@ -1346,3 +1346,299 @@ class TestCommandLine:
         with pytest.raises(SystemExit) as raised:
             main(["benchmarks", "build"])
         assert raised.value.code == 2
+
+
+# A fictional BDC Gen3 dictionary, in the shape that the release's target model
+# has: nodes by name, each with its properties, its bookkeeping fields and its
+# links, beside shared sections whose names start with an underscore and the
+# dictionary's metaschema and root.
+LINKED_SUBJECT = {
+    "properties": {
+        "id": {"type": "string", "term": {"description": "A 128-bit identifier."}},
+        "submitter_id": {"type": ["string", "null"]},
+    }
+}
+BDC_DICTIONARY = {
+    "_definitions": {"UUID": {"type": "string"}},
+    "_settings": {"_dict_version": "9.9.9"},
+    "metaschema": {"properties": {"links": {"type": "array"}}},
+    "root": {
+        "description": "The root of the dictionary.",
+        "properties": {"schema_version": {"type": "string"}},
+    },
+    "demographic": {
+        "description": "Data for the characterization of the participant.",
+        "systemProperties": ["id", "created_datetime"],
+        "links": [{"name": "subjects", "target_type": "subject"}],
+        "properties": {
+            "id": {"type": "string", "description": "A 128-bit identifier."},
+            "type": {"enum": ["demographic"]},
+            "submitter_id": {
+                "type": ["string", "null"],
+                "description": "A project-specific identifier for a node.",
+            },
+            "created_datetime": {
+                "oneOf": [{"format": "date-time", "type": "string"}, {"type": "null"}],
+                "description": "A combination of date and time of day.",
+            },
+            "ethnicity": {
+                "description": "The participant's self-reported ethnicity.",
+                "enum": ["Hispanic or Latino", "Not Hispanic or Latino"],
+            },
+            "age_at_index": {
+                "description": "The participant's age at the index date, in years.",
+                "oneOf": [{"type": "integer"}, {"type": "null"}],
+            },
+            "subjects": {
+                "anyOf": [
+                    {"type": "array", "items": LINKED_SUBJECT},
+                    {"type": "object", **LINKED_SUBJECT},
+                ]
+            },
+        },
+    },
+    "blood_pressure_test": {
+        "description": "Blood pressure measured at a visit.",
+        "properties": {
+            "bp_systolic": {
+                "type": "number",
+                "description": "Systolic blood pressure (mm Hg).",
+            }
+        },
+    },
+}
+BDC_MAPPING_HEADER = "source_node_prop_type_desc\ttarget_node_prop_type_desc"
+
+
+def bdc_study(study_id, properties, mappings, accession=None):
+    """One study of a fictional release, as one line of its file of studies."""
+    custom_metrics = {"panel": "bdc_gen3"}
+    if accession:
+        custom_metrics["study_accession"] = accession
+    return {
+        "input_source_model": {
+            "nodes": [{"name": "abcd_visit", "properties": properties}]
+        },
+        "input_target_model": BDC_DICTIONARY,
+        "harmonized_mapping": "\n".join([BDC_MAPPING_HEADER, *mappings]),
+        "custom_metrics": custom_metrics,
+        "study_id": study_id,
+    }
+
+
+ETHNICITY = {
+    "name": "ETHNIC",
+    "description": "Participant ethnicity",
+    "type": "string",
+}
+SYSTOLIC = {
+    "name": "SBP",
+    "description": "Systolic blood pressure at the clinic visit",
+    "type": "number",
+}
+DIASTOLIC = {
+    "name": "DBP",
+    "description": "Diastolic blood pressure at the clinic visit",
+    "type": "number",
+}
+PARTICIPANT = {"name": "SUBJID", "description": "Participant ID", "type": "string"}
+AGE = {"name:": "AGE", "description": "Age at the visit", "type": "integer"}
+BDC_STUDIES = [
+    bdc_study(
+        "phs999901",
+        [ETHNICITY, SYSTOLIC, DIASTOLIC],
+        [
+            "abcd_visit.ETHNIC (string): Participant ethnicity\t"
+            "demographic.ethnicity (enum): The participant's self-reported ethnicity.",
+            "abcd_visit.SBP (number): Systolic blood pressure at the clinic visit\t"
+            "blood_pressure_test.bp_systolic (number): Systolic blood pressure (mm Hg).",
+            "abcd_visit.DBP (number): Diastolic blood pressure at the clinic visit\t"
+            "blood_pressure_test.bp_diastolic (number): Diastolic blood pressure (mm Hg).",
+        ],
+        accession="phs999901",
+    ),
+    bdc_study(
+        "row1",
+        [PARTICIPANT, AGE],
+        [
+            "abcd_visit.SUBJID (string): Participant ID\tdemographic.subject.id (string): ",
+            "abcd_visit.AGE (integer): Age at the visit\tdemographic.age_at_index "
+            "(integer): The participant's age at the index date, in years.",
+        ],
+    ),
+]
+
+
+def bdc_archive(studies, version="9.9"):
+    """A fictional release archive: a .tar.gz with one file of studies, of the version given."""
+    name = f"{bdc.STUDIES_FILE_PREFIX}{version}_2studies_2026-01-01.jsonl"
+    text = "\n".join(json.dumps(study) for study in studies).encode("utf-8")
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
+        member = tarfile.TarInfo(f"abcd_deposit/{name}")
+        member.size = len(text)
+        tar.addfile(member, io.BytesIO(text))
+    return buffer.getvalue()
+
+
+def bdc_manifest(archive, sha=None):
+    """A committed manifest that pins the fictional archive."""
+    return {
+        "version": "1",
+        "sources": [
+            {
+                "role": "mappings and targets",
+                "name": bdc.RELEASE,
+                "location": "abcd-release.tar.gz",
+                "version": "9.9",
+                "sha256": sha or manifests.sha256(archive),
+            }
+        ],
+    }
+
+
+class TestBdc:
+    """The BDC builder: each property that from_gen3_model reads is a target, except the bookkeeping fields, and each source variable becomes a row with its expected targets."""
+
+    def test_every_property_but_the_bookkeeping_fields_is_a_target(self):
+        """The data properties, submitter_id and the link's id and submitter_id are targets.
+
+        The node's systemProperties, id and created_datetime, and its type are
+        not. The metaschema and root entries give none.
+        """
+        targets, version = bdc.dictionary_targets(BDC_STUDIES)
+        assert [row["target_property"] for row in targets] == [
+            "blood_pressure_test.bp_systolic",
+            "demographic.age_at_index",
+            "demographic.ethnicity",
+            "demographic.subject.id",
+            "demographic.subject.submitter_id",
+            "demographic.submitter_id",
+        ]
+        assert version == "9.9.9"
+
+    def test_a_target_takes_its_type_and_values_from_the_dictionary(self):
+        """The age's type comes from its oneOf, and the ethnicity's values from its enum.
+
+        submitter_id declares the type list ["string", "null"], which is
+        written as string, without null.
+        """
+        targets, _ = bdc.dictionary_targets(BDC_STUDIES)
+        by_key = {row["target_property"]: row for row in targets}
+        assert by_key["demographic.age_at_index"]["target_type"] == "integer"
+        assert by_key["demographic.submitter_id"]["target_type"] == "string"
+        assert by_key["demographic.ethnicity"]["target_values"] == (
+            f"Hispanic or Latino{VALUE_SEPARATOR}Not Hispanic or Latino"
+        )
+
+    def test_a_target_outside_the_dictionary_is_left_out_and_listed(self):
+        """The diastolic pressure maps to a property that this dictionary does not hold: the build lists it, and gives it no row."""
+        targets, _ = bdc.dictionary_targets(BDC_STUDIES)
+        rows, left_out = bdc.mapping_rows(BDC_STUDIES, targets)
+        assert left_out == [
+            "phs999901: abcd_visit.DBP -> blood_pressure_test.bp_diastolic"
+        ]
+        assert [
+            (row["source_variable_name"], row["expected_target"]) for row in rows
+        ] == [
+            ("ETHNIC", ["demographic.ethnicity"]),
+            ("SBP", ["blood_pressure_test.bp_systolic"]),
+            ("AGE", ["demographic.age_at_index"]),
+            ("SUBJID", ["demographic.subject.id"]),
+        ]
+
+    def test_a_study_is_its_accession_or_the_release_id(self):
+        """A study with an accession takes it as its id. An earlier study without one keeps the release's own id."""
+        assert bdc.study_id(BDC_STUDIES[0]) == "phs999901"
+        assert bdc.study_id(BDC_STUDIES[1]) == "row1"
+
+    def test_a_release_id_with_an_accession_takes_the_accession(self):
+        """A study from release 1.0.1 keeps its release id, row2 here. When its release gives its accession, the accession is its id."""
+        study = bdc_study("row2", [AGE], [], accession="phs999903")
+        assert bdc.study_id(study) == "phs999903"
+
+    def test_a_name_under_the_key_name_colon_is_read(self):
+        """The builder reads a source model with from_simple_json, as the evaluation does, so a property named under "name:" keeps its name."""
+        study = bdc_study(
+            "row1",
+            [AGE],
+            [
+                "abcd_visit.AGE (integer): Age at the visit\t"
+                "demographic.age_at_index (integer): "
+            ],
+        )
+        rows, _ = bdc.mapping_rows([study], bdc.dictionary_targets([study])[0])
+        assert [row["source_variable_name"] for row in rows] == ["AGE"]
+
+    def test_a_mapping_of_an_unknown_variable_is_an_error(self):
+        """A mapping that names a variable missing from its source model stops the build."""
+        study = bdc_study(
+            "phs999901",
+            [ETHNICITY],
+            ["abcd_visit.HISPANIC (string): \tdemographic.ethnicity (enum): "],
+        )
+        with pytest.raises(ValueError, match="abcd_visit.HISPANIC"):
+            bdc.mapping_rows([study], bdc.dictionary_targets([study])[0])
+
+    def test_the_studies_must_share_one_dictionary(self):
+        """Two studies with different target dictionaries stop the build."""
+        other_study = {
+            **BDC_STUDIES[1],
+            "input_target_model": {"subject": {"properties": {}}},
+        }
+        with pytest.raises(ValueError, match="share one target dictionary"):
+            bdc.dictionary_targets([BDC_STUDIES[0], other_study])
+
+    def test_build_reads_the_pinned_archive(self, tmp_path):
+        """build reads the archive that the manifest names, and records its SHA-256.
+
+        The counts come from BDC_STUDIES: 2 studies, row1 without an
+        accession, 4 variables that map to a target, the 6 targets of
+        test_every_property_but_the_bookkeeping_fields_is_a_target, and the
+        diastolic pressure's mapping left out.
+        """
+        archive = bdc_archive(BDC_STUDIES)
+        (tmp_path / "abcd-release.tar.gz").write_bytes(archive)
+        targets, mappings, sources, counts = bdc.build(tmp_path, bdc_manifest(archive))
+        assert counts == {
+            "studies": 2,
+            "studies_without_accession": 1,
+            "source_variables": 4,
+            "targets": 6,
+            "mappings_left_out": 1,
+        }
+        assert sources[0]["sha256"] == manifests.sha256(archive)
+
+    def test_build_warns_about_the_studies_without_an_accession(self, tmp_path, capsys):
+        """build warns about each study that has no accession, which the corpus's study rule cannot match: row1 here."""
+        archive = bdc_archive(BDC_STUDIES)
+        (tmp_path / "abcd-release.tar.gz").write_bytes(archive)
+        bdc.build(tmp_path, bdc_manifest(archive))
+        assert (
+            "warning: studies without a dbGaP accession, which the corpus's study"
+            " rule cannot match: row1"
+        ) in capsys.readouterr().err
+
+    def test_a_missing_archive_is_named(self, tmp_path):
+        """Without the archive, the error names its path, and says that the benchmark has no download yet."""
+        with pytest.raises(
+            FileNotFoundError,
+            match=(
+                "abcd-release.tar.gz is missing. The BDC benchmark is in"
+                " preparation for publication, and has no download yet"
+            ),
+        ):
+            bdc.build(tmp_path, bdc_manifest(b"", sha="aa"))
+
+    def test_an_archive_with_another_checksum_is_refused(self, tmp_path):
+        """An archive whose SHA-256 is not the pinned one stops the build."""
+        archive = bdc_archive(BDC_STUDIES)
+        (tmp_path / "abcd-release.tar.gz").write_bytes(archive)
+        with pytest.raises(ValueError, match="not the pinned"):
+            bdc.build(tmp_path, bdc_manifest(archive, sha="aa"))
+
+    def test_the_archive_needs_one_file_of_studies(self):
+        """An archive without a file of studies of the pinned version stops the build."""
+        archive = bdc_archive(BDC_STUDIES, version="9.8")
+        with pytest.raises(ValueError, match="holds 0 files"):
+            bdc.read_studies(archive, "9.9")

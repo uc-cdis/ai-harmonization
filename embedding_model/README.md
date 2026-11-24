@@ -139,8 +139,7 @@ run a step again on its own.
 
 | | step | what it does | writes |
 |---|---|---|---|
-| benchmarks | `benchmarks build --topmed` | builds the [TOPMed benchmark](docs/benchmarks.md#topmed) | `inputs/benchmarks/` |
-| | `benchmarks build --gdc` | builds the [GDC benchmark](docs/benchmarks.md#gdc) | `inputs/benchmarks/` |
+| benchmarks | `benchmarks build --<benchmark> [--<benchmark> ...]` | builds each [benchmark](docs/benchmarks.md) that a flag names: `--topmed` or `--gdc` | `inputs/benchmarks/` |
 | training data | `sources fetch [--source <source> ...]` | downloads the [sources of training data](docs/sources.md), or some of them | `inputs/sources/` |
 | | `pairs prepare [--source <source> ...]` | turns each source into [pairs](docs/pairs.md) of texts that mean the same thing | `inputs/pairs/<source>/` |
 | | `corpus build --name <corpus> [--source <source> ...] [--validation-share <share>]` | combines the sources' pairs into a [corpus](docs/corpus.md): drops the pairs that would leak a benchmark built so far, and splits the rest into training and validation pairs | `inputs/corpora/<corpus>/` |

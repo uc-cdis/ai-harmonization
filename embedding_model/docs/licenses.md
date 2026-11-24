@@ -1,0 +1,332 @@
+# Licenses and references
+
+The benchmarks and the sources of training data are built from public data
+that others publish. This page gives the license or terms of each one, and the
+reference to cite. It also gives each license's id in
+[SPDX](https://spdx.org/licenses/), as the manifests record it, for example
+`CC-BY-4.0`. [Restricted items](#restricted-items) says how single restricted
+items are left out.
+
+## What this repository shares
+
+The repository shares no third-party data. Each benchmark build and each
+source fetch downloads the originals from their publishers. Then it makes its
+files on your machine, under `embedding_model/inputs/`. The pairs are made
+there too.
+
+The manifests are committed. They record each input's version or checksum,
+and its license. For a third-party input, they also record its citation. They
+hold no data (see [manifests.md](manifests.md)).
+
+You must build the GDC benchmark on your machine: see [GDC](#gdc).
+
+## Benchmarks
+
+### TOPMed
+
+**Website:**
+[UW-GAC/topmed-dcc-harmonized-phenotypes](https://github.com/UW-GAC/topmed-dcc-harmonized-phenotypes).
+
+**License:** The documentation repository states no license. The benchmark
+also reads [dbGaP](https://www.ncbi.nlm.nih.gov/gap/)'s variable summaries, for its source variables' texts. They
+state no license either, and NCBI's
+[website policies](https://www.ncbi.nlm.nih.gov/home/about/policies/) do not
+cover them.
+
+**SPDX:** `NONE`, for both.
+
+**Reference:**
+
+> Stilp, A. M., Emery, L. S., Broome, J. G., Buth, E. J., Khan, A. T.,
+> Laurie, C. A., Wang, F. F., Wong, Q., Chen, D., D'Augustine, C. M.,
+> Heard-Costa, N. L., Hohensee, C. R., Johnson, W. C., Juarez, L. D., Liu, J.,
+> Mutalik, K. M., Raffield, L. M., Wiggins, K. L., de Vries, P. S., et al.
+> (2021). A System for Phenotype Harmonization in the National Heart, Lung,
+> and Blood Institute Trans-Omics for Precision Medicine (TOPMed) Program.
+> *American Journal of Epidemiology*, *190*(10), 1977–1992.
+> https://doi.org/10.1093/aje/kwab115
+
+### GDC
+
+**Website:** GDC-SM's [Zenodo record](https://doi.org/10.5281/zenodo.14963588),
+the [GDC Data Dictionary](https://docs.gdc.cancer.gov/Data_Dictionary/), released
+as [gdcdictionary](https://github.com/NCI-GDC/gdcdictionary). Magneto's code,
+[VIDA-NYU/magneto-matcher](https://github.com/VIDA-NYU/magneto-matcher), comes
+with the paper that publishes GDC-SM. The build does not read it.
+
+**License:** The ground truth is [CC BY
+4.0](https://creativecommons.org/licenses/by/4.0/), and the GDC dictionary is
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0). Seven of the ten
+papers are published under [CC BY-NC-ND
+4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/), a Creative Commons
+NonCommercial NoDerivatives license. It allows sharing a file as published,
+but not for commercial purposes, and not a modified version of it. A
+benchmark table is a modified version: it is repaired and joined to the
+expert mappings.
+
+So GDC-SM distributes only the ground truth, with instructions for rebuilding
+the tables from the publishers' originals. This repository distributes no
+benchmark files either.
+
+**SPDX:** the ground truth is `CC-BY-4.0`, and the dictionary is
+`Apache-2.0`. Each paper's Crossref record gives its license: `CC-BY-4.0` for
+Cao, Clark and Dou, and `CC-BY-NC-ND-4.0` for the other seven.
+
+**References:**
+
+> Santos, A., Wu, E., Lopez, R., Keegan, S., Pena, E., Liu, W., Liu, Y.,
+> Fenyo, D., & Freire, J. (2025). *GDC-SM: The GDC Schema Matching Benchmark*
+> (Version 1.0) [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.14963588
+
+> Liu, Y., Pena, E. H. M., Santos, A., Wu, E., & Freire, J. (2025). Magneto:
+> Combining Small and Large Language Models for Schema Matching. *Proceedings
+> of the VLDB Endowment*, *18*(8), 2681–2694.
+> https://doi.org/10.14778/3742728.3742757
+
+`embedding_model/benchmarks/manifests/gdc.json` lists each paper's table,
+with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4), and its
+article's DOI.
+
+## Sources of training data
+
+Every source is free to use, under the license or terms below.
+
+### NCIt
+
+**Website:** [evs.nci.nih.gov](https://evs.nci.nih.gov/).
+
+**License:** NCIt is released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), as EVS's
+[Terms of Use](https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm)
+state.
+
+**SPDX:** `CC-BY-4.0`.
+
+**Reference:**
+
+> Sioutos, N., Coronado, S. d., Haber, M. W., Hartel, F. W., Shaiu, W.-L., &
+> Wright, L. W. (2007). NCI Thesaurus: A semantic model integrating
+> cancer-related clinical and molecular information. *Journal of Biomedical
+> Informatics*, *40*(1), 30–43. https://doi.org/10.1016/j.jbi.2006.02.013
+
+### Ontologies
+
+**Website:** [OBO Foundry](https://obofoundry.org/), which lists all seven. The
+table links each one's page there.
+
+**License:** Each ontology's file states its license, and the table below
+shows it. For CMO and MMO, the OBO Foundry pages give [CC0
+1.0](https://creativecommons.org/publicdomain/zero/1.0/), while the files
+state [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+| ontology | website | license | SPDX |
+|---|---|---|---|
+| MONDO, diseases | [mondo](https://obofoundry.org/ontology/mondo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| HP, phenotypes | [hp](https://obofoundry.org/ontology/hp.html) | [HPO license](https://human-phenotype-ontology.github.io/license.html) | `LicenseRef-HPO` |
+| Uberon, anatomy | [uberon](https://obofoundry.org/ontology/uberon.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | `CC-BY-3.0` |
+| OBA, biological attributes | [oba](https://obofoundry.org/ontology/oba.html) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) | `CC0-1.0` |
+| CMO, clinical measurements | [cmo](https://obofoundry.org/ontology/cmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| MMO, measurement methods | [mmo](https://obofoundry.org/ontology/mmo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+| DUO, data use | [duo](https://obofoundry.org/ontology/duo.html) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `CC-BY-4.0` |
+
+The HPO license names no standard license. It asks users to:
+
+- acknowledge the HPO Consortium, and cite the article that its
+  [citation page](https://hpo.jax.org/citation) names
+- show the date or version of each HPO file that they display
+- leave the files and their logical relationships unaltered
+- say in a service or product: "This service/product is using the Human
+  Phenotype Ontology (_version information_)."
+
+The HP file's header names `https://hpo.jax.org/app/license`, which no
+longer loads. The license is now at the address in the table.
+
+**References:**
+
+> Vasilevsky, N. A., Toro, S., Matentzoglu, N., Flack, J. E., Mullen, K. R.,
+> Hegde, H., Gehrke, S., Whetzel, P. L., Shwetar, Y., Harris, N. L., Ngu, M.
+> S., Alyea, G. L., Kane, M. S., Roncaglia, P., Sid, E., Thaxton, C. L.,
+> Wood, V., Abraham, R. S., Achatz, M. I., et al. (2025). Mondo: integrating
+> disease terminology across communities. *Genetics*, *232*(4).
+> https://doi.org/10.1093/genetics/iyaf215
+
+> Gargano, M. A., Matentzoglu, N., Coleman, B., Addo-Lartey, E. B.,
+> Anagnostopoulos, A., Anderton, J., Avillach, P., Bagley, A. M., Bakštein,
+> E., Balhoff, J. P., Baynam, G., Bello, S. M., Berk, M., Bertram, H., Bishop,
+> S., Blau, H., Bodenstein, D. F., Botas, P., Boztug, K., et al. (2023). The
+> Human Phenotype Ontology in 2024: phenotypes around the world. *Nucleic
+> Acids Research*, *52*(D1), D1333–D1346. https://doi.org/10.1093/nar/gkad1005
+
+> Mungall, C. J., Torniai, C., Gkoutos, G. V., Lewis, S. E., & Haendel, M. A.
+> (2012). Uberon, an integrative multi-species anatomy ontology. *Genome
+> Biology*, *13*(1). https://doi.org/10.1186/gb-2012-13-1-r5
+
+> Stefancsik, R., Balhoff, J. P., Balk, M. A., Ball, R. L., Bello, S. M.,
+> Caron, A. R., Chesler, E. J., de Souza, V., Gehrke, S., Haendel, M., Harris,
+> L. W., Harris, N. L., Ibrahim, A., Koehler, S., Matentzoglu, N., McMurry, J.
+> A., Mungall, C. J., Munoz-Torres, M. C., Putman, T., et al. (2023). The
+> Ontology of Biological Attributes (OBA)—computational traits for the life
+> sciences. *Mammalian Genome*, *34*(3), 364–378.
+> https://doi.org/10.1007/s00335-023-09992-1
+
+> Smith, J. R., Park, C. A., Nigam, R., Laulederkind, S. J., Hayman, G. T.,
+> Wang, S.-J., Lowry, T. F., Petri, V., Pons, J. D., Tutaj, M., Liu, W.,
+> Worthey, E. A., Shimoyama, M., & Dwinell, M. R. (2013). The clinical
+> measurement, measurement method and experimental condition ontologies:
+> expansion, improvements and new applications. *Journal of Biomedical
+> Semantics*, *4*(1). https://doi.org/10.1186/2041-1480-4-26
+
+> Lawson, J., Cabili, M. N., Kerry, G., Boughtwood, T., Thorogood, A., Alper,
+> P., Bowers, S. R., Boyles, R. R., Brookes, A. J., Brush, M., Burdett, T.,
+> Clissold, H., Donnelly, S., Dyke, S. O. M., Freeberg, M. A., Haendel, M. A.,
+> Hata, C., Holub, P., Jeanson, F., et al. (2021). The Data Use Ontology to
+> streamline responsible access to human biomedical datasets. *Cell
+> Genomics*, *1*(2), 100028. https://doi.org/10.1016/j.xgen.2021.100028
+
+### LOINC
+
+**Website:** [loinc.org](https://loinc.org/).
+
+**License:** The [LOINC License](https://loinc.org/license/): free, with
+attribution. Content that belongs to a third party carries a notice, and is not
+open (see [Restricted items](#restricted-items)).
+
+**A model trained on LOINC:** the license allows training a model on LOINC
+content and publishing the model's weights, as Regenstrief has confirmed. A
+published model's card, and any license file beside the weights, then carry:
+
+- LOINC's notice: "This material contains content from LOINC
+  (http://loinc.org). LOINC is copyright © Regenstrief Institute, Inc. and the
+  Logical Observation Identifiers Names and Codes (LOINC) Committee and is
+  available at no cost under the license at http://loinc.org/license. LOINC®
+  is a registered United States trademark of Regenstrief Institute, Inc."
+- the LOINC version that the model was trained on, from the sources
+  manifest
+- a statement that Regenstrief Institute and the LOINC Committee did not
+  develop, review or endorse the model. Its outputs are suggestions for
+  experts to verify, not authoritative LOINC mappings.
+
+A file that holds LOINC codes, for example a label set, gives each code with
+a LOINC display name. The repository shares no such file.
+
+**SPDX:** `LicenseRef-LOINC`.
+
+**Reference:**
+
+> McDonald, C. J., Huff, S. M., Suico, J. G., Hill, G., Leavelle, D., Aller,
+> R., Forrey, A., Mercer, K., DeMoor, G., Hook, J., Williams, W., Case, J.,
+> Maloney, P., & Laboratory LOINC Developers. (2003). LOINC, a Universal
+> Standard for Identifying Laboratory Observations: A 5-Year Update.
+> *Clinical Chemistry*, *49*(4), 624–633. https://doi.org/10.1373/49.4.624
+
+### CDISC
+
+**Website:**
+[CDISC Controlled Terminology](https://www.cdisc.org/standards/terminology/controlled-terminology).
+
+**License:** NCI states that CDISC Terminology can be used "for free, without
+licensing restrictions", on its
+[CDISC terminology page](https://www.cancer.gov/about-nci/organization/cbiit/data-standards/cdisc).
+
+**SPDX:** `LicenseRef-NCI-CDISC`.
+
+**Reference:**
+
+> CDISC. (n.d.). *Controlled Terminology*. Retrieved October 22, 2026, from
+> https://www.cdisc.org/standards/terminology/controlled-terminology
+
+### NIH CDE
+
+**Website:** [cde.nlm.nih.gov](https://cde.nlm.nih.gov/).
+
+**License:** NLM's [web policies](https://www.nlm.nih.gov/web_policies.html#copyright)
+state that U.S. government works on its sites "may be freely used or reproduced
+without permission in the U.S.". NLM asks you to name it as the source, with
+"Courtesy of the National Library of Medicine" or "Source: National Library
+of Medicine". Content contributed by others may be copyrighted. Each
+element's `copyrightStatus` and `noRenderAllowed` say which, as
+[Restricted items](#restricted-items) shows.
+
+**SPDX:** `LicenseRef-NLM-Web-Policies`.
+
+**Reference:**
+
+> National Library of Medicine. (n.d.). *NIH Common Data Elements (CDE)
+> Repository*. Retrieved October 22, 2026, from https://cde.nlm.nih.gov/
+
+### caDSR
+
+**Website:** [cadsr.cancer.gov](https://cadsr.cancer.gov/).
+
+**License:** NCI states that "unless otherwise indicated, all text within
+National Cancer Institute (NCI) products is free of copyright"
+([Reuse of NCI Information](https://www.cancer.gov/policies/copyright-reuse)).
+The same page asks you to "credit the National Cancer Institute as the
+source". An element of a proprietary measure is not open (see
+[Restricted items](#restricted-items)).
+
+**SPDX:** `LicenseRef-NCI-Reuse`.
+
+**Reference:**
+
+> Covitz, P. A., Hartel, F., Schaefer, C., De Coronado, S., Fragoso, G., Sahni,
+> H., Gustafson, S., & Buetow, K. H. (2003). caCORE: A common infrastructure
+> for cancer informatics. *Bioinformatics*, *19*(18), 2404–2412.
+> https://doi.org/10.1093/bioinformatics/btg335
+
+### NHANES
+
+**Website:** [wwwn.cdc.gov/nchs/nhanes](https://wwwn.cdc.gov/nchs/nhanes/).
+
+**License:** CDC states that most of the information on its websites is in the
+public domain. It "may be freely used or reproduced without obtaining copyright
+permission"
+([Use of Agency Materials](https://www.cdc.gov/other/agencymaterials.html)).
+
+**SPDX:** `LicenseRef-CDC-Agency-Materials`.
+
+**Reference:**
+
+> Centers for Disease Control and Prevention, National Center for Health
+> Statistics. (n.d.). *National Health and Nutrition Examination Survey*.
+> Retrieved October 22, 2026, from https://wwwn.cdc.gov/nchs/nhanes/
+
+### PhenX
+
+**Website:** [phenxtoolkit.org](https://www.phenxtoolkit.org/).
+
+**License:** PhenX's [FAQ](https://www.phenxtoolkit.org/help/faq#question-11) states that
+most of its protocols are freely available, and a small share have limited
+availability. Each protocol's `availability` says which, as
+[Restricted items](#restricted-items) shows.
+
+**SPDX:** `LicenseRef-PhenX`.
+
+**Reference:**
+
+> Hamilton, C. M., Strader, L. C., Pratt, J. G., Maiese, D., Hendershot, T.,
+> Kwok, R. K., Hammond, J. A., Huggins, W., Jackman, D., Pan, H., Nettles, D.
+> S., Beaty, T. H., Farrer, L. A., Kraft, P., Marazita, M. L., Ordovas, J. M.,
+> Pato, C. N., Spitz, M. R., Wagener, D., et al. (2011). The PhenX Toolkit:
+> Get the Most From Your Measures. *American Journal of Epidemiology*,
+> *174*(3), 253–260. https://doi.org/10.1093/aje/kwr193
+
+## Restricted items
+
+Some sources also mark single items as restricted, in a field of their own.
+For example, [LOINC](sources.md#loinc) marks a code whose content belongs to a third party. The
+fetch reads these restriction fields too. Each source's main table has an
+`open` column: true when the item's restriction field allows its use.
+`pairs prepare` uses only open items.
+
+Where the field holds one of a list of values, an item is open only when its
+value is known to allow use. A value that the fetch has not seen before means
+the item is not open. The fetch prints the value, so that you can review it.
+
+| source | restriction field | open when |
+|---|---|---|
+| [NCIt](sources.md#ncit), [ontologies](sources.md#ontologies), [CDISC](sources.md#cdisc) | none per item | always: the source's license covers every item |
+| [LOINC](sources.md#loinc) | `EXTERNAL_COPYRIGHT_NOTICE`, and a form row's `AdditionalCopyright` | two things hold. First, the code has no notice of its own. Second, it sits in at least one open panel, or in no panel. A panel is closed when it or its code has a notice, or when a panel that it sits in is closed. A notice marks third-party content. |
+| [NIH CDE](sources.md#nih-cde) | `copyrightStatus`, `noRenderAllowed` | `copyrightStatus` is "Public domain, free to use", and `noRenderAllowed` is false. Without `noRenderAllowed`, it is closed. |
+| [caDSR](sources.md#cadsr) | its reference documents | each is of a known kind, other than a "Proprietary Measure Permission". A kind that the fetch has not seen before closes the element. |
+| [NHANES](sources.md#nhanes) | "Use Constraints", per data file | it is "None" or "RDC Only". "RDC Only" restricts access to the data, not the documentation read here. |
+| [PhenX](sources.md#phenx) | the protocol's availability | it is "Available". A variable whose protocol is not in the PhenX `protocols` table, for example one of the COVID-19 library's, has none, so it is closed. |

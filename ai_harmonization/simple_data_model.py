@@ -131,13 +131,11 @@ class SimpleDataModel(BaseModel):
                     for sub_properties in property_info["anyOf"]:
                         sub_node_name = property_name
 
-                        if sub_node_name.endswith("s"):
-                            sub_node_name = sub_node_name[:-1]
-
                         # TODO better handle non-plural
-
                         if sub_node_name.endswith("ies"):
                             sub_node_name = sub_node_name[:-3] + "y"
+                        elif sub_node_name.endswith("s"):
+                            sub_node_name = sub_node_name[:-1]
 
                         for sub_property_name, sub_property_info in (
                             sub_properties.get("items", {})
@@ -151,19 +149,15 @@ class SimpleDataModel(BaseModel):
                             if skip:
                                 continue
 
+                            prop_type, description, values = _property_fields(
+                                sub_property_info
+                            )
                             node_property = Property(
-                                description=sub_property_info.get("description", ""),
-                                type=sub_property_info.get("type", ""),
+                                description=description,
+                                type=prop_type,
+                                values=values,
                                 name=f"{sub_node_name}.{sub_property_name}",
                             )
-                            if not node_property.type:
-                                if "enum" in sub_property_info:
-                                    node_property.type = "enum"
-                            if not node_property.description:
-                                if "term" in sub_property_info:
-                                    node_property.description = sub_property_info[
-                                        "term"
-                                    ].get("description", "")
 
                             if (
                                 "term" in sub_property_info
@@ -177,19 +171,13 @@ class SimpleDataModel(BaseModel):
                                 )
                             properties.append(node_property)
                 else:
+                    prop_type, description, values = _property_fields(property_info)
                     node_property = Property(
-                        description=property_info.get("description", ""),
-                        type=property_info.get("type", ""),
+                        description=description,
+                        type=prop_type,
+                        values=values,
                         name=property_name,
                     )
-                    if not node_property.type:
-                        if "enum" in property_info:
-                            node_property.type = "enum"
-                    if not node_property.description:
-                        if "term" in property_info:
-                            node_property.description = property_info["term"].get(
-                                "description", ""
-                            )
 
                     if "term" in property_info and "termDef" in property_info["term"]:
                         if not node_property.additional_metadata:
@@ -226,20 +214,6 @@ class SimpleDataModel(BaseModel):
         """
         Converts a GDC model to a standard SimpleDataModel
         Accepts input as a json string or a parsed dict.
-
-        A property's description, type and values come from the property
-        itself where it gives them. Where it gives none, they come from where
-        the dictionary keeps them instead:
-
-        - a description shared by many nodes, from `common` (or the
-          property's `term`);
-        - a type and values, from its `oneOf` options;
-        - an array's allowed values, from `items`.
-
-        A property with values but no type is an `enum`. The fallbacks never
-        raise: they skip a value of an unexpected shape, for example a `oneOf`
-        that is not a list. So a dictionary that converted before still
-        converts. Only a property's own fields can make the conversion fail.
         """
         # If input is a string, parse it
         if isinstance(input_json, str):
@@ -258,57 +232,7 @@ class SimpleDataModel(BaseModel):
             properties = []
 
             for prop_name, prop_data in node_data.get("properties", {}).items():
-                one_of = prop_data.get("oneOf")
-                options = [
-                    option
-                    for option in (one_of if isinstance(one_of, list) else [])
-                    if isinstance(option, dict)
-                ]
-
-                # Exctract values
-                values = None
-                if "enum" in prop_data:
-                    values = prop_data["enum"]
-                elif "values" in prop_data:
-                    values = prop_data["values"]
-                else:
-                    items = prop_data.get("items")
-                    candidates = [items.get("enum")] if isinstance(items, dict) else []
-                    candidates += [option.get("enum") for option in options]
-                    found = []
-                    for listed in candidates:
-                        if isinstance(listed, list):
-                            found += [v for v in listed if v not in found]
-                    values = found or None
-
-                prop_type = prop_data.get("type", "")
-                if prop_type == "":
-                    types = []
-                    for option in options:
-                        declared = option.get("type")
-                        for kind in (
-                            declared if isinstance(declared, list) else [declared]
-                        ):
-                            if (
-                                isinstance(kind, str)
-                                and kind != "null"
-                                and kind not in types
-                            ):
-                                types.append(kind)
-                    if len(types) == 1:
-                        prop_type = types[0]
-                    else:
-                        prop_type = types or ("enum" if values else "")
-
-                description = prop_data.get("description", "")
-                if description == "":
-                    for holder in (prop_data.get("common"), prop_data.get("term")):
-                        if isinstance(holder, dict) and isinstance(
-                            holder.get("description"), str
-                        ):
-                            description = holder["description"]
-                            if description:
-                                break
+                prop_type, description, values = _property_fields(prop_data)
 
                 # Build a Property object
                 prop = Property(
@@ -609,6 +533,73 @@ def get_data_model_as_langchain_documents(
             )
 
     return documents
+
+
+def _property_fields(prop_data):
+    """A Gen3 or GDC property's type, description and values.
+
+    They come from the property itself where it gives them. Where it gives
+    none, they come from where the dictionary keeps them instead:
+
+    - a description shared by many nodes, from `common` (or the property's
+      `term`)
+    - a type and values, from its `oneOf` options
+    - an array's allowed values, from `items`
+
+    A property with values but no type is an `enum`. The fallbacks never
+    raise: they skip a value of an unexpected shape, for example a `oneOf`
+    that is not a list.
+
+    Args:
+        prop_data (dict): The property's definition in the dictionary.
+
+    Returns:
+        tuple: The property's type, description and values. The values are
+            None where the dictionary lists none.
+    """
+    one_of = prop_data.get("oneOf")
+    options = [
+        option
+        for option in (one_of if isinstance(one_of, list) else [])
+        if isinstance(option, dict)
+    ]
+
+    values = None
+    if "enum" in prop_data:
+        values = prop_data["enum"]
+    elif "values" in prop_data:
+        values = prop_data["values"]
+    else:
+        items = prop_data.get("items")
+        candidates = [items.get("enum")] if isinstance(items, dict) else []
+        candidates += [option.get("enum") for option in options]
+        gathered = []
+        for listed in candidates:
+            if isinstance(listed, list):
+                gathered += [value for value in listed if value not in gathered]
+        values = gathered or None
+
+    prop_type = prop_data.get("type", "")
+    if prop_type == "":
+        types = []
+        for option in options:
+            declared = option.get("type")
+            for kind in declared if isinstance(declared, list) else [declared]:
+                if isinstance(kind, str) and kind != "null" and kind not in types:
+                    types.append(kind)
+        if len(types) == 1:
+            prop_type = types[0]
+        else:
+            prop_type = types or ("enum" if values else "")
+
+    description = prop_data.get("description", "")
+    if description == "":
+        for holder in (prop_data.get("common"), prop_data.get("term")):
+            if isinstance(holder, dict) and isinstance(holder.get("description"), str):
+                description = holder["description"]
+                if description:
+                    break
+    return prop_type, description, values
 
 
 # ── LinkML YAML inheritance resolution (helpers for from_linkml_yaml) ──────────

@@ -1498,24 +1498,22 @@ def bdc_manifest(archive, sha=None):
 
 
 class TestBdc:
-    """The BDC builder: each property that from_gen3_model reads is a target, and each source variable becomes a row with its expected targets."""
+    """The BDC builder: each property that from_gen3_model reads is a target, except the bookkeeping fields, and each source variable becomes a row with its expected targets."""
 
-    def test_every_property_that_the_gen3_reader_reads_is_a_target(self):
-        """The data properties, the bookkeeping fields, the type and the link's id and submitter_id are targets.
+    def test_every_property_but_the_bookkeeping_fields_is_a_target(self):
+        """The data properties, submitter_id and the link's id and submitter_id are targets.
 
-        The metaschema and root entries give none.
+        The node's systemProperties, id and created_datetime, and its type are
+        not. The metaschema and root entries give none.
         """
         targets, version = bdc.dictionary_targets(BDC_STUDIES)
         assert [row["target_property"] for row in targets] == [
             "blood_pressure_test.bp_systolic",
             "demographic.age_at_index",
-            "demographic.created_datetime",
             "demographic.ethnicity",
-            "demographic.id",
             "demographic.subject.id",
             "demographic.subject.submitter_id",
             "demographic.submitter_id",
-            "demographic.type",
         ]
         assert version == "9.9.9"
 
@@ -1595,8 +1593,8 @@ class TestBdc:
         """build reads the archive that the manifest names, and records its SHA-256.
 
         The counts come from BDC_STUDIES: 2 studies, row1 without an
-        accession, 4 variables that map to a target, the 9 targets of
-        test_every_property_that_the_gen3_reader_reads_is_a_target, and the
+        accession, 4 variables that map to a target, the 6 targets of
+        test_every_property_but_the_bookkeeping_fields_is_a_target, and the
         diastolic pressure's mapping left out.
         """
         archive = bdc_archive(BDC_STUDIES)
@@ -1606,7 +1604,7 @@ class TestBdc:
             "studies": 2,
             "studies_without_accession": 1,
             "source_variables": 4,
-            "targets": 9,
+            "targets": 6,
             "mappings_left_out": 1,
         }
         assert sources[0]["sha256"] == manifests.sha256(archive)

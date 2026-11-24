@@ -24,7 +24,7 @@ from ai_harmonization.dbgap import resolve_variable_type
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
-from embedding_model.benchmarks.common import target_row
+from embedding_model.benchmarks.common import bookkeeping_fields, target_row
 from embedding_model.download import cached, github_archive
 from embedding_model.manifests import sha256
 
@@ -154,7 +154,7 @@ def dictionary_targets(dictionary):
         if node.name in NOT_NODES:
             continue
         schema = dictionary[node.name]
-        bookkeeping = {"type", *(schema.get("systemProperties") or [])}
+        bookkeeping = bookkeeping_fields(schema)
         for prop in node.properties:
             if prop.name in bookkeeping or "anyOf" in schema["properties"][prop.name]:
                 continue

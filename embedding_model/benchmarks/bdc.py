@@ -12,7 +12,7 @@ from pathlib import PurePosixPath
 
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
-from embedding_model.benchmarks.common import target_row
+from embedding_model.benchmarks.common import bookkeeping_fields, target_row
 from embedding_model.manifests import sha256
 
 RELEASE = "BDC Gen3 harmonization benchmark"
@@ -64,7 +64,10 @@ def study_id(study):
 
 
 def dictionary_targets(studies):
-    """One target per property of the dictionary that every study shares, as from_gen3_model reads it.
+    """One target per property of the dictionary that every study shares, as from_gen3_model reads it, except the bookkeeping fields.
+
+    A node's bookkeeping fields come from bookkeeping_fields. A link's fields
+    stay targets.
 
     Args:
         studies (list[dict]): The studies, from read_studies.
@@ -80,11 +83,14 @@ def dictionary_targets(studies):
     dictionary = studies[0]["input_target_model"]
     if any(study["input_target_model"] != dictionary for study in studies):
         raise ValueError("the studies do not all share one target dictionary")
-    targets = [
-        target_row(node.name, prop)
-        for node in SimpleDataModel.from_gen3_model(json.dumps(dictionary)).nodes
-        for prop in node.properties
-    ]
+    targets = []
+    for node in SimpleDataModel.from_gen3_model(json.dumps(dictionary)).nodes:
+        bookkeeping = bookkeeping_fields(dictionary[node.name])
+        targets.extend(
+            target_row(node.name, prop)
+            for prop in node.properties
+            if prop.name not in bookkeeping
+        )
     targets.sort(key=lambda row: row["target_property"])
     dictionary_version = dictionary.get("_settings", {}).get("_dict_version", "")
     return targets, dictionary_version

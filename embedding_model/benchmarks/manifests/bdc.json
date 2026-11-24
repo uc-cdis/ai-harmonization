@@ -1,6 +1,6 @@
 {
   "benchmark": "bdc",
-  "version": "1",
+  "version": "2",
   "built": "2026-11-24",
   "files": {
     "bdc_mappings.csv": {
@@ -8,8 +8,8 @@
       "sha256": "95e8388fd3722fc611a20ace52e4c8ff01694f73eaa457604060b80ff51ba302"
     },
     "bdc_targets.csv": {
-      "rows": 876,
-      "sha256": "d221f58612122d704b7f1cabd39a2b6347a0d96aaeec1e5a63077dfccfa2e623"
+      "rows": 644,
+      "sha256": "192f6fc0ba18e528598576d199e612b5d68a734c92ff7d58b702bb28fd166ae5"
     }
   },
   "sources": [
@@ -27,7 +27,7 @@
     "studies": 44,
     "studies_without_accession": 3,
     "source_variables": 564,
-    "targets": 876,
+    "targets": 644,
     "mappings_left_out": 0
   }
 }

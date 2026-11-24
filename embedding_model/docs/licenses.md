@@ -87,6 +87,11 @@ Cao, Clark and Dou, and `CC-BY-NC-ND-4.0` for the other seven.
 with its [SHA-256](https://doi.org/10.6028/NIST.FIPS.180-4), and its
 article's DOI.
 
+### BDC
+
+The BDC benchmark is in preparation for publication. Its license and
+reference come with its publication.
+
 ## Sources of training data
 
 Every source is free to use, under the license or terms below.

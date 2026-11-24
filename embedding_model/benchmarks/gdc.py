@@ -24,6 +24,7 @@ from ai_harmonization.dbgap import resolve_variable_type
 from ai_harmonization.formatters import VALUE_SEPARATOR
 from ai_harmonization.simple_data_model import SimpleDataModel
 from embedding_model import manifests
+from embedding_model.benchmarks.common import target_row
 from embedding_model.download import cached, github_archive
 from embedding_model.manifests import sha256
 
@@ -157,19 +158,7 @@ def dictionary_targets(dictionary):
         for prop in node.properties:
             if prop.name in bookkeeping or "anyOf" in schema["properties"][prop.name]:
                 continue
-            declared = prop.type
-            if isinstance(declared, list):
-                declared = "/".join(str(kind) for kind in declared if kind != "null")
-            targets.append(
-                {
-                    "target_property": f"{node.name}.{prop.name}",
-                    "target_type": str(declared),
-                    "target_description": prop.description,
-                    "target_values": VALUE_SEPARATOR.join(
-                        str(value) for value in prop.values or []
-                    ),
-                }
-            )
+            targets.append(target_row(node.name, prop))
     targets.sort(key=lambda row: row["target_property"])
     return targets
 

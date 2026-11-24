@@ -26,7 +26,7 @@ from pathlib import Path
 import pandas as pd
 
 from embedding_model import manifests
-from embedding_model.benchmarks import gdc, topmed
+from embedding_model.benchmarks import bdc, gdc, topmed
 from embedding_model.manifests import sha256
 
 MAPPING_COLUMNS = [
@@ -47,9 +47,9 @@ TARGET_COLUMNS = [
 ]
 TARGET_SEPARATOR = ";"
 MANIFESTS = Path(__file__).resolve().parent / "manifests"
-BUILDERS = {"topmed": topmed, "gdc": gdc}
+BUILDERS = {"topmed": topmed, "gdc": gdc, "bdc": bdc}
 # Each benchmark's name as its publishers write it, for figures and reports.
-TITLES = {"topmed": "TOPMed", "gdc": "GDC"}
+TITLES = {"topmed": "TOPMed", "gdc": "GDC", "bdc": "BDC"}
 
 
 def write_benchmark(directory, name, version, targets, mappings, sources, counts):

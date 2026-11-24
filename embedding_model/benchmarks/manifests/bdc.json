@@ -1,0 +1,33 @@
+{
+  "benchmark": "bdc",
+  "version": "1",
+  "built": "2026-11-24",
+  "files": {
+    "bdc_mappings.csv": {
+      "rows": 564,
+      "sha256": "95e8388fd3722fc611a20ace52e4c8ff01694f73eaa457604060b80ff51ba302"
+    },
+    "bdc_targets.csv": {
+      "rows": 876,
+      "sha256": "d221f58612122d704b7f1cabd39a2b6347a0d96aaeec1e5a63077dfccfa2e623"
+    }
+  },
+  "sources": [
+    {
+      "role": "mappings and targets",
+      "name": "BDC Gen3 harmonization benchmark",
+      "location": "harmonization_benchmark_bdc_gen3_v2.0_2026-11-11.tar.gz",
+      "version": "2.0",
+      "sha256": "0a6d4fafef9e220460afc6a63779d4e6095a8e312e9269521d41ed40761f3fc3",
+      "license": "NONE",
+      "citation": "embedding_model/docs/licenses.md#bdc"
+    }
+  ],
+  "counts": {
+    "studies": 44,
+    "studies_without_accession": 3,
+    "source_variables": 564,
+    "targets": 876,
+    "mappings_left_out": 0
+  }
+}

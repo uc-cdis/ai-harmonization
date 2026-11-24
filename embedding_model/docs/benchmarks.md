@@ -7,6 +7,8 @@ variables to data-model properties:
   variables, mapped to TOPMed's harmonized variables
 - [GDC](#gdc): variables of cancer papers, mapped to the GDC data dictionary
 
+Another benchmark, BDC, is in preparation for publication.
+
 A benchmark lists source variables, each with its expected targets: the
 target properties, written `node.property`, that the experts mapped it to.
 `benchmarks build` builds each benchmark on your machine, from its published

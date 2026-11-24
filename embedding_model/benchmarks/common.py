@@ -1,0 +1,33 @@
+"""What the benchmark builders share.
+
+``target_row`` writes a dictionary property as a row of a benchmark's targets,
+the same way for the GDC and the BDC benchmarks.
+"""
+
+from ai_harmonization.formatters import VALUE_SEPARATOR
+
+
+def target_row(node_name, prop):
+    """A dictionary property's row in a benchmark's targets, keyed by ``benchmarks.TARGET_COLUMNS``.
+
+    A type that lists several kinds, for example ``["string", "null"]``, is
+    written as its kinds other than ``null``, joined by ``/``.
+
+    Args:
+        node_name (str): The property's node.
+        prop (Property): The property, as ``SimpleDataModel`` reads it.
+
+    Returns:
+        dict: The target's property key, type, description and values.
+    """
+    target_type = prop.type
+    if isinstance(target_type, list):
+        target_type = "/".join(str(kind) for kind in target_type if kind != "null")
+    return {
+        "target_property": f"{node_name}.{prop.name}",
+        "target_type": str(target_type),
+        "target_description": prop.description,
+        "target_values": VALUE_SEPARATOR.join(
+            str(value) for value in prop.values or []
+        ),
+    }
